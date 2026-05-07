@@ -1,25 +1,82 @@
+# Arquivos compilados
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.bak
+*.swp
+*~ 
+
+# Arquivos de sistema
 .DS_Store
-.cache
-npm-debug.log
 Thumbs.db
-node_modules/
-.build/
-.vscode/extensions/**/out/
-extensions/**/dist/
-/out*/
-/extensions/**/out/
-build/node_modules
-coverage/
-test_data/
-test-results/
-test-results.xml
-vscode.lsif
-vscode.db
-/.profile-oss
-/cli/target
-/cli/openssl
-product.overrides.json
-*.snap.actual
-*.tsbuildinfo
-.vscode-test
-vscode-telemetry-docs/
+ehthumbs.db
+Desktop.ini
+
+# Java
+hs_err_pid*
+replay_pid*
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradlew
+!gradlew.bat
+gradle-app.setting
+**/build/
+
+# IDEs
+# Eclipse
+.settings/
+.metadata/
+*.tmp
+*.bak
+*.swp
+*.class
+*.project
+*.classpath
+*.prefs
+local.properties
+bin/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Outros
+.vscode/

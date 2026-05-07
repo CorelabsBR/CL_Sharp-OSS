@@ -1,0 +1,129 @@
+package br.com.corelabs.npsharpfx.frontend.ui.theme;
+
+/**
+ * Representa uma entrada de tema definida no package.json.
+ *
+ * Essa classe corresponde diretamente à estrutura JSON usada
+ * pelos temas do VSCode.
+ *
+ * Exemplo de entrada no package.json:
+ *
+ * {
+ *   "id": "vscode-dark",
+ *   "label": "VSCode Dark",
+ *   "uiTheme": "vs-dark",
+ *   "path": "vscode-dark.json"
+ * }
+ *
+ * Fluxo do sistema:
+ *
+ * package.json
+ *      ↓
+ * ThemePackageLoader
+ *      ↓
+ * VSCodeThemePackage
+ *      ↓
+ * VSCodeThemeEntry
+ *      ↓
+ * ThemeFileLoader
+ *      ↓
+ * EditorTheme
+ *
+ * Ou seja:
+ * Essa classe contém apenas metadados sobre o tema,
+ * não o conteúdo real das cores.
+ */
+public class VSCodeThemeEntry {
+
+    /**
+     * Identificador único do tema.
+     *
+     * Usado internamente pelo sistema para selecionar temas.
+     *
+     * Exemplo:
+     * "np-dark"
+     * "vscode-dark"
+     */
+    private String id;
+
+    /**
+     * Nome amigável do tema.
+     *
+     * Esse nome normalmente aparece na interface
+     * quando o usuário escolhe um tema.
+     *
+     * Exemplo:
+     * "NP Dark"
+     * "VSCode Dark+"
+     */
+    private String label;
+
+    /**
+     * Tipo de tema da interface.
+     *
+     * Valores usados pelo VSCode:
+     *
+     * "vs"      → tema claro
+     * "vs-dark" → tema escuro
+     *
+     * Isso é usado para decidir cores padrão
+     * da interface e dos ícones.
+     */
+    private String uiTheme;
+
+    /**
+     * Caminho para o arquivo JSON que contém
+     * as cores reais do tema.
+     *
+     * Exemplo:
+     * "themes/vscode-dark.json"
+     */
+    private String path;
+
+    /**
+     * Retorna o ID do tema.
+     */
+    public String getId() {
+        return id;
+    }
+
+    /**
+     * Retorna o nome amigável do tema.
+     */
+    public String getLabel() {
+        return label;
+    }
+
+    /**
+     * Retorna o tipo de UI do tema.
+     */
+    public String getUiTheme() {
+        return uiTheme;
+    }
+
+    /**
+     * Retorna o caminho do arquivo JSON do tema.
+     */
+    public String getPath() {
+        return path;
+    }
+
+    /**
+     * Verifica se o tema é escuro.
+     *
+     * Um tema é considerado escuro se uiTheme == "vs-dark".
+     */
+    public boolean isDark() {
+        return "vs-dark".equalsIgnoreCase(uiTheme);
+    }
+
+    /**
+     * Verifica se o tema é claro.
+     *
+     * Um tema é considerado claro se uiTheme == "vs".
+     */
+    public boolean isLight() {
+        return "vs".equalsIgnoreCase(uiTheme);
+    }
+}
+

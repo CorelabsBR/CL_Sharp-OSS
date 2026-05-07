@@ -1,0 +1,1652 @@
+/* =========================================================
+   GLOBAL / ROOT
+   ========================================================= */
+
+.root,
+.root-pane {
+
+    /* fonte estilo VSCode - UI */
+    -fx-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+
+    /* tamanho padrão confortável */
+    -fx-font-size: 13px;
+
+    /* deixa texto mais respirável */
+    -fx-line-spacing: 2px;
+
+    /* suavização */
+    -fx-font-smoothing-type: lcd;
+
+}
+
+.label {
+    -fx-text-fill: theme-fg;
+}
+
+.wallpaper-layer {
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+/* =========================================================
+   TITLE BAR
+   ========================================================= */
+
+.title-bar {
+    -fx-background-color: theme-titlebar-bg;
+    -fx-border-color: theme-titlebar-border;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 0 0 8;
+}
+
+.title-logo {
+    -fx-text-fill: theme-titlebar-fg;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.title-menu {
+    -fx-text-fill: theme-titlebar-fg;
+    -fx-font-size: 10px;
+    -fx-padding: 8 10 8 10;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+}
+
+.title-menu:hover {
+    -fx-background-color: theme-highlight;
+}
+
+.title-toolbar-button {
+    -fx-text-fill: theme-titlebar-fg;
+    -fx-font-size: 11px;
+    -fx-padding: 6 9 6 9;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+}
+
+.title-toolbar-button:hover {
+    -fx-background-color: theme-highlight;
+}
+
+.command-bar {
+    -fx-background-color: theme-input-bg;
+    -fx-text-fill: theme-input-fg;
+    -fx-prompt-text-fill: theme-input-bg;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-padding: 3 10 3 10;
+    -fx-font-size: 12px;
+}
+
+.command-bar:focused {
+    -fx-border-color: theme-accent;
+    -fx-background-color: theme-highlight;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.window-button {
+    -fx-text-fill: theme-titlebar-fg;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-min-width: 46px;
+    -fx-pref-width: 46px;
+    -fx-max-width: 46px;
+    -fx-background-radius: 0;
+}
+
+.window-button:hover {
+    -fx-background-color: theme-highlight;
+}
+
+.window-button-close:hover {
+    -fx-background-color: theme-error;
+    -fx-text-fill: theme-list-active-fg;
+}
+
+/* =========================================================
+   ACTIVITY BAR
+   ========================================================= */
+
+.activity-bar {
+    -fx-background-color: theme-activitybar-bg;
+    -fx-border-color: theme-border;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 4 0 4 0;
+    -fx-spacing: 0;
+    -fx-alignment: top-center;
+    -fx-min-width: 48px;
+    -fx-pref-width: 48px;
+    -fx-max-width: 48px;
+}
+
+.activity-icon {
+    -fx-min-width: 48px;
+    -fx-pref-width: 48px;
+    -fx-max-width: 48px;
+    -fx-min-height: 48px;
+    -fx-pref-height: 48px;
+    -fx-max-height: 48px;
+    -fx-padding: 0;
+    -fx-alignment: center;
+    -fx-content-display: graphic-only;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 0 2;
+}
+
+.activity-icon:hover {
+    -fx-background-color: theme-highlight;
+}
+
+.activity-icon:pressed {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.activity-icon.active {
+    -fx-background-color: theme-highlight;
+    -fx-border-color: theme-activitybar-active;
+}
+
+.activity-icon .image-view {
+    -fx-opacity: 0.72;
+}
+
+.activity-icon:hover .image-view {
+    -fx-opacity: 0.92;
+}
+
+.activity-icon.active .image-view {
+    -fx-opacity: 1;
+}
+
+/* =========================================================
+   SIDE PANEL / LEFT SIDEBAR
+   ========================================================= */
+
+.left-sidebar-area {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.side-panel-host {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-border-color: theme-sidebar-border;
+    -fx-border-width: 0 1 0 0;
+    -fx-min-width: 260px;
+    -fx-pref-width: 300px;
+    -fx-max-width: 420px;
+}
+
+.side-panel {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+
+.side-panel-header {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-border-color: theme-border;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 8 0 12;
+    -fx-alignment: center-left;
+    -fx-min-height: 35px;
+    -fx-pref-height: 35px;
+    -fx-max-height: 35px;
+}
+
+.panel-title {
+    -fx-text-fill: theme-sidebar-fg;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 0;
+}
+
+.panel-section-title {
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 10 14 6 14;
+}
+
+.side-panel-collapse-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 4;
+    -fx-cursor: hand;
+    -fx-min-width: 26px;
+    -fx-pref-width: 26px;
+    -fx-max-width: 26px;
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
+    -fx-max-height: 26px;
+}
+
+.side-panel-collapse-button:hover {
+    -fx-background-color: theme-highlight;
+}
+
+.side-panel-collapse-button:pressed {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+/* =========================================================
+   FILE TREE / EXPLORER
+   ========================================================= */
+
+.explorer-pane {
+    -fx-background-color: transparent;
+}
+
+.file-tree {
+    -fx-background-color: transparent;
+    -fx-control-inner-background: transparent;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+}
+
+.file-tree:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.file-tree .virtual-flow,
+.file-tree .clipped-container,
+.file-tree .sheet {
+    -fx-background-color: transparent;
+}
+
+.file-tree .tree-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: theme-sidebar-fg;
+    -fx-font-size: 13px;
+    -fx-padding: 0 8 0 8;
+    -fx-background-radius: 0;
+    -fx-graphic-text-gap: 6;
+    -fx-alignment: center-left;
+    -fx-indent: 10;
+    -fx-cell-size: 24px;
+}
+
+.file-tree .tree-cell:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.file-tree .tree-cell:selected,
+.file-tree .tree-cell:filled:selected,
+.file-tree .tree-cell:filled:selected:focused {
+    -fx-background-color: theme-list-active-bg;
+    -fx-text-fill: theme-list-active-fg;
+}
+
+.file-tree .tree-cell .image-view {
+    -fx-opacity: 1;
+}
+
+.file-tree .tree-disclosure-node {
+    -fx-padding: 0 2 0 0;
+}
+
+.file-tree .tree-disclosure-node .arrow {
+    -fx-background-color: theme-sidebar-fg;
+}
+
+/* =========================================================
+   CENTER / EDITOR AREA
+   ========================================================= */
+
+.center-area {
+    -fx-background-color: transparent;
+}
+
+.editor-area {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+/* =========================================================
+   TABPANE
+   ========================================================= */
+
+.editor-tabs {
+    -fx-background-color: theme-bg;
+    -fx-tab-min-height: 35px;
+    -fx-tab-max-height: 35px;
+    -fx-open-tab-animation: NONE;
+    -fx-close-tab-animation: NONE;
+}
+
+.editor-tabs .tab-header-area {
+    -fx-background-color: theme-bg;
+    -fx-padding: 0;
+}
+
+.editor-tabs .tab-header-background {
+    -fx-background-color: theme-bg;
+    -fx-border-color: theme-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.editor-tabs .headers-region {
+    -fx-background-color: theme-bg;
+}
+
+.editor-tabs .tab {
+    -fx-background-color: theme-tab-inactive-bg;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent theme-tab-border transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 7 14 7 14;
+}
+
+.editor-tabs .tab:hover {
+    -fx-background-color: theme-tab-hover-bg;
+}
+
+.editor-tabs .tab:selected {
+    -fx-background-color: theme-tab-active-bg;
+    -fx-border-color: theme-tab-active-top theme-tab-border transparent transparent;
+    -fx-border-width: 1 1 0 0;
+}
+
+.editor-tabs .tab-label {
+    -fx-text-fill: theme-tab-inactive-fg;
+    -fx-font-size: 13px;
+    -fx-padding: 0 6 0 0;
+}
+
+.editor-tabs .tab:selected .tab-label {
+    -fx-text-fill: theme-tab-active-fg;
+}
+
+.editor-tabs .tab-close-button {
+    -fx-background-color: transparent;
+    -fx-shape: "M 0 0 L 7 7 M 7 0 L 0 7";
+    -fx-scale-x: 0.8;
+    -fx-scale-y: 0.8;
+    -fx-padding: 4;
+    -fx-opacity: 0.75;
+}
+
+.editor-tabs .tab-close-button:hover {
+    -fx-background-color: theme-highlight;
+    -fx-background-radius: 4;
+    -fx-opacity: 1;
+}
+
+.editor-tabs .tab-down-button {
+    -fx-background-color: transparent;
+}
+
+.editor-tabs .arrow {
+    -fx-background-color: theme-fg;
+}
+
+/* =========================================================
+   TEXT AREA / EDITOR (RichTextFX CodeArea)
+   ========================================================= */
+
+.editor-textarea {
+    -fx-background-color: theme-bg;
+    -fx-text-fill: theme-fg;
+    -fx-highlight-fill: theme-selection-bg;
+    -fx-highlight-text-fill: theme-list-active-fg;
+    -fx-font-family: "Cascadia Code", "Jetbrains Mono", "Courier New", monospace;
+    -fx-font-size: 14px;
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-padding: 0;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.styled-text-area {
+    -fx-background-color: theme-bg;
+}
+
+.editor-textarea .paragraph-box {
+    -fx-background-color: theme-bg;
+    -fx-padding: 0 0 0 14;
+}
+
+.editor-textarea .paragraph-box:has-caret {
+    -fx-background-color: theme-highlight;
+}
+
+.editor-textarea .paragraph-text {
+    -fx-fill: theme-fg;
+    -fx-font-family: "Cascadia Code", "Jetbrains Mono", "Courier New", monospace;
+    -fx-font-size: 14px;
+}
+
+.editor-textarea .caret {
+    -fx-stroke: theme-fg;
+}
+
+.editor-textarea .selection {
+    -fx-fill: theme-selection-bg;
+}
+
+.editor-textarea:focused {
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.editor-textarea .scroll-bar {
+    -fx-background-color: theme-bg;
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+
+.button {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-color: transparent;
+    -fx-padding: 5 12 5 12;
+}
+
+.button:hover {
+    -fx-background-color: transparent;
+}
+
+.button:pressed {
+    -fx-background-color: transparent;
+}
+
+.button-primary {
+    -fx-background-color: theme-brand;
+    -fx-text-fill: theme-bg;
+    -fx-font-weight: bold;
+}
+
+.button-primary:hover {
+    -fx-background-color: theme-brand-hover;
+}
+
+/* =========================================================
+   WELCOME SCREEN
+   ========================================================= */
+
+.welcome-pane {
+    -fx-background-color: theme-bg;
+    -fx-padding: 60 40 60 40;
+    -fx-alignment: center;
+    -fx-spacing: 12;
+}
+
+.welcome-logo {
+    -fx-text-fill: theme-bg;
+    -fx-font-size: 48px;
+    -fx-font-weight: bold;
+    -fx-background-color: theme-brand;
+    -fx-background-radius: 10;
+    -fx-padding: 12 22 12 22;
+}
+
+.welcome-title {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+.welcome-subtitle {
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 13px;
+    -fx-padding: 0 0 20 0;
+}
+
+.welcome-action {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 13px;
+    -fx-background-color: theme-highlight;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-padding: 8 16 8 16;
+    -fx-cursor: hand;
+}
+
+.welcome-action:hover {
+    -fx-background-color: theme-input-bg;
+    -fx-border-color: theme-accent;
+}
+
+.welcome-hint {
+    -fx-text-fill: theme-tab-inactive-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 14 0 0 0;
+}
+
+/* =========================================================
+   STATUS BAR
+   ========================================================= */
+
+.status-bar {
+    -fx-background-color: theme-statusbar-bg;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0 10 0 10;
+    -fx-alignment: center-left;
+    -fx-spacing: 8;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+    -fx-max-height: 22px;
+}
+
+.status-label {
+    -fx-text-fill: theme-statusbar-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 0 6 0 6;
+    -fx-background-radius: 3;
+}
+
+.status-label:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 10px;
+    -fx-pref-height: 10px;
+}
+
+.scroll-bar .track {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-background-radius: 999;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+    -fx-background-radius: 999;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.28);
+}
+
+.increment-button,
+.decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+}
+
+.increment-arrow,
+.decrement-arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+/* =========================================================
+   SETTINGS / THEMES
+   ========================================================= */
+
+.settings-panel-content,
+.theme-chooser-content {
+    -fx-background-color: transparent;
+    -fx-padding: 8;
+    -fx-spacing: 6;
+}
+
+.settings-scroll,
+.theme-chooser-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.settings-scroll > .viewport,
+.theme-chooser-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.settings-scroll > .corner,
+.theme-chooser-scroll > .corner {
+    -fx-background-color: transparent;
+}
+
+.settings-menu-item {
+    -fx-background-color: transparent;
+    -fx-text-fill: theme-fg;
+    -fx-alignment: center-left;
+    -fx-content-display: graphic-only;
+    -fx-padding: 0 12 0 12;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+    -fx-graphic-text-gap: 8;
+    -fx-min-height: 30px;
+    -fx-pref-height: 30px;
+}
+
+.settings-menu-item:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.settings-menu-item:pressed {
+    -fx-background-color: theme-list-active-bg;
+}
+
+.settings-menu-text {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 13px;
+}
+
+.settings-menu-shortcut {
+    -fx-text-fill: theme-tab-inactive-fg;
+    -fx-font-size: 12px;
+}
+
+.settings-panel-content .separator .line {
+    -fx-border-color: theme-border;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* =========================================================
+   CONTEXT MENU
+   ========================================================= */
+
+.context-menu {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-background-radius: 5;
+    -fx-border-color: theme-border;
+    -fx-border-radius: 5;
+    -fx-padding: 4 0 4 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 8, 0, 0, 2);
+}
+
+.context-menu-row {
+    -fx-background-radius: 0;
+    -fx-padding: 4 8 4 8;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+}
+
+.context-menu-row:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.context-menu-item {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 13px;
+}
+
+.context-menu-shortcut {
+    -fx-text-fill: theme-tab-inactive-fg;
+    -fx-font-size: 12px;
+}
+
+.codicon-svg {
+    -fx-fill: theme-fg;
+}
+/* =========================================================
+   ICON SIZE FIX
+   ========================================================= */
+
+.titlebar-icon {
+    -fx-scale-x: 0.75;
+    -fx-scale-y: 0.75;
+}
+
+/* =========================================================
+   WALLPAPER & THEMES
+   ========================================================= */
+
+.wallpaper-actions-box {
+    -fx-background-color: transparent;
+    -fx-padding: 8;
+    -fx-spacing: 6;
+}
+
+.wallpaper-preview-box {
+    -fx-background-color: rgba(0, 0, 0, 0.18);
+    -fx-border-color: theme-border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10;
+}
+
+.wallpaper-meta-text {
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 12px;
+}
+
+.wallpaper-section-title {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.wallpaper-action-button {
+    -fx-background-color: theme-highlight;
+    -fx-text-fill: theme-fg;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: theme-border;
+    -fx-padding: 8 12 8 12;
+}
+
+.wallpaper-action-button:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.wallpaper-action-button:pressed {
+    -fx-background-color: theme-list-active-bg;
+}
+
+/* =========================================================
+   THEME LIST
+   ========================================================= */
+
+.theme-list-scroll {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.theme-list-scroll > .viewport {
+    -fx-background-color: theme-bg;
+}
+
+.theme-list-scroll > .corner {
+    -fx-background-color: theme-bg;
+}
+
+.theme-list-containers {
+    -fx-background-color: theme-bg;
+    -fx-padding: 8;
+    -fx-spacing: 6;
+}
+
+.theme-list-item {
+    -fx-background-color: theme-highlight;
+    -fx-text-fill: theme-fg;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-padding: 8 12 8 12;
+    -fx-cursor: hand;
+    -fx-alignment: center-left;
+    -fx-max-width: Infinity;
+}
+
+.theme-list-item:hover {
+    -fx-background-color: theme-list-hover-bg;
+    -fx-border-color: theme-tab-inactive-fg;
+}
+
+.theme-list-item:pressed {
+    -fx-background-color: theme-list-active-bg;
+}
+
+.theme-list-item-active {
+    -fx-background-color: theme-list-active-bg;
+    -fx-border-color: theme-accent;
+    -fx-text-fill: theme-list-active-fg;
+}
+
+.theme-list-item .text {
+    -fx-fill: theme-fg;
+}
+
+.theme-list-item-active .text {
+    -fx-fill: theme-list-active-fg;
+}
+
+/* =========================================================
+   THEME MENU IMPROVEMENTS
+   ========================================================= */
+
+.theme-row-container {
+    -fx-background-color: transparent;
+    -fx-padding: 2 0 2 0;
+    -fx-spacing: 0;
+}
+
+.settings-menu-item.theme-active {
+    -fx-background-color: theme-list-active-bg;
+    -fx-text-fill: theme-list-active-fg;
+    -fx-border-color: theme-accent;
+    -fx-border-width: 0 0 0 3;
+}
+
+.settings-menu-item.theme-active:hover {
+    -fx-background-color: theme-selection-bg;
+}
+
+.settings-menu-item.theme-active:pressed {
+    -fx-background-color: theme-highlight;
+}
+
+/* =========================================================
+   THEME CHOOSER
+   ========================================================= */
+
+.theme-chooser-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.theme-chooser-scroll > .viewport {
+    -fx-background-color: theme-bg;
+}
+
+.theme-chooser-scroll > .corner {
+    -fx-background-color: theme-bg;
+}
+
+.theme-chooser-content {
+    -fx-background-color: theme-bg;
+    -fx-padding: 10;
+    -fx-spacing: 6;
+}
+
+/* =========================================================
+   SCROLLBARS FOR PANELS
+   ========================================================= */
+
+.side-panel .scroll-bar:vertical,
+.side-panel .scroll-bar:horizontal,
+.settings-scroll .scroll-bar:vertical,
+.settings-scroll .scroll-bar:horizontal,
+.theme-list-scroll .scroll-bar:vertical,
+.theme-list-scroll .scroll-bar:horizontal,
+.theme-chooser-scroll .scroll-bar:vertical,
+.theme-chooser-scroll .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 10px;
+    -fx-pref-height: 10px;
+}
+
+.side-panel .scroll-bar .track,
+.settings-scroll .scroll-bar .track,
+.theme-list-scroll .scroll-bar .track,
+.theme-chooser-scroll .scroll-bar .track {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-background-radius: 999;
+}
+
+.side-panel .scroll-bar .thumb,
+.settings-scroll .scroll-bar .thumb,
+.theme-list-scroll .scroll-bar .thumb,
+.theme-chooser-scroll .scroll-bar .thumb {
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+    -fx-background-radius: 999;
+}
+
+.side-panel .scroll-bar .thumb:hover,
+.settings-scroll .scroll-bar .thumb:hover,
+.theme-list-scroll .scroll-bar .thumb:hover,
+.theme-chooser-scroll .scroll-bar .thumb:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.28);
+}
+
+.side-panel .increment-button,
+.side-panel .decrement-button,
+.settings-scroll .increment-button,
+.settings-scroll .decrement-button,
+.theme-list-scroll .increment-button,
+.theme-list-scroll .decrement-button,
+.theme-chooser-scroll .increment-button,
+.theme-chooser-scroll .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.side-panel .increment-arrow,
+.side-panel .decrement-arrow,
+.settings-scroll .increment-arrow,
+.settings-scroll .decrement-arrow,
+.theme-list-scroll .increment-arrow,
+.theme-list-scroll .decrement-arrow,
+.theme-chooser-scroll .increment-arrow,
+.theme-chooser-scroll .decrement-arrow {
+    -fx-background-color: transparent;
+}
+
+/* =========================================================
+   SPECIAL ELEMENT PROTECTION
+   ========================================================= */
+
+/* Prevent special buttons from being affected by generic button styles */
+.activity-icon,
+.side-panel-collapse-button,
+.settings-menu-item,
+.window-button {
+    -fx-border-insets: 0;
+    -fx-background-insets: 0;
+}
+
+/* =========================================================
+   SEARCH PANE & COMPONENTS
+   ========================================================= */
+
+.search-pane {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-padding: 10;
+    -fx-spacing: 8;
+}
+
+.search-input {
+    -fx-background-color: theme-input-bg;
+    -fx-text-fill: theme-input-fg;
+    -fx-prompt-text-fill: theme-prompt-fg;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-padding: 6 10 6 10;
+    -fx-font-size: 13px;
+}
+
+.search-input:focused {
+    -fx-border-color: theme-accent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.search-check {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 4;
+}
+
+.search-check:selected {
+    -fx-text-fill: theme-brand;
+}
+
+.search-check .box {
+    -fx-background-color: theme-input-bg;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+}
+
+.search-check:selected .box {
+    -fx-background-color: theme-accent;
+    -fx-border-color: theme-accent;
+}
+
+.search-check:selected .mark {
+    -fx-background-color: theme-bg;
+}
+
+.search-action-button {
+    -fx-background-color: theme-brand;
+    -fx-text-fill: theme-bg;
+    -fx-font-weight: bold;
+    -fx-padding: 6 12 6 12;
+    -fx-background-radius: 2;
+    -fx-cursor: hand;
+}
+
+.search-action-button:hover {
+    -fx-background-color: theme-brand-hover;
+}
+
+.search-action-button:pressed {
+    -fx-background-color: theme-brand;
+}
+
+.search-summary {
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 4 0 4 0;
+}
+
+.search-result-list {
+    -fx-background-color: theme-sidebar-bg;
+    -fx-control-inner-background: transparent;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 2;
+    -fx-padding: 0;
+}
+
+.search-result-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 6;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: theme-list-hover-bg;
+}
+
+.search-result-list .list-cell:selected {
+    -fx-background-color: theme-list-active-bg;
+}
+
+.search-result-list .list-cell:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.search-result-item {
+    -fx-background-color: transparent;
+    -fx-padding: 2;
+}
+
+.search-result-title {
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.search-result-preview {
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 11px;
+    -fx-padding: 2 0 0 0;
+}
+
+/* =========================================================
+   INPUTS / FORMS
+   ========================================================= */
+
+.text-field,
+.text-area {
+    -fx-background-color: theme-input-bg;
+    -fx-text-fill: theme-input-fg;
+    -fx-prompt-text-fill: theme-prompt-fg;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-padding: 4 8 4 8;
+    -fx-font-size: 12px;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-border-color: theme-accent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+/* =========================================================
+   COMBO BOX
+   ========================================================= */
+
+.combo-box {
+    -fx-background-color: theme-input-bg;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-padding: 4 8 4 8;
+}
+
+.combo-box-base .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 6 0 0;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: theme-input-bg;
+    -fx-border-color: theme-input-border;
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-text-fill: theme-fg;
+    -fx-padding: 6 8 6 8;
+}
+
+.combo-box-popup .list-view .list-cell:selected {
+    -fx-background-color: theme-list-active-bg;
+}
+
+.combo-box-popup .list-view .list-cell:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+/* =========================================================
+   CHOICE BOX
+   ========================================================= */
+
+.choice-box {
+    -fx-background-color: theme-input-bg;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-text-fill: theme-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 4 8 4 8;
+}
+
+.choice-box .menu-item:focused {
+    -fx-background-color: theme-list-active-bg;
+}
+
+.choice-box .menu-item {
+    -fx-text-fill: theme-fg;
+}
+
+/* =========================================================
+   SPINNERS & SLIDERS
+   ========================================================= */
+
+.spinner {
+    -fx-background-color: theme-input-bg;
+    -fx-border-color: theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+}
+
+.spinner .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 4;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 4;
+}
+
+.slider {
+    -fx-control-inner-background: theme-input-bg;
+}
+
+.slider .thumb {
+    -fx-background-color: theme-accent;
+}
+
+.slider .track {
+    -fx-background-color: theme-border;
+}
+
+/* =========================================================
+   PROGRESS BAR & INDICATORS
+   ========================================================= */
+
+.progress-bar {
+    -fx-background-color: theme-border;
+    -fx-border-color: transparent;
+    -fx-padding: 2;
+}
+
+.progress-bar .bar {
+    -fx-background-color: theme-brand;
+}
+
+.progress-indicator {
+    -fx-progress-color: theme-brand;
+}
+
+/* =========================================================
+   TABS (Generic)
+   ========================================================= */
+
+.tab-pane {
+    -fx-background-color: theme-bg;
+    -fx-border-color: transparent;
+}
+
+.tab-pane .tab-header-area {
+    -fx-background-color: theme-bg;
+}
+
+/* =========================================================
+   TREE VIEW (Generic)
+   ========================================================= */
+
+.tree-view {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.tree-view:focused {
+    -fx-background-color: transparent;
+}
+
+/* =========================================================
+   LIST VIEW (Generic)
+   ========================================================= */
+
+.list-view {
+    -fx-background-color: transparent;
+    -fx-control-inner-background: transparent;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-padding: 0;
+}
+
+.list-view .list-cell {
+    -fx-text-fill: theme-fg;
+    -fx-padding: 4 8 4 8;
+    -fx-background-color: transparent;
+}
+
+.list-view .list-cell:selected {
+    -fx-background-color: theme-list-active-bg;
+}
+
+.list-view .list-cell:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+/* =========================================================
+   DIALOG & ALERTS
+   ========================================================= */
+
+.dialog-pane {
+    -fx-background-color: theme-bg;
+    -fx-border-color: theme-border;
+}
+
+.dialog-pane:header .header-panel {
+    -fx-background-color: theme-bg;
+}
+
+.dialog-pane:content {
+    -fx-padding: 16;
+}
+
+.dialog-pane .button {
+    -fx-background-color: theme-highlight;
+    -fx-text-fill: theme-fg;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-padding: 6 16 6 16;
+}
+
+.dialog-pane .button:default {
+    -fx-background-color: theme-brand;
+    -fx-text-fill: theme-bg;
+    -fx-font-weight: bold;
+    -fx-border-color: theme-brand;
+}
+
+.dialog-pane .button:hover {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.dialog-pane .button:default:hover {
+    -fx-background-color: theme-brand-hover;
+}
+
+/* =========================================================
+   HYPERLINK
+   ========================================================= */
+
+.hyperlink {
+    -fx-text-fill: theme-brand;
+    -fx-underline: false;
+}
+
+.hyperlink:visited {
+    -fx-text-fill: theme-fg;
+}
+
+.hyperlink:hover {
+    -fx-text-fill: theme-brand-hover;
+    -fx-underline: true;
+}
+
+/* =========================================================
+   SEPARATOR
+   ========================================================= */
+
+.separator {
+    -fx-border-color: theme-border;
+}
+
+.separator .line {
+    -fx-border-color: theme-border;
+}
+
+/* =========================================================
+   TITLED PANE
+   ========================================================= */
+
+.titled-pane {
+    -fx-text-fill: theme-fg;
+    -fx-border-color: theme-border;
+    -fx-background-color: theme-highlight;
+}
+
+.titled-pane:expanded .title {
+    -fx-background-color: theme-input-bg;
+}
+
+.titled-pane .title {
+    -fx-background-color: theme-input-bg;
+    -fx-padding: 8;
+}
+
+.titled-pane .content {
+    -fx-padding: 12;
+    -fx-background-color: transparent;
+}
+
+/* =========================================================
+   SCROLLBARS FOR PANELS (ENHANCED)
+   ========================================================= */
+
+.side-panel .scroll-bar:vertical,
+.side-panel .scroll-bar:horizontal,
+.settings-scroll .scroll-bar:vertical,
+.settings-scroll .scroll-bar:horizontal,
+.theme-list-scroll .scroll-bar:vertical,
+.theme-list-scroll .scroll-bar:horizontal,
+.theme-chooser-scroll .scroll-bar:vertical,
+.theme-chooser-scroll .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 10px;
+    -fx-pref-height: 10px;
+}
+
+.side-panel .scroll-bar .track,
+.settings-scroll .scroll-bar .track,
+.theme-list-scroll .scroll-bar .track,
+.theme-chooser-scroll .scroll-bar .track {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-background-radius: 999;
+}
+
+.side-panel .scroll-bar .thumb,
+.settings-scroll .scroll-bar .thumb,
+.theme-list-scroll .scroll-bar .thumb,
+.theme-chooser-scroll .scroll-bar .thumb {
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+    -fx-background-radius: 999;
+}
+
+.side-panel .scroll-bar .thumb:hover,
+.settings-scroll .scroll-bar .thumb:hover,
+.theme-list-scroll .scroll-bar .thumb:hover,
+.theme-chooser-scroll .scroll-bar .thumb:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.28);
+}
+
+.side-panel .increment-button,
+.side-panel .decrement-button,
+.settings-scroll .increment-button,
+.settings-scroll .decrement-button,
+.theme-list-scroll .increment-button,
+.theme-list-scroll .decrement-button,
+.theme-chooser-scroll .increment-button,
+.theme-chooser-scroll .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.side-panel .increment-arrow,
+.side-panel .decrement-arrow,
+.settings-scroll .increment-arrow,
+.settings-scroll .decrement-arrow,
+.theme-list-scroll .increment-arrow,
+.theme-list-scroll .decrement-arrow,
+.theme-chooser-scroll .increment-arrow,
+.theme-chooser-scroll .decrement-arrow {
+    -fx-background-color: transparent;
+}
+
+.integrated-terminal {
+    -fx-background-color: theme-terminal-bg;
+    -fx-border-color: theme-panel-border;
+    -fx-border-width: 1 0 0 0;
+}
+
+.integrated-terminal-header {
+    -fx-background-color: theme-terminal-bg;
+    -fx-border-color: theme-panel-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.integrated-terminal-title {
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.terminal-session {
+    -fx-background-color: theme-terminal-bg;
+}
+
+.terminal-output {
+    -fx-control-inner-background: theme-terminal-bg;
+    -fx-background-color: theme-terminal-bg;
+    -fx-text-fill: theme-terminal-fg;
+    -fx-highlight-fill: theme-selection-bg;
+    -fx-highlight-text-fill: white;
+    -fx-font-family: "Cascadia Code", "Consolas", "JetBrains Mono", monospace;
+    -fx-font-size: 13px;
+    -fx-border-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.terminal-input {
+    -fx-background-color: theme-input-bg;
+    -fx-text-fill: theme-terminal-fg;
+    -fx-prompt-text-fill: theme-tab-inactive-fg;
+    -fx-font-family: "Cascadia Code", "Consolas", "JetBrains Mono", monospace;
+    -fx-font-size: 13px;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: theme-input-border;
+}
+
+.integrated-terminal .tab-pane,
+.integrated-terminal .tab-header-area,
+.integrated-terminal .tab-header-background {
+    -fx-background-color: theme-terminal-bg;
+}
+
+.integrated-terminal .tab {
+    -fx-background-color: theme-highlight;
+}
+
+.integrated-terminal .tab:selected {
+    -fx-background-color: theme-list-hover-bg;
+}
+
+.integrated-terminal .tab-label {
+    -fx-text-fill: theme-terminal-fg;
+}
+
+/* =========================================================
+   TERMINAL CONTROLS IMPROVEMENTS
+   ========================================================= */
+
+.terminal-control-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: theme-description-fg;
+    -fx-font-size: 14px;
+    -fx-padding: 4 8 4 8;
+    -fx-cursor: hand;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-color: transparent;
+}
+
+.terminal-control-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-text-fill: theme-fg;
+}
+
+.terminal-control-button:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
+.terminal-resize-handle {
+    -fx-background-color: transparent;
+    -fx-border-color: theme-panel-border;
+    -fx-border-width: 1 0 0 0;
+    -fx-pref-height: 4;
+}
+
+.terminal-resize-handle:hover {
+    -fx-border-color: theme-accent;
+    -fx-background-color: rgba(54, 136, 200, 0.1);
+}
+
+/* =========================================================
+   SEARCH SCOPE TOOLBAR
+   ========================================================= */
+
+.search-scope-toolbar {
+    -fx-background-color: theme-input-bg;
+    -fx-padding: 6 10 6 10;
+    -fx-border-radius: 4;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-spacing: 4;
+}
+
+.search-scope-button {
+    -fx-text-fill: theme-tab-inactive-fg;
+    -fx-background-color: theme-highlight;
+    -fx-border-color: theme-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-padding: 4 12 4 12;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+
+.search-scope-button:hover {
+    -fx-background-color: theme-list-hover-bg;
+    -fx-border-color: theme-tab-inactive-fg;
+}
+
+.search-scope-button:selected {
+    -fx-background-color: theme-list-active-bg;
+    -fx-text-fill: theme-list-active-fg;
+    -fx-border-color: theme-accent;
+}
+
+.search-scope-button:selected:hover {
+    -fx-background-color: theme-selection-bg;
+}
+
+/* =========================================================
+   SYNTAX HIGHLIGHTING (RichTextFX CodeArea)
+   ========================================================= */
+
+.editor-textarea .syntax-default {
+    -fx-fill: theme-fg;
+}
+
+.editor-textarea .syntax-keyword {
+    -fx-fill: theme-accent;
+    -fx-font-weight: bold;
+}
+
+.editor-textarea .syntax-type {
+    -fx-fill: theme-brand;
+}
+
+.editor-textarea .syntax-string {
+    -fx-fill: #CE9178;
+}
+
+.editor-textarea .syntax-number {
+    -fx-fill: #B5CEA8;
+}
+
+.editor-textarea .syntax-comment {
+    -fx-fill: theme-prompt-fg;
+    -fx-font-style: italic;
+}
+
+.editor-textarea .syntax-annotation {
+    -fx-fill: theme-brand;
+}
+
+/* === EASTER EGG: Nomes especiais (brand highlights) === */
+
+.editor-textarea .syntax-brand-corelabs {
+    -fx-fill: #FF8C00;
+    -fx-font-weight: bold;
+}
+
+.editor-textarea .syntax-brand-girelli {
+    -fx-fill: #FF4444;
+    -fx-font-weight: bold;
+}
+
+.editor-textarea .syntax-brand-arcari {
+    -fx-fill: #44CC44;
+    -fx-font-weight: bold;
+}
+
+/* Descomente e troque a cor / nome que quiser */
+/*
+.syntax-brand-reserved {
+    -fx-fill: #FF69B4;
+    -fx-font-weight: bold;
+}
+*/
+
+/* =========================================================
+   WALLPAPER ACTIVE (transparência no editor quando há wallpaper)
+   ========================================================= */
+
+.wallpaper-active .editor-textarea {
+    -fx-background-color: rgba(0, 0, 0, 0.3);
+}
+
+.wallpaper-active .editor-textarea .paragraph-box {
+    -fx-background-color: transparent;
+}
+
+.wallpaper-active .editor-textarea .paragraph-box:has-caret {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+}
+
+.wallpaper-active .editor-textarea .scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.wallpaper-active .editor-tabs {
+    -fx-background-color: rgba(0, 0, 0, 0.4);
+}
+
+.wallpaper-active .editor-tabs .tab-header-background {
+    -fx-background-color: rgba(0, 0, 0, 0.4);
+}
+
+.wallpaper-active .editor-tabs .tab:selected {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+}
+
+.wallpaper-active .welcome-pane {
+    -fx-background-color: transparent;
+}
