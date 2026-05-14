@@ -98,6 +98,7 @@ public class TitleBar extends HBox {
 
     private Consumer<String> statusUpdater;
     private java.util.function.Supplier<String> menuStyleSupplier;
+    private final PortugolInterpreter portugolInterpreter = new PortugolInterpreter();
 
     public TitleBar(Stage stage, EditorManager editorManager) {
         this.stage = Objects.requireNonNull(stage);
@@ -584,8 +585,35 @@ public class TitleBar extends HBox {
         );
         showMenuBelow(goMenu, menu);
     }
-    private final PortugolInterpreter portugolInterpreter = new PortugolInterpreter();
-    
+    private void runCurrentFile() {
+    File currentFile = editorManager.getCurrentFile();
+
+    if (currentFile == null) {
+        updateStatus("Nenhum arquivo aberto");
+        return;
+    }
+
+    if (!currentFile.getName().toLowerCase().endsWith(".gol")) {
+        updateStatus("Por enquanto o Run executa apenas arquivos .gol");
+        return;
+    }
+
+    String source = editorManager.getCurrentEditorText();
+
+    if (source == null || source.isBlank()) {
+        updateStatus("Arquivo .gol vazio");
+        return;
+    }
+
+    try {
+        updateStatus("Executando Portugol...");
+        portugolInterpreter.execute(source);
+        updateStatus("Programa finalizado");
+    } catch (Exception e) {
+        e.printStackTrace();
+        updateStatus("Erro ao executar: " + e.getMessage());
+    }
+}
     private void openMoreMenu() {
         VBox menu = createMenuBox();
 
