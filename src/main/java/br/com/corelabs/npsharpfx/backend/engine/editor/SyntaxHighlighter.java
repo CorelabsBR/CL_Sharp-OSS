@@ -137,6 +137,29 @@ public class SyntaxHighlighter {
     private static final String JSON_NUMBER = "-?\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b";
     private static final String JSON_BOOLEAN = "\\b(true|false|null)\\b";
 
+
+private static final String PORTUGOL_PATTERN =
+
+        "\\b(?i)(ALGORITMO|VAR|INICIO|FIMALGORITMO|"
+                + "INTEIRO|REAL|LOGICO|CARACTERE|LITERAL|"
+                + "LEIA|ESCREVA|ESCREVAL|"
+                + "SE|ENTAO|SENAO|FIMSE|"
+                + "ENQUANTO|FACA|FIMENQUANTO|"
+                + "PARA|DE|ATE|PASSO|FIMPARA|"
+                + "REPITA|"
+                + "ESCOLHA|CASO|FIMESCOLHA|"
+                + "PROCEDIMENTO|FIMPROCEDIMENTO|"
+                + "FUNCAO|FIMFUNCAO|RETORNE|"
+                + "E|OU|NAO|"
+                + "VERDADEIRO|FALSO)\\b";
+
+private static final String PORTUGOL_OPERATOR_PATTERN =
+
+        "(<-|>=|<=|<>|=|>|<|\\+|-|\\*|/|%)";
+private static final String PORTUGOL_BOOLEAN_PATTERN =
+
+        "\\b(?i)(VERDADEIRO|FALSO)\\b";
+        
     // === SQL ===
     private static final String SQL_KEYWORDS =
             "\\b(?i)(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|DROP|ALTER|"

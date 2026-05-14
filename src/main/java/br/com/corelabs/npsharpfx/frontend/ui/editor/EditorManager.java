@@ -97,6 +97,7 @@ public class EditorManager {
 
     // caminho absoluto do arquivo -> aba aberta
     private final Map<String, Tab> openTabs = new HashMap<>();
+    
 
     // aba -> arquivo associado
     private final Map<Tab, File> tabFiles = new HashMap<>();
@@ -159,6 +160,30 @@ public class EditorManager {
         updateWelcomeVisibility();
     }
 
+    public String getCurrentEditorText() {
+    Tab tab = tabPane.getSelectionModel().getSelectedItem();
+
+    if (tab == null) {
+        return "";
+    }
+
+    CodeArea editor = tabEditors.get(tab);
+
+    if (editor == null) {
+        return "";
+    }
+
+    return editor.getText();
+}
+public File getCurrentFile() {
+    Tab tab = tabPane.getSelectionModel().getSelectedItem();
+
+    if (tab == null) {
+        return null;
+    }
+
+    return tabFiles.get(tab);
+}
     /* =========================================
        RETORNA VIEW PRINCIPAL DO EDITOR
     ========================================= */
@@ -1255,6 +1280,13 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
        - nome
        - salvo/modificado
     ========================================= */
+    public List<File> getOpenFiles() {
+    return tabFiles.values()
+            .stream()
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+}
 
     private void refreshStatusFromSelectedTab() {
         Tab selectedTab = tabPane.getSelectionModel().getSelectedItem();
@@ -1386,6 +1418,8 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
             case "cs" -> "C#";
 
             case "py" -> "Python";
+
+            case "gol" -> "Portugol";
 
             case "php" -> "PHP";
 

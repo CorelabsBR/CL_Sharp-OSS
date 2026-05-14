@@ -4,7 +4,10 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
+import java.util.Arrays;
+import java.util.prefs.Preferences;
 
+import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
@@ -78,6 +81,12 @@ public class MainWindow {
     private FileExplorerPane explorerPane;
     private SearchPane searchPane;
 
+    private static final String PREF_WORKSPACE = "workspace";
+    private static final String PREF_OPEN_FILES = "openFiles";
+
+    private final Preferences prefs =
+        Preferences.userNodeForPackage(MainWindow.class);
+
     // Activity items storage
     private final java.util.Map<String, ActivityItem> activityItems = new java.util.LinkedHashMap<>();
 
@@ -95,6 +104,50 @@ public class MainWindow {
         configureStage();
     }
 
+    private void saveSession() {
+    File workspace = explorerPane.getCurrentRootFolder();
+
+    if (workspace != null && workspace.exists() && workspace.isDirectory()) {
+        prefs.put(PREF_WORKSPACE, workspace.getAbsolutePath());
+    } else {
+        prefs.remove(PREF_WORKSPACE);
+    }
+
+    String openFiles = editorManager.getOpenFiles()
+            .stream()
+            .filter(File::exists)
+            .filter(File::isFile)
+            .map(File::getAbsolutePath)
+            .reduce((a, b) -> a + File.pathSeparator + b)
+            .orElse("");
+
+    prefs.put(PREF_OPEN_FILES, openFiles);
+}
+
+private void restoreSession() {
+    String workspacePath = prefs.get(PREF_WORKSPACE, "");
+
+    if (!workspacePath.isBlank()) {
+        File workspace = new File(workspacePath);
+
+        if (workspace.exists() && workspace.isDirectory()) {
+            explorerPane.openFolder(workspace);
+            searchPane.setWorkspaceRoot(workspace);
+            statusBarManager.updateStatusLeft("Workspace restaurado: " + workspace.getName());
+        }
+    }
+
+    String openFilesRaw = prefs.get(PREF_OPEN_FILES, "");
+
+    if (!openFilesRaw.isBlank()) {
+        Arrays.stream(openFilesRaw.split(java.util.regex.Pattern.quote(File.pathSeparator)))
+                .map(File::new)
+                .filter(File::exists)
+                .filter(File::isFile)
+                .forEach(editorManager::openFileInTab);
+    }
+}
+
     public void show() {
         stage.show();
     }
@@ -108,7 +161,61 @@ public class MainWindow {
         configureShortcuts();
         restoreDefaultLayout();
         themeManager.applyTheme(wallpaperLayer, wallpaperOverlay, appRoot);
+        restoreSession();
+        stage.setOnCloseRequest(event -> saveSession());
     }
+    private void flushPrefs() {
+    try {
+        prefs.flush();
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+
+private final PortugolInterpreter portugolInterpreter =
+        new PortugolInterpreter();
+
+    private void setWorkspaceAndPersist(File workspace) {
+    searchPane.setWorkspaceRoot(workspace);
+
+    if (workspace != null && workspace.exists() && workspace.isDirectory()) {
+        prefs.put(PREF_WORKSPACE, workspace.getAbsolutePath());
+        flushPrefs();
+        statusBarManager.updateStatusLeft("Workspace salvo: " + workspace.getName());
+    }
+}
+    
+private void runCurrentPortugolFile() {
+
+    String source =
+            editorManager.getCurrentEditorText();
+
+    if (source == null || source.isBlank()) {
+
+        statusBarManager.updateStatusLeft(
+                "Nenhum codigo para executar"
+        );
+
+        return;
+    }
+
+    try {
+
+        portugolInterpreter.execute(source);
+
+        statusBarManager.updateStatusLeft(
+                "Programa executado"
+        );
+
+    } catch (Exception e) {
+
+        e.printStackTrace();
+
+        statusBarManager.updateStatusLeft(
+                "Erro: " + e.getMessage()
+        );
+    }
+}
 
     private void prepareStage() {
         TitleBar.prepareStage(stage);
@@ -152,7 +259,7 @@ public class MainWindow {
     explorerPane = new FileExplorerPane(
             stage,
             editorManager::openFileInTab,
-            searchPane::setWorkspaceRoot
+            this::setWorkspaceAndPersist
     );
 }
 
@@ -472,15 +579,15 @@ public class MainWindow {
         statusBarManager.updateStatusRight("Explorer");
     }
 
-    private void closeFolderFromExplorer() {
-        try {
-            explorerPane.getClass().getMethod("clear").invoke(explorerPane);
-            statusBarManager.updateStatusLeft("Pasta fechada");
-            statusBarManager.updateStatusRight("Explorer");
-        } catch (ReflectiveOperationException e) {
-            statusBarManager.updateStatusLeft("Fechar pasta ainda nÃƒÂ£o implementado");
-        }
-    }
+private void closeFolderFromExplorer() {
+    explorerPane.clearFolder();
+    searchPane.setWorkspaceRoot(null);
+
+    prefs.remove(PREF_WORKSPACE);
+
+    statusBarManager.updateStatusLeft("Pasta fechada");
+    statusBarManager.updateStatusRight("Explorer");
+}
 
     private void focusEditor() {
         if (editorManager != null && editorManager.getTabPane() != null) {

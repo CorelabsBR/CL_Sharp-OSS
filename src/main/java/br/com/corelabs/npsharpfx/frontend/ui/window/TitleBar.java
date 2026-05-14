@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
 import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeIconHelper;
+import br.com.corelabs.npsharpfx.backend.portugol.runtime.*;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -207,7 +208,7 @@ public class TitleBar extends HBox {
         forwardButton.getStyleClass().add("title-toolbar-button-disabled");
 
         commandBar = new TextField();
-        commandBar.setPromptText("Search files, commands, symbols...");
+        commandBar.setPromptText("NPSharp");
         commandBar.getStyleClass().add("command-bar");
         commandBar.setPrefWidth(420);
         commandBar.setMinWidth(220);
@@ -543,12 +544,12 @@ public class TitleBar extends HBox {
     private void openEditMenu() {
         VBox menu = createMenuBox();
         menu.getChildren().addAll(
-                createMenuItem("Undo", "Ctrl+Z", editorManager::undo),
-                createMenuItem("Redo", "Ctrl+Y", editorManager::redo),
+                createMenuItem("Desfazer", "Ctrl+Z", editorManager::undo),
+                createMenuItem("Refazer", "Ctrl+Y", editorManager::redo),
                 new Separator(),
-                createMenuItem("Copy", "Ctrl+C", editorManager::copy),
-                createMenuItem("Paste", "Ctrl+V", editorManager::paste),
-                createMenuItem("Select All", "Ctrl+A", editorManager::selectAll)
+                createMenuItem("Copiar", "Ctrl+C", editorManager::copy),
+                createMenuItem("Colar", "Ctrl+V", editorManager::paste),
+                createMenuItem("Selecionar Tudo", "Ctrl+A", editorManager::selectAll)
         );
         showMenuBelow(editMenu, menu);
     }
@@ -556,9 +557,9 @@ public class TitleBar extends HBox {
     private void openSelectionMenu() {
         VBox menu = createMenuBox();
         menu.getChildren().addAll(
-                createMenuItem("Select All", "Ctrl+A", editorManager::selectAll),
-                createMenuItem("Duplicate Line", "Shift+Alt+Down", this::duplicateLineSafe),
-                createMenuItem("Delete Line", "Ctrl+Shift+K", this::deleteLineSafe)
+                createMenuItem("Selecionar Tudo", "Ctrl+A", editorManager::selectAll),
+                createMenuItem("Duplicar Linha", "Shift+Alt+Down", this::duplicateLineSafe),
+                createMenuItem("Excluir Linha", "Ctrl+Shift+K", this::deleteLineSafe)
         );
         showMenuBelow(selectionMenu, menu);
     }
@@ -566,10 +567,10 @@ public class TitleBar extends HBox {
     private void openViewMenu() {
         VBox menu = createMenuBox();
         menu.getChildren().addAll(
-                createMenuItem("Command Palette...", "Ctrl+Shift+P", this::openCommandPalette),
+                createMenuItem("Paleta de Comandos", "Ctrl+Shift+P", this::openCommandPalette),
                 createMenuItem("Explorer", "Ctrl+Shift+E", () -> runAction(showExplorerAction, "Explorer")),
-                createMenuItem("Search", "Ctrl+Shift+F", () -> runAction(showSearchAction, "Search")),
-                createMenuItem("Toggle Sidebar", "Ctrl+B", () -> runAction(toggleSidebarAction, "Toggle sidebar"))
+                createMenuItem("Pesquisar", "Ctrl+Shift+F", () -> runAction(showSearchAction, "Search")),
+                createMenuItem("Desativar Barra Lateral", "Ctrl+B", () -> runAction(toggleSidebarAction, "Toggle sidebar"))
         );
         showMenuBelow(viewMenu, menu);
     }
@@ -577,31 +578,32 @@ public class TitleBar extends HBox {
     private void openGoMenu() {
         VBox menu = createMenuBox();
         menu.getChildren().addAll(
-                createMenuItem("Go to File...", "Ctrl+P", this::openCommandPalette),
-                createMenuItem("Go to Symbol...", "Ctrl+Shift+O", this::openCommandPalette),
-                createMenuItem("Go to Line/Column...", "Ctrl+G", this::openCommandPalette)
+                createMenuItem("Ir para Arquivo...", "Ctrl+P", this::openCommandPalette),
+                createMenuItem("Ir para Símbolo...", "Ctrl+Shift+O", this::openCommandPalette),
+                createMenuItem("Ir para Linha/Coluna...", "Ctrl+G", this::openCommandPalette)
         );
         showMenuBelow(goMenu, menu);
     }
-
+    private final PortugolInterpreter portugolInterpreter = new PortugolInterpreter();
+    
     private void openMoreMenu() {
         VBox menu = createMenuBox();
 
-        HBox runRow = createSubmenuItem("Run");
+        HBox runRow = createSubmenuItem("Rodar");
         VBox runMenu = createMenuBox();
         runMenu.getChildren().addAll(
-                createMenuItem("Start Debugging", "F5", () -> updateStatus("Start debugging")),
-                createMenuItem("Run Without Debugging", "Ctrl+F5", () -> updateStatus("Run without debugging")),
-                createMenuItem("Stop", "Shift+F5", () -> updateStatus("Stop debugging"))
+                createMenuItem("Rodar", "F5", this::runCurrentFile),
+                createMenuItem("Rodar sem Debuggar", "Ctrl+F5", () -> updateStatus("Run without debugging")),
+                createMenuItem("Parar", "Shift+F5", () -> updateStatus("Stop debugging"))
         );
         bindSubmenu(runRow, runMenu);
 
         HBox terminalRow = createSubmenuItem("Terminal");
         VBox terminalMenu = createMenuBox();
         terminalMenu.getChildren().addAll(
-                createMenuItem("New Terminal", "Ctrl+Shift+`", () -> runAction(newTerminalAction, "New terminal")),
-                createMenuItem("Split Terminal", "Ctrl+Shift+5", () -> runAction(splitTerminalAction, "Split terminal")),
-                createMenuItem("Kill Terminal", null, () -> runAction(killTerminalAction, "Kill terminal")),
+                createMenuItem("Novo Terminal", "Ctrl+Shift+`", () -> runAction(newTerminalAction, "New terminal")),
+                createMenuItem("Dividir Terminal", "Ctrl+Shift+5", () -> runAction(splitTerminalAction, "Split terminal")),
+                createMenuItem("Matar Terminal", null, () -> runAction(killTerminalAction, "Kill terminal")),
                 new Separator(),
                 createMenuItem("Focus Terminal", null, () -> runAction(focusTerminalAction, "Focus terminal"))
         );
