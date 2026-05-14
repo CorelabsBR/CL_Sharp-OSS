@@ -1,32 +1,35 @@
 package br.com.corelabs.npsharpfx.frontend.ui.search;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import br.com.corelabs.npsharpfx.backend.engine.search.WorkspaceSearchService;
 import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchQuery;
 import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchResult;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 public class SearchPane {
+
+    private static final int MIN_SEARCH_LENGTH = 2;
+    private static final int SEARCH_DELAY_MS = 450;
 
     private final Function<SearchQuery, List<SearchResult>> searchProvider;
     private final Consumer<SearchResult> resultOpener;
@@ -37,12 +40,10 @@ public class SearchPane {
     private final CheckBox wholeWordCheck;
     private final Label resultSummary;
     private final ListView<SearchResult> resultList;
-    
     private final WorkspaceSearchService workspaceSearchService;
+    private final AtomicLong searchVersion = new AtomicLong(0);
+
     private File currentWorkspaceRoot;
-    private boolean searchInWorkspace = false;
-    private final ToggleButton openFilesToggle;
-    private final ToggleButton workspaceToggle;
 
     public SearchPane(
             Function<SearchQuery, List<SearchResult>> searchProvider,
@@ -51,6 +52,8 @@ public class SearchPane {
         this.searchProvider = searchProvider;
         this.resultOpener = resultOpener;
         this.workspaceSearchService = new WorkspaceSearchService();
+
+        System.out.println("SEARCH PANE CREATED");
 
         queryField = new TextField();
         queryField.setPromptText("Search");
@@ -62,35 +65,12 @@ public class SearchPane {
         wholeWordCheck = new CheckBox("Whole Word");
         wholeWordCheck.getStyleClass().add("search-check");
 
-        // Toggle buttons para alternar entre abordagens de busca
-        ToggleGroup searchScope = new ToggleGroup();
-        
-        openFilesToggle = new ToggleButton("Open Files");
-        openFilesToggle.setToggleGroup(searchScope);
-        openFilesToggle.setSelected(true);
-        openFilesToggle.getStyleClass().add("search-scope-button");
-        openFilesToggle.setOnAction(e -> {
-            searchInWorkspace = false;
-            runSearch();
-        });
-
-        workspaceToggle = new ToggleButton("Workspace");
-        workspaceToggle.setToggleGroup(searchScope);
-        workspaceToggle.getStyleClass().add("search-scope-button");
-        workspaceToggle.setOnAction(e -> {
-            searchInWorkspace = true;
-            runSearch();
-        });
-
-        Button searchButton = new Button("Search");
-        searchButton.getStyleClass().add("search-action-button");
-        searchButton.setOnAction(e -> runSearch());
-
         resultSummary = new Label("No results");
         resultSummary.getStyleClass().add("search-summary");
 
         resultList = new ListView<>();
         resultList.getStyleClass().add("search-result-list");
+
         resultList.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(SearchResult item, boolean empty) {
@@ -102,7 +82,15 @@ public class SearchPane {
                     return;
                 }
 
-                Label title = new Label(item.getFileName() + "  Ln " + item.getLine() + ", Col " + item.getColumn());
+                String displayName = new File(item.getFileName()).getName();
+
+                Label title = new Label(
+                        displayName
+                                + "  Ln "
+                                + item.getLine()
+                                + ", Col "
+                                + item.getColumn()
+                );
                 title.getStyleClass().add("search-result-title");
 
                 Label preview = new Label(item.getPreview());
@@ -119,40 +107,65 @@ public class SearchPane {
 
         resultList.setOnMouseClicked(e -> {
             if (e.getClickCount() >= 2) {
-                SearchResult selected = resultList.getSelectionModel().getSelectedItem();
-                if (selected != null) {
-                    resultOpener.accept(selected);
-                }
+                openSelectedResult();
             }
         });
 
         resultList.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
-                SearchResult selected = resultList.getSelectionModel().getSelectedItem();
-                if (selected != null) {
-                    resultOpener.accept(selected);
+                openSelectedResult();
+            }
+        });
+
+        PauseTransition debounce = new PauseTransition(Duration.millis(SEARCH_DELAY_MS));
+
+        queryField.textProperty().addListener((obs, oldValue, newValue) -> {
+            debounce.stop();
+
+            if (newValue == null || newValue.isBlank()) {
+                searchVersion.incrementAndGet();
+                resultList.setItems(FXCollections.observableArrayList());
+                resultSummary.setText("Digite para buscar");
+                return;
+            }
+
+            if (newValue.trim().length() < MIN_SEARCH_LENGTH) {
+                searchVersion.incrementAndGet();
+                resultList.setItems(FXCollections.observableArrayList());
+                resultSummary.setText("Escreva pelo menos 2 caracteres");
+                return;
+            }
+
+            resultSummary.setText("Buscando...");
+
+            debounce.setOnFinished(event -> runSearchAsync());
+            debounce.playFromStart();
+        });
+
+        queryField.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) {
+                SearchResult first = resultList.getItems()
+                        .stream()
+                        .findFirst()
+                        .orElse(null);
+
+                if (first != null) {
+                    resultOpener.accept(first);
                 }
             }
         });
 
-        queryField.setOnAction(e -> runSearch());
-
         VBox.setVgrow(resultList, Priority.ALWAYS);
 
-        // Toolbar com toggle buttons
-        HBox scopeToolbar = new HBox(8, openFilesToggle, workspaceToggle);
-        scopeToolbar.getStyleClass().add("search-scope-toolbar");
-        scopeToolbar.setPadding(new Insets(5, 10, 5, 10));
-
-        view = new VBox(8,
+        view = new VBox(
+                8,
                 queryField,
-                scopeToolbar,
                 caseSensitiveCheck,
                 wholeWordCheck,
-                searchButton,
                 resultSummary,
                 resultList
         );
+
         view.getStyleClass().add("search-pane");
         view.setPadding(new Insets(10));
     }
@@ -167,14 +180,31 @@ public class SearchPane {
     }
 
     public void setWorkspaceRoot(File root) {
+        System.out.println("WORKSPACE SET: " + root);
         this.currentWorkspaceRoot = root;
+        runSearchAsync();
     }
 
     public void runSearch() {
+        runSearchAsync();
+    }
+
+    private void runSearchAsync() {
         String raw = queryField.getText();
+
         if (raw == null || raw.isBlank()) {
+            searchVersion.incrementAndGet();
             resultList.setItems(FXCollections.observableArrayList());
-            resultSummary.setText("Type something to search");
+            resultSummary.setText("Digite para buscar");
+            return;
+        }
+
+        raw = raw.trim();
+
+        if (raw.length() < MIN_SEARCH_LENGTH) {
+            searchVersion.incrementAndGet();
+            resultList.setItems(FXCollections.observableArrayList());
+            resultSummary.setText("Escreva pelo menos 2 caracteres");
             return;
         }
 
@@ -184,64 +214,106 @@ public class SearchPane {
                 wholeWordCheck.isSelected()
         );
 
-        List<SearchResult> results;
-        
-        if (searchInWorkspace && currentWorkspaceRoot != null) {
-            // Buscar em todo o workspace
-            List<WorkspaceSearchResult> workspaceResults = workspaceSearchService.search(
-                    currentWorkspaceRoot.toPath(),
-                    new WorkspaceSearchQuery(
-                            query.getText(),
-                            query.isCaseSensitive(),
-                            query.isWholeWord()
-                    )
-            );
-            
-            results = workspaceResults.stream()
-                    .map(wr -> new SearchResult(
-                            null,
-                            wr.getFile().getFileName().toString(),
-                            wr.getLine(),
-                            wr.getColumn(),
-                            wr.getPreview(),
-                            wr.getStartOffset(),
-                            wr.getEndOffset()
-                    ))
-                    .collect(Collectors.toList());
-            
-            // Desabilitar abra de arquivo para resultados do workspace
-            resultList.setOnMouseClicked(e -> {
-                if (e.getClickCount() >= 2) {
-                    SearchResult selected = resultList.getSelectionModel().getSelectedItem();
-                    if (selected != null && selected.getTab() != null) {
-                        resultOpener.accept(selected);
-                    }
-                }
-            });
-        } else {
-            // Buscar nos arquivos abertos
-            results = searchProvider.apply(query);
-            
-            resultList.setOnMouseClicked(e -> {
-                if (e.getClickCount() >= 2) {
-                    SearchResult selected = resultList.getSelectionModel().getSelectedItem();
-                    if (selected != null) {
-                        resultOpener.accept(selected);
-                    }
-                }
-            });
+        File workspaceRootSnapshot = currentWorkspaceRoot;
+        long version = searchVersion.incrementAndGet();
+
+        resultSummary.setText("Buscando...");
+
+new Thread(() -> {
+    List<SearchResult> finalResults = doSearch(query, workspaceRootSnapshot);
+
+    Platform.runLater(() -> {
+        if (version != searchVersion.get()) {
+            return;
         }
-        
-        resultList.setItems(FXCollections.observableArrayList(results));
-        resultSummary.setText(results.size() + " result(s)");
+
+        resultList.setItems(FXCollections.observableArrayList(finalResults));
+        resultSummary.setText(finalResults.size() + " result(s)");
+    });
+}, "npsharp-search-thread").start();
+    }
+
+    private List<SearchResult> doSearch(SearchQuery query, File workspaceRootSnapshot) {
+        List<SearchResult> finalResults = new ArrayList<>();
+
+        try {
+            List<SearchResult> openFileResults = searchProvider.apply(query);
+            finalResults.addAll(openFileResults);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (workspaceRootSnapshot != null
+                && workspaceRootSnapshot.exists()
+                && workspaceRootSnapshot.isDirectory()) {
+
+            try {
+                List<WorkspaceSearchResult> workspaceResults =
+                        workspaceSearchService.search(
+                                workspaceRootSnapshot.toPath(),
+                                new WorkspaceSearchQuery(
+                                        query.getText(),
+                                        query.isCaseSensitive(),
+                                        query.isWholeWord()
+                                )
+                        );
+
+                List<SearchResult> mapped = workspaceResults.stream()
+                        .map(wr -> new SearchResult(
+                                null,
+                                wr.getFile().toAbsolutePath().toString(),
+                                wr.getLine(),
+                                wr.getColumn(),
+                                wr.getPreview(),
+                                wr.getStartOffset(),
+                                wr.getEndOffset()
+                        ))
+                        .toList();
+
+                finalResults.addAll(mapped);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        finalResults.sort((a, b) -> {
+            boolean aOpen = a.getTab() != null;
+            boolean bOpen = b.getTab() != null;
+
+            if (aOpen && !bOpen) {
+                return -1;
+            }
+
+            if (!aOpen && bOpen) {
+                return 1;
+            }
+
+            return 0;
+        });
+
+        return finalResults;
+    }
+
+    private void openSelectedResult() {
+        SearchResult selected = resultList.getSelectionModel().getSelectedItem();
+
+        if (selected != null) {
+            resultOpener.accept(selected);
+        }
     }
 
     public static class SearchQuery {
+
         private final String text;
         private final boolean caseSensitive;
         private final boolean wholeWord;
 
-        public SearchQuery(String text, boolean caseSensitive, boolean wholeWord) {
+        public SearchQuery(
+                String text,
+                boolean caseSensitive,
+                boolean wholeWord
+        ) {
             this.text = text;
             this.caseSensitive = caseSensitive;
             this.wholeWord = wholeWord;

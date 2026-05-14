@@ -76,7 +76,7 @@ public class WelcomePane extends VBox {
            SUBTÃTULO / SLOGAN
         ----------------------------------------- */
 
-        Label subtitle = new Label("CÃ³digo. Controle. DomÃ­nio.");
+        Label subtitle = new Label("Tecnologia sem limites.");
         subtitle.getStyleClass().add("welcome-subtitle");
 
         /* -----------------------------------------
@@ -84,17 +84,17 @@ public class WelcomePane extends VBox {
         ----------------------------------------- */
 
         // botÃ£o visual para criar novo arquivo
-        HBox actionNew = createActionButton("New File", "Ctrl+N", onNewFile);
+        HBox actionNew = createActionButton("Novo Arquivo", "Ctrl+N", onNewFile);
 
         // botÃ£o visual para abrir arquivo existente
-        HBox actionOpen = createActionButton("Open File", "Ctrl+O", onOpenFile);
+        HBox actionOpen = createActionButton("Abrir Arquivo", "Ctrl+O", onOpenFile);
 
         /* -----------------------------------------
            DICA VISUAL ADICIONAL
            NÃ£o Ã© clicÃ¡vel, sÃ³ informativa
         ----------------------------------------- */
 
-        Label actionSave = new Label("Save File    Ctrl+S");
+        Label actionSave = new Label("Salvar Arquivo    Ctrl+S");
         actionSave.getStyleClass().add("welcome-hint");
 
         /* -----------------------------------------

@@ -345,7 +345,7 @@ public class EditorManager {
         CodeArea editor = tabEditors.get(selectedTab);
 
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save File");
+        chooser.setTitle("Salvar Arquivo");
 
         File currentFile = tabFiles.get(selectedTab);
 
@@ -1325,40 +1325,109 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
     ========================================= */
 
     private String detectLanguage(Tab tab, String fileName) {
-        String ext = tabSuggestedExtensions.get(tab);
-        if (ext == null || ext.isBlank()) {
-            ext = getExtension(fileName);
-        }
 
-        return switch (ext) {
+    String ext = tabSuggestedExtensions.get(tab);
+
+    if (ext == null || ext.isBlank()) {
+        ext = getExtension(fileName);
+    }
+
+    if (ext != null && !ext.isBlank()) {
+        return switch (ext.toLowerCase(Locale.ROOT)) {
+
             case "java" -> "Java";
             case "kt" -> "Kotlin";
-            case "js" -> "JavaScript";
+
+            case "js", "mjs", "cjs" -> "JavaScript";
             case "ts" -> "TypeScript";
+
             case "json" -> "JSON";
+
             case "html", "htm" -> "HTML";
             case "css" -> "CSS";
             case "scss" -> "SCSS";
+
             case "xml" -> "XML";
+
             case "md" -> "Markdown";
-            case "txt" -> "Plain Text";
+
+            case "txt", "log", "conf", "cfg", "ini" -> "Plain Text";
+
             case "sql" -> "SQL";
+
             case "yml", "yaml" -> "YAML";
+
             case "properties" -> "Properties";
-            case "sh" -> "Shell Script";
-            case "bat" -> "Batch";
+
+            case "sh", "bash", "zsh" -> "Shell Script";
+
+            case "bat", "cmd" -> "Batch";
+
             case "ps1" -> "PowerShell";
+
             case "c" -> "C";
-            case "cpp", "cc", "cxx" -> "C++";
+
+            case "cpp", "cc", "cxx", "hpp", "h" -> "C++";
+
             case "cs" -> "C#";
+
             case "py" -> "Python";
+
             case "php" -> "PHP";
+
             case "go" -> "Go";
+
             case "rs" -> "Rust";
+
+            case "lua" -> "Lua";
+
+            case "toml" -> "TOML";
+
+            case "dockerfile" -> "Docker";
+
             default -> "Plain Text";
         };
     }
 
+    CodeArea editor = tabEditors.get(tab);
+
+    if (editor == null) {
+        return "Plain Text";
+    }
+
+    String text = editor.getText();
+
+    if (text == null || text.isBlank()) {
+        return "Plain Text";
+    }
+
+    String firstLine = text.lines().findFirst().orElse("").trim();
+
+    if (firstLine.startsWith("#!/")) {
+
+        String lower = firstLine.toLowerCase(Locale.ROOT);
+
+        if (lower.contains("python")) {
+            return "Python";
+        }
+
+        if (lower.contains("bash")
+                || lower.contains("sh")
+                || lower.contains("zsh")) {
+            return "Shell Script";
+        }
+
+        if (lower.contains("node")) {
+            return "JavaScript";
+        }
+
+        if (lower.contains("php")) {
+            return "PHP";
+        }
+    }
+
+    return detectLanguageFromContent(text);
+}
     /* =========================================
        DETECTA TIPO DE QUEBRA DE LINHA
        CRLF -> Windows
@@ -1439,5 +1508,73 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
             statusUpdater.accept(text);
         }
     }
+    private String detectLanguageFromContent(String text) {
+
+    String lower = text.toLowerCase(Locale.ROOT);
+
+    if (lower.contains("public class")
+            || lower.contains("system.out.println")) {
+        return "Java";
+    }
+
+    if (lower.contains("fun main(")
+            || lower.contains("val ")
+            || lower.contains("var ")) {
+        return "Kotlin";
+    }
+
+    if (lower.contains("console.log")
+            || lower.contains("function ")
+            || lower.contains("=>")) {
+        return "JavaScript";
+    }
+
+    if (lower.contains("import react")
+            || lower.contains("export default")) {
+        return "JavaScript";
+    }
+
+    if (lower.contains("def ")
+            || lower.contains("print(")
+            || lower.contains("import os")) {
+        return "Python";
+    }
+
+    if (lower.contains("<?php")) {
+        return "PHP";
+    }
+
+    if (lower.contains("#include")) {
+        return "C++";
+    }
+
+    if (lower.contains("fn main(")
+            || lower.contains("println!")) {
+        return "Rust";
+    }
+
+    if (lower.contains("<html")
+            || lower.contains("<body")) {
+        return "HTML";
+    }
+
+    if (lower.contains("{")
+            && lower.contains("}")
+            && lower.contains(":")) {
+
+        try {
+            text.trim();
+
+            if (text.trim().startsWith("{")
+                    || text.trim().startsWith("[")) {
+                return "JSON";
+            }
+
+        } catch (Exception ignored) {
+        }
+    }
+
+    return "Plain Text";
+}
 }
 

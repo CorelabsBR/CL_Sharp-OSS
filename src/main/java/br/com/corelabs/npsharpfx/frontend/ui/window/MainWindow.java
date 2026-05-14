@@ -125,10 +125,35 @@ public class MainWindow {
     }
 
     private void createManagers() {
-        editorManager = new EditorManager(stage, this::updateEditorStatus);
-        explorerPane = new FileExplorerPane(stage, editorManager::openFileInTab);
-        searchPane = new SearchPane(this::searchInOpenTabs, this::openSearchResult);
-    }
+
+    editorManager = new EditorManager(
+            stage,
+            this::updateEditorStatus
+    );
+
+    /*
+    ========================================
+    SEARCH PANE PRIMEIRO
+    ========================================
+    */
+
+    searchPane = new SearchPane(
+            this::searchInOpenTabs,
+            this::openSearchResult
+    );
+
+    /*
+    ========================================
+    EXPLORER DEPOIS
+    ========================================
+    */
+
+    explorerPane = new FileExplorerPane(
+            stage,
+            editorManager::openFileInTab,
+            searchPane::setWorkspaceRoot
+    );
+}
 
     private void createPanels() {
         Button explorerBtn = activityBarManager.createActivityButton();

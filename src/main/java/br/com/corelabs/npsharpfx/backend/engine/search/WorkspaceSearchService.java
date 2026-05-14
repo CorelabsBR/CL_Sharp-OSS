@@ -6,8 +6,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -19,109 +21,445 @@ import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchResult;
 
 public class WorkspaceSearchService {
 
-    private static final long MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+    /*
+    ========================================
+    CONFIG
+    ========================================
+    */
+
+    private static final long MAX_FILE_SIZE_BYTES =
+            5 * 1024 * 1024;
+
+    private static final int MAX_RESULTS =
+            5000;
+
+    /*
+    ========================================
+    FILTERS
+    ========================================
+    */
 
     private final SearchableFileFilter fileFilter;
+
     private final SearchTextAnalyzer textAnalyzer;
 
     public WorkspaceSearchService() {
+
         this.fileFilter = new SearchableFileFilter();
+
         this.textAnalyzer = new SearchTextAnalyzer();
     }
 
-    public List<WorkspaceSearchResult> search(Path workspaceRoot, WorkspaceSearchQuery query) {
-        if (workspaceRoot == null || query == null || query.getText() == null || query.getText().isBlank()) {
+    /*
+    ========================================
+    MAIN SEARCH
+    ========================================
+    */
+
+    public List<WorkspaceSearchResult> search(
+            Path workspaceRoot,
+            WorkspaceSearchQuery query
+    ) {
+
+        if (workspaceRoot == null
+                || query == null
+                || query.getText() == null
+                || query.getText().isBlank()) {
+
             return Collections.emptyList();
         }
 
-        if (!Files.exists(workspaceRoot) || !Files.isDirectory(workspaceRoot)) {
+        if (!Files.exists(workspaceRoot)
+                || !Files.isDirectory(workspaceRoot)) {
+
             return Collections.emptyList();
         }
 
-        List<WorkspaceSearchResult> results = new ArrayList<>();
+        ConcurrentLinkedQueue<WorkspaceSearchResult> results =
+                new ConcurrentLinkedQueue<>();
 
         try (Stream<Path> stream = Files.walk(workspaceRoot)) {
-            stream.filter(Files::isRegularFile)
+
+            stream
+
+                    .parallel()
+
+                    .filter(Files::isRegularFile)
+
+                    .filter(this::isAllowedPath)
+
                     .filter(fileFilter::isSearchableFile)
-                    .forEach(path -> searchFile(path, query, results));
+
+                    .filter(this::isTextLikeFile)
+
+                    .forEach(path -> {
+
+                        if (results.size() >= MAX_RESULTS) {
+                            return;
+                        }
+
+                        searchFile(path, query, results);
+                    });
+
         } catch (IOException e) {
-            throw new IllegalStateException("Erro ao pesquisar no workspace", e);
+
+            throw new IllegalStateException(
+                    "Erro ao pesquisar workspace",
+                    e
+            );
         }
 
-        return results;
+        List<WorkspaceSearchResult> sorted =
+                new ArrayList<>(results);
+
+        /*
+        ========================================
+        SORT:
+        MELHORES RESULTADOS PRIMEIRO
+        ========================================
+        */
+
+        sorted.sort(Comparator
+
+                .comparingInt(
+                        (WorkspaceSearchResult r) ->
+                                scoreResult(r, query)
+                )
+
+                .reversed()
+        );
+
+        return sorted;
     }
 
-    private void searchFile(Path file, WorkspaceSearchQuery query, List<WorkspaceSearchResult> results) {
+    /*
+    ========================================
+    FILE SEARCH
+    ========================================
+    */
+
+    private void searchFile(
+            Path file,
+            WorkspaceSearchQuery query,
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results
+    ) {
+
         try {
+
             long size = Files.size(file);
+
             if (size > MAX_FILE_SIZE_BYTES) {
                 return;
             }
 
-            String text = Files.readString(file, StandardCharsets.UTF_8);
+            String text =
+                    Files.readString(
+                            file,
+                            StandardCharsets.UTF_8
+                    );
+
+            /*
+            ========================================
+            BINÁRIO
+            ========================================
+            */
+
             if (text.indexOf('\0') >= 0) {
+                return;
+            }
+
+            if (text.isBlank()) {
                 return;
             }
 
             String needle = query.getText();
 
             if (query.isWholeWord()) {
-                searchWithWholeWord(text, needle, file, query.isCaseSensitive(), results);
+
+                searchWholeWord(
+                        text,
+                        needle,
+                        file,
+                        query.isCaseSensitive(),
+                        results
+                );
+
                 return;
             }
 
-            searchWithoutWholeWord(text, needle, file, query.isCaseSensitive(), results);
+            searchNormal(
+                    text,
+                    needle,
+                    file,
+                    query.isCaseSensitive(),
+                    results
+            );
 
-        } catch (IOException ignored) {
-            // ignora arquivo ilegível, binário, encoding zoado, etc.
+        } catch (Exception ignored) {
+
+            /*
+            ========================================
+            IGNORA:
+            - encoding zoado
+            - permission denied
+            - binário
+            - lock
+            ========================================
+            */
         }
     }
 
-    private void searchWithWholeWord(String text, String needle, Path file, boolean caseSensitive, 
-                                     List<WorkspaceSearchResult> results) {
-        String flags = caseSensitive ? "" : "(?i)";
-        Pattern pattern = Pattern.compile(flags + "\\b" + Pattern.quote(needle) + "\\b");
-        Matcher matcher = pattern.matcher(text);
+    /*
+    ========================================
+    WHOLE WORD SEARCH
+    ========================================
+    */
+
+    private void searchWholeWord(
+            String text,
+            String needle,
+            Path file,
+            boolean caseSensitive,
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results
+    ) {
+
+        String flags =
+                caseSensitive
+                        ? ""
+                        : "(?i)";
+
+        Pattern pattern =
+                Pattern.compile(
+                        flags
+                                + "\\b"
+                                + Pattern.quote(needle)
+                                + "\\b"
+                );
+
+        Matcher matcher =
+                pattern.matcher(text);
 
         while (matcher.find()) {
+
             int start = matcher.start();
+
             int end = matcher.end();
 
-            results.add(new WorkspaceSearchResult(
+            results.add(buildResult(
                     file,
-                    textAnalyzer.getLineNumber(text, start),
-                    textAnalyzer.getColumnNumber(text, start),
-                    textAnalyzer.extractPreview(text, start, end),
+                    text,
                     start,
                     end
             ));
         }
     }
 
-    private void searchWithoutWholeWord(String text, String needle, Path file, boolean caseSensitive, 
-                                        List<WorkspaceSearchResult> results) {
-        String haystack = caseSensitive ? text : text.toLowerCase(Locale.ROOT);
-        String normalizedNeedle = caseSensitive ? needle : needle.toLowerCase(Locale.ROOT);
+    /*
+    ========================================
+    NORMAL SEARCH
+    ========================================
+    */
+
+    private void searchNormal(
+            String text,
+            String needle,
+            Path file,
+            boolean caseSensitive,
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results
+    ) {
+
+        String haystack =
+                caseSensitive
+                        ? text
+                        : text.toLowerCase(Locale.ROOT);
+
+        String normalizedNeedle =
+                caseSensitive
+                        ? needle
+                        : needle.toLowerCase(Locale.ROOT);
 
         int from = 0;
+
         while (true) {
-            int index = haystack.indexOf(normalizedNeedle, from);
+
+            int index =
+                    haystack.indexOf(
+                            normalizedNeedle,
+                            from
+                    );
+
             if (index < 0) {
                 break;
             }
 
-            int end = index + needle.length();
+            int end =
+                    index + needle.length();
 
-            results.add(new WorkspaceSearchResult(
+            results.add(buildResult(
                     file,
-                    textAnalyzer.getLineNumber(text, index),
-                    textAnalyzer.getColumnNumber(text, index),
-                    textAnalyzer.extractPreview(text, index, end),
+                    text,
                     index,
                     end
             ));
 
-            from = end;
+            /*
+            ========================================
+            EVITA LOOP
+            ========================================
+            */
+
+            from = Math.max(
+                    end,
+                    from + 1
+            );
         }
+    }
+
+    /*
+    ========================================
+    RESULT BUILDER
+    ========================================
+    */
+
+    private WorkspaceSearchResult buildResult(
+            Path file,
+            String text,
+            int start,
+            int end
+    ) {
+
+        return new WorkspaceSearchResult(
+
+                file,
+
+                textAnalyzer.getLineNumber(
+                        text,
+                        start
+                ),
+
+                textAnalyzer.getColumnNumber(
+                        text,
+                        start
+                ),
+
+                textAnalyzer.extractPreview(
+                        text,
+                        start,
+                        end
+                ),
+
+                start,
+
+                end
+        );
+    }
+
+    /*
+    ========================================
+    PATH FILTER
+    ========================================
+    */
+
+    private boolean isAllowedPath(Path path) {
+
+        String normalized =
+                path.toString()
+                        .replace("\\", "/")
+                        .toLowerCase();
+
+        return !normalized.contains("/.git/")
+                && !normalized.contains("/node_modules/")
+                && !normalized.contains("/target/")
+                && !normalized.contains("/build/")
+                && !normalized.contains("/dist/")
+                && !normalized.contains("/out/")
+                && !normalized.contains("/bin/")
+                && !normalized.contains("/.idea/")
+                && !normalized.contains("/.gradle/")
+                && !normalized.contains("/.settings/")
+                && !normalized.contains("/vendor/")
+                && !normalized.contains("/coverage/");
+    }
+
+    /*
+    ========================================
+    TEXT FILE FILTER
+    ========================================
+    */
+
+    private boolean isTextLikeFile(Path path) {
+
+        String name =
+                path.getFileName()
+                        .toString()
+                        .toLowerCase();
+
+        return !name.endsWith(".png")
+                && !name.endsWith(".jpg")
+                && !name.endsWith(".jpeg")
+                && !name.endsWith(".gif")
+                && !name.endsWith(".webp")
+                && !name.endsWith(".mp4")
+                && !name.endsWith(".mp3")
+                && !name.endsWith(".wav")
+                && !name.endsWith(".ogg")
+                && !name.endsWith(".jar")
+                && !name.endsWith(".class")
+                && !name.endsWith(".dll")
+                && !name.endsWith(".so")
+                && !name.endsWith(".exe")
+                && !name.endsWith(".zip")
+                && !name.endsWith(".7z")
+                && !name.endsWith(".rar")
+                && !name.endsWith(".pdf")
+                && !name.endsWith(".ttf")
+                && !name.endsWith(".woff")
+                && !name.endsWith(".woff2");
+    }
+
+    /*
+    ========================================
+    RESULT SCORE
+    ========================================
+    */
+
+    private int scoreResult(
+            WorkspaceSearchResult result,
+            WorkspaceSearchQuery query
+    ) {
+
+        int score = 0;
+
+        String preview =
+                result.getPreview()
+                        .toLowerCase();
+
+        String needle =
+                query.getText()
+                        .toLowerCase();
+
+        if (preview.startsWith(needle)) {
+            score += 100;
+        }
+
+        if (preview.contains(needle)) {
+            score += 50;
+        }
+
+        String fileName =
+                result.getFile()
+                        .getFileName()
+                        .toString()
+                        .toLowerCase();
+
+        if (fileName.contains(needle)) {
+            score += 200;
+        }
+
+        if (fileName.equals(needle)) {
+            score += 500;
+        }
+
+        return score;
     }
 }
