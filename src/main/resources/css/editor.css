@@ -1,0 +1,16 @@
+
+.code-area .text {
+    -fx-font-family: "Consolas";
+    -fx-font-size: 14px;
+}
+
+.paragraph-box {
+    -fx-font-family: "Consolas";
+    -fx-font-size: 14px;
+}
+
+.lineno {
+    -fx-font-family: "Consolas";
+    -fx-font-size: 13px;
+    -fx-padding: 0 10 0 10;
+}

@@ -30,6 +30,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.fxmisc.richtext.LineNumberFactory;
 
 /*
 ========================================================
@@ -779,7 +780,20 @@ public class EditorManager {
         CodeArea editor = new CodeArea();
         editor.getStyleClass().add("editor-textarea");
         editor.setWrapText(false);
+editor.getStylesheets().add(
+        Objects.requireNonNull(
+                getClass().getResource("/css/editor.css")
+        ).toExternalForm()
+);
+/*
+========================================
+LINE NUMBERS
+========================================
+*/
 
+editor.setParagraphGraphicFactory(
+        LineNumberFactory.get(editor)
+);
         // remove o background branco hardcoded do GenericStyledArea
         // para que o CSS consiga controlar a cor de fundo
         editor.setBackground(null);
@@ -1217,7 +1231,7 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
             if (text == null || text.isBlank()) {
                 baseName = "untitled";
             } else {
-                if (text.startsWith("â— ")) {
+                if (text.startsWith("**")) {
                     text = text.substring(2);
                 }
                 if (text.startsWith("*")) {

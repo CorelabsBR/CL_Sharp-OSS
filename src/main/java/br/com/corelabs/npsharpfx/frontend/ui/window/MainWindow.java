@@ -1,5 +1,6 @@
 package br.com.corelabs.npsharpfx.frontend.ui.window;
 
+import java.io.File;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
@@ -507,16 +508,50 @@ public class MainWindow {
     }
 
     private void openSearchResult(SearchResult result) {
-        if (result == null || result.getTab() == null) {
-            return;
-        }
+    if (result == null) {
+        return;
+    }
 
+    if (result.getTab() != null) {
         var tab = result.getTab();
+
         editorManager.selectTab(tab);
         editorManager.goToPosition(tab, result.getLine(), result.getColumn());
 
-        statusBarManager.updateStatusLeft("Navegando para: " + result.getFileName() + " Ln " + result.getLine());
+        statusBarManager.updateStatusLeft(
+                "Navegando para: " + result.getFileName() + " Ln " + result.getLine()
+        );
+
+        return;
     }
+
+    File file = new File(result.getFileName());
+
+    if (!file.exists() || !file.isFile()) {
+        statusBarManager.updateStatusLeft(
+                "Arquivo nao encontrado: " + result.getFileName()
+        );
+        return;
+    }
+
+    editorManager.openFileInTab(file);
+
+    var selectedTab = editorManager.getTabPane()
+            .getSelectionModel()
+            .getSelectedItem();
+
+    if (selectedTab != null) {
+        editorManager.goToPosition(
+                selectedTab,
+                result.getLine(),
+                result.getColumn()
+        );
+    }
+
+    statusBarManager.updateStatusLeft(
+            "Navegando para: " + file.getName() + " Ln " + result.getLine()
+    );
+}
 
     private void updateEditorStatus(String text) {
         statusBarManager.updateStatusLeft(text);

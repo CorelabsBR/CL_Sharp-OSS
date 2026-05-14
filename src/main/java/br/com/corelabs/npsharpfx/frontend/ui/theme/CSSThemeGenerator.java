@@ -66,7 +66,7 @@ public final class CSSThemeGenerator {
         // ROOT
         css.append(".root, .root-pane {\n");
         css.append("    -fx-background-color: ").append(bg).append(";\n");
-        css.append("    -fx-font-family: \"JetBrains Mono\", \"Consolas\", \"Segoe UI\", sans-serif;\n");
+        css.append("    -fx-font-family: \"JetBrains Mono\", \"Consolas\"\n");
         css.append("}\n\n");
 
         // LABEL
