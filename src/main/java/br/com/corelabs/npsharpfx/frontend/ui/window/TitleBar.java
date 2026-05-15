@@ -98,7 +98,12 @@ public class TitleBar extends HBox {
 
     private Consumer<String> statusUpdater;
     private java.util.function.Supplier<String> menuStyleSupplier;
-    private final PortugolInterpreter portugolInterpreter = new PortugolInterpreter();
+
+    private Runnable runCurrentFileAction;
+
+    public void setRunCurrentFileAction(Runnable runCurrentFileAction) {
+    this.runCurrentFileAction = runCurrentFileAction;
+}
 
     public TitleBar(Stage stage, EditorManager editorManager) {
         this.stage = Objects.requireNonNull(stage);
@@ -585,42 +590,13 @@ public class TitleBar extends HBox {
         );
         showMenuBelow(goMenu, menu);
     }
-    private void runCurrentFile() {
-    File currentFile = editorManager.getCurrentFile();
-
-    if (currentFile == null) {
-        updateStatus("Nenhum arquivo aberto");
-        return;
-    }
-
-    if (!currentFile.getName().toLowerCase().endsWith(".gol")) {
-        updateStatus("Por enquanto o Run executa apenas arquivos .gol");
-        return;
-    }
-
-    String source = editorManager.getCurrentEditorText();
-
-    if (source == null || source.isBlank()) {
-        updateStatus("Arquivo .gol vazio");
-        return;
-    }
-
-    try {
-        updateStatus("Executando Portugol...");
-        portugolInterpreter.execute(source);
-        updateStatus("Programa finalizado");
-    } catch (Exception e) {
-        e.printStackTrace();
-        updateStatus("Erro ao executar: " + e.getMessage());
-    }
-}
     private void openMoreMenu() {
         VBox menu = createMenuBox();
 
         HBox runRow = createSubmenuItem("Rodar");
         VBox runMenu = createMenuBox();
         runMenu.getChildren().addAll(
-                createMenuItem("Rodar", "F5", this::runCurrentFile),
+                createMenuItem("Rodar", "F5", () -> runAction(runCurrentFileAction, "Rodar")),
                 createMenuItem("Rodar sem Debuggar", "Ctrl+F5", () -> updateStatus("Run without debugging")),
                 createMenuItem("Parar", "Shift+F5", () -> updateStatus("Stop debugging"))
         );
