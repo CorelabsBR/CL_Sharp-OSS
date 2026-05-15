@@ -65,32 +65,48 @@ public final class FileIconManager {
         EXTENSION_ICONS.put("java", "java.svg");
         EXTENSION_ICONS.put("js", "js.svg");
         EXTENSION_ICONS.put("ts", "typescript.svg");
+        EXTENSION_ICONS.put("tsx", "typescript.svg");
+        EXTENSION_ICONS.put("py", "python.svg");
+        EXTENSION_ICONS.put("go", "go.svg");
+        EXTENSION_ICONS.put("rb", "ruby.svg");
+        EXTENSION_ICONS.put("php", "php.svg");
+        EXTENSION_ICONS.put("c", "c.svg");
+        EXTENSION_ICONS.put("cpp", "cpp.svg");
+        EXTENSION_ICONS.put("cs", "csharp.svg");
+        EXTENSION_ICONS.put("kt", "kotlin.svg");
+        EXTENSION_ICONS.put("rs", "rust.svg");
 
         // Dados
         EXTENSION_ICONS.put("json", "json.svg");
         EXTENSION_ICONS.put("xml", "xml.svg");
         EXTENSION_ICONS.put("csv", "csv.svg");
+        EXTENSION_ICONS.put("sql", "sql.svg");
+        EXTENSION_ICONS.put("sqlite", "sqlite.svg");
 
         // Web
         EXTENSION_ICONS.put("html", "html.svg");
         EXTENSION_ICONS.put("css", "css.svg");
         EXTENSION_ICONS.put("scss", "scss.svg");
+        EXTENSION_ICONS.put("less", "less.svg");
 
         // Documentação
         EXTENSION_ICONS.put("md", "markdown.svg");
         EXTENSION_ICONS.put("txt", "txt.svg");
+        EXTENSION_ICONS.put("rst", "restructuredtext.svg");
 
         // Configuração
         EXTENSION_ICONS.put("yml", "yaml.svg");
         EXTENSION_ICONS.put("yaml", "yaml.svg");
         EXTENSION_ICONS.put("properties", "properties.svg");
-
-        // Banco
-        EXTENSION_ICONS.put("sql", "sql.svg");
+        EXTENSION_ICONS.put("toml", "toml.svg");
+        EXTENSION_ICONS.put("ini", "conf.svg");
+        EXTENSION_ICONS.put("conf", "conf.svg");
 
         // Binários / arquivos compactados
         EXTENSION_ICONS.put("jar", "jar.svg");
         EXTENSION_ICONS.put("zip", "zip.svg");
+        EXTENSION_ICONS.put("tar", "zip.svg");
+        EXTENSION_ICONS.put("gz", "zip.svg");
 
         // Documentos
         EXTENSION_ICONS.put("pdf", "pdf.svg");
@@ -101,11 +117,23 @@ public final class FileIconManager {
         EXTENSION_ICONS.put("jpeg", "imagejpg.svg");
         EXTENSION_ICONS.put("gif", "imagegif.svg");
         EXTENSION_ICONS.put("svg", "svg.svg");
+        EXTENSION_ICONS.put("ico", "imageico.svg");
+        EXTENSION_ICONS.put("webp", "imagewebp.svg");
 
         // Build / scripts
         EXTENSION_ICONS.put("gradle", "gradle.svg");
         EXTENSION_ICONS.put("bat", "bat.svg");
         EXTENSION_ICONS.put("sh", "shell.svg");
+        EXTENSION_ICONS.put("bash", "shell.svg");
+        EXTENSION_ICONS.put("make", "makefile.svg");
+
+        // Build e package managers
+        EXTENSION_ICONS.put("pom", "maven.svg");
+        EXTENSION_ICONS.put("lock", "lock.svg");
+
+        // Portugol e scripts
+        EXTENSION_ICONS.put("ptg", "file.svg");
+        EXTENSION_ICONS.put("pt", "file.svg");
     }
 
     /**
@@ -130,33 +158,20 @@ public final class FileIconManager {
      */
     public static Node getIcon(File file, boolean expanded) {
 
-        /**
-         * Descobre qual ícone deve ser usado.
-         */
         String iconName = resolveIcon(file, expanded);
-
-        /**
-         * Carrega o SVG convertido em imagem.
-         *
-         * Caminho base:
-         *
-         * /fileicons/icons/
-         */
+        
         javafx.scene.image.Image img = null;
+        String fullPath = "/fileicons/icons/" + iconName;
         
         try {
-            img = SvgIconLoader.load("/fileicons/icons/" + iconName, 16);
+            img = SvgIconLoader.load(fullPath, 16);
         } catch (RuntimeException e) {
-            // Se o ícone específico não existir, tenta fallback
-            System.err.println("ICON NOT FOUND: " + iconName + " (" + e.getMessage() + ")");
+            System.err.println("[ICON MANAGER] Icon not found: " + fullPath + " - trying fallback");
             
             try {
                 img = SvgIconLoader.load("/fileicons/icons/file.svg", 16);
             } catch (RuntimeException fallbackError) {
-                // Se nem o fallback existir, cria um ícone vazio placeholder
-                System.err.println("FALLBACK ICON ALSO FAILED: " + fallbackError.getMessage());
-                
-                // Retorna um ImageView vazio para evitar NPE
+                System.err.println("[ICON MANAGER] Fallback also failed, returning empty view");
                 ImageView emptyView = new ImageView();
                 emptyView.setFitWidth(16);
                 emptyView.setFitHeight(16);
@@ -164,30 +179,12 @@ public final class FileIconManager {
             }
         }
 
-        /**
-         * Cria um componente visual para exibir a imagem.
-         */
         ImageView view = new ImageView(img);
-
-        /**
-         * Define tamanho do ícone.
-         */
         view.setFitWidth(16);
         view.setFitHeight(16);
-
-        /**
-         * Mantém proporção original da imagem.
-         */
         view.setPreserveRatio(true);
-
-        /**
-         * Aplica suavização (anti-aliasing).
-         */
         view.setSmooth(true);
 
-        /**
-         * Retorna o ícone pronto para UI.
-         */
         return view;
     }
 

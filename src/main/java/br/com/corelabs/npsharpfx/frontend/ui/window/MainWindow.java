@@ -2,12 +2,13 @@ package br.com.corelabs.npsharpfx.frontend.ui.window;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Arrays;
 import java.util.prefs.Preferences;
 
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
@@ -201,15 +202,30 @@ private void runCurrentPortugolFile() {
 
     try {
 
-        portugolInterpreter.execute(source);
+        // Garantir que há um terminal disponível
+        if (!terminalPane.hasTerminal()) {
+            terminalPane.newTerminal();
+        }
+
+        // Limpar o terminal e mostrar header
+        terminalPane.appendOutput("\n--- Executando Portugol ---\n");
+
+        // Executar com output direcionado para o terminal
+        portugolInterpreter.executeWithOutput(source, terminalPane::appendOutput);
+        
+        // Mostrar conclusão
+        terminalPane.appendOutput("\n--- Execução concluída ---\n");
+        terminalPane.focusCurrentTerminal();
 
         statusBarManager.updateStatusLeft(
-                "Programa executado"
+                "Programa executado no terminal"
         );
 
     } catch (Exception e) {
 
         e.printStackTrace();
+
+        terminalPane.appendOutput("[ERRO] " + e.getMessage());
 
         statusBarManager.updateStatusLeft(
                 "Erro: " + e.getMessage()
@@ -264,46 +280,66 @@ private void runCurrentPortugolFile() {
 }
 
     private void createPanels() {
+        System.out.println("[MainWindow] Creating panels with icons...");
+        
         Button explorerBtn = activityBarManager.createActivityButton();
-        explorerBtn.setGraphic(Codicon.icon("/icons/codicons/files.svg"));
+        Node explorerIcon = Codicon.icon("/icons/codicons/files.svg");
+        explorerBtn.setGraphic(explorerIcon);
+        System.out.println("[MainWindow] Explorer icon loaded: " + explorerIcon);
+        
         registerActivity("explorer",
                 explorerBtn,
                 sidePanelManager.wrapSidePanel("EXPLORER", explorerPane.getView(), 
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
 
         Button searchBtn = activityBarManager.createActivityButton();
-        searchBtn.setGraphic(Codicon.icon("/icons/codicons/search.svg"));
+        Node searchIcon = Codicon.icon("/icons/codicons/search.svg");
+        searchBtn.setGraphic(searchIcon);
+        System.out.println("[MainWindow] Search icon loaded: " + searchIcon);
+        
         registerActivity("search",
                 searchBtn,
                 sidePanelManager.wrapSidePanel("SEARCH", searchPane.getView(),
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
 
         Button gitBtn = activityBarManager.createActivityButton();
-        gitBtn.setGraphic(Codicon.icon("/icons/codicons/source-control.svg"));
+        Node gitIcon = Codicon.icon("/icons/codicons/source-control.svg");
+        gitBtn.setGraphic(gitIcon);
+        System.out.println("[MainWindow] Git icon loaded: " + gitIcon);
+        
         registerActivity("git",
                 gitBtn,
                 sidePanelManager.wrapSidePanel("SOURCE CONTROL",
-                    settingsPanelBuilder.buildPlaceholderPanel("SOURCE CONTROL", "Controle de versÃƒÂ£o virÃƒÂ¡ depois."),
+                    settingsPanelBuilder.buildPlaceholderPanel("SOURCE CONTROL", "Controle de versão virá depois."),
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
 
         Button debugBtn = activityBarManager.createActivityButton();
-        debugBtn.setGraphic(Codicon.icon("/icons/codicons/debug-alt.svg"));
+        Node debugIcon = Codicon.icon("/icons/codicons/debug-alt.svg");
+        debugBtn.setGraphic(debugIcon);
+        System.out.println("[MainWindow] Debug icon loaded: " + debugIcon);
+        
         registerActivity("debug",
                 debugBtn,
                 sidePanelManager.wrapSidePanel("RUN AND DEBUG",
-                    settingsPanelBuilder.buildPlaceholderPanel("RUN AND DEBUG", "Debug ainda nÃƒÂ£o implementado."),
+                    settingsPanelBuilder.buildPlaceholderPanel("RUN AND DEBUG", "Debug ainda não implementado."),
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
 
         Button extBtn = activityBarManager.createActivityButton();
-        extBtn.setGraphic(Codicon.icon("/icons/codicons/extensions.svg"));
+        Node extIcon = Codicon.icon("/icons/codicons/extensions.svg");
+        extBtn.setGraphic(extIcon);
+        System.out.println("[MainWindow] Extensions icon loaded: " + extIcon);
+        
         registerActivity("extensions",
                 extBtn,
                 sidePanelManager.wrapSidePanel("EXTENSIONS",
-                    settingsPanelBuilder.buildPlaceholderPanel("EXTENSIONS", "Sistema de extensÃƒÂµes virÃƒÂ¡ depois."),
+                    settingsPanelBuilder.buildPlaceholderPanel("EXTENSIONS", "Sistema de extensões virá depois."),
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
 
         Button settingsBtn = activityBarManager.createActivityButton();
-        settingsBtn.setGraphic(Codicon.icon("/icons/codicons/settings-gear.svg"));
+        Node settingsIcon = Codicon.icon("/icons/codicons/settings-gear.svg");
+        settingsBtn.setGraphic(settingsIcon);
+        System.out.println("[MainWindow] Settings icon loaded: " + settingsIcon);
+        
         registerActivity("settings", settingsBtn, new StackPane());
 
         activityItems.forEach((id, item) -> {
@@ -314,6 +350,8 @@ private void runCurrentPortugolFile() {
         });
 
         settingsBtn.setOnAction(event -> showSettingsPopup(settingsBtn));
+        
+        System.out.println("[MainWindow] Panels created successfully");
     }
 
     private void buildLayout() {
@@ -452,14 +490,44 @@ private void runCurrentPortugolFile() {
                     public void focusEditor() { MainWindow.this.focusEditor(); }
                     @Override
                     public void splitTerminal() { showTerminalPane(); terminalPane.splitTerminal(); }
+                    @Override
+                    public void runCurrentFile() { showTerminalPane();  MainWindow.this.runSelectedCode();; }
+                     
                 });
     }
+    private DebuggerService debuggerService =
+        new DebuggerService();
+    
+
+    private File currentFile;
 
     private void restoreDefaultLayout() {
         sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange);
         statusBarManager.updateStatusLeft("Pronto");
         statusBarManager.updateStatusRight("NPSharp");
     }
+
+    public void runSelectedCode() {
+    showTerminalPane();
+
+    if (!terminalPane.hasTerminal()) {
+        terminalPane.newTerminal();
+    }
+
+    File file = editorManager.getCurrentFile();
+
+    if (file == null) {
+        terminalPane.appendOutput("[ERRO] Nenhum arquivo aberto.\n");
+        return;
+    }
+
+    debuggerService.debug(
+            file.toPath(),
+            line -> terminalPane.appendOutput(line + "\n")
+    );
+
+    terminalPane.focusCurrentTerminal();
+}
 
     private void openThemeChooser() {
         javafx.scene.Node themeChooserContent = themeChooserPanel.buildThemeChooserPanel(

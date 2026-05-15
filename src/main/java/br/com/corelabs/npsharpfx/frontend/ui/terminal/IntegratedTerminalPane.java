@@ -201,6 +201,20 @@ public class IntegratedTerminalPane extends BorderPane {
         }
     }
 
+    public void appendOutput(String output) {
+        if (tabPane.getTabs().isEmpty()) {
+            newTerminal();
+        }
+
+        Tab selected = tabPane.getSelectionModel().getSelectedItem();
+        if (selected != null && selected.getContent() instanceof BorderPane pane) {
+            Object sessionObj = pane.getUserData();
+            if (sessionObj instanceof TerminalSession session) {
+                session.appendOutput(output);
+            }
+        }
+    }
+
     public boolean hasTerminal() {
         return !tabPane.getTabs().isEmpty();
     }
@@ -315,6 +329,10 @@ public class IntegratedTerminalPane extends BorderPane {
                 outputArea.appendText(text + System.lineSeparator());
                 outputArea.positionCaret(outputArea.getText().length());
             });
+        }
+
+        public void appendOutput(String text) {
+            appendLine(text);
         }
 
         public void clear() {

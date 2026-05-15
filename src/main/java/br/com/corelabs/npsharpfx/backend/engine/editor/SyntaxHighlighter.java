@@ -158,8 +158,9 @@ private static final String PORTUGOL_OPERATOR_PATTERN =
         "(<-|>=|<=|<>|=|>|<|\\+|-|\\*|/|%)";
 private static final String PORTUGOL_BOOLEAN_PATTERN =
 
+
         "\\b(?i)(VERDADEIRO|FALSO)\\b";
-        
+
     // === SQL ===
     private static final String SQL_KEYWORDS =
             "\\b(?i)(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|DROP|ALTER|"

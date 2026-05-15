@@ -23,6 +23,7 @@ public class ShortcutManager {
         void showTerminal();
         void focusEditor();
         void splitTerminal();
+        void runCurrentFile();
     }
 
     public ShortcutManager() {
@@ -115,6 +116,12 @@ public class ShortcutManager {
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.DIGIT5, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
                 windowActions::splitTerminal
+        );
+
+        // Portugol execution
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.F5),
+                windowActions::runCurrentFile
         );
 
         // Tab focus

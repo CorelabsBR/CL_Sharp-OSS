@@ -101,23 +101,13 @@ public final class SvgIconLoader {
      */
     public static String loadSvgPath(String resourcePath) {
 
-        /**
-         * try-with-resources garante que o stream
-         * será fechado automaticamente.
-         */
         try (InputStream stream = SvgIconLoader.class.getResourceAsStream(resourcePath)) {
 
-            /**
-             * Verifica se o arquivo existe.
-             */
             if (stream == null) {
-                throw new RuntimeException("Icon not found: " + resourcePath);
+                System.err.println("SVG not found at: " + resourcePath);
+                return "M0 0";
             }
 
-            /**
-             * Lê todos os bytes do arquivo SVG
-             * e converte para String UTF-8.
-             */
             String svg = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
 
             // Tenta encontrar o atributo d com diferentes formatos possíveis
@@ -125,7 +115,7 @@ public final class SvgIconLoader {
             if (startIndex == -1) {
                 startIndex = svg.indexOf("d='");
                 if (startIndex == -1) {
-                    // Se não encontrar, retorna um path vazio válido
+                    System.err.println("No path element found in: " + resourcePath);
                     return "M0 0";
                 }
                 startIndex += 3; // d='
@@ -143,19 +133,12 @@ public final class SvgIconLoader {
                 return "M0 0";
             }
 
-            /**
-             * Extrai apenas o conteúdo do path.
-             */
             return svg.substring(startIndex, endIndex);
 
         } catch (Exception e) {
-
-            /**
-             * Caso qualquer erro ocorra,
-             * encapsula em RuntimeException.
-             */
             System.err.println("Failed to load SVG: " + resourcePath + " - " + e.getMessage());
-            throw new RuntimeException("Failed to load svg: " + resourcePath, e);
+            e.printStackTrace();
+            return "M0 0";
         }
     }
 }

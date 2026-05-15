@@ -40,62 +40,23 @@ public final class Codicon {
     public static Node icon(String resourcePath) {
 
         try {
-            /**
-             * Carrega o path do SVG a partir do arquivo.
-             * 
-             * A classe SvgIconLoader provavelmente abre o SVG,
-             * extrai o atributo "d" do <path>, e retorna como String.
-             * 
-             * Exemplo de conteúdo:
-             * "M10 10 L20 20 Z"
-             */
             String path = SvgIconLoader.loadSvgPath(resourcePath);
 
-            /**
-             * Cria um objeto SVGPath.
-             * 
-             * Esse objeto é o que realmente desenha o vetor no JavaFX.
-             */
             SVGPath svg = new SVGPath();
-
-            /**
-             * Define o conteúdo do caminho SVG.
-             * 
-             * Aqui estamos dizendo ao JavaFX:
-             * "Desenha esse vetor".
-             */
             svg.setContent(path);
-
-            /**
-             * Adiciona uma classe CSS ao SVG.
-             * 
-             * Isso permite estilizar o ícone no arquivo CSS da aplicação,
-             * por exemplo:
-             * 
-             * .codicon-svg {
-             *     -fx-fill: #c5c5c5;
-             *     -fx-scale-x: 1.2;
-             *     -fx-scale-y: 1.2;
-             * }
-             */
             svg.getStyleClass().add("codicon-svg");
 
-            /**
-             * Retorna o SVG como Node.
-             * 
-             * Como SVGPath herda de Node, ele pode ser usado em qualquer
-             * lugar da UI:
-             * 
-             * botão.setGraphic(Codicon.icon("/icons/file.svg"));
-             * label.setGraphic(Codicon.icon("/icons/folder.svg"));
-             */
             return svg;
         } catch (Exception e) {
-            System.err.println("Error loading icon: " + resourcePath + " - " + e.getMessage());
-            // Retorna um SVG vazio em caso de erro ao invés de quebrar a UI
+            System.err.println("[CODICON ERROR] Failed to load icon: " + resourcePath);
+            e.printStackTrace();
+            
+            // Retorna um SVG com placeholder em caso de erro
             SVGPath emptyIcon = new SVGPath();
-            emptyIcon.setContent("M0 0");
+            emptyIcon.setContent("M8 2C4.13 2 1 5.13 1 9s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7z M9 14H7v-2h2v2z M9 11H7V5h2v6z");
             emptyIcon.getStyleClass().add("codicon-svg");
+            emptyIcon.setScaleX(0.75);
+            emptyIcon.setScaleY(0.75);
             return emptyIcon;
         }
     }
