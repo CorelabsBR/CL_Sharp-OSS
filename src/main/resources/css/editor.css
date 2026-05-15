@@ -1,16 +1,32 @@
 
-.code-area .text {
-    -fx-font-family: "Consolas";
-    -fx-font-size: 14px;
-}
-
+.code-area,
+.code-area .content,
+.styled-text-area,
 .paragraph-box {
-    -fx-font-family: "Consolas";
-    -fx-font-size: 14px;
-}
+    -fx-background-color: transparent;
+}   
 
 .lineno {
+
+    -fx-background-color: transparent;
+
     -fx-font-family: "Consolas";
     -fx-font-size: 13px;
+
     -fx-padding: 0 10 0 10;
+
+    -fx-alignment: CENTER-RIGHT;
+}
+
+.lineno .text {
+    -fx-fill: -fx-text-inner-color;
+}
+
+.paragraph-box:has-caret .lineno {
+
+    -fx-background-color: transparent;
+}
+
+.paragraph-box:has-caret .lineno .text {
+    -fx-fill: -fx-text-inner-color;
 }
