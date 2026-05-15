@@ -5,8 +5,10 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import javafx.application.Platform;
 
 public class DebuggerService {
 
@@ -17,98 +19,89 @@ public class DebuggerService {
     }
 
     private void registerDefaults() {
+        FileDebugger portugolDebugger = (file, output, input) -> {
+            try {
+                safeOutput(output, "[DEBUG] Runtime Portugol selecionado");
 
-        /*
-         * Portugol
-         */
-        register(".gol", new FileDebugger() {
-            @Override
-            public void debug(
-    Path file,
-    Consumer<String> output,
-    java.util.function.Supplier<String> input
-) {
-                try {
-                    output.accept("[DEBUG] Runtime Portugol selecionado");
+                String source = Files.readString(file);
 
-                    String source = Files.readString(file);
+                PortugolInterpreter interpreter = new PortugolInterpreter();
+                interpreter.setInputProvider(input);
 
-                    PortugolInterpreter interpreter =
-                            new PortugolInterpreter();
-                            interpreter.setInputProvider(input);
+                interpreter.executeWithOutput(
+                        source,
+                        line -> safeOutput(output, "[PORTUGOL] " + line)
+                );
 
-                    interpreter.executeWithOutput(
-                            source,
-                            line -> output.accept("[PORTUGOL] " + line)
-                    );
+                safeOutput(output, "[DEBUG] Execução finalizada");
 
-                    output.accept("[DEBUG] Execução finalizada");
-
-                } catch (Exception e) {
-                    output.accept("[ERRO] " + e.getMessage());
-                    e.printStackTrace();
-                }
+            } catch (Exception e) {
+                safeOutput(output, "[ERRO] " + e.getMessage());
+                e.printStackTrace();
             }
-        });
+        };
 
-        register(".por", debuggers.get(".gol"));
-        register(".portugol", debuggers.get(".gol"));
+        register(".gol", portugolDebugger);
+        register(".por", portugolDebugger);
+        register(".portugol", portugolDebugger);
     }
 
     public void register(String extension, FileDebugger debugger) {
-
         if (extension == null || debugger == null) {
             return;
         }
 
-        debuggers.put(
-                normalizeExtension(extension),
-                debugger
-        );
+        debuggers.put(normalizeExtension(extension), debugger);
     }
 
     public boolean supports(Path file) {
-
-        String extension = getExtension(file);
-
-        return debuggers.containsKey(extension);
+        return debuggers.containsKey(getExtension(file));
     }
-    
-    
 
     public void debug(
-        Path file,
-        Consumer<String> output,
-        java.util.function.Supplier<String> input
-) {
+            Path file,
+            Consumer<String> output,
+            Supplier<String> input
+    ) {
+        if (file == null) {
+            safeOutput(output, "[ERRO] Arquivo nulo.");
+            return;
+        }
 
-    if (file == null) {
-        output.accept("[ERRO] Arquivo nulo.");
-        return;
+        String extension = getExtension(file);
+        FileDebugger debugger = debuggers.get(extension);
+
+        if (debugger == null) {
+            safeOutput(output, "[ERRO] Nenhum debugger encontrado para: " + extension);
+            return;
+        }
+
+        safeOutput(output, "[DEBUG] Arquivo detectado: " + file.getFileName());
+        safeOutput(output, "[DEBUG] Extensão detectada: " + extension);
+
+        Thread thread = new Thread(
+                () -> debugger.debug(file, output, input),
+                "npsharp-debugger-" + extension
+        );
+
+        thread.setDaemon(true);
+        thread.start();
     }
 
-    String extension = getExtension(file);
+    private static void safeOutput(Consumer<String> output, String text) {
+        if (output == null) {
+            return;
+        }
 
-    FileDebugger debugger = debuggers.get(extension);
-
-    if (debugger == null) {
-        output.accept("[ERRO] Nenhum debugger encontrado para: " + extension);
-        return;
+        if (Platform.isFxApplicationThread()) {
+            output.accept(text);
+        } else {
+            Platform.runLater(() -> output.accept(text));
+        }
     }
-
-    output.accept("[DEBUG] Arquivo detectado: " + file.getFileName());
-    output.accept("[DEBUG] Extensão detectada: " + extension);
-
-    debugger.debug(file, output, input);
-}
 
     private String getExtension(Path file) {
-
-        String fileName =
-                file.getFileName()
-                        .toString()
-                        .toLowerCase();
-
+        String fileName = file.getFileName().toString().toLowerCase();
         int index = fileName.lastIndexOf('.');
 
         if (index == -1) {
@@ -119,7 +112,6 @@ public class DebuggerService {
     }
 
     private String normalizeExtension(String extension) {
-
         extension = extension.toLowerCase();
 
         if (!extension.startsWith(".")) {
@@ -130,12 +122,10 @@ public class DebuggerService {
     }
 
     public interface FileDebugger {
-
         void debug(
                 Path file,
                 Consumer<String> output,
-                java.util.function.Supplier<String> input
+                Supplier<String> input
         );
     }
-    
 }

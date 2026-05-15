@@ -37,6 +37,7 @@ public class IntegratedTerminalPane extends BorderPane {
 
     private double currentHeight = 220;
     private boolean resizing = false;
+    private java.util.function.Consumer<String> inputListener;
     private final java.util.concurrent.BlockingQueue<String> inputQueue =
         new java.util.concurrent.LinkedBlockingQueue<>();
 
@@ -71,77 +72,109 @@ public class IntegratedTerminalPane extends BorderPane {
 }
 
     private HBox buildHeader() {
+    Label problems = createPanelTab("PROBLEMS 48");
+    Label output = createPanelTab("OUTPUT");
+    Label debugConsole = createPanelTab("DEBUG CONSOLE");
+    Label terminal = createPanelTab("TERMINAL");
+    Label ports = createPanelTab("PORTS");
+    Label gitlens = createPanelTab("GITLENS");
 
-        Label title = new Label("TERMINAL");
-        title.getStyleClass().add("integrated-terminal-title");
+    terminal.getStyleClass().add("integrated-terminal-tab-active");
 
-        Button newTerminalBtn = new Button("+");
-        newTerminalBtn.getStyleClass().add("terminal-control-button");
-        newTerminalBtn.setPrefWidth(30);
-        newTerminalBtn.setOnAction(e -> newTerminal());
+    problems.setOnMouseClicked(e -> appendOutput("[Problems ainda não implementado]"));
+    output.setOnMouseClicked(e -> appendOutput("[Output ainda não implementado]"));
+    debugConsole.setOnMouseClicked(e -> newDebuggerConsole());
+    terminal.setOnMouseClicked(e -> {
+        if (!hasTerminal()) {
+            newTerminal();
+        }
+    });
+    ports.setOnMouseClicked(e -> appendOutput("[Ports ainda não implementado]"));
+    gitlens.setOnMouseClicked(e -> appendOutput("[GitLens ainda não implementado]"));
 
-        Tooltip.install(
-                newTerminalBtn,
-                new Tooltip("Novo Terminal (Ctrl+Shift+`)")
-        );
+    Label currentShell = new Label("▣ powershell");
+    currentShell.getStyleClass().add("integrated-terminal-shell-label");
 
-        Button splitTerminalBtn = new Button("⊞");
-        splitTerminalBtn.getStyleClass().add("terminal-control-button");
-        splitTerminalBtn.setPrefWidth(30);
-        splitTerminalBtn.setOnAction(e -> splitTerminal());
+    Button newTerminalBtn = createHeaderButton("+", "Novo Terminal");
+    newTerminalBtn.setOnAction(e -> newTerminal());
 
-        Tooltip.install(
-                splitTerminalBtn,
-                new Tooltip("Split Terminal")
-        );
+    Button dropdownBtn = createHeaderButton("⌄", "Selecionar Terminal");
+    dropdownBtn.setOnAction(e -> appendOutput("[Selecionar terminal ainda não implementado]"));
 
-        Button killTerminalBtn = new Button("✕");
-        killTerminalBtn.getStyleClass().add("terminal-control-button");
-        killTerminalBtn.setPrefWidth(30);
-        killTerminalBtn.setOnAction(e -> killCurrentTerminal());
+    Button splitTerminalBtn = createHeaderButton("▥", "Dividir Terminal");
+    splitTerminalBtn.setOnAction(e -> splitTerminal());
 
-        Tooltip.install(
-                killTerminalBtn,
-                new Tooltip("Fechar Terminal")
-        );
+    Button killTerminalBtn = createHeaderButton("🗑", "Fechar Terminal");
+    killTerminalBtn.setOnAction(e -> killCurrentTerminal());
 
-        Button clearTerminalBtn = new Button("C");
-        clearTerminalBtn.getStyleClass().add("terminal-control-button");
-        clearTerminalBtn.setPrefWidth(30);
-        clearTerminalBtn.setOnAction(e -> clearCurrentTerminal());
+    Button moreBtn = createHeaderButton("⋯", "Mais ações");
+    moreBtn.setOnAction(e -> appendOutput("[Mais ações ainda não implementado]"));
 
-        Tooltip.install(
-                clearTerminalBtn,
-                new Tooltip("Limpar Terminal")
-        );
+    Button maximizeBtn = createHeaderButton("□", "Maximizar painel");
+    maximizeBtn.setOnAction(e -> increaseHeight());
 
-        HBox controls = new HBox(
-                5,
-                newTerminalBtn,
-                splitTerminalBtn,
-                killTerminalBtn,
-                clearTerminalBtn
-        );
+    Button closePanelBtn = createHeaderButton("×", "Fechar painel");
+    closePanelBtn.setOnAction(e -> {
+        setManaged(false);
+        setVisible(false);
+    });
 
-        controls.setAlignment(Pos.CENTER_RIGHT);
-        controls.setPadding(new Insets(0, 10, 0, 0));
+    HBox tabs = new HBox(
+            22,
+            problems,
+            output,
+            debugConsole,
+            terminal,
+            ports,
+            gitlens
+    );
+    tabs.setAlignment(Pos.CENTER_LEFT);
 
-        HBox box = new HBox(title);
+    HBox controls = new HBox(
+            8,
+            currentShell,
+            newTerminalBtn,
+            dropdownBtn,
+            splitTerminalBtn,
+            killTerminalBtn,
+            moreBtn,
+            maximizeBtn,
+            closePanelBtn
+    );
+    controls.setAlignment(Pos.CENTER_RIGHT);
 
-        box.getStyleClass().add("integrated-terminal-header");
+    HBox spacer = new HBox();
+    HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        box.setAlignment(Pos.CENTER_LEFT);
+    HBox box = new HBox(
+            tabs,
+            spacer,
+            controls
+    );
 
-        box.setPadding(new Insets(6, 10, 6, 10));
+    box.getStyleClass().add("integrated-terminal-header");
+    box.setAlignment(Pos.CENTER_LEFT);
+    box.setPadding(new Insets(6, 10, 6, 10));
 
-        HBox.setHgrow(title, Priority.ALWAYS);
+    return box;
+}
 
-        box.getChildren().add(controls);
+private Label createPanelTab(String text) {
+    Label label = new Label(text);
+    label.getStyleClass().add("integrated-terminal-tab");
+    return label;
+}
 
-        HBox.setHgrow(controls, Priority.NEVER);
+private Button createHeaderButton(String text, String tooltip) {
+    Button button = new Button(text);
+    button.getStyleClass().add("terminal-control-button");
+    button.setMinWidth(26);
+    button.setPrefWidth(30);
 
-        return box;
-    }
+    Tooltip.install(button, new Tooltip(tooltip));
+
+    return button;
+}
 
     private VBox buildResizeHandle() {
 
@@ -184,7 +217,9 @@ public class IntegratedTerminalPane extends BorderPane {
 
     public void newTerminal() {
 
-        TerminalSession session = new TerminalSession();
+        TerminalSession session =
+        new TerminalSession(false);
+        
 
         sessions.add(session);
 
@@ -215,6 +250,42 @@ public class IntegratedTerminalPane extends BorderPane {
         newTerminal();
     }
 
+
+   public void newDebuggerConsole() {
+    inputQueue.clear();
+
+    for (Tab tab : tabPane.getTabs()) {
+        if (tab.getContent() instanceof BorderPane pane) {
+            Object obj = pane.getUserData();
+
+            if (obj instanceof TerminalSession session && session.isDebugger()) {
+                tabPane.getSelectionModel().select(tab);
+                session.clear();
+                session.requestInputFocus();
+                session.append("[NPSharp Debug Console]");
+                return;
+            }
+        }
+    }
+
+    TerminalSession session = new TerminalSession(true);
+    sessions.add(session);
+
+    Tab tab = new Tab("debug");
+    tab.setClosable(true);
+    tab.setContent(session.getView());
+
+    tab.setOnClosed(e -> {
+        session.destroy();
+        sessions.remove(session);
+    });
+
+    tabPane.getTabs().add(tab);
+    tabPane.getSelectionModel().select(tab);
+
+    session.start();
+    session.requestInputFocus();
+}
     public void killCurrentTerminal() {
 
         Tab selected = tabPane
@@ -332,240 +403,281 @@ public class IntegratedTerminalPane extends BorderPane {
         }
     }
 
-    private final class TerminalSession {
+   private final class TerminalSession {
 
-        private final TextArea outputArea = new TextArea();
+    private final boolean debugger;
 
-        private final TextField inputField = new TextField();
+    public boolean isDebugger() {
+    return debugger;
+}
 
-        private final BorderPane view = new BorderPane();
+    private final TextArea outputArea = new TextArea();
 
-        private Process process;
+    private final TextField inputField = new TextField();
 
-        private BufferedWriter writer;
+    private final BorderPane view = new BorderPane();
 
-        private TerminalSession() {
+    private Process process;
 
-            outputArea.setEditable(false);
+    private BufferedWriter writer;
 
-            outputArea.setWrapText(false);
+    private TerminalSession(boolean debugger) {
 
-            outputArea.getStyleClass().add("terminal-output");
+        this.debugger = debugger;
 
-            inputField.setPromptText(
-                    "Digite um comando e pressione Enter..."
-            );
+        outputArea.setEditable(false);
 
-            inputField.getStyleClass().add("terminal-input");
+        outputArea.setWrapText(false);
 
-            HBox inputBox = new HBox(inputField);
+        outputArea.getStyleClass().add("terminal-output");
 
-            inputBox.setPadding(new Insets(8));
+        inputField.setPromptText(
+                debugger
+                        ? "Entrada do programa..."
+                        : "Digite um comando e pressione Enter..."
+        );
 
-            HBox.setHgrow(
-                    inputField,
-                    Priority.ALWAYS
-            );
+        inputField.getStyleClass().add("terminal-input");
 
-            view.setCenter(outputArea);
+        HBox inputBox = new HBox(inputField);
 
-            view.setBottom(inputBox);
+        inputBox.setPadding(new Insets(8));
 
-            view.getStyleClass().add("terminal-session");
+        HBox.setHgrow(
+                inputField,
+                Priority.ALWAYS
+        );
 
-            Platform.runLater(() -> view.setUserData(this));
+        view.setCenter(outputArea);
 
-            inputField.setOnAction(e -> {
+        view.setBottom(inputBox);
 
-                String command = inputField.getText();
+        view.getStyleClass().add("terminal-session");
 
-                if (command == null
-                        || command.isBlank()
-                        || writer == null) {
+        Platform.runLater(() -> view.setUserData(this));
 
-                    return;
-                }
+        inputField.setOnAction(e -> {
 
-                try {
+            String command = inputField.getText();
 
-                    writer.write(command);
+            if (command == null) {
+                return;
+            }
 
-                    writer.newLine();
+            appendLine("> " + command);
 
-                    writer.flush();
+            inputField.clear();
 
-                    appendLine("> " + command);
-                    inputQueue.offer(command);
-                    inputField.clear();
+            /*
+             * DEBUG CONSOLE
+             */
+            if (debugger) {
 
-                } catch (IOException ex) {
+                inputQueue.offer(command);
 
-                    appendLine(
-                            "[erro] Falha ao enviar comando: "
-                                    + ex.getMessage()
-                    );
-                }
-            });
-        }
+                return;
+            }
 
-        public BorderPane getView() {
-
-            return view;
-        }
-
-        public void requestInputFocus() {
-
-            Platform.runLater(inputField::requestFocus);
-        }
-
-        public void start() {
+            /*
+             * TERMINAL NORMAL
+             */
+            if (command.isBlank() || writer == null) {
+                return;
+            }
 
             try {
 
-                ProcessBuilder pb = new ProcessBuilder(
-                        resolveShellCommand()
-                );
+                writer.write(command);
 
-                pb.redirectErrorStream(true);
+                writer.newLine();
 
-                process = pb.start();
+                writer.flush();
 
-                writer = new BufferedWriter(
-                        new OutputStreamWriter(
-                                process.getOutputStream(),
-                                resolveCharset()
-                        )
-                );
-
-                Thread readerThread = new Thread(
-                        this::readOutputLoop,
-                        "terminal-reader"
-                );
-
-                readerThread.setDaemon(true);
-
-                readerThread.start();
-
-            } catch (IOException e) {
+            } catch (IOException ex) {
 
                 appendLine(
-                        "[erro] Não foi possível iniciar terminal: "
-                                + e.getMessage()
+                        "[erro] Falha ao enviar comando: "
+                                + ex.getMessage()
                 );
             }
+        });
+    }
+
+    public BorderPane getView() {
+
+        return view;
+    }
+
+    public void requestInputFocus() {
+
+        Platform.runLater(inputField::requestFocus);
+    }
+
+    public void start() {
+
+        /*
+         * DEBUG NÃO ABRE CMD
+         */
+        if (debugger) {
+
+            appendLine("[NPSharp Debug Console]");
+
+            return;
         }
 
-        private void readOutputLoop() {
+        try {
 
-            try (
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(
-                                    process.getInputStream(),
-                                    resolveCharset()
-                            )
+            ProcessBuilder pb = new ProcessBuilder(
+                    resolveShellCommand()
+            );
+
+            pb.redirectErrorStream(true);
+
+            process = pb.start();
+
+            writer = new BufferedWriter(
+                    new OutputStreamWriter(
+                            process.getOutputStream(),
+                            resolveCharset()
                     )
-            ) {
+            );
 
-                String line;
+            Thread readerThread = new Thread(
+                    this::readOutputLoop,
+                    "terminal-reader"
+            );
 
-                while ((line = reader.readLine()) != null) {
+            readerThread.setDaemon(true);
 
-                    appendLine(line);
-                }
+            readerThread.start();
 
-            } catch (IOException e) {
+        } catch (IOException e) {
 
-                appendLine(
-                        "[erro] Leitura do terminal falhou: "
-                                + e.getMessage()
-                );
-            }
-        }
-
-        private void appendLine(String text) {
-
-            Platform.runLater(() -> {
-
-                outputArea.appendText(
-                        text + System.lineSeparator()
-                );
-
-                outputArea.positionCaret(
-                        outputArea.getText().length()
-                );
-            });
-        }
-
-        public void clear() {
-
-            Platform.runLater(outputArea::clear);
-        }
-
-        public void destroy() {
-
-            try {
-
-                if (writer != null) {
-
-                    writer.write("exit");
-
-                    writer.newLine();
-
-                    writer.flush();
-                }
-
-            } catch (Exception ignored) {
-            }
-
-            if (process != null && process.isAlive()) {
-
-                process.destroy();
-            }
-        }
-
-        private static List<String> resolveShellCommand() {
-
-            String os = System.getProperty(
-                    "os.name",
-                    ""
-            ).toLowerCase(Locale.ROOT);
-
-            if (os.contains("win")) {
-
-                return List.of(
-                        "cmd.exe",
-                        "/Q"
-                );
-            }
-
-            return List.of("/bin/bash");
-        }
-
-        private static Charset resolveCharset() {
-
-            String os = System.getProperty(
-                    "os.name",
-                    ""
-            ).toLowerCase(Locale.ROOT);
-
-            if (os.contains("win")) {
-
-                try {
-
-                    return Charset.forName("Cp850");
-
-                } catch (Exception ignored) {
-
-                    return StandardCharsets.UTF_8;
-                }
-            }
-
-            return StandardCharsets.UTF_8;
-        }
-
-        public void append(String text) {
-
-            appendLine(text);
+            appendLine(
+                    "[erro] Não foi possível iniciar terminal: "
+                            + e.getMessage()
+            );
         }
     }
+
+    private void readOutputLoop() {
+
+        try (
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(
+                                process.getInputStream(),
+                                resolveCharset()
+                        )
+                )
+        ) {
+
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+
+                appendLine(line);
+            }
+
+        } catch (IOException e) {
+
+            appendLine(
+                    "[erro] Leitura do terminal falhou: "
+                            + e.getMessage()
+            );
+        }
+    }
+
+    private void appendLine(String text) {
+
+        Platform.runLater(() -> {
+
+            outputArea.appendText(
+                    text + System.lineSeparator()
+            );
+
+            outputArea.positionCaret(
+                    outputArea.getText().length()
+            );
+        });
+    }
+
+    public void clear() {
+
+        Platform.runLater(outputArea::clear);
+    }
+
+    public void destroy() {
+
+        /*
+         * DEBUG NÃO TEM PROCESSO
+         */
+        if (debugger) {
+            return;
+        }
+
+        try {
+
+            if (writer != null) {
+
+                writer.write("exit");
+
+                writer.newLine();
+
+                writer.flush();
+            }
+
+        } catch (Exception ignored) {
+        }
+
+        if (process != null && process.isAlive()) {
+
+            process.destroy();
+        }
+    }
+
+    private static List<String> resolveShellCommand() {
+
+        String os = System.getProperty(
+                "os.name",
+                ""
+        ).toLowerCase(Locale.ROOT);
+
+        if (os.contains("win")) {
+
+            return List.of(
+                    "cmd.exe",
+                    "/Q"
+            );
+        }
+
+        return List.of("/bin/bash");
+    }
+
+    private static Charset resolveCharset() {
+
+        String os = System.getProperty(
+                "os.name",
+                ""
+        ).toLowerCase(Locale.ROOT);
+
+        if (os.contains("win")) {
+
+            try {
+
+                return Charset.forName("Cp850");
+
+            } catch (Exception ignored) {
+
+                return StandardCharsets.UTF_8;
+            }
+        }
+
+        return StandardCharsets.UTF_8;
+    }
+
+    public void append(String text) {
+
+        appendLine(text);
+    }
+}
 }

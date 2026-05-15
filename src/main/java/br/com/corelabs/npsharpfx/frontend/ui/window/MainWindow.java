@@ -270,11 +270,14 @@ private final PortugolInterpreter portugolInterpreter =
         debugBtn.setGraphic(debugIcon);
         System.out.println("[MainWindow] Debug icon loaded: " + debugIcon);
         
-        registerActivity("debug",
-                debugBtn,
-                sidePanelManager.wrapSidePanel("RUN AND DEBUG",
-                    settingsPanelBuilder.buildPlaceholderPanel("RUN AND DEBUG", "Debug ainda não implementado."),
-                    () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
+registerActivity("debug",
+        debugBtn,
+        sidePanelManager.wrapSidePanel(
+                "RUN AND DEBUG",
+                buildRunAndDebugPanel(),
+                () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)
+        )
+);
 
         Button extBtn = activityBarManager.createActivityButton();
         Node extIcon = Codicon.icon("/icons/codicons/extensions.svg");
@@ -305,6 +308,57 @@ private final PortugolInterpreter portugolInterpreter =
         
         System.out.println("[MainWindow] Panels created successfully");
     }
+
+    private Node buildRunAndDebugPanel() {
+    VBox panel = new VBox(10);
+    panel.setPadding(new Insets(12));
+    panel.getStyleClass().add("settings-panel");
+
+    Label title = new Label("Run and Debug");
+    title.getStyleClass().add("settings-title");
+
+    Button runButton = new Button("▶ Rodar arquivo atual");
+    runButton.setMaxWidth(Double.MAX_VALUE);
+    runButton.getStyleClass().add("terminal-control-button");
+    runButton.setOnAction(event -> runSelectedCode());
+
+    Button debugConsoleButton = new Button("▣ Abrir Debug Console");
+    debugConsoleButton.setMaxWidth(Double.MAX_VALUE);
+    debugConsoleButton.getStyleClass().add("terminal-control-button");
+    debugConsoleButton.setOnAction(event -> {
+        showTerminalPane();
+        terminalPane.newDebuggerConsole();
+        statusBarManager.updateStatusLeft("Debug Console aberto");
+        statusBarManager.updateStatusRight("Debug");
+    });
+
+    Button clearButton = new Button("🧹 Limpar Console Atual");
+    clearButton.setMaxWidth(Double.MAX_VALUE);
+    clearButton.getStyleClass().add("terminal-control-button");
+    clearButton.setOnAction(event -> {
+        showTerminalPane();
+        terminalPane.clearCurrentTerminal();
+        statusBarManager.updateStatusLeft("Console limpo");
+    });
+
+    Label info = new Label(
+            "F5 roda o arquivo atual.\n" +
+            "Arquivos .gol, .por e .portugol usam o runtime Portugol.\n" +
+            "O leia() usa o Debug Console, não o terminal CMD."
+    );
+    info.setWrapText(true);
+    info.getStyleClass().add("settings-description");
+
+    panel.getChildren().addAll(
+            title,
+            runButton,
+            debugConsoleButton,
+            clearButton,
+            info
+    );
+
+    return panel;
+}
 
     private void buildLayout() {
         root = new BorderPane();
@@ -459,25 +513,23 @@ private final PortugolInterpreter portugolInterpreter =
         statusBarManager.updateStatusRight("NPSharp");
     }
 
-    public void runSelectedCode() {
+public void runSelectedCode() {
     showTerminalPane();
 
-    if (!terminalPane.hasTerminal()) {
-        terminalPane.newTerminal();
-    }
-
     File file = editorManager.getCurrentFile();
+
+    terminalPane.newDebuggerConsole();
 
     if (file == null) {
         terminalPane.appendOutput("[ERRO] Nenhum arquivo aberto.\n");
         return;
     }
 
-debuggerService.debug(
-        file.toPath(),
-        line -> terminalPane.appendOutput(line + "\n"),
-        terminalPane::waitInput
-);
+    debuggerService.debug(
+            file.toPath(),
+            line -> terminalPane.appendOutput(line + "\n"),
+            terminalPane::waitInput
+    );
 
     terminalPane.focusCurrentTerminal();
 }
@@ -512,13 +564,13 @@ debuggerService.debug(
                 createPopupMenuItem("Settings", "Ctrl+,", null),
                 createPopupMenuItem("Keyboard Shortcuts", "Ctrl+K Ctrl+S", null),
                 createPopupMenuItem("Snippets", null, null),
-                createPopupMenuItem("Tasks", null, null),
-                createPopupMenuItem("Themes", "Escolher", () -> {
+                createPopupMenuItem("Tarefas", null, null),
+                createPopupMenuItem("Temas", "Escolher", () -> {
                     settingsPopup.hide();
                     openThemeChooser();
                 }),
                 new Separator(),
-                createPopupMenuItem("Backup and Sync Settings...", null, null),
+                createPopupMenuItem("Backup e sincronizar configurações", null, null),
                 new Separator(),
                 createPopupMenuItem("Wallpapers", "Escolher", () -> {
                     settingsPopup.hide();
@@ -528,7 +580,7 @@ debuggerService.debug(
                     settingsPopup.hide();
                     clearWallpaper();
                 }),
-                createPopupMenuItem("Download Update (1)", null, null)
+                createPopupMenuItem("Perfis", null, null)
         );
 
         settingsPopup = new Popup();
