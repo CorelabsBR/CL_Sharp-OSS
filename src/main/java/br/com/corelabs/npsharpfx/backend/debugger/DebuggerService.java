@@ -23,7 +23,11 @@ public class DebuggerService {
          */
         register(".gol", new FileDebugger() {
             @Override
-            public void debug(Path file, Consumer<String> output) {
+            public void debug(
+    Path file,
+    Consumer<String> output,
+    java.util.function.Supplier<String> input
+) {
                 try {
                     output.accept("[DEBUG] Runtime Portugol selecionado");
 
@@ -31,6 +35,7 @@ public class DebuggerService {
 
                     PortugolInterpreter interpreter =
                             new PortugolInterpreter();
+                            interpreter.setInputProvider(input);
 
                     interpreter.executeWithOutput(
                             source,
@@ -72,42 +77,30 @@ public class DebuggerService {
     
 
     public void debug(
-            Path file,
-            Consumer<String> output
-    ) {
+        Path file,
+        Consumer<String> output,
+        java.util.function.Supplier<String> input
+) {
 
-        if (file == null) {
-            output.accept("[ERRO] Arquivo nulo.");
-            return;
-        }
-
-        String extension = getExtension(file);
-
-        FileDebugger debugger =
-                debuggers.get(extension);
-
-        if (debugger == null) {
-
-            output.accept(
-                    "[ERRO] Nenhum debugger encontrado para: "
-                    + extension
-            );
-
-            return;
-        }
-
-        output.accept(
-                "[DEBUG] Arquivo detectado: "
-                + file.getFileName()
-        );
-
-        output.accept(
-                "[DEBUG] Extensão detectada: "
-                + extension
-        );
-
-        debugger.debug(file, output);
+    if (file == null) {
+        output.accept("[ERRO] Arquivo nulo.");
+        return;
     }
+
+    String extension = getExtension(file);
+
+    FileDebugger debugger = debuggers.get(extension);
+
+    if (debugger == null) {
+        output.accept("[ERRO] Nenhum debugger encontrado para: " + extension);
+        return;
+    }
+
+    output.accept("[DEBUG] Arquivo detectado: " + file.getFileName());
+    output.accept("[DEBUG] Extensão detectada: " + extension);
+
+    debugger.debug(file, output, input);
+}
 
     private String getExtension(Path file) {
 
@@ -140,7 +133,8 @@ public class DebuggerService {
 
         void debug(
                 Path file,
-                Consumer<String> output
+                Consumer<String> output,
+                java.util.function.Supplier<String> input
         );
     }
     

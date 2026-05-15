@@ -49,10 +49,10 @@ import javafx.stage.Stage;
 
 public class MainWindow {
 
-    private static final double DEFAULT_WIDTH = 1280;
-    private static final double DEFAULT_HEIGHT = 720;
-    private static final double MIN_WIDTH = 960;
-    private static final double MIN_HEIGHT = 640;
+private static final double DEFAULT_WIDTH = 900;
+private static final double DEFAULT_HEIGHT = 560;
+private static final double MIN_WIDTH = 800;
+private static final double MIN_HEIGHT = 520;
 
     private final Stage stage;
     private Scene scene;
@@ -185,54 +185,6 @@ private final PortugolInterpreter portugolInterpreter =
         statusBarManager.updateStatusLeft("Workspace salvo: " + workspace.getName());
     }
 }
-    
-private void runCurrentPortugolFile() {
-
-    String source =
-            editorManager.getCurrentEditorText();
-
-    if (source == null || source.isBlank()) {
-
-        statusBarManager.updateStatusLeft(
-                "Nenhum codigo para executar"
-        );
-
-        return;
-    }
-
-    try {
-
-        // Garantir que há um terminal disponível
-        if (!terminalPane.hasTerminal()) {
-            terminalPane.newTerminal();
-        }
-
-        // Limpar o terminal e mostrar header
-        terminalPane.appendOutput("\n--- Executando Portugol ---\n");
-
-        // Executar com output direcionado para o terminal
-        portugolInterpreter.executeWithOutput(source, terminalPane::appendOutput);
-        
-        // Mostrar conclusão
-        terminalPane.appendOutput("\n--- Execução concluída ---\n");
-        terminalPane.focusCurrentTerminal();
-
-        statusBarManager.updateStatusLeft(
-                "Programa executado no terminal"
-        );
-
-    } catch (Exception e) {
-
-        e.printStackTrace();
-
-        terminalPane.appendOutput("[ERRO] " + e.getMessage());
-
-        statusBarManager.updateStatusLeft(
-                "Erro: " + e.getMessage()
-        );
-    }
-}
-
     private void prepareStage() {
         TitleBar.prepareStage(stage);
 
@@ -397,7 +349,7 @@ private void runCurrentPortugolFile() {
 
     private TitleBar buildTitleBar() {
         TitleBar titleBar = new TitleBar(stage, editorManager);
-
+        titleBar.setRunCurrentFileAction(this::runSelectedCode);
         titleBar.setOpenFolderAction(this::openFolderInExplorer);
         titleBar.setCloseFolderAction(this::closeFolderFromExplorer);
         titleBar.setOpenPreferencesAction(() -> showSettingsPopup(activityItems.get("settings").button));
@@ -521,10 +473,11 @@ private void runCurrentPortugolFile() {
         return;
     }
 
-    debuggerService.debug(
-            file.toPath(),
-            line -> terminalPane.appendOutput(line + "\n")
-    );
+debuggerService.debug(
+        file.toPath(),
+        line -> terminalPane.appendOutput(line + "\n"),
+        terminalPane::waitInput
+);
 
     terminalPane.focusCurrentTerminal();
 }
@@ -748,8 +701,8 @@ private void closeFolderFromExplorer() {
             case "search" -> "Busca";
             case "git" -> "Git";
             case "debug" -> "Debug";
-            case "extensions" -> "ExtensÃƒÂµes";
-            case "settings" -> "ConfiguraÃƒÂ§ÃƒÂµes";
+            case "extensions" -> "Extensões";
+            case "settings" -> "Configurações";     
             default -> "Painel";
         };
     }

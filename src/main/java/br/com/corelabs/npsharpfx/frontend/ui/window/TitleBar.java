@@ -9,6 +9,7 @@ import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
 import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeIconHelper;
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.*;
+import br.com.corelabs.npsharpfx.frontend.ui.window.MainWindow;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -97,10 +98,8 @@ public class TitleBar extends HBox {
     private Runnable focusTerminalAction;
 
     private Consumer<String> statusUpdater;
-    private java.util.function.Supplier<String> menuStyleSupplier;
-
     private Runnable runCurrentFileAction;
-
+    private java.util.function.Supplier<String> menuStyleSupplier;
     public void setRunCurrentFileAction(Runnable runCurrentFileAction) {
     this.runCurrentFileAction = runCurrentFileAction;
 }
@@ -596,7 +595,7 @@ public class TitleBar extends HBox {
         HBox runRow = createSubmenuItem("Rodar");
         VBox runMenu = createMenuBox();
         runMenu.getChildren().addAll(
-                createMenuItem("Rodar", "F5", () -> runAction(runCurrentFileAction, "Rodar")),
+               createMenuItem("Rodar", "F5", () -> runAction(runCurrentFileAction, "Rodar")),
                 createMenuItem("Rodar sem Debuggar", "Ctrl+F5", () -> updateStatus("Run without debugging")),
                 createMenuItem("Parar", "Shift+F5", () -> updateStatus("Stop debugging"))
         );

@@ -21,6 +21,8 @@ public enum TokenType {
     LOGICO,
     CARACTERE,
     LITERAL,
+    LIMPATELA,
+    LEIA,
 
     /*
     ========================================
@@ -73,6 +75,23 @@ public enum TokenType {
     COMMA,
 
     NEWLINE,
+    SE,
+ENTAO,
+SENAO,
+FIMSE,
 
-    EOF
+ENQUANTO,
+FACA,
+FIMENQUANTO,
+
+AND,
+OR,
+NOT,
+LEFT_BRACKET,
+RIGHT_BRACKET,
+DOT_DOT,
+
+VETOR,
+DE,
+EOF
 }

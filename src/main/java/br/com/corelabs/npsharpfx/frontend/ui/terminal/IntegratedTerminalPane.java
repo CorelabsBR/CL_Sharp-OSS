@@ -36,6 +36,9 @@ public class IntegratedTerminalPane extends BorderPane {
     private final double maxHeight = Double.MAX_VALUE;
 
     private double currentHeight = 220;
+    private boolean resizing = false;
+    private final java.util.concurrent.BlockingQueue<String> inputQueue =
+        new java.util.concurrent.LinkedBlockingQueue<>();
 
     public IntegratedTerminalPane() {
 
@@ -57,6 +60,15 @@ public class IntegratedTerminalPane extends BorderPane {
 
         newTerminal();
     }
+
+    public String waitInput() {
+    try {
+        return inputQueue.take();
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return "";
+    }
+}
 
     private HBox buildHeader() {
 
@@ -320,7 +332,7 @@ public class IntegratedTerminalPane extends BorderPane {
         }
     }
 
-    private static final class TerminalSession {
+    private final class TerminalSession {
 
         private final TextArea outputArea = new TextArea();
 
@@ -383,7 +395,7 @@ public class IntegratedTerminalPane extends BorderPane {
                     writer.flush();
 
                     appendLine("> " + command);
-
+                    inputQueue.offer(command);
                     inputField.clear();
 
                 } catch (IOException ex) {

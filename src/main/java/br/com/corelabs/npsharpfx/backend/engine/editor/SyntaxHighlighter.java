@@ -140,7 +140,7 @@ public class SyntaxHighlighter {
 
 private static final String PORTUGOL_PATTERN =
 
-        "\\b(?i)(ALGORITMO|VAR|INICIO|FIMALGORITMO|"
+        "(?i)\\b(ALGORITMO|VAR|INICIO|FIMALGORITMO|"
                 + "INTEIRO|REAL|LOGICO|CARACTERE|LITERAL|"
                 + "LEIA|ESCREVA|ESCREVAL|"
                 + "SE|ENTAO|SENAO|FIMSE|"
@@ -159,11 +159,11 @@ private static final String PORTUGOL_OPERATOR_PATTERN =
 private static final String PORTUGOL_BOOLEAN_PATTERN =
 
 
-        "\\b(?i)(VERDADEIRO|FALSO)\\b";
+        "(?i)\\b(VERDADEIRO|FALSO)\\b";
 
     // === SQL ===
     private static final String SQL_KEYWORDS =
-            "\\b(?i)(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|DROP|ALTER|"
+            "(?i)\\b(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|DROP|ALTER|"
                     + "TABLE|INDEX|VIEW|JOIN|INNER|LEFT|RIGHT|OUTER|ON|AND|OR|NOT|IN|IS|NULL|"
                     + "LIKE|BETWEEN|EXISTS|HAVING|GROUP|BY|ORDER|ASC|DESC|LIMIT|OFFSET|"
                     + "UNION|ALL|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|CASE|WHEN|THEN|ELSE|END|"

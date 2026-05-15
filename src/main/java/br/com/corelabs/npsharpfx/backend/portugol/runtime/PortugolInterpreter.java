@@ -16,6 +16,10 @@ public class PortugolInterpreter {
 
     private List<Token> tokens;
     private int current;
+    private java.util.function.Supplier<String> inputProvider;
+    public void setInputProvider(java.util.function.Supplier<String> provider) {
+    this.inputProvider = provider;
+}
 
     public void setOutputHandler(Consumer<String> handler) {
         this.outputHandler = handler != null ? handler : System.out::println;
@@ -31,8 +35,8 @@ public class PortugolInterpreter {
             variables.clear();
 
             Lexer lexer = new Lexer(source);
-            this.tokens = lexer.scanTokens();
-            this.current = 0;
+            tokens = lexer.scanTokens();
+            current = 0;
 
             consumeUntil(TokenType.VAR, TokenType.INICIO);
 
@@ -41,6 +45,7 @@ public class PortugolInterpreter {
             }
 
             consume(TokenType.INICIO, "Esperado 'inicio'.");
+            consumeLineEnd();
 
             while (!check(TokenType.FIMALGORITMO) && !isAtEnd()) {
                 executeStatement();
@@ -56,44 +61,113 @@ public class PortugolInterpreter {
     }
 
     private void parseVarBlock() {
-        while (!check(TokenType.INICIO) && !isAtEnd()) {
-            if (match(TokenType.NEWLINE)) {
-                continue;
-            }
+    while (!check(TokenType.INICIO) && !isAtEnd()) {
+        if (match(TokenType.NEWLINE)) {
+            continue;
+        }
 
-            Token name = consume(TokenType.IDENTIFIER, "Esperado nome da variável.");
+        java.util.List<Token> names = new java.util.ArrayList<>();
 
-            consume(TokenType.COLON, "Esperado ':' depois do nome da variável.");
+        names.add(consume(TokenType.IDENTIFIER, "Esperado nome da variável."));
 
-            if (
+        while (match(TokenType.COMMA)) {
+            names.add(consume(TokenType.IDENTIFIER, "Esperado nome da variável depois da vírgula."));
+        }
+
+        consume(TokenType.COLON, "Esperado ':' depois do nome da variável.");
+
+        if (
                 match(TokenType.INTEIRO) ||
                 match(TokenType.REAL) ||
                 match(TokenType.CARACTERE) ||
+                match(TokenType.LITERAL) ||
                 match(TokenType.LOGICO)
-            ) {
-                variables.put(name.getLexeme(), null);
-            } else {
-                throw error(peek(), "Tipo de variável inválido.");
+        ) {
+            for (Token name : names) {
+                variables.put(normalizeName(name.getLexeme()), null);
             }
-
-            consumeLineEnd();
+        } else {
+            throw error(peek(), "Tipo de variável inválido.");
         }
+
+        consumeLineEnd();
+    }
+}
+
+
+private void executeRead() {
+
+    consume(TokenType.LEFT_PAREN, "Esperado '('.");
+
+    Token name =
+            consume(
+                    TokenType.IDENTIFIER,
+                    "Esperado nome da variável no leia."
+            );
+
+    consume(TokenType.RIGHT_PAREN, "Esperado ')'.");
+
+    String varName =
+            normalizeName(name.getLexeme());
+
+    if (!variables.containsKey(varName)) {
+        throw error(
+                name,
+                "Variável não declarada: "
+                        + name.getLexeme()
+        );
     }
 
-    private void executeStatement() {
-        if (match(TokenType.NEWLINE)) {
-            return;
+    if (inputProvider == null) {
+        variables.put(varName, "");
+        return;
+    }
+
+    String value =
+            inputProvider.get();
+
+    Object converted = value;
+
+    try {
+
+        if (value.contains(".")) {
+            converted =
+                    Double.parseDouble(value);
+        } else {
+            converted =
+                    Integer.parseInt(value);
         }
 
+    } catch (Exception ignored) {
+    }
+
+    variables.put(varName, converted);
+}
+private void executeClearScreen() {
+    outputHandler.accept("\n\n\n\n\n");
+}
+    private void executeStatement() {
+        if (match(TokenType.NEWLINE)) return;
+
         if (match(TokenType.ESCREVA)) {
-            executeWrite(false);
+            executeWrite();
             consumeLineEnd();
             return;
         }
 
         if (match(TokenType.ESCREVAL)) {
-            executeWrite(true);
+            executeWrite();
             consumeLineEnd();
+            return;
+        }
+
+        if (match(TokenType.SE)) {
+            executeIf();
+            return;
+        }
+
+        if (match(TokenType.ENQUANTO)) {
+            executeWhile();
             return;
         }
 
@@ -103,7 +177,24 @@ public class PortugolInterpreter {
             return;
         }
 
-        if (check(TokenType.FIMALGORITMO)) {
+        if (match(TokenType.LEIA)) {
+    executeRead();
+    consumeLineEnd();
+    return;
+}
+
+if (match(TokenType.LIMPATELA)) {
+    executeClearScreen();
+    consumeLineEnd();
+    return;
+}
+
+        if (
+                check(TokenType.FIMALGORITMO) ||
+                check(TokenType.FIMSE) ||
+                check(TokenType.SENAO) ||
+                check(TokenType.FIMENQUANTO)
+        ) {
             return;
         }
 
@@ -112,25 +203,26 @@ public class PortugolInterpreter {
 
     private void executeAssignment() {
         Token name = consume(TokenType.IDENTIFIER, "Esperado nome da variável.");
+        String varName = normalizeName(name.getLexeme());
 
-        if (!variables.containsKey(name.getLexeme())) {
+        if (!variables.containsKey(varName)) {
             throw error(name, "Variável não declarada: " + name.getLexeme());
         }
 
         consume(TokenType.ASSIGN, "Esperado '<-' na atribuição.");
 
-        Object value = evaluateValue();
+        Object value = evaluateExpression();
 
-        variables.put(name.getLexeme(), value);
+        variables.put(varName, value);
     }
 
-    private void executeWrite(boolean newline) {
+    private void executeWrite() {
         consume(TokenType.LEFT_PAREN, "Esperado '('.");
 
         StringBuilder out = new StringBuilder();
 
         while (!check(TokenType.RIGHT_PAREN) && !isAtEnd()) {
-            Object value = evaluateValue();
+            Object value = evaluateExpression();
             out.append(value == null ? "" : value);
 
             if (match(TokenType.COMMA)) {
@@ -141,13 +233,182 @@ public class PortugolInterpreter {
         }
 
         consume(TokenType.RIGHT_PAREN, "Esperado ')'.");
-
         outputHandler.accept(out.toString());
     }
 
-    private Object evaluateValue() {
+    private void executeIf() {
+        boolean condition = toBoolean(evaluateExpression());
+
+        consume(TokenType.ENTAO, "Esperado 'entao'.");
+        consumeLineEnd();
+
+        if (condition) {
+            executeUntil(TokenType.SENAO, TokenType.FIMSE);
+
+            if (match(TokenType.SENAO)) {
+                skipUntil(TokenType.FIMSE);
+            }
+
+            consume(TokenType.FIMSE, "Esperado 'fimse'.");
+            consumeLineEnd();
+            return;
+        }
+
+        skipUntil(TokenType.SENAO, TokenType.FIMSE);
+
+if (match(TokenType.SENAO)) {
+    if (!check(TokenType.NEWLINE) && !check(TokenType.FIMSE)) {
+        if (!toBoolean(evaluateExpression())) {
+            skipUntil(TokenType.FIMSE);
+            consume(TokenType.FIMSE, "Esperado 'fimse'.");
+            consumeLineEnd();
+            return;
+        }
+
+        if (check(TokenType.ENTAO)) {
+            advance();
+        }
+    }
+
+    consumeLineEnd();
+    executeUntil(TokenType.FIMSE);
+}
+        consume(TokenType.FIMSE, "Esperado 'fimse'.");
+        consumeLineEnd();
+    }
+
+    private void executeWhile() {
+        int conditionStart = current;
+
+        while (true) {
+            current = conditionStart;
+
+            boolean condition = toBoolean(evaluateExpression());
+
+            consume(TokenType.FACA, "Esperado 'faca'.");
+            consumeLineEnd();
+
+            int bodyStart = current;
+
+            if (!condition) {
+                skipUntil(TokenType.FIMENQUANTO);
+                consume(TokenType.FIMENQUANTO, "Esperado 'fimenquanto'.");
+                consumeLineEnd();
+                return;
+            }
+
+            executeUntil(TokenType.FIMENQUANTO);
+
+            consume(TokenType.FIMENQUANTO, "Esperado 'fimenquanto'.");
+            consumeLineEnd();
+
+            current = conditionStart;
+
+            if (bodyStart == current) {
+                throw error(peek(), "Loop inválido.");
+            }
+        }
+    }
+
+    private void executeUntil(TokenType... stopTypes) {
+        while (!isAtEnd() && !checkAny(stopTypes)) {
+            executeStatement();
+        }
+    }
+
+    private void skipUntil(TokenType... stopTypes) {
+        while (!isAtEnd() && !checkAny(stopTypes)) {
+            advance();
+        }
+    }
+
+    private Object evaluateExpression() {
+        return evaluateComparison();
+    }
+
+    private Object evaluateComparison() {
+        Object left = evaluateAddition();
+
+        while (
+                match(TokenType.GREATER) ||
+                match(TokenType.GREATER_EQUAL) ||
+                match(TokenType.LESS) ||
+                match(TokenType.LESS_EQUAL) ||
+                match(TokenType.EQUAL) ||
+                match(TokenType.NOT_EQUAL)
+        ) {
+            Token operator = previous();
+            Object right = evaluateAddition();
+
+            left = switch (operator.getType()) {
+                case GREATER -> toNumber(left) > toNumber(right);
+                case GREATER_EQUAL -> toNumber(left) >= toNumber(right);
+                case LESS -> toNumber(left) < toNumber(right);
+                case LESS_EQUAL -> toNumber(left) <= toNumber(right);
+                case EQUAL -> valuesEqual(left, right);
+                case NOT_EQUAL -> !valuesEqual(left, right);
+                default -> throw error(operator, "Operador inválido.");
+            };
+        }
+
+        return left;
+    }
+
+    private Object evaluateAddition() {
+        Object left = evaluateMultiplication();
+
+        while (match(TokenType.PLUS) || match(TokenType.MINUS)) {
+            Token operator = previous();
+            Object right = evaluateMultiplication();
+
+            left = switch (operator.getType()) {
+                case PLUS -> {
+                    if (left instanceof String || right instanceof String) {
+                        yield String.valueOf(left) + String.valueOf(right);
+                    }
+
+                    yield normalizeNumber(toNumber(left) + toNumber(right));
+                }
+                case MINUS -> normalizeNumber(toNumber(left) - toNumber(right));
+                default -> throw error(operator, "Operador inválido.");
+            };
+        }
+
+        return left;
+    }
+
+    private Object evaluateMultiplication() {
+        Object left = evaluateUnary();
+
+        while (match(TokenType.STAR) || match(TokenType.SLASH)) {
+            Token operator = previous();
+            Object right = evaluateUnary();
+
+            left = switch (operator.getType()) {
+                case STAR -> normalizeNumber(toNumber(left) * toNumber(right));
+                case SLASH -> normalizeNumber(toNumber(left) / toNumber(right));
+                default -> throw error(operator, "Operador inválido.");
+            };
+        }
+
+        return left;
+    }
+
+    private Object evaluateUnary() {
+        if (match(TokenType.MINUS)) {
+            return normalizeNumber(-toNumber(evaluateUnary()));
+        }
+
+        if (match(TokenType.NOT)) {
+            return !toBoolean(evaluateUnary());
+        }
+
+        return evaluatePrimary();
+    }
+
+    private Object evaluatePrimary() {
         if (match(TokenType.STRING)) {
-            return previous().getLexeme().replaceAll("^\"|\"$", "");
+            return previous().getLexeme();
         }
 
         if (match(TokenType.NUMBER)) {
@@ -165,7 +426,7 @@ public class PortugolInterpreter {
         }
 
         if (match(TokenType.IDENTIFIER)) {
-            String name = previous().getLexeme();
+            String name = normalizeName(previous().getLexeme());
 
             if (!variables.containsKey(name)) {
                 throw error(previous(), "Variável não declarada: " + name);
@@ -180,24 +441,76 @@ public class PortugolInterpreter {
             return value;
         }
 
+        if (match(TokenType.LEFT_PAREN)) {
+            Object value = evaluateExpression();
+            consume(TokenType.RIGHT_PAREN, "Esperado ')'.");
+            return value;
+        }
+
         throw error(peek(), "Valor inválido: " + peek().getLexeme());
+    }
+
+    private boolean valuesEqual(Object a, Object b) {
+        if (a instanceof Number && b instanceof Number) {
+            return Double.compare(toNumber(a), toNumber(b)) == 0;
+        }
+
+        return String.valueOf(a).equalsIgnoreCase(String.valueOf(b));
+    }
+
+    private double toNumber(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+
+        throw new RuntimeException("Valor não numérico: " + value);
+    }
+
+    private boolean toBoolean(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+
+        if (value instanceof Number number) {
+            return number.doubleValue() != 0;
+        }
+
+        return Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private Object normalizeNumber(double value) {
+        if (value == Math.rint(value)) {
+            return (int) value;
+        }
+
+        return value;
+    }
+
+    private String normalizeName(String name) {
+        return name.toLowerCase();
     }
 
     private void consumeLineEnd() {
         while (match(TokenType.NEWLINE)) {
-            // limpa quebras de linha
         }
     }
 
     private void consumeUntil(TokenType... types) {
         while (!isAtEnd()) {
             for (TokenType type : types) {
-                if (check(type)) {
-                    return;
-                }
+                if (check(type)) return;
             }
+
             advance();
         }
+    }
+
+    private boolean checkAny(TokenType... types) {
+        for (TokenType type : types) {
+            if (check(type)) return true;
+        }
+
+        return false;
     }
 
     private boolean match(TokenType type) {
@@ -210,26 +523,17 @@ public class PortugolInterpreter {
     }
 
     private boolean check(TokenType type) {
-        if (isAtEnd()) {
-            return false;
-        }
-
+        if (isAtEnd()) return false;
         return peek().getType() == type;
     }
 
     private Token consume(TokenType type, String message) {
-        if (check(type)) {
-            return advance();
-        }
-
+        if (check(type)) return advance();
         throw error(peek(), message);
     }
 
     private Token advance() {
-        if (!isAtEnd()) {
-            current++;
-        }
-
+        if (!isAtEnd()) current++;
         return previous();
     }
 

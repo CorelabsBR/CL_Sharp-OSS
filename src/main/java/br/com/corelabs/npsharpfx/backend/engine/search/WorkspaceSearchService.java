@@ -138,6 +138,114 @@ public class WorkspaceSearchService {
     ========================================
     */
 
+public int replaceAll(
+        java.nio.file.Path workspace,
+        String search,
+        String replace,
+        boolean caseSensitive,
+        boolean wholeWord
+) throws java.io.IOException {
+
+    if (workspace == null || search == null || search.isBlank()) {
+        return 0;
+    }
+
+    if (replace == null) {
+        replace = "";
+    }
+
+    final String finalReplace = replace;
+    final int[] replacedCount = {0};
+
+    try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(workspace)) {
+        paths.filter(java.nio.file.Files::isRegularFile)
+                .filter(path -> {
+                    String name = path.getFileName().toString().toLowerCase();
+
+                    return name.endsWith(".java")
+                            || name.endsWith(".txt")
+                            || name.endsWith(".xml")
+                            || name.endsWith(".json")
+                            || name.endsWith(".css")
+                            || name.endsWith(".html")
+                            || name.endsWith(".js")
+                            || name.endsWith(".ts")
+                            || name.endsWith(".md")
+                            || name.endsWith(".gol")
+                            || name.endsWith(".por")
+                            || name.endsWith(".portugol");
+                })
+                .forEach(path -> {
+                    try {
+                        String content = java.nio.file.Files.readString(path);
+                        String newContent;
+
+                        if (wholeWord) {
+                            String flags = caseSensitive ? "" : "(?i)";
+                            String regex = flags + "\\b" + java.util.regex.Pattern.quote(search) + "\\b";
+
+                            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
+                            java.util.regex.Matcher matcher = pattern.matcher(content);
+
+                            int count = 0;
+                            while (matcher.find()) {
+                                count++;
+                            }
+
+                            newContent = matcher.replaceAll(
+                                    java.util.regex.Matcher.quoteReplacement(finalReplace)
+                            );
+
+                            replacedCount[0] += count;
+                        } else if (caseSensitive) {
+                            int count = countOccurrences(content, search);
+                            newContent = content.replace(search, finalReplace);
+                            replacedCount[0] += count;
+                        } else {
+                            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                                    java.util.regex.Pattern.quote(search),
+                                    java.util.regex.Pattern.CASE_INSENSITIVE
+                            );
+
+                            java.util.regex.Matcher matcher = pattern.matcher(content);
+
+                            int count = 0;
+                            while (matcher.find()) {
+                                count++;
+                            }
+
+                            newContent = matcher.replaceAll(
+                                    java.util.regex.Matcher.quoteReplacement(finalReplace)
+                            );
+
+                            replacedCount[0] += count;
+                        }
+
+                        if (!content.equals(newContent)) {
+                            java.nio.file.Files.writeString(path, newContent);
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+    }
+
+    return replacedCount[0];
+}
+
+private static int countOccurrences(String text, String search) {
+    int count = 0;
+    int index = 0;
+
+    while ((index = text.indexOf(search, index)) != -1) {
+        count++;
+        index += search.length();
+    }
+
+    return count;
+}
+
     private void searchFile(
             Path file,
             WorkspaceSearchQuery query,

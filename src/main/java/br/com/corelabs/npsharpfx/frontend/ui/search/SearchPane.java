@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javafx.scene.layout.HBox;
 
 import br.com.corelabs.npsharpfx.backend.engine.search.WorkspaceSearchService;
 import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchQuery;
@@ -28,7 +29,7 @@ import javafx.util.Duration;
 
 public class SearchPane {
 
-    private static final int MIN_SEARCH_LENGTH = 2;
+    private static final int MIN_SEARCH_LENGTH = 1;
     private static final int SEARCH_DELAY_MS = 450;
 
     private final Function<SearchQuery, List<SearchResult>> searchProvider;
@@ -36,6 +37,7 @@ public class SearchPane {
 
     private final VBox view;
     private final TextField queryField;
+    private final TextField replaceField;
     private final CheckBox caseSensitiveCheck;
     private final CheckBox wholeWordCheck;
     private final Label resultSummary;
@@ -56,14 +58,25 @@ public class SearchPane {
         System.out.println("SEARCH PANE CREATED");
 
         queryField = new TextField();
-        queryField.setPromptText("Search");
+        queryField.setPromptText("Pesquisar");
         queryField.getStyleClass().add("search-input");
+
+        replaceField = new TextField();
+        replaceField.setPromptText("Substituir");
+        replaceField.getStyleClass().add("search-input");
 
         caseSensitiveCheck = new CheckBox("Match Case");
         caseSensitiveCheck.getStyleClass().add("search-check");
 
-        wholeWordCheck = new CheckBox("Whole Word");
+        wholeWordCheck = new CheckBox("Toda a palavra");
         wholeWordCheck.getStyleClass().add("search-check");
+
+        Label replaceAllButton = new Label("Replace All");
+        replaceAllButton.getStyleClass().add("search-action");
+
+        replaceAllButton.setOnMouseClicked(e -> {
+        replaceAllOccurrences();
+        });
 
         resultSummary = new Label("No results");
         resultSummary.getStyleClass().add("search-summary");
@@ -97,9 +110,21 @@ public class SearchPane {
                 preview.getStyleClass().add("search-result-preview");
                 preview.setWrapText(true);
 
-                VBox box = new VBox(3, title, preview);
+                Label replaceOneButton = new Label("Replace");
+replaceOneButton.getStyleClass().add("search-action-small");
+replaceOneButton.setOnMouseClicked(e -> {
+    e.consume();
+    replaceSingleOccurrence(item);
+});
+
+HBox titleRow = new HBox(8, title, replaceOneButton);
+titleRow.setAlignment(Pos.CENTER_LEFT);
+
+VBox box = new VBox(3, titleRow, preview);
                 box.setAlignment(Pos.CENTER_LEFT);
                 box.getStyleClass().add("search-result-item");
+
+                
 
                 setGraphic(box);
             }
@@ -157,14 +182,16 @@ public class SearchPane {
 
         VBox.setVgrow(resultList, Priority.ALWAYS);
 
-        view = new VBox(
-                8,
-                queryField,
-                caseSensitiveCheck,
-                wholeWordCheck,
-                resultSummary,
-                resultList
-        );
+    view = new VBox(
+        8,
+        queryField,
+        replaceField,
+        replaceAllButton,
+        caseSensitiveCheck,
+        wholeWordCheck,
+        resultSummary,
+        resultList
+);
 
         view.getStyleClass().add("search-pane");
         view.setPadding(new Insets(10));
@@ -303,6 +330,102 @@ new Thread(() -> {
         }
     }
 
+
+            private void replaceAllOccurrences() {
+
+    String search =
+            queryField.getText();
+
+    String replace =
+            replaceField.getText();
+
+    if (search == null || search.isBlank()) {
+        resultSummary.setText("Nada para substituir");
+        return;
+    }
+
+    try {
+
+        int replaced = 0;
+
+        if (currentWorkspaceRoot != null) {
+
+            replaced =
+                    workspaceSearchService.replaceAll(
+                            currentWorkspaceRoot.toPath(),
+                            search,
+                            replace,
+                            caseSensitiveCheck.isSelected(),
+                            wholeWordCheck.isSelected()
+                    );
+        }
+
+        resultSummary.setText(
+                replaced + " ocorrência(s) substituída(s)"
+        );
+
+        runSearchAsync();
+
+    } catch (Exception e) {
+
+        e.printStackTrace();
+
+        resultSummary.setText(
+                "Erro ao substituir"
+        );
+    }
+}
+
+private void replaceSingleOccurrence(SearchResult result) {
+    if (result == null) {
+        return;
+    }
+
+    String search = queryField.getText();
+    String replace = replaceField.getText();
+
+    if (search == null || search.isBlank()) {
+        resultSummary.setText("Nada para substituir");
+        return;
+    }
+
+    if (replace == null) {
+        replace = "";
+    }
+
+    try {
+        File file = new File(result.getFileName());
+
+        if (!file.exists() || !file.isFile()) {
+            resultSummary.setText("Arquivo não encontrado");
+            return;
+        }
+
+        String content = java.nio.file.Files.readString(file.toPath());
+
+        int start = result.getStartOffset();
+        int end = result.getEndOffset();
+
+        if (start < 0 || end <= start || end > content.length()) {
+            resultSummary.setText("Offset inválido");
+            return;
+        }
+
+        String newContent =
+                content.substring(0, start)
+                        + replace
+                        + content.substring(end);
+
+        java.nio.file.Files.writeString(file.toPath(), newContent);
+
+        resultSummary.setText("1 ocorrência substituída");
+        runSearchAsync();
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        resultSummary.setText("Erro ao substituir ocorrência");
+    }
+}
     public static class SearchQuery {
 
         private final String text;
