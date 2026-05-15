@@ -518,20 +518,19 @@ public void runSelectedCode() {
 
     File file = editorManager.getCurrentFile();
 
-    terminalPane.newDebuggerConsole();
+    terminalPane.showDebugConsolePanel();
+    terminalPane.clearDebugConsole();
 
     if (file == null) {
-        terminalPane.appendOutput("[ERRO] Nenhum arquivo aberto.\n");
+        terminalPane.appendDebugOutput("[ERRO] Nenhum arquivo aberto.");
         return;
     }
 
     debuggerService.debug(
             file.toPath(),
-            line -> terminalPane.appendOutput(line + "\n"),
+            terminalPane::appendDebugOutput,
             terminalPane::waitInput
     );
-
-    terminalPane.focusCurrentTerminal();
 }
 
     private void openThemeChooser() {

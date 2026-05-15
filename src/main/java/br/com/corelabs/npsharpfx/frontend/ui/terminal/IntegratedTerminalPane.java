@@ -38,6 +38,10 @@ public class IntegratedTerminalPane extends BorderPane {
     private double currentHeight = 220;
     private boolean resizing = false;
     private java.util.function.Consumer<String> inputListener;
+    private final BorderPane debugConsolePane = new BorderPane();
+private final TextArea debugOutputArea = new TextArea();
+private final TextField debugInputField = new TextField();
+
     private final java.util.concurrent.BlockingQueue<String> inputQueue =
         new java.util.concurrent.LinkedBlockingQueue<>();
 
@@ -58,6 +62,8 @@ public class IntegratedTerminalPane extends BorderPane {
 
         setTop(topContainer);
         setCenter(tabPane);
+        setupDebugConsole();
+        showTerminalPanel();
 
         newTerminal();
     }
@@ -71,8 +77,65 @@ public class IntegratedTerminalPane extends BorderPane {
     }
 }
 
+private void setupDebugConsole() {
+    debugOutputArea.setEditable(false);
+    debugOutputArea.getStyleClass().add("terminal-output");
+
+    debugInputField.setPromptText("Entrada do programa...");
+    debugInputField.getStyleClass().add("terminal-input");
+
+    debugInputField.setOnAction(e -> {
+        String text = debugInputField.getText();
+
+        if (text == null) {
+            return;
+        }
+
+        debugOutputArea.appendText("> " + text + System.lineSeparator());
+        debugOutputArea.positionCaret(debugOutputArea.getText().length());
+
+        inputQueue.offer(text);
+
+        debugInputField.clear();
+    });
+
+    HBox inputBox = new HBox(debugInputField);
+    inputBox.setPadding(new Insets(8));
+    HBox.setHgrow(debugInputField, Priority.ALWAYS);
+
+    debugConsolePane.setCenter(debugOutputArea);
+    debugConsolePane.setBottom(inputBox);
+}
+
+public void showDebugConsolePanel() {
+    setCenter(debugConsolePane);
+    debugInputField.requestFocus();
+}
+
+public void showTerminalPanel() {
+    setCenter(tabPane);
+
+    if (!hasTerminal()) {
+        newTerminal();
+    }
+
+    focusCurrentTerminal();
+}
+
+public void clearDebugConsole() {
+    debugOutputArea.clear();
+    inputQueue.clear();
+}
+
+public void appendDebugOutput(String text) {
+    Platform.runLater(() -> {
+        debugOutputArea.appendText(text + System.lineSeparator());
+        debugOutputArea.positionCaret(debugOutputArea.getText().length());
+    });
+}
+
     private HBox buildHeader() {
-    Label problems = createPanelTab("PROBLEMS 48");
+    Label problems = createPanelTab("PROBLEMS");
     Label output = createPanelTab("OUTPUT");
     Label debugConsole = createPanelTab("DEBUG CONSOLE");
     Label terminal = createPanelTab("TERMINAL");
@@ -83,12 +146,8 @@ public class IntegratedTerminalPane extends BorderPane {
 
     problems.setOnMouseClicked(e -> appendOutput("[Problems ainda não implementado]"));
     output.setOnMouseClicked(e -> appendOutput("[Output ainda não implementado]"));
-    debugConsole.setOnMouseClicked(e -> newDebuggerConsole());
-    terminal.setOnMouseClicked(e -> {
-        if (!hasTerminal()) {
-            newTerminal();
-        }
-    });
+debugConsole.setOnMouseClicked(e -> showDebugConsolePanel());
+terminal.setOnMouseClicked(e -> showTerminalPanel());
     ports.setOnMouseClicked(e -> appendOutput("[Ports ainda não implementado]"));
     gitlens.setOnMouseClicked(e -> appendOutput("[GitLens ainda não implementado]"));
 
