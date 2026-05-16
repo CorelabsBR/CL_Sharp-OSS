@@ -142,7 +142,7 @@ public class FileExplorerPane {
             File home = new File(System.getProperty("user.home"));
 
             if (home.exists()) {
-                chooser.setInitialDirectory(home);
+                chooser.setInitialDirectory(home);  
             }
         }
 

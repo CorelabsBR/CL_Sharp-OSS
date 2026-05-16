@@ -81,6 +81,7 @@ private static final double MIN_HEIGHT = 520;
     private EditorManager editorManager;
     private FileExplorerPane explorerPane;
     private SearchPane searchPane;
+    private TitleBar titleBar;
 
     private static final String PREF_WORKSPACE = "workspace";
     private static final String PREF_OPEN_FILES = "openFiles";
@@ -364,7 +365,16 @@ registerActivity("debug",
         root = new BorderPane();
         root.getStyleClass().add("root-pane");
 
-        TitleBar titleBar = buildTitleBar();
+        titleBar = buildTitleBar();
+        titleBar.setWorkspaceNameSupplier(() -> {
+    File root = explorerPane.getCurrentRootFolder();
+
+    if (root == null) {
+        return "Nenhuma pasta aberta";
+    }
+
+    return root.getName();
+});
 
         VBox activityBar = activityBarManager.createActivityBar();
         StackPane sidePanelHost = sidePanelManager.getSidePanelHost();

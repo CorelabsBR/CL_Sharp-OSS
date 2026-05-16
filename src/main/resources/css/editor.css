@@ -4,6 +4,7 @@
 .styled-text-area,
 .paragraph-box {
     -fx-background-color: transparent;
+        -fx-font-family: "Consolas";
 }   
 
 .lineno {

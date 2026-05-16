@@ -1,0 +1,43 @@
+algoritmo "teste_interpreter"
+
+var
+    nome: caractere
+    idade: inteiro
+    altura: real
+    ativo: logico
+teste:caractere
+
+inicio
+
+    nome <- "Girelli"
+    idade <- 18
+    altura <- 1.85
+    ativo <- verdadeiro
+
+    escreval("=== TESTE DO INTERPRETADOR ===")
+    escreval("Nome: ", nome)
+    escreval("Idade: ", idade)
+    escreval("Altura: ", altura)
+    escreval("Ativo: ", ativo)
+escreval ("asdasd")
+leia(teste)
+escreval(teste)
+
+    idade <- idade + 2
+
+    escreval("Idade atualizada: ", idade)
+
+    se idade >= 18 entao
+        escreval("Maior de idade")
+    senao
+        escreval("Menor de idade")
+    fimse
+
+    enquanto idade < 25 faca
+        escreval("Loop idade: ", idade)
+        idade <- idade + 1
+    fimenquanto
+
+    escreval("Fim do programa")
+
+fimalgoritmo

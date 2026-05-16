@@ -4,12 +4,11 @@ import java.io.File;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
 import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeIconHelper;
-import br.com.corelabs.npsharpfx.backend.portugol.runtime.*;
-import br.com.corelabs.npsharpfx.frontend.ui.window.MainWindow;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -73,6 +72,7 @@ public class TitleBar extends HBox {
     private Label viewMenu;
     private Label goMenu;
     private Label moreMenu;
+    private Supplier<String> workspaceNameSupplier;
 
     private Label backButton;
     private Label forwardButton;
@@ -190,6 +190,31 @@ public class TitleBar extends HBox {
         applyCurrentIconTheme();
     }
 
+    public void setWorkspaceNameSupplier(Supplier<String> workspaceNameSupplier) {
+    this.workspaceNameSupplier = workspaceNameSupplier;
+    updateWorkspaceNameInCommandBar();
+}
+
+public void updateWorkspaceNameInCommandBar() {
+    if (commandBar != null) {
+        commandBar.setPromptText(getWorkspaceNameForBar());
+    }
+}
+
+private String getWorkspaceNameForBar() {
+    if (workspaceNameSupplier == null) {
+        return "Nenhuma pasta aberta";
+    }
+
+    String name = workspaceNameSupplier.get();
+
+    if (name == null || name.isBlank()) {
+        return "Nenhuma pasta aberta";
+    }
+
+    return name;
+}
+
     private void build() {
 
         ImageView logo = new ImageView(
@@ -211,9 +236,8 @@ public class TitleBar extends HBox {
 
         backButton.getStyleClass().add("title-toolbar-button-disabled");
         forwardButton.getStyleClass().add("title-toolbar-button-disabled");
-
-        commandBar = new TextField();
-        commandBar.setPromptText("NPSharp");
+commandBar = new TextField();
+commandBar.setPromptText(getWorkspaceNameForBar());
         commandBar.getStyleClass().add("command-bar");
         commandBar.setPrefWidth(420);
         commandBar.setMinWidth(220);

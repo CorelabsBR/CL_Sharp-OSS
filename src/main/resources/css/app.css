@@ -1573,13 +1573,6 @@
     -fx-fill: theme-brand;
 }
 
-.editor-textarea .syntax-string {
-    -fx-fill: #CE9178;
-}
-
-.editor-textarea .syntax-number {
-    -fx-fill: #B5CEA8;
-}
 
 .editor-textarea .syntax-comment {
     -fx-fill: theme-prompt-fg;
