@@ -1,12 +1,13 @@
 package br.com.corelabs.npsharpfx.frontend.ui.search;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import javafx.scene.layout.HBox;
 
 import br.com.corelabs.npsharpfx.backend.engine.search.WorkspaceSearchService;
 import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchQuery;
@@ -17,23 +18,28 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 public class SearchPane {
 
     private static final int MIN_SEARCH_LENGTH = 1;
-    private static final int SEARCH_DELAY_MS = 450;
+    private static final int SEARCH_DELAY_MS = 300;
 
     private final Function<SearchQuery, List<SearchResult>> searchProvider;
     private final Consumer<SearchResult> resultOpener;
+    private final WorkspaceSearchService workspaceSearchService = new WorkspaceSearchService();
+    private final AtomicLong searchVersion = new AtomicLong(0);
 
     private final VBox view;
     private final TextField queryField;
@@ -42,157 +48,83 @@ public class SearchPane {
     private final CheckBox wholeWordCheck;
     private final Label resultSummary;
     private final ListView<SearchResult> resultList;
-    private final WorkspaceSearchService workspaceSearchService;
-    private final AtomicLong searchVersion = new AtomicLong(0);
 
     private File currentWorkspaceRoot;
 
     public SearchPane(
             Function<SearchQuery, List<SearchResult>> searchProvider,
-            Consumer<SearchResult> resultOpener
-    ) {
+            Consumer<SearchResult> resultOpener) {
+
         this.searchProvider = searchProvider;
         this.resultOpener = resultOpener;
-        this.workspaceSearchService = new WorkspaceSearchService();
-
-        System.out.println("SEARCH PANE CREATED");
 
         queryField = new TextField();
-        queryField.setPromptText("Pesquisar");
+        queryField.setPromptText("Search");
         queryField.getStyleClass().add("search-input");
 
         replaceField = new TextField();
-        replaceField.setPromptText("Substituir");
+        replaceField.setPromptText("Replace");
         replaceField.getStyleClass().add("search-input");
 
         caseSensitiveCheck = new CheckBox("Match Case");
         caseSensitiveCheck.getStyleClass().add("search-check");
 
-        wholeWordCheck = new CheckBox("Toda a palavra");
+        wholeWordCheck = new CheckBox("Whole Word");
         wholeWordCheck.getStyleClass().add("search-check");
 
-        Label replaceAllButton = new Label("Replace All");
-        replaceAllButton.getStyleClass().add("search-action");
+        Button replaceAllButton = new Button("Replace All");
+        replaceAllButton.getStyleClass().add("search-action-button");
+        replaceAllButton.setMaxWidth(Double.MAX_VALUE);
+        replaceAllButton.setOnAction(e -> replaceAllOccurrences());
 
-        replaceAllButton.setOnMouseClicked(e -> {
-        replaceAllOccurrences();
-        });
-
-        resultSummary = new Label("No results");
+        resultSummary = new Label("Type to search");
         resultSummary.getStyleClass().add("search-summary");
 
         resultList = new ListView<>();
         resultList.getStyleClass().add("search-result-list");
-
-        resultList.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(SearchResult item, boolean empty) {
-                super.updateItem(item, empty);
-
-                if (empty || item == null) {
-                    setText(null);
-                    setGraphic(null);
-                    return;
-                }
-
-                String displayName = new File(item.getFileName()).getName();
-
-                Label title = new Label(
-                        displayName
-                                + "  Ln "
-                                + item.getLine()
-                                + ", Col "
-                                + item.getColumn()
-                );
-                title.getStyleClass().add("search-result-title");
-
-                Label preview = new Label(item.getPreview());
-                preview.getStyleClass().add("search-result-preview");
-                preview.setWrapText(true);
-
-                Label replaceOneButton = new Label("Replace");
-replaceOneButton.getStyleClass().add("search-action-small");
-replaceOneButton.setOnMouseClicked(e -> {
-    e.consume();
-    replaceSingleOccurrence(item);
-});
-
-HBox titleRow = new HBox(8, title, replaceOneButton);
-titleRow.setAlignment(Pos.CENTER_LEFT);
-
-VBox box = new VBox(3, titleRow, preview);
-                box.setAlignment(Pos.CENTER_LEFT);
-                box.getStyleClass().add("search-result-item");
-
-                
-
-                setGraphic(box);
-            }
-        });
-
+        resultList.setCellFactory(list -> new SearchResultCell());
         resultList.setOnMouseClicked(e -> {
             if (e.getClickCount() >= 2) {
                 openSelectedResult();
             }
         });
-
         resultList.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
                 openSelectedResult();
             }
         });
+        VBox.setVgrow(resultList, Priority.ALWAYS);
 
         PauseTransition debounce = new PauseTransition(Duration.millis(SEARCH_DELAY_MS));
-
         queryField.textProperty().addListener((obs, oldValue, newValue) -> {
             debounce.stop();
-
-            if (newValue == null || newValue.isBlank()) {
-                searchVersion.incrementAndGet();
-                resultList.setItems(FXCollections.observableArrayList());
-                resultSummary.setText("Digite para buscar");
+            if (clearIfQueryIsEmpty(newValue)) {
                 return;
             }
-
-            if (newValue.trim().length() < MIN_SEARCH_LENGTH) {
-                searchVersion.incrementAndGet();
-                resultList.setItems(FXCollections.observableArrayList());
-                resultSummary.setText("Escreva pelo menos 2 caracteres");
-                return;
-            }
-
-            resultSummary.setText("Buscando...");
-
+            resultSummary.setText("Searching...");
             debounce.setOnFinished(event -> runSearchAsync());
             debounce.playFromStart();
         });
-
         queryField.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
-                SearchResult first = resultList.getItems()
-                        .stream()
-                        .findFirst()
-                        .orElse(null);
-
-                if (first != null) {
-                    resultOpener.accept(first);
-                }
+                openFirstResult();
             }
         });
+        caseSensitiveCheck.selectedProperty().addListener((obs, oldValue, newValue) -> runSearchAsync());
+        wholeWordCheck.selectedProperty().addListener((obs, oldValue, newValue) -> runSearchAsync());
 
-        VBox.setVgrow(resultList, Priority.ALWAYS);
+        HBox options = new HBox(10, caseSensitiveCheck, wholeWordCheck);
+        options.setAlignment(Pos.CENTER_LEFT);
 
-    view = new VBox(
-        8,
-        queryField,
-        replaceField,
-        replaceAllButton,
-        caseSensitiveCheck,
-        wholeWordCheck,
-        resultSummary,
-        resultList
-);
-
+        view = new VBox(
+                8,
+                queryField,
+                replaceField,
+                replaceAllButton,
+                options,
+                resultSummary,
+                resultList
+        );
         view.getStyleClass().add("search-pane");
         view.setPadding(new Insets(10));
     }
@@ -207,7 +139,6 @@ VBox box = new VBox(3, titleRow, preview);
     }
 
     public void setWorkspaceRoot(File root) {
-        System.out.println("WORKSPACE SET: " + root);
         this.currentWorkspaceRoot = root;
         runSearchAsync();
     }
@@ -217,21 +148,8 @@ VBox box = new VBox(3, titleRow, preview);
     }
 
     private void runSearchAsync() {
-        String raw = queryField.getText();
-
-        if (raw == null || raw.isBlank()) {
-            searchVersion.incrementAndGet();
-            resultList.setItems(FXCollections.observableArrayList());
-            resultSummary.setText("Digite para buscar");
-            return;
-        }
-
-        raw = raw.trim();
-
-        if (raw.length() < MIN_SEARCH_LENGTH) {
-            searchVersion.incrementAndGet();
-            resultList.setItems(FXCollections.observableArrayList());
-            resultSummary.setText("Escreva pelo menos 2 caracteres");
+        String raw = normalizedQuery();
+        if (clearIfQueryIsEmpty(raw)) {
             return;
         }
 
@@ -241,202 +159,233 @@ VBox box = new VBox(3, titleRow, preview);
                 wholeWordCheck.isSelected()
         );
 
-        File workspaceRootSnapshot = currentWorkspaceRoot;
+        File workspaceSnapshot = currentWorkspaceRoot;
         long version = searchVersion.incrementAndGet();
+        resultSummary.setText("Searching...");
 
-        resultSummary.setText("Buscando...");
+        Thread searchThread = new Thread(() -> {
+            List<SearchResult> results = doSearch(query, workspaceSnapshot);
 
-new Thread(() -> {
-    List<SearchResult> finalResults = doSearch(query, workspaceRootSnapshot);
+            Platform.runLater(() -> {
+                if (version != searchVersion.get()) {
+                    return;
+                }
 
-    Platform.runLater(() -> {
-        if (version != searchVersion.get()) {
-            return;
-        }
-
-        resultList.setItems(FXCollections.observableArrayList(finalResults));
-        resultSummary.setText(finalResults.size() + " result(s)");
-    });
-}, "npsharp-search-thread").start();
+                resultList.setItems(FXCollections.observableArrayList(results));
+                resultSummary.setText(formatSummary(results.size(), workspaceSnapshot));
+                if (!results.isEmpty()) {
+                    resultList.getSelectionModel().select(0);
+                }
+            });
+        }, "npsharp-search-thread");
+        searchThread.setDaemon(true);
+        searchThread.start();
     }
 
     private List<SearchResult> doSearch(SearchQuery query, File workspaceRootSnapshot) {
-        List<SearchResult> finalResults = new ArrayList<>();
+        List<SearchResult> results = new ArrayList<>();
 
         try {
-            List<SearchResult> openFileResults = searchProvider.apply(query);
-            finalResults.addAll(openFileResults);
-        } catch (Exception e) {
-            e.printStackTrace();
+            results.addAll(searchProvider.apply(query));
+        } catch (Exception ignored) {
         }
 
         if (workspaceRootSnapshot != null
                 && workspaceRootSnapshot.exists()
                 && workspaceRootSnapshot.isDirectory()) {
-
             try {
-                List<WorkspaceSearchResult> workspaceResults =
-                        workspaceSearchService.search(
-                                workspaceRootSnapshot.toPath(),
-                                new WorkspaceSearchQuery(
-                                        query.getText(),
-                                        query.isCaseSensitive(),
-                                        query.isWholeWord()
-                                )
-                        );
+                List<WorkspaceSearchResult> workspaceResults = workspaceSearchService.search(
+                        workspaceRootSnapshot.toPath(),
+                        new WorkspaceSearchQuery(
+                                query.getText(),
+                                query.isCaseSensitive(),
+                                query.isWholeWord()
+                        )
+                );
 
-                List<SearchResult> mapped = workspaceResults.stream()
-                        .map(wr -> new SearchResult(
-                                null,
-                                wr.getFile().toAbsolutePath().toString(),
-                                wr.getLine(),
-                                wr.getColumn(),
-                                wr.getPreview(),
-                                wr.getStartOffset(),
-                                wr.getEndOffset()
-                        ))
-                        .toList();
-
-                finalResults.addAll(mapped);
-
-            } catch (Exception e) {
-                e.printStackTrace();
+                workspaceResults.stream()
+                        .map(this::mapWorkspaceResult)
+                        .forEach(results::add);
+            } catch (Exception ignored) {
             }
         }
 
-        finalResults.sort((a, b) -> {
-            boolean aOpen = a.getTab() != null;
-            boolean bOpen = b.getTab() != null;
+        results.sort(Comparator
+                .comparing((SearchResult result) -> result.getTab() == null)
+                .thenComparing(SearchResult::getFileName, Comparator.nullsLast(String::compareToIgnoreCase))
+                .thenComparingInt(SearchResult::getLine)
+                .thenComparingInt(SearchResult::getColumn));
 
-            if (aOpen && !bOpen) {
-                return -1;
-            }
+        return results;
+    }
 
-            if (!aOpen && bOpen) {
-                return 1;
-            }
-
-            return 0;
-        });
-
-        return finalResults;
+    private SearchResult mapWorkspaceResult(WorkspaceSearchResult result) {
+        return new SearchResult(
+                null,
+                result.getFile().toAbsolutePath().toString(),
+                result.getLine(),
+                result.getColumn(),
+                result.getPreview(),
+                result.getStartOffset(),
+                result.getEndOffset()
+        );
     }
 
     private void openSelectedResult() {
         SearchResult selected = resultList.getSelectionModel().getSelectedItem();
-
         if (selected != null) {
             resultOpener.accept(selected);
         }
     }
 
-
-            private void replaceAllOccurrences() {
-
-    String search =
-            queryField.getText();
-
-    String replace =
-            replaceField.getText();
-
-    if (search == null || search.isBlank()) {
-        resultSummary.setText("Nada para substituir");
-        return;
-    }
-
-    try {
-
-        int replaced = 0;
-
-        if (currentWorkspaceRoot != null) {
-
-            replaced =
-                    workspaceSearchService.replaceAll(
-                            currentWorkspaceRoot.toPath(),
-                            search,
-                            replace,
-                            caseSensitiveCheck.isSelected(),
-                            wholeWordCheck.isSelected()
-                    );
+    private void openFirstResult() {
+        SearchResult first = resultList.getItems().stream().findFirst().orElse(null);
+        if (first != null) {
+            resultOpener.accept(first);
         }
-
-        resultSummary.setText(
-                replaced + " ocorrência(s) substituída(s)"
-        );
-
-        runSearchAsync();
-
-    } catch (Exception e) {
-
-        e.printStackTrace();
-
-        resultSummary.setText(
-                "Erro ao substituir"
-        );
-    }
-}
-
-private void replaceSingleOccurrence(SearchResult result) {
-    if (result == null) {
-        return;
     }
 
-    String search = queryField.getText();
-    String replace = replaceField.getText();
-
-    if (search == null || search.isBlank()) {
-        resultSummary.setText("Nada para substituir");
-        return;
-    }
-
-    if (replace == null) {
-        replace = "";
-    }
-
-    try {
-        File file = new File(result.getFileName());
-
-        if (!file.exists() || !file.isFile()) {
-            resultSummary.setText("Arquivo não encontrado");
+    private void replaceAllOccurrences() {
+        String search = normalizedQuery();
+        if (search.isBlank()) {
+            resultSummary.setText("Nothing to replace");
             return;
         }
 
-        String content = java.nio.file.Files.readString(file.toPath());
-
-        int start = result.getStartOffset();
-        int end = result.getEndOffset();
-
-        if (start < 0 || end <= start || end > content.length()) {
-            resultSummary.setText("Offset inválido");
+        if (currentWorkspaceRoot == null || !currentWorkspaceRoot.isDirectory()) {
+            resultSummary.setText("Open a folder to replace across files");
             return;
         }
 
-        String newContent =
-                content.substring(0, start)
-                        + replace
-                        + content.substring(end);
-
-        java.nio.file.Files.writeString(file.toPath(), newContent);
-
-        resultSummary.setText("1 ocorrência substituída");
-        runSearchAsync();
-
-    } catch (Exception e) {
-        e.printStackTrace();
-        resultSummary.setText("Erro ao substituir ocorrência");
+        try {
+            int replaced = workspaceSearchService.replaceAll(
+                    currentWorkspaceRoot.toPath(),
+                    search,
+                    replaceField.getText(),
+                    caseSensitiveCheck.isSelected(),
+                    wholeWordCheck.isSelected()
+            );
+            resultSummary.setText(replaced + " occurrence(s) replaced");
+            runSearchAsync();
+        } catch (Exception e) {
+            resultSummary.setText("Replace failed: " + firstLine(e.getMessage()));
+        }
     }
-}
+
+    private void replaceSingleOccurrence(SearchResult result) {
+        String search = normalizedQuery();
+        if (result == null || search.isBlank()) {
+            resultSummary.setText("Nothing to replace");
+            return;
+        }
+
+        try {
+            File file = new File(result.getFileName());
+            if (!file.isFile()) {
+                resultSummary.setText("File not found");
+                return;
+            }
+
+            String content = Files.readString(file.toPath());
+            int start = result.getStartOffset();
+            int end = result.getEndOffset();
+
+            if (start < 0 || end <= start || end > content.length()) {
+                resultSummary.setText("Invalid result position");
+                return;
+            }
+
+            String replacement = replaceField.getText() == null ? "" : replaceField.getText();
+            String newContent = content.substring(0, start) + replacement + content.substring(end);
+            Files.writeString(file.toPath(), newContent);
+
+            resultSummary.setText("1 occurrence replaced");
+            runSearchAsync();
+        } catch (Exception e) {
+            resultSummary.setText("Replace failed: " + firstLine(e.getMessage()));
+        }
+    }
+
+    private boolean clearIfQueryIsEmpty(String value) {
+        if (value == null || value.trim().length() < MIN_SEARCH_LENGTH) {
+            searchVersion.incrementAndGet();
+            resultList.setItems(FXCollections.observableArrayList());
+            resultSummary.setText("Type to search");
+            return true;
+        }
+        return false;
+    }
+
+    private String normalizedQuery() {
+        String text = queryField.getText();
+        return text == null ? "" : text.trim();
+    }
+
+    private String formatSummary(int count, File workspace) {
+        String scope = workspace == null ? "open editors" : workspace.getName();
+        return count + " result(s) in " + scope;
+    }
+
+    private String firstLine(String text) {
+        if (text == null || text.isBlank()) {
+            return "unknown error";
+        }
+        return text.lines().findFirst().orElse(text);
+    }
+
+    private final class SearchResultCell extends ListCell<SearchResult> {
+        @Override
+        protected void updateItem(SearchResult item, boolean empty) {
+            super.updateItem(item, empty);
+
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+
+            Label title = new Label(resultTitle(item));
+            title.getStyleClass().add("search-result-title");
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Button replaceButton = new Button("Replace");
+            replaceButton.getStyleClass().add("search-action-small");
+            replaceButton.setOnAction(event -> {
+                event.consume();
+                replaceSingleOccurrence(item);
+            });
+
+            HBox titleRow = new HBox(8, title, spacer, replaceButton);
+            titleRow.setAlignment(Pos.CENTER_LEFT);
+
+            Label preview = new Label(item.getPreview() == null ? "" : item.getPreview());
+            preview.getStyleClass().add("search-result-preview");
+            preview.setWrapText(true);
+
+            VBox box = new VBox(3, titleRow, preview);
+            box.setAlignment(Pos.CENTER_LEFT);
+            box.getStyleClass().add("search-result-item");
+
+            setGraphic(box);
+        }
+
+        private String resultTitle(SearchResult item) {
+            String displayName = item.getFileName() == null
+                    ? "Untitled"
+                    : new File(item.getFileName()).getName();
+            return displayName + "  Ln " + item.getLine() + ", Col " + item.getColumn();
+        }
+    }
+
     public static class SearchQuery {
 
         private final String text;
         private final boolean caseSensitive;
         private final boolean wholeWord;
 
-        public SearchQuery(
-                String text,
-                boolean caseSensitive,
-                boolean wholeWord
-        ) {
+        public SearchQuery(String text, boolean caseSensitive, boolean wholeWord) {
             this.text = text;
             this.caseSensitive = caseSensitive;
             this.wholeWord = wholeWord;

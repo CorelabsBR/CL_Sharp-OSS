@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.FileIconManager;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -43,6 +44,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class FileExplorerPane {
 
@@ -74,22 +76,6 @@ public class FileExplorerPane {
         VBox.setVgrow(treeView, Priority.ALWAYS);
 
         this.treeView.setCellFactory(tv -> new ExplorerTreeCell());
-
-        this.treeView.setOnMouseClicked(event -> {
-            if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 2) {
-                return;
-            }
-
-            TreeItem<File> selected = treeView.getSelectionModel().getSelectedItem();
-            if (selected == null) {
-                return;
-            }
-
-            File file = selected.getValue();
-            if (file != null && file.isFile() && onFileOpen != null) {
-                onFileOpen.accept(file);
-            }
-        });
 
         this.treeView.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
@@ -254,10 +240,13 @@ public class FileExplorerPane {
         Label collapse = createToolbarButton("/icons/codicons/collapse-all.svg", "Recolher tudo");
         collapse.setOnMouseClicked(event -> collapseAll());
 
+        Label rename = createToolbarButton("/icons/codicons/rename.svg", "Renomear selecionado");
+        rename.setOnMouseClicked(event -> renameSelectedItem());
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox box = new HBox(4, spacer, newFile, newFolder, refresh, collapse);
+        HBox box = new HBox(4, spacer, newFile, newFolder, rename, refresh, collapse);
         box.getStyleClass().add("explorer-toolbar");
         box.setAlignment(Pos.CENTER_RIGHT);
         return box;
@@ -414,6 +403,13 @@ public class FileExplorerPane {
         TreeItem<File> item = findItem(treeView.getRoot(), file);
         if (item != null) {
             startInlineRename(item);
+        }
+    }
+
+    private void renameSelectedItem() {
+        TreeItem<File> selected = treeView.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            startInlineRename(selected);
         }
     }
 
@@ -615,6 +611,14 @@ public class FileExplorerPane {
             return;
         }
 
+        openTreeItem(selected);
+    }
+
+    private void openTreeItem(TreeItem<File> selected) {
+        if (selected == null) {
+            return;
+        }
+
         File file = selected.getValue();
         if (file == null) {
             return;
@@ -753,7 +757,28 @@ public class FileExplorerPane {
 
     private final class ExplorerTreeCell extends TreeCell<File> {
 
+        private final PauseTransition openDelay = new PauseTransition(Duration.millis(230));
         private TextField editor;
+
+        private ExplorerTreeCell() {
+            setOnMouseClicked(event -> {
+                if (event.getButton() != MouseButton.PRIMARY || isEmpty() || getTreeItem() == null) {
+                    return;
+                }
+
+                TreeItem<File> item = getTreeItem();
+                treeView.getSelectionModel().select(item);
+
+                if (event.getClickCount() == 1) {
+                    openDelay.stop();
+                } else if (event.getClickCount() == 2) {
+                    openDelay.stop();
+                    openDelay.setOnFinished(finished -> openTreeItem(item));
+                    openDelay.playFromStart();
+                    event.consume();
+                }
+            });
+        }
 
         @Override
         public void startEdit() {

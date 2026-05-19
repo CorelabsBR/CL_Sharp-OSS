@@ -1,0 +1,72 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Aqua_Dark_Clean",
+  "type": "dark",
+
+  "colors": {
+    "editor.background": "#0A0F11",
+    "editor.foreground": "#E8FFFF",
+
+    "editorCursor.foreground": "#3FE6C8",
+    "editor.selectionBackground": "#133C3A",
+    "editor.inactiveSelectionBackground": "#0F2A29",
+    "editorLineNumber.foreground": "#2B3A3D",
+    "editorLineNumber.activeForeground": "#3FE6C8",
+
+    "editorWhitespace.foreground": "#162628",
+
+    "activityBar.background": "#0C1214",
+    "activityBar.foreground": "#E8FFFF",
+    "activityBarBadge.background": "#2CC9B2",
+    "activityBarBadge.foreground": "#000000",
+
+    "sideBar.background": "#0C1214",
+    "sideBar.foreground": "#DAFFFF",
+
+    "statusBar.background": "#0C1214",
+    "statusBar.foreground": "#3FE6C8",
+
+    "tab.activeBackground": "#11181A",
+    "tab.activeForeground": "#FFFFFF",
+    "tab.inactiveBackground": "#080D0E",
+    "tab.inactiveForeground": "#8EB9B9",
+    "tab.border": "#00000000",
+    "tab.activeBorder": "#2CC9B2",
+
+    "terminal.background": "#0A0F11",
+    "terminal.foreground": "#E8FFFF",
+    "terminalCursor.foreground": "#3FE6C8",
+
+    "terminal.ansiBlack": "#0D1516",
+    "terminal.ansiRed": "#C76060",
+    "terminal.ansiGreen": "#2CC9B2",
+    "terminal.ansiYellow": "#3FE6C8",
+    "terminal.ansiBlue": "#6ED8D0",
+    "terminal.ansiMagenta": "#5ACFC4",
+    "terminal.ansiCyan": "#3FE6C8",
+    "terminal.ansiWhite": "#FFFFFF",
+
+    "button.background": "#2CC9B2",
+    "button.foreground": "#000000",
+    "button.hoverBackground": "#3FE6C8"
+  },
+
+  "semanticHighlighting": true,
+
+  "tokenColors": [
+    { "scope": "comment", "settings": { "foreground": "#7DA6A6", "fontStyle": "italic" } },
+
+    { "scope": "keyword", "settings": { "foreground": "#3FE6C8" } },
+    { "scope": "string", "settings": { "foreground": "#CFFFFF" } },
+    { "scope": "number", "settings": { "foreground": "#3FE6C8" } },
+
+    { "scope": "variable", "settings": { "foreground": "#2CC9B2" } },
+    { "scope": "constant", "settings": { "foreground": "#3FE6C8" } },
+
+    { "scope": "function", "settings": { "foreground": "#E8FFFF" } },
+    { "scope": "type", "settings": { "foreground": "#2CC9B2" } },
+    { "scope": "operator", "settings": { "foreground": "#3FE6C8" } },
+
+    { "scope": "punctuation", "settings": { "foreground": "#A8D7D7" } }
+  ]
+}

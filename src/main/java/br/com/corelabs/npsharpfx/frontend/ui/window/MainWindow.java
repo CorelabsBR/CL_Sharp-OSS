@@ -316,7 +316,7 @@ registerActivity("debug",
         registerActivity("extensions",
                 extBtn,
                 sidePanelManager.wrapSidePanel("EXTENSIONS",
-                    settingsPanelBuilder.buildPlaceholderPanel("EXTENSIONS", "Sistema de extensões virá depois."),
+                    buildExtensionsPanel(),
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
 
         Button settingsBtn = activityBarManager.createActivityButton();
@@ -346,12 +346,12 @@ registerActivity("debug",
     Label title = new Label("Run and Debug");
     title.getStyleClass().add("settings-title");
 
-    Button runButton = new Button("▶ Rodar arquivo atual");
+    Button runButton = new Button("Run current file");
     runButton.setMaxWidth(Double.MAX_VALUE);
     runButton.getStyleClass().add("terminal-control-button");
     runButton.setOnAction(event -> runSelectedCode());
 
-    Button debugConsoleButton = new Button("▣ Abrir Debug Console");
+    Button debugConsoleButton = new Button("Open Debug Console");
     debugConsoleButton.setMaxWidth(Double.MAX_VALUE);
     debugConsoleButton.getStyleClass().add("terminal-control-button");
     debugConsoleButton.setOnAction(event -> {
@@ -361,7 +361,7 @@ registerActivity("debug",
         statusBarManager.updateStatusRight("Debug");
     });
 
-    Button clearButton = new Button("🧹 Limpar Console Atual");
+    Button clearButton = new Button("Clear Current Console");
     clearButton.setMaxWidth(Double.MAX_VALUE);
     clearButton.getStyleClass().add("terminal-control-button");
     clearButton.setOnAction(event -> {
@@ -373,7 +373,7 @@ registerActivity("debug",
     Label info = new Label(
             "F5 roda o arquivo atual.\n" +
             "Arquivos .gol, .por e .portugol usam o runtime Portugol.\n" +
-            "O leia() usa o Debug Console, não o terminal CMD."
+            "O leia() usa o Debug Console, nao o terminal CMD."
     );
     info.setWrapText(true);
     info.getStyleClass().add("settings-description");
@@ -388,6 +388,82 @@ registerActivity("debug",
 
     return panel;
 }
+
+    private Node buildExtensionsPanel() {
+        VBox panel = new VBox(10);
+        panel.setPadding(new Insets(12));
+        panel.getStyleClass().add("settings-panel");
+
+        Label title = new Label("Installed Tools");
+        title.getStyleClass().add("settings-title");
+
+        Label description = new Label("Runtimes and command-line tools used by run, debug and source control.");
+        description.setWrapText(true);
+        description.getStyleClass().add("settings-description");
+
+        Button rescanButton = createSourceControlButton("Rescan PATH");
+        rescanButton.setOnAction(event -> {
+            rescanRuntimePaths();
+            refreshExtensionsPanel();
+        });
+
+        VBox runtimeList = new VBox(6);
+        runtimeList.getStyleClass().add("runtime-list");
+        populateRuntimeList(runtimeList);
+
+        panel.getChildren().addAll(title, description, rescanButton, new Separator(), runtimeList);
+        return panel;
+    }
+
+    private void refreshExtensionsPanel() {
+        ActivityItem item = activityItems.get("extensions");
+        if (item == null) {
+            return;
+        }
+
+        registerActivity("extensions",
+                item.button,
+                sidePanelManager.wrapSidePanel("EXTENSIONS",
+                        buildExtensionsPanel(),
+                        () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
+        sidePanelManager.showSidePanel("extensions", this::updateStatusOnPanelChange);
+    }
+
+    private void populateRuntimeList(VBox runtimeList) {
+        RuntimeRegistry registry = new RuntimeRegistry(RuntimePaths.appDataDir());
+        try {
+            registry.load();
+        } catch (Exception ignored) {
+        }
+
+        for (LanguageRuntime language : LanguageRuntime.values()) {
+            HBox row = new HBox(8);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.getStyleClass().add("runtime-row");
+
+            boolean installed = registry.isInstalled(language);
+            String state = installed ? "Configured" : "Missing";
+
+            Label name = new Label(language.displayName());
+            name.getStyleClass().add("runtime-name");
+
+            Label status = new Label(state);
+            status.getStyleClass().add(installed ? "runtime-state-ok" : "runtime-state-missing");
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Button configure = new Button("Path");
+            configure.getStyleClass().add("terminal-control-button");
+            configure.setOnAction(event -> {
+                configureRuntimePath(language);
+                refreshExtensionsPanel();
+            });
+
+            row.getChildren().addAll(name, spacer, status, configure);
+            runtimeList.getChildren().add(row);
+        }
+    }
 
     private Node buildSourceControlPanel() {
         VBox panel = new VBox(8);
@@ -995,7 +1071,7 @@ registerActivity("debug",
         scene.getStylesheets().add(
                 Objects.requireNonNull(
                         getClass().getResource("/css/app.css"),
-                        "CSS /css/app.css nÃƒÂ£o encontrado"
+                        "CSS /css/app.css nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrado"
                 ).toExternalForm()
         );
 
@@ -1242,6 +1318,19 @@ registerActivity("debug",
         commands.add(new CommandAction("Preferences: Wallpaper Opacity -", "", "wallpaper opacidade diminuir", () -> adjustWallpaperOpacity(-0.08)));
         commands.add(new CommandAction("Preferences: Remove Wallpaper", "", "wallpaper remover", this::clearWallpaper));
 
+        commands.add(new CommandAction("Runtime: Rescan PATH", "", "runtime path ferramenta linguagem git debug", this::rescanRuntimePaths));
+        for (LanguageRuntime language : LanguageRuntime.values()) {
+            if (language == LanguageRuntime.PORTUGOL) {
+                continue;
+            }
+            commands.add(new CommandAction(
+                    "Runtime: Configure " + language.displayName() + " Path...",
+                    "",
+                    "runtime caminho fisico path exe ferramenta " + language.id(),
+                    () -> configureRuntimePath(language)
+            ));
+        }
+
         commands.add(new CommandAction("Git: Refresh", "", "git atualizar", this::refreshSourceControlPanel));
         commands.add(new CommandAction("Git: Stage All", "", "git add stage", () -> {
             runGitCommand("add", "-A");
@@ -1345,12 +1434,18 @@ public void runSelectedCode() {
                     showTerminalPane();
                     terminalPane.showTerminalPanel();
                 }),
+                createPopupMenuItem("Configurar ferramentas no PATH", null, () -> {
+                    settingsPopup.hide();
+                    showCommandPalette();
+                    commandPaletteInput.setText("Runtime: ");
+                    commandPaletteInput.positionCaret(commandPaletteInput.getText().length());
+                }),
                 createPopupMenuItem("Temas", "Escolher", () -> {
                     settingsPopup.hide();
                     openThemeChooser();
                 }),
                 new Separator(),
-                createPopupMenuItem("Backup e sincronizar configurações", null, null),
+                createPopupMenuItem("Backup e sincronizar configuraÃƒÂ§ÃƒÂµes", null, null),
                 new Separator(),
                 createPopupMenuItem("Wallpapers", "Escolher", () -> {
                     settingsPopup.hide();
@@ -1434,6 +1529,53 @@ public void runSelectedCode() {
         double next = Math.max(0.0, Math.min(0.85, current + delta));
         themeManager.setWallpaperOpacity(next, wallpaperLayer, wallpaperOverlay, appRoot);
         statusBarManager.updateStatusLeft("Opacidade do wallpaper: " + (int) Math.round(next * 100) + "%");
+    }
+
+    private void rescanRuntimePaths() {
+        try {
+            RuntimeRegistry registry = new RuntimeRegistry(RuntimePaths.appDataDir());
+            registry.load();
+            int found = registry.discoverAllFromPath();
+            registry.save();
+            debuggerService = new DebuggerService();
+            refreshSourceControlPanel();
+            statusBarManager.updateStatusLeft(found == 0
+                    ? "Nenhuma nova ferramenta encontrada no PATH"
+                    : found + " ferramenta(s) registrada(s) via PATH");
+        } catch (Exception e) {
+            statusBarManager.updateStatusLeft("Falha ao procurar ferramentas: " + firstLine(e.getMessage()));
+        }
+    }
+
+    private void configureRuntimePath(LanguageRuntime language) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Selecionar executavel de " + language.displayName());
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Executaveis e scripts", "*.exe", "*.cmd", "*.bat", "*.sh", "*.*"),
+                new FileChooser.ExtensionFilter("Todos os arquivos", "*.*")
+        );
+
+        File selected = chooser.showOpenDialog(stage);
+        if (selected == null) {
+            statusBarManager.updateStatusLeft("Configuracao cancelada: " + language.displayName());
+            return;
+        }
+
+        try {
+            RuntimeRegistry registry = new RuntimeRegistry(RuntimePaths.appDataDir());
+            registry.load();
+            registry.registerExecutable(language, selected.toPath());
+            registry.save();
+            debuggerService = new DebuggerService();
+
+            if (language == LanguageRuntime.GIT) {
+                refreshSourceControlPanel();
+            }
+
+            statusBarManager.updateStatusLeft(language.displayName() + " configurado: " + selected.getName());
+        } catch (Exception e) {
+            statusBarManager.updateStatusLeft("Falha ao configurar " + language.displayName() + ": " + firstLine(e.getMessage()));
+        }
     }
 
     private void openFolderInExplorer() {
@@ -1590,10 +1732,11 @@ private void closeFolderFromExplorer() {
             case "search" -> "Busca";
             case "git" -> "Git";
             case "debug" -> "Debug";
-            case "extensions" -> "Extensões";
-            case "settings" -> "Configurações";     
+            case "extensions" -> "ExtensÃƒÂµes";
+            case "settings" -> "ConfiguraÃƒÂ§ÃƒÂµes";     
             default -> "Painel";
         };
     }
 }
+
 

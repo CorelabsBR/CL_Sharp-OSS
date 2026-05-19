@@ -139,17 +139,17 @@ public void appendDebugOutput(String text) {
     Label debugConsole = createPanelTab("DEBUG CONSOLE");
     Label terminal = createPanelTab("TERMINAL");
     Label ports = createPanelTab("PORTS");
-    Label gitlens = createPanelTab("GITLENS");
+    Label gitlens = createPanelTab("GIT");
 
     terminal.getStyleClass().add("integrated-terminal-tab-active");
 
     problems.setOnMouseClicked(e -> {
         showTerminalPanel();
-        appendOutput("[Problems] Nenhum problema registrado nesta sessão.");
+        appendOutput("[Problems] Nenhum problema registrado nesta sessao.");
     });
     output.setOnMouseClicked(e -> {
         showTerminalPanel();
-        appendOutput("[Output] Canal de saída ativo.");
+        appendOutput("[Output] Canal de saida ativo.");
     });
 debugConsole.setOnMouseClicked(e -> showDebugConsolePanel());
 terminal.setOnMouseClicked(e -> showTerminalPanel());
@@ -162,28 +162,28 @@ terminal.setOnMouseClicked(e -> showTerminalPanel());
         appendOutput("[Git] Use o painel Source Control para branch, stage e commit.");
     });
 
-    Label currentShell = new Label("▣ powershell");
+    Label currentShell = new Label("powershell");
     currentShell.getStyleClass().add("integrated-terminal-shell-label");
 
     Button newTerminalBtn = createHeaderButton("+", "Novo Terminal");
     newTerminalBtn.setOnAction(e -> newTerminal());
 
-    Button dropdownBtn = createHeaderButton("⌄", "Selecionar Terminal");
+    Button dropdownBtn = createHeaderButton("v", "Selecionar Terminal");
     dropdownBtn.setOnAction(e -> showTerminalPanel());
 
-    Button splitTerminalBtn = createHeaderButton("▥", "Dividir Terminal");
+    Button splitTerminalBtn = createHeaderButton("|", "Dividir Terminal");
     splitTerminalBtn.setOnAction(e -> splitTerminal());
 
-    Button killTerminalBtn = createHeaderButton("🗑", "Fechar Terminal");
+    Button killTerminalBtn = createHeaderButton("x", "Fechar Terminal");
     killTerminalBtn.setOnAction(e -> killCurrentTerminal());
 
-    Button moreBtn = createHeaderButton("⋯", "Mais ações");
-    moreBtn.setOnAction(e -> appendOutput("[Terminal] Ações: novo, dividir, limpar ou fechar terminal."));
+    Button moreBtn = createHeaderButton("...", "Mais acoes");
+    moreBtn.setOnAction(e -> appendOutput("[Terminal] AÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes: novo, dividir, limpar ou fechar terminal."));
 
-    Button maximizeBtn = createHeaderButton("□", "Maximizar painel");
+    Button maximizeBtn = createHeaderButton("^", "Maximizar painel");
     maximizeBtn.setOnAction(e -> increaseHeight());
 
-    Button closePanelBtn = createHeaderButton("×", "Fechar painel");
+    Button closePanelBtn = createHeaderButton("x", "Fechar painel");
     closePanelBtn.setOnAction(e -> {
         setManaged(false);
         setVisible(false);
@@ -547,7 +547,7 @@ private Button createHeaderButton(String text, String tooltip) {
     public void start() {
 
         /*
-         * DEBUG NÃO ABRE CMD
+         * DEBUG NÃƒÆ’Ã†â€™O ABRE CMD
          */
         if (debugger) {
 
@@ -585,7 +585,7 @@ private Button createHeaderButton(String text, String tooltip) {
         } catch (IOException e) {
 
             appendLine(
-                    "[erro] Não foi possível iniciar terminal: "
+                    "[erro] Nao foi possivel iniciar terminal: "
                             + e.getMessage()
             );
         }
@@ -640,7 +640,7 @@ private Button createHeaderButton(String text, String tooltip) {
     public void destroy() {
 
         /*
-         * DEBUG NÃO TEM PROCESSO
+         * DEBUG NÃƒÆ’Ã†â€™O TEM PROCESSO
          */
         if (debugger) {
             return;

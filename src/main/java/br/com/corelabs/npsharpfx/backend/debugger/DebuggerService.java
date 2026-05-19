@@ -50,6 +50,7 @@ public class DebuggerService {
         register(".gol", portugolDebugger);
         register(".por", portugolDebugger);
         register(".portugol", portugolDebugger);
+        register(".alg", portugolDebugger);
     }
 
     public void register(String extension, FileDebugger debugger) {
@@ -72,7 +73,9 @@ public class DebuggerService {
         }
 
         LanguageRuntime language = LanguageRuntime.fromFileName(file.getFileName().toString());
-        return language != null && language != LanguageRuntime.GIT && runtimeRegistry.isInstalled(language);
+        return language != null
+                && language != LanguageRuntime.GIT
+                && ensureRuntimeAvailable(language);
     }
 
     public void debug(
@@ -97,6 +100,7 @@ public class DebuggerService {
         safeOutput(output, "[DEBUG] Arquivo detectado: " + file.getFileName());
         safeOutput(output, "[DEBUG] Extensao detectada: " + extension);
         if (language != null) {
+            ensureRuntimeAvailable(language);
             safeOutput(output, "[DEBUG] Runtime selecionado: " + language.displayName());
         }
 
@@ -138,6 +142,27 @@ public class DebuggerService {
         try {
             runtimeRegistry.load();
         } catch (Exception ignored) {
+        }
+    }
+
+    private boolean ensureRuntimeAvailable(LanguageRuntime language) {
+        if (language == LanguageRuntime.PORTUGOL) {
+            return true;
+        }
+
+        reloadRegistry();
+        if (runtimeRegistry.isInstalled(language)) {
+            return true;
+        }
+
+        try {
+            boolean discovered = runtimeRegistry.discoverFromPath(language);
+            if (discovered) {
+                runtimeRegistry.save();
+            }
+            return discovered;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
