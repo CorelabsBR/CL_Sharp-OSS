@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
     private static final String PREF_WORKSPACE_URI = "workspace_uri";
     private static final String PREF_CURRENT_FILE_URI = "current_file_uri";
     private static final String PREF_CURSOR = "cursor";
+    private static final String PREF_THEME = "theme";
 
     private int bg = Color.rgb(30, 30, 30);
     private int sideBg = Color.rgb(37, 37, 38);
@@ -65,6 +66,8 @@ public class MainActivity extends Activity {
     private int accent = Color.rgb(0, 122, 204);
 
     private LinearLayout root;
+    private LinearLayout topBar;
+    private LinearLayout commandBar;
     private LinearLayout workArea;
     private LinearLayout activityBar;
     private LinearLayout sidePanel;
@@ -77,6 +80,7 @@ public class MainActivity extends Activity {
     private TextView fileTitle;
     private TextView console;
     private EditText terminalInput;
+    private LinearLayout statusBarView;
     private TextView statusLeft;
     private TextView statusRight;
     private TextView bottomTitle;
@@ -94,7 +98,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        compactLayout = getResources().getConfiguration().screenWidthDp < 700;
         restoreWorkspace();
+        restaurarTema();
         setContentView(buildUi());
         showPanel("explorer");
         if (workspace == null) {
@@ -109,7 +115,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(bg);
         root.addView(buildTop(), matchWrap());
         root.addView(buildWorkArea(), new LinearLayout.LayoutParams(-1, 0, 1));
-        root.addView(buildStatusBar(), new LinearLayout.LayoutParams(-1, dp(24)));
+        root.addView(buildStatusBar(), new LinearLayout.LayoutParams(-1, dp(compactLayout ? 20 : 24)));
         return root;
     }
 
@@ -117,25 +123,41 @@ public class MainActivity extends Activity {
         LinearLayout top = vertical();
         top.setBackgroundColor(titleBg);
 
-        LinearLayout menu = horizontal();
-        menu.setGravity(Gravity.CENTER_VERTICAL);
-        menu.setPadding(dp(6), dp(2), dp(6), dp(1));
+        topBar = horizontal();
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setPadding(dp(compactLayout ? 2 : 6), dp(2), dp(compactLayout ? 2 : 6), dp(1));
+        LinearLayout menu = topBar;
+        if (compactLayout) {
+            menu.addView(iconButton("A", "Arquivo", v -> menuArquivo()));
+            menu.addView(iconButton("+", "Novo arquivo", v -> novoArquivo()));
+            menu.addView(iconButton("D", "Abrir workspace", v -> abrirWorkspace()));
+            menu.addView(iconButton("S", "Salvar", v -> salvarArquivo()));
+            menu.addView(iconButton("R", "Executar", v -> executarArquivo()));
+            menu.addView(iconButton("T", "Terminal", v -> focarTerminal()));
+            TextView compactTitle = label("NPSharp", 12, muted, Typeface.BOLD);
+            compactTitle.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+            menu.addView(compactTitle, new LinearLayout.LayoutParams(0, -2, 1));
+            menu.addView(iconButton("...", "Paleta", v -> paletaComandos()));
+            top.addView(menu, matchWrap());
+            return top;
+        }
         menu.addView(menuButton("Arquivo", v -> menuArquivo()));
         menu.addView(menuButton("Editar", v -> menuEditar()));
         menu.addView(menuButton("Exibir", v -> menuExibir()));
         menu.addView(menuButton("Executar", v -> menuExecutar()));
         menu.addView(menuButton("Terminal", v -> focarTerminal()));
-        menu.addView(menuButton("Ajuda", v -> mostrarSobre()));
         TextView title = label("NPSharp", 13, muted, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         menu.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        menu.addView(menuButton("Ajuda", v -> mostrarSobre()));
 
-        LinearLayout command = horizontal();
+        commandBar = horizontal();
+        LinearLayout command = commandBar;
         command.setGravity(Gravity.CENTER_VERTICAL);
-        command.setPadding(dp(8), dp(2), dp(8), dp(5));
+        command.setPadding(dp(compactLayout ? 2 : 8), dp(2), dp(compactLayout ? 2 : 8), dp(compactLayout ? 2 : 5));
         TextView center = label("Comandos e arquivos", 13, text, Typeface.NORMAL);
         center.setGravity(Gravity.CENTER_VERTICAL);
-        center.setPadding(dp(12), dp(6), dp(12), dp(6));
+        center.setPadding(dp(compactLayout ? 6 : 12), dp(compactLayout ? 3 : 6), dp(compactLayout ? 6 : 12), dp(compactLayout ? 3 : 6));
         center.setBackgroundColor(Color.rgb(60, 60, 64));
         center.setOnClickListener(v -> paletaComandos());
         command.addView(center, new LinearLayout.LayoutParams(0, -2, 1));
@@ -151,9 +173,8 @@ public class MainActivity extends Activity {
     }
 
     private View buildWorkArea() {
-        compactLayout = getResources().getConfiguration().screenWidthDp < 700;
         workArea = horizontal();
-        workArea.addView(buildActivityBar(), new LinearLayout.LayoutParams(dp(50), -1));
+        workArea.addView(buildActivityBar(), new LinearLayout.LayoutParams(dp(compactLayout ? 38 : 50), -1));
 
         View side = buildSidePanel();
         editorArea = buildEditorArea();
@@ -201,17 +222,18 @@ public class MainActivity extends Activity {
         area.setBackgroundColor(bg);
         tabRow = horizontal();
         tabRow.setBackgroundColor(sideBg);
+        if (compactLayout) tabRow.setVisibility(View.GONE);
         fileTitle = label("Sem arquivo", 12, text, Typeface.BOLD);
-        fileTitle.setPadding(dp(10), dp(6), dp(10), dp(6));
+        fileTitle.setPadding(dp(compactLayout ? 6 : 10), dp(compactLayout ? 3 : 6), dp(compactLayout ? 6 : 10), dp(compactLayout ? 3 : 6));
         fileTitle.setBackgroundColor(titleBg);
         editor = new EditText(this);
         editor.setGravity(Gravity.START | Gravity.TOP);
         editor.setMinLines(24);
-        editor.setTextSize(14);
+        editor.setTextSize(compactLayout ? 13 : 14);
         editor.setTypeface(Typeface.MONOSPACE);
         editor.setTextColor(text);
         editor.setBackgroundColor(bg);
-        editor.setPadding(dp(12), dp(10), dp(12), dp(10));
+        editor.setPadding(dp(compactLayout ? 6 : 12), dp(compactLayout ? 6 : 10), dp(compactLayout ? 6 : 12), dp(compactLayout ? 6 : 10));
         editor.setHorizontallyScrolling(true);
         editor.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -266,6 +288,7 @@ public class MainActivity extends Activity {
 
     private View buildStatusBar() {
         LinearLayout status = horizontal();
+        statusBarView = status;
         status.setGravity(Gravity.CENTER_VERTICAL);
         status.setPadding(dp(8), 0, dp(8), 0);
         status.setBackgroundColor(accent);
@@ -704,10 +727,15 @@ public class MainActivity extends Activity {
 
     private void escolherTema() {
         try {
-            String[] themes = getAssets().list("themes");
-            if (themes == null) themes = new String[0];
-            Arrays.sort(themes);
-            String[] finalThemes = themes;
+            String[] allThemes = getAssets().list("themes");
+            List<String> themes = new ArrayList<>();
+            if (allThemes != null) {
+                for (String theme : allThemes) {
+                    if (theme.endsWith(".json") && !"package.json".equals(theme)) themes.add(theme);
+                }
+            }
+            themes.sort(String::compareTo);
+            String[] finalThemes = themes.toArray(new String[0]);
             new AlertDialog.Builder(this)
                     .setTitle("Tema de cores")
                     .setItems(finalThemes, (d, which) -> aplicarTema(finalThemes[which]))
@@ -722,10 +750,11 @@ public class MainActivity extends Activity {
             String json = readAsset("themes/" + assetName);
             bg = color(json, "editor.background", bg);
             text = color(json, "editor.foreground", text);
-            sideBg = color(json, "sideBar.background", sideBg);
-            titleBg = color(json, "titleBar.activeBackground", titleBg);
-            panelBg = color(json, "panel.background", panelBg);
-            accent = color(json, "statusBar.background", accent);
+            sideBg = color(json, "sideBar.background", shade(bg, 0.12f));
+            titleBg = color(json, "titleBar.activeBackground", shade(bg, 0.20f));
+            panelBg = color(json, "panel.background", shade(bg, -0.06f));
+            accent = color(json, "statusBar.background", color(json, "focusBorder", Color.rgb(0, 122, 204)));
+            prefs().edit().putString(PREF_THEME, assetName).apply();
             refreshColors();
             aplicarHighlight();
             status("Tema aplicado: " + assetName, "Tema");
@@ -734,9 +763,28 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void restaurarTema() {
+        String theme = prefs().getString(PREF_THEME, null);
+        if (theme == null) return;
+        try {
+            String json = readAsset("themes/" + theme);
+            bg = color(json, "editor.background", bg);
+            text = color(json, "editor.foreground", text);
+            sideBg = color(json, "sideBar.background", shade(bg, 0.12f));
+            titleBg = color(json, "titleBar.activeBackground", shade(bg, 0.20f));
+            panelBg = color(json, "panel.background", shade(bg, -0.06f));
+            accent = color(json, "statusBar.background", color(json, "focusBorder", accent));
+        } catch (Exception ignored) {
+        }
+    }
+
     private void refreshColors() {
         root.setBackgroundColor(bg);
+        if (topBar != null) topBar.setBackgroundColor(titleBg);
+        if (commandBar != null) commandBar.setBackgroundColor(titleBg);
+        if (activityBar != null) activityBar.setBackgroundColor(shade(sideBg, -0.10f));
         sidePanel.setBackgroundColor(sideBg);
+        tabRow.setBackgroundColor(sideBg);
         editor.setBackgroundColor(bg);
         editor.setTextColor(text);
         fileTitle.setBackgroundColor(titleBg);
@@ -744,8 +792,35 @@ public class MainActivity extends Activity {
         bottomPanel.setBackgroundColor(panelBg);
         console.setBackgroundColor(panelBg);
         console.setTextColor(text);
-        statusLeft.getRootView().findViewById(android.R.id.content);
+        terminalInput.setBackgroundColor(shade(panelBg, 0.08f));
+        terminalInput.setTextColor(text);
+        terminalInput.setHintTextColor(muted);
+        if (statusBarView != null) statusBarView.setBackgroundColor(accent);
+        recolorChildren(root);
         showPanel(activePanel);
+    }
+
+    private void recolorChildren(View view) {
+        if (view instanceof Button) {
+            Button button = (Button) view;
+            button.setTextColor(text);
+        } else if (view instanceof TextView
+                && view != editor
+                && view != console
+                && view != statusLeft
+                && view != statusRight) {
+            ((TextView) view).setTextColor(text);
+        }
+        if (view instanceof LinearLayout) {
+            LinearLayout layout = (LinearLayout) view;
+            for (int i = 0; i < layout.getChildCount(); i++) recolorChildren(layout.getChildAt(i));
+        } else if (view instanceof ScrollView) {
+            ScrollView scroll = (ScrollView) view;
+            if (scroll.getChildCount() > 0) recolorChildren(scroll.getChildAt(0));
+        } else if (view instanceof HorizontalScrollView) {
+            HorizontalScrollView scroll = (HorizontalScrollView) view;
+            if (scroll.getChildCount() > 0) recolorChildren(scroll.getChildAt(0));
+        }
     }
 
     private void atualizarAbas() {
@@ -1193,6 +1268,27 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             return fallback;
         }
+    }
+
+    private int shade(int color, float amount) {
+        int r = Color.red(color);
+        int g = Color.green(color);
+        int b = Color.blue(color);
+        if (amount >= 0) {
+            r += Math.round((255 - r) * amount);
+            g += Math.round((255 - g) * amount);
+            b += Math.round((255 - b) * amount);
+        } else {
+            float factor = 1f + amount;
+            r = Math.round(r * factor);
+            g = Math.round(g * factor);
+            b = Math.round(b * factor);
+        }
+        return Color.rgb(clampColor(r), clampColor(g), clampColor(b));
+    }
+
+    private int clampColor(int value) {
+        return Math.max(0, Math.min(255, value));
     }
 
     private SharedPreferences prefs() {
