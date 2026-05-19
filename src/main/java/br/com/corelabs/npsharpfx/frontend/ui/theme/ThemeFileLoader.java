@@ -210,6 +210,8 @@ public final class ThemeFileLoader {
                 }
             }
 
+            completeThemeColors(theme);
+
             return theme;
 
         } catch (Exception e) {
@@ -220,6 +222,159 @@ public final class ThemeFileLoader {
              */
             throw new IllegalStateException("Erro ao carregar tema " + normalizedPath, e);
         }
+    }
+
+    private static void completeThemeColors(EditorTheme theme) {
+        boolean dark = theme.isDark();
+        String bg = normalizeColor(theme.color("editor.background", dark ? "#0C1021" : "#FFFFFF"));
+        String fg = normalizeColor(theme.color("editor.foreground", dark ? "#F8F8F8" : "#1F2328"));
+        String panel = normalizeColor(theme.color("panel.background", shift(bg, dark ? 0.08 : -0.04)));
+        String sidebar = normalizeColor(theme.color("sideBar.background", panel));
+        String border = normalizeColor(theme.color("editorGroup.border", dark ? shift(bg, 0.18) : shift(bg, -0.16)));
+        String accent = normalizeColor(theme.color("focusBorder", theme.color("activityBar.activeBorder", dark ? "#FCE94F" : "#007ACC")));
+        String selection = normalizeColor(theme.color("editor.selectionBackground", dark ? "#253B76" : "#ADD6FF"));
+        String input = normalizeColor(theme.color("input.background", shift(bg, dark ? 0.1 : -0.06)));
+        String hover = normalizeColor(theme.color("list.hoverBackground", shift(bg, dark ? 0.12 : -0.08)));
+        String inactiveTab = normalizeColor(theme.color("tab.inactiveBackground", shift(bg, dark ? 0.06 : -0.04)));
+        String inactiveFg = normalizeColor(theme.color("tab.inactiveForeground", dark ? "#A7ADB7" : "#616161"));
+        String button = normalizeColor(theme.color("button.background", accent));
+        String buttonFg = normalizeColor(theme.color("button.foreground", readableText(button, dark)));
+
+        putColor(theme, "editor.background", bg);
+        putColor(theme, "editor.foreground", fg);
+        putColor(theme, "editorCursor.foreground", fg);
+        putColor(theme, "editorLineNumber.foreground", dark ? "#858585" : "#6E7681");
+        putColor(theme, "editor.selectionBackground", selection);
+        putColor(theme, "editor.lineHighlightBackground", hover);
+
+        putColor(theme, "focusBorder", accent);
+        putColor(theme, "errorForeground", "#EF2929");
+        putColor(theme, "descriptionForeground", dark ? "#CCCCCC" : "#6F6F6F");
+        putColor(theme, "input.placeholderForeground", dark ? "#8B949E" : "#767676");
+        putColor(theme, "progressBar.background", accent);
+
+        putColor(theme, "sideBar.background", sidebar);
+        putColor(theme, "sideBar.foreground", fg);
+        putColor(theme, "sideBar.border", border);
+
+        putColor(theme, "titleBar.activeBackground", panel);
+        putColor(theme, "titleBar.activeForeground", fg);
+        putColor(theme, "titleBar.border", border);
+
+        putColor(theme, "activityBar.background", panel);
+        putColor(theme, "activityBar.foreground", fg);
+        putColor(theme, "activityBar.activeBorder", accent);
+
+        putColor(theme, "editorGroup.border", border);
+        putColor(theme, "editorGroupHeader.tabsBackground", bg);
+        putColor(theme, "editorGroupHeader.tabsBorder", border);
+
+        putColor(theme, "tab.activeBackground", bg);
+        putColor(theme, "tab.activeForeground", fg);
+        putColor(theme, "tab.inactiveBackground", inactiveTab);
+        putColor(theme, "tab.inactiveForeground", inactiveFg);
+        putColor(theme, "tab.border", border);
+        putColor(theme, "tab.activeBorderTop", accent);
+        putColor(theme, "tab.hoverBackground", hover);
+
+        putColor(theme, "statusBar.background", dark ? "#007ACC" : "#007ACC");
+        putColor(theme, "statusBar.foreground", "#FFFFFF");
+
+        putColor(theme, "input.background", input);
+        putColor(theme, "input.border", border);
+        putColor(theme, "input.foreground", fg);
+
+        putColor(theme, "list.hoverBackground", hover);
+        putColor(theme, "list.activeSelectionBackground", selection);
+        putColor(theme, "list.activeSelectionForeground", readableText(selection, dark));
+
+        putColor(theme, "panel.background", panel);
+        putColor(theme, "panel.border", border);
+        putColor(theme, "terminal.background", bg);
+        putColor(theme, "terminal.foreground", fg);
+
+        putColor(theme, "button.background", button);
+        putColor(theme, "button.foreground", buttonFg);
+
+        putTokenColor(theme, "string", dark ? "#CE9178" : "#A31515");
+        putTokenColor(theme, "keyword", dark ? "#C586C0" : "#0000FF");
+        putTokenColor(theme, "comment", dark ? "#6A9955" : "#008000");
+        putTokenColor(theme, "number", dark ? "#B5CEA8" : "#098658");
+        putTokenColor(theme, "function", dark ? "#DCDCAA" : "#795E26");
+        putTokenColor(theme, "variable", fg);
+        putTokenColor(theme, "type", dark ? "#4EC9B0" : "#267F99");
+        putTokenColor(theme, "constant", dark ? "#4FC1FF" : "#0070C1");
+        putTokenColor(theme, "punctuation", dark ? "#D4D4D4" : "#393A34");
+        putTokenColor(theme, "invalid", "#FFFFFF");
+    }
+
+    private static void putColor(EditorTheme theme, String key, String value) {
+        if (!theme.getColors().containsKey(key) && value != null && !value.isBlank()) {
+            theme.getColors().put(key, value);
+        }
+    }
+
+    private static void putTokenColor(EditorTheme theme, String scope, String foreground) {
+        if (theme.tokenColor(scope, null) == null && foreground != null && !foreground.isBlank()) {
+            theme.getTokenColors().add(
+                    new EditorTheme.TokenColorEntry(List.of(scope), foreground, null)
+            );
+        }
+    }
+
+    private static String normalizeColor(String color) {
+        if (color == null || color.isBlank()) {
+            return "#000000";
+        }
+
+        String trimmed = color.trim();
+        if (trimmed.matches("#[0-9A-Fa-f]{8}")) {
+            return trimmed.substring(0, 7);
+        }
+        return trimmed;
+    }
+
+    private static String shift(String color, double amount) {
+        String hex = normalizeColor(color);
+        if (!hex.matches("#[0-9A-Fa-f]{6}")) {
+            return hex;
+        }
+
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+
+        if (amount >= 0) {
+            r += (int) ((255 - r) * amount);
+            g += (int) ((255 - g) * amount);
+            b += (int) ((255 - b) * amount);
+        } else {
+            double factor = 1.0 + amount;
+            r = (int) (r * factor);
+            g = (int) (g * factor);
+            b = (int) (b * factor);
+        }
+
+        return String.format("#%02X%02X%02X", clamp(r), clamp(g), clamp(b));
+    }
+
+    private static String readableText(String bg, boolean darkTheme) {
+        String hex = normalizeColor(bg);
+        if (!hex.matches("#[0-9A-Fa-f]{6}")) {
+            return darkTheme ? "#FFFFFF" : "#000000";
+        }
+
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        double luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        return luminance > 0.55 ? "#000000" : "#FFFFFF";
+    }
+
+    private static int clamp(int value) {
+        return Math.max(0, Math.min(255, value));
     }
 
     /**

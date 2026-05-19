@@ -1,6 +1,8 @@
 package br.com.corelabs.npsharpfx.frontend.ui.window;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -16,6 +18,8 @@ import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -81,6 +85,8 @@ public class TitleBar extends HBox {
 
     private Popup activeMenuPopup;
     private Popup activeSubmenuPopup;
+    private Popup quickOpenPopup;
+    private ListView<File> quickOpenList;
 
     private Runnable openFolderAction;
     private Runnable closeFolderAction;
@@ -91,6 +97,9 @@ public class TitleBar extends HBox {
     private Runnable showCommandPaletteAction;
     private Runnable newWindowAction;
     private Runnable showAboutAction;
+    private Supplier<File> workspaceRootSupplier;
+    private Supplier<List<File>> workspaceFilesSupplier;
+    private Consumer<File> quickOpenFileAction;
 
     private Runnable newTerminalAction;
     private Runnable splitTerminalAction;
@@ -215,6 +224,19 @@ private String getWorkspaceNameForBar() {
     return name;
 }
 
+    public void setWorkspaceRootSupplier(Supplier<File> workspaceRootSupplier) {
+        this.workspaceRootSupplier = workspaceRootSupplier;
+        updateWorkspaceNameInCommandBar();
+    }
+
+    public void setWorkspaceFilesSupplier(Supplier<List<File>> workspaceFilesSupplier) {
+        this.workspaceFilesSupplier = workspaceFilesSupplier;
+    }
+
+    public void setQuickOpenFileAction(Consumer<File> quickOpenFileAction) {
+        this.quickOpenFileAction = quickOpenFileAction;
+    }
+
     private void build() {
 
         ImageView logo = new ImageView(
@@ -236,8 +258,8 @@ private String getWorkspaceNameForBar() {
 
         backButton.getStyleClass().add("title-toolbar-button-disabled");
         forwardButton.getStyleClass().add("title-toolbar-button-disabled");
-commandBar = new TextField();
-commandBar.setPromptText(getWorkspaceNameForBar());
+        commandBar = new TextField();
+        commandBar.setPromptText(getWorkspaceNameForBar());
         commandBar.getStyleClass().add("command-bar");
         commandBar.setPrefWidth(420);
         commandBar.setMinWidth(220);
@@ -303,16 +325,34 @@ commandBar.setPromptText(getWorkspaceNameForBar());
     private void configureCommandBar() {
         commandBar.setOnMouseClicked(event -> {
             if (event.getClickCount() >= 1) {
-                openCommandPalette();
+                openQuickOpen();
+            }
+        });
+
+        commandBar.focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (focused) {
+                openQuickOpen();
+            }
+        });
+
+        commandBar.textProperty().addListener((obs, oldValue, newValue) -> {
+            if (quickOpenPopup != null && quickOpenPopup.isShowing()) {
+                updateQuickOpenResults(newValue);
             }
         });
 
         commandBar.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
-                openCommandPalette();
+                openSelectedQuickOpenItem();
+                event.consume();
+            } else if (event.getCode() == KeyCode.DOWN) {
+                if (quickOpenList != null && !quickOpenList.getItems().isEmpty()) {
+                    quickOpenList.requestFocus();
+                    quickOpenList.getSelectionModel().selectNext();
+                }
                 event.consume();
             } else if (event.getCode() == KeyCode.ESCAPE) {
-                closeAllMenus();
+                closeQuickOpen();
                 getParent().requestFocus();
                 event.consume();
             }
@@ -502,6 +542,190 @@ commandBar.setPromptText(getWorkspaceNameForBar());
             activeMenuPopup.hide();
             activeMenuPopup = null;
         }
+        closeQuickOpen();
+    }
+
+    private void openQuickOpen() {
+        closeAllMenusExceptQuickOpen();
+
+        if (quickOpenPopup == null) {
+            quickOpenPopup = new Popup();
+            quickOpenPopup.setAutoHide(true);
+            quickOpenPopup.setHideOnEscape(true);
+
+            quickOpenList = new ListView<>();
+            quickOpenList.getStyleClass().add("quick-open-list");
+            quickOpenList.setPrefWidth(Math.max(commandBar.getWidth(), 420));
+            quickOpenList.setPrefHeight(320);
+            quickOpenList.setCellFactory(list -> new ListCell<>() {
+                @Override
+                protected void updateItem(File file, boolean empty) {
+                    super.updateItem(file, empty);
+
+                    if (empty || file == null) {
+                        setText(null);
+                        setGraphic(null);
+                        return;
+                    }
+
+                    setText(formatQuickOpenItem(file));
+                }
+            });
+            quickOpenList.setOnMouseClicked(event -> {
+                if (event.getClickCount() >= 2) {
+                    openSelectedQuickOpenItem();
+                }
+            });
+            quickOpenList.setOnKeyPressed(event -> {
+                if (event.getCode() == KeyCode.ENTER) {
+                    openSelectedQuickOpenItem();
+                    event.consume();
+                } else if (event.getCode() == KeyCode.ESCAPE) {
+                    closeQuickOpen();
+                    commandBar.requestFocus();
+                    event.consume();
+                }
+            });
+            quickOpenPopup.getContent().add(quickOpenList);
+        }
+
+        updateQuickOpenResults(commandBar.getText());
+
+        if (!quickOpenPopup.isShowing()) {
+            Bounds bounds = commandBar.localToScreen(commandBar.getBoundsInLocal());
+            quickOpenPopup.show(stage, bounds.getMinX(), bounds.getMaxY() + 4);
+        }
+
+        commandBar.requestFocus();
+    }
+
+    private void closeAllMenusExceptQuickOpen() {
+        if (activeSubmenuPopup != null) {
+            activeSubmenuPopup.hide();
+            activeSubmenuPopup = null;
+        }
+        if (activeMenuPopup != null) {
+            activeMenuPopup.hide();
+            activeMenuPopup = null;
+        }
+    }
+
+    private void closeQuickOpen() {
+        if (quickOpenPopup != null) {
+            quickOpenPopup.hide();
+        }
+    }
+
+    private void updateQuickOpenResults(String rawQuery) {
+        if (quickOpenList == null) {
+            return;
+        }
+
+        String query = rawQuery == null ? "" : rawQuery.trim();
+
+        if (query.startsWith(">")) {
+            quickOpenList.getItems().setAll(List.of());
+            updateStatus("Command Palette ainda nao implementada");
+            return;
+        }
+
+        List<File> files = workspaceFilesSupplier == null
+                ? List.of()
+                : workspaceFilesSupplier.get();
+
+        List<File> filtered = new ArrayList<>(files);
+        if (!query.isBlank()) {
+            String normalizedQuery = normalizeQuickOpenText(query);
+            filtered.removeIf(file -> !normalizeQuickOpenText(relativeWorkspacePath(file)).contains(normalizedQuery)
+                    && !normalizeQuickOpenText(file.getName()).contains(normalizedQuery));
+        }
+
+        filtered.sort(Comparator
+                .comparingInt((File file) -> scoreQuickOpen(file, query))
+                .thenComparing(this::relativeWorkspacePath, String.CASE_INSENSITIVE_ORDER));
+
+        if (filtered.size() > 100) {
+            filtered = new ArrayList<>(filtered.subList(0, 100));
+        }
+
+        quickOpenList.getItems().setAll(filtered);
+        if (!filtered.isEmpty()) {
+            quickOpenList.getSelectionModel().select(0);
+        }
+    }
+
+    private void openSelectedQuickOpenItem() {
+        File selected = quickOpenList == null ? null : quickOpenList.getSelectionModel().getSelectedItem();
+
+        if (selected == null || !selected.isFile()) {
+            return;
+        }
+
+        closeQuickOpen();
+        commandBar.clear();
+
+        if (quickOpenFileAction != null) {
+            quickOpenFileAction.accept(selected);
+        }
+    }
+
+    private int scoreQuickOpen(File file, String query) {
+        if (query == null || query.isBlank()) {
+            return 1000;
+        }
+
+        String q = normalizeQuickOpenText(query);
+        String name = normalizeQuickOpenText(file.getName());
+        String path = normalizeQuickOpenText(relativeWorkspacePath(file));
+
+        if (name.equals(q)) {
+            return 0;
+        }
+        if (name.startsWith(q)) {
+            return 10;
+        }
+        if (path.startsWith(q)) {
+            return 20;
+        }
+        if (name.contains(q)) {
+            return 30;
+        }
+        return 50;
+    }
+
+    private String formatQuickOpenItem(File file) {
+        String relative = relativeWorkspacePath(file);
+        String name = file.getName();
+
+        if (relative.equals(name)) {
+            return name;
+        }
+
+        int idx = relative.lastIndexOf(File.separatorChar);
+        String parent = idx <= 0 ? "" : relative.substring(0, idx);
+        return name + "    " + parent;
+    }
+
+    private String relativeWorkspacePath(File file) {
+        File root = workspaceRootSupplier == null ? null : workspaceRootSupplier.get();
+
+        if (root == null || file == null) {
+            return file == null ? "" : file.getAbsolutePath();
+        }
+
+        try {
+            return root.toPath().toAbsolutePath().normalize()
+                    .relativize(file.toPath().toAbsolutePath().normalize())
+                    .toString();
+        } catch (Exception e) {
+            return file.getAbsolutePath();
+        }
+    }
+
+    private String normalizeQuickOpenText(String value) {
+        return value == null
+                ? ""
+                : value.replace('\\', '/').toLowerCase(java.util.Locale.ROOT);
     }
 
     private void openFileMenu() {

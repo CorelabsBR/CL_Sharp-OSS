@@ -2,6 +2,11 @@ package br.com.corelabs.npsharpfx;
 
 // Classe File usada para manipular arquivos do sistema.
 // Aqui seria usada para criar um "lock file" e impedir duas instâncias do programa.
+import java.nio.file.Path;
+
+import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimeInstaller;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
 import br.com.corelabs.npsharpfx.frontend.ui.window.MainWindow;
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -23,22 +28,66 @@ public class Main extends Application {
      * 
      * O Stage representa a janela principal do programa.
      */
-    @Override
-    public void start(Stage stage) {
+@Override
+public void start(Stage stage) {
+    initializeExtensionsAsync();
 
-        /*
-         * Cria a janela principal da aplicação.
-         * 
-         * Passa o Stage (janela do JavaFX) para a classe MainWindow
-         * que vai construir toda a interface da IDE.
-         */
-        MainWindow window = new MainWindow(stage);
+    MainWindow window = new MainWindow(stage);
+    window.show();
+}
 
-        /*
-         * Mostra a janela na tela.
-         */
-        window.show();
-    }
+private void initializeExtensionsAsync() {
+    Thread extensionThread = new Thread(() -> {
+        System.out.println("");
+        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        System.out.println(" ATIVANDO EXTENSÕES...");
+        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        System.out.println("");
+
+        Path appData = Path.of(System.getProperty("user.home"), ".npsharp");
+
+        try {
+            RuntimeRegistry registry = new RuntimeRegistry(appData);
+            registry.load();
+
+            RuntimeInstaller installer = new RuntimeInstaller(appData, registry);
+
+            installer.installAllCommon(new RuntimeInstaller.Listener() {
+                @Override
+                public void onLog(String message) {
+                    System.out.println("[EXTENSION HOST] " + message);
+                }
+
+                @Override
+                public void onProgress(LanguageRuntime language, double progress) {
+                    int percent = (int) (progress * 100);
+
+                    System.out.println(
+                            "[EXTENSION HOST] "
+                                    + language.displayName()
+                                    + " -> "
+                                    + percent
+                                    + "%"
+                    );
+                }
+            });
+
+            System.out.println("");
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println(" EXTENSÕES ATIVADAS");
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println("");
+
+        } catch (Exception e) {
+            System.err.println("[EXTENSION HOST] Falha ao ativar extensões.");
+            e.printStackTrace();
+        }
+    }, "npsharp-extension-host");
+
+    extensionThread.setDaemon(true);
+    extensionThread.start();
+}
+
 
 
 

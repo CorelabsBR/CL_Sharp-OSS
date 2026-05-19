@@ -183,6 +183,9 @@ private final PortugolInterpreter portugolInterpreter =
     if (workspace != null && workspace.exists() && workspace.isDirectory()) {
         prefs.put(PREF_WORKSPACE, workspace.getAbsolutePath());
         flushPrefs();
+        if (titleBar != null) {
+            titleBar.updateWorkspaceNameInCommandBar();
+        }
         statusBarManager.updateStatusLeft("Workspace salvo: " + workspace.getName());
     }
 }
@@ -373,8 +376,11 @@ registerActivity("debug",
         return "Nenhuma pasta aberta";
     }
 
-    return root.getName();
+    return root.getAbsolutePath();
 });
+        titleBar.setWorkspaceRootSupplier(explorerPane::getCurrentRootFolder);
+        titleBar.setWorkspaceFilesSupplier(this::listWorkspaceFilesForQuickOpen);
+        titleBar.setQuickOpenFileAction(editorManager::openFileInTab);
 
         VBox activityBar = activityBarManager.createActivityBar();
         StackPane sidePanelHost = sidePanelManager.getSidePanelHost();
@@ -461,6 +467,52 @@ registerActivity("debug",
         });
 
         return titleBar;
+    }
+
+    private List<File> listWorkspaceFilesForQuickOpen() {
+        File workspace = explorerPane == null ? null : explorerPane.getCurrentRootFolder();
+
+        if (workspace == null || !workspace.exists() || !workspace.isDirectory()) {
+            return List.of();
+        }
+
+        try (var stream = java.nio.file.Files.walk(workspace.toPath())) {
+            return stream
+                    .filter(java.nio.file.Files::isRegularFile)
+                    .filter(path -> isQuickOpenPathAllowed(workspace.toPath(), path))
+                    .map(java.nio.file.Path::toFile)
+                    .limit(5000)
+                    .toList();
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private boolean isQuickOpenPathAllowed(java.nio.file.Path workspace, java.nio.file.Path path) {
+        String normalized;
+
+        try {
+            normalized = workspace.toAbsolutePath().normalize()
+                    .relativize(path.toAbsolutePath().normalize())
+                    .toString()
+                    .replace("\\", "/")
+                    .toLowerCase(java.util.Locale.ROOT);
+        } catch (Exception e) {
+            normalized = path.toString().replace("\\", "/").toLowerCase(java.util.Locale.ROOT);
+        }
+
+        return !normalized.contains("/.git/")
+                && !normalized.startsWith(".git/")
+                && !normalized.contains("/node_modules/")
+                && !normalized.startsWith("node_modules/")
+                && !normalized.contains("/target/")
+                && !normalized.startsWith("target/")
+                && !normalized.contains("/build/")
+                && !normalized.startsWith("build/")
+                && !normalized.contains("/dist/")
+                && !normalized.startsWith("dist/")
+                && !normalized.contains("/out/")
+                && !normalized.startsWith("out/");
     }
 
     private void configureScene() {
@@ -656,6 +708,7 @@ public void runSelectedCode() {
         java.io.File rootFolder = explorerPane.getCurrentRootFolder();
         if (rootFolder != null) {
             searchPane.setWorkspaceRoot(rootFolder);
+            titleBar.updateWorkspaceNameInCommandBar();
         }
         
         statusBarManager.updateStatusRight("Explorer");
@@ -664,6 +717,7 @@ public void runSelectedCode() {
 private void closeFolderFromExplorer() {
     explorerPane.clearFolder();
     searchPane.setWorkspaceRoot(null);
+    titleBar.updateWorkspaceNameInCommandBar();
 
     prefs.remove(PREF_WORKSPACE);
 

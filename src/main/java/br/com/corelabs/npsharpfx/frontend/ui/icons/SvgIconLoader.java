@@ -1,145 +1,116 @@
 package br.com.corelabs.npsharpfx.frontend.ui.icons;
 
-// Classe usada para trabalhar com streams de arquivos.
-// Aqui é usada para ler recursos internos do classpath (ícones SVG).
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.batik.transcoder.TranscoderInput;
+import org.apache.batik.transcoder.TranscoderOutput;
+import org.apache.batik.transcoder.image.PNGTranscoder;
 
 import javafx.scene.image.Image;
 
-/**
- * Classe utilitária responsável por carregar ícones SVG do classpath.
- *
- * Ela possui dois modos de operação:
- *
- * 1) Converter SVG em Image (para ícones de arquivos)
- * 2) Extrair o atributo "d" do SVG (para SVGPath do JavaFX)
- *
- * Ou seja:
- *
- * SVG
- *  ↓
- * ou vira Image
- * ou vira path String
- *
- * Isso permite usar ícones de duas formas diferentes dentro da UI.
- */
 public final class SvgIconLoader {
 
-    /**
-     * Construtor privado.
-     *
-     * Impede instanciamento da classe.
-     *
-     * Essa classe funciona como utilitário estático.
-     */
-    private SvgIconLoader() {}
+    private static final Pattern PATH_DATA_PATTERN = Pattern.compile("\\sd\\s*=\\s*([\"'])(.*?)\\1", Pattern.DOTALL);
+    private static final Pattern STOP_WITHOUT_OFFSET_PATTERN = Pattern.compile(
+            "<stop(?![^>]*\\soffset\\s*=)([^>]*)>",
+            Pattern.CASE_INSENSITIVE
+    );
 
-    /**
-     * Carrega um SVG como Image JavaFX.
-     *
-     * Usado principalmente pelos ícones de arquivos
-     * exibidos no explorer.
-     *
-     * @param resourcePath caminho do recurso dentro do classpath
-     * @param size tamanho desejado da imagem
-     *
-     * @return Image pronta para ser exibida em ImageView
-     */
-    public static Image load(String resourcePath, int size) {
-
-        /**
-         * Abre um stream do recurso dentro do classpath.
-         *
-         * Exemplo de caminho:
-         * /fileicons/icons/java.svg
-         */
-        InputStream stream = SvgIconLoader.class.getResourceAsStream(resourcePath);
-
-        /**
-         * Caso o recurso não exista, lança erro.
-         */
-        if (stream == null) {
-            throw new RuntimeException("Icon not found: " + resourcePath);
-        }
-
-        /**
-         * Cria a imagem JavaFX.
-         *
-         * Parâmetros:
-         *
-         * stream  → fonte da imagem
-         * size    → largura
-         * size    → altura
-         * true    → preservar proporção
-         * true    → aplicar suavização
-         */
-        return new Image(stream, size, size, true, true);
+    private SvgIconLoader() {
     }
 
-    /**
-     * Carrega um SVG e extrai o atributo "d" do path.
-     *
-     * Esse método é usado pelos Codicons que utilizam
-     * SVGPath em vez de ImageView.
-     *
-     * O atributo "d" contém o caminho vetorial do SVG.
-     *
-     * Exemplo de SVG:
-     *
-     * <svg>
-     *   <path d="M10 10 L20 20 Z"/>
-     * </svg>
-     *
-     * O método extrai apenas:
-     *
-     * M10 10 L20 20 Z
-     *
-     * @param resourcePath caminho do arquivo SVG
-     *
-     * @return String contendo o path vetorial
-     */
+    public static Image load(String resourcePath, int size) {
+        try (InputStream stream = openResource(resourcePath)) {
+            if (stream == null) {
+                throw new RuntimeException("Icon not found: " + resourcePath);
+            }
+
+            String svg = sanitizeSvg(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+
+            PNGTranscoder transcoder = new PNGTranscoder();
+            transcoder.addTranscodingHint(PNGTranscoder.KEY_WIDTH, (float) size);
+            transcoder.addTranscodingHint(PNGTranscoder.KEY_HEIGHT, (float) size);
+
+            ByteArrayOutputStream png = new ByteArrayOutputStream();
+            transcoder.transcode(
+                    new TranscoderInput(new ByteArrayInputStream(svg.getBytes(StandardCharsets.UTF_8))),
+                    new TranscoderOutput(png)
+            );
+
+            return new Image(
+                    new ByteArrayInputStream(png.toByteArray()),
+                    size,
+                    size,
+                    true,
+                    true
+            );
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to render SVG icon: " + resourcePath, e);
+        }
+    }
+
     public static String loadSvgPath(String resourcePath) {
-
-        try (InputStream stream = SvgIconLoader.class.getResourceAsStream(resourcePath)) {
-
+        try (InputStream stream = openResource(resourcePath)) {
             if (stream == null) {
                 System.err.println("SVG not found at: " + resourcePath);
                 return "M0 0";
             }
 
             String svg = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            Matcher matcher = PATH_DATA_PATTERN.matcher(svg);
+            StringBuilder path = new StringBuilder();
 
-            // Tenta encontrar o atributo d com diferentes formatos possíveis
-            int startIndex = svg.indexOf("d=\"");
-            if (startIndex == -1) {
-                startIndex = svg.indexOf("d='");
-                if (startIndex == -1) {
-                    System.err.println("No path element found in: " + resourcePath);
-                    return "M0 0";
+            while (matcher.find()) {
+                if (!path.isEmpty()) {
+                    path.append(' ');
                 }
-                startIndex += 3; // d='
-                int endIndex = svg.indexOf("'", startIndex);
-                if (endIndex != -1) {
-                    return svg.substring(startIndex, endIndex);
-                }
+                path.append(matcher.group(2).trim());
+            }
+
+            if (path.isEmpty()) {
+                System.err.println("No path data found in: " + resourcePath);
                 return "M0 0";
             }
 
-            startIndex += 3; // d="
-            int endIndex = svg.indexOf("\"", startIndex);
-            
-            if (endIndex == -1) {
-                return "M0 0";
-            }
-
-            return svg.substring(startIndex, endIndex);
-
+            return path.toString();
         } catch (Exception e) {
             System.err.println("Failed to load SVG: " + resourcePath + " - " + e.getMessage());
             e.printStackTrace();
             return "M0 0";
         }
     }
-}
 
+    private static InputStream openResource(String resourcePath) {
+        InputStream stream = SvgIconLoader.class.getResourceAsStream(resourcePath);
+
+        if (stream != null) {
+            return stream;
+        }
+
+        String pathWithoutSlash = resourcePath != null && resourcePath.startsWith("/")
+                ? resourcePath.substring(1)
+                : resourcePath;
+
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        if (cl != null && pathWithoutSlash != null) {
+            stream = cl.getResourceAsStream(pathWithoutSlash);
+        }
+
+        if (stream == null && pathWithoutSlash != null) {
+            stream = ClassLoader.getSystemResourceAsStream(pathWithoutSlash);
+        }
+
+        return stream;
+    }
+
+    private static String sanitizeSvg(String svg) {
+        return STOP_WITHOUT_OFFSET_PATTERN.matcher(svg).replaceAll("<stop offset=\"0\"$1>");
+    }
+}
