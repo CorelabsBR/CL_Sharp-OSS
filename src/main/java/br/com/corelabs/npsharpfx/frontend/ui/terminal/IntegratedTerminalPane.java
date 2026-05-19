@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.DoubleConsumer;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -37,6 +38,7 @@ public class IntegratedTerminalPane extends BorderPane {
 
     private double currentHeight = 220;
     private boolean resizing = false;
+    private DoubleConsumer heightChangeHandler;
     private java.util.function.Consumer<String> inputListener;
     private final BorderPane debugConsolePane = new BorderPane();
 private final TextArea debugOutputArea = new TextArea();
@@ -74,6 +76,10 @@ private final TextField debugInputField = new TextField();
         Thread.currentThread().interrupt();
         return "";
     }
+}
+
+public void setHeightChangeHandler(DoubleConsumer heightChangeHandler) {
+    this.heightChangeHandler = heightChangeHandler;
 }
 
 private void setupDebugConsole() {
@@ -399,6 +405,10 @@ private Button createHeaderButton(String text, String tooltip) {
         setPrefHeight(newHeight);
 
         currentHeight = newHeight;
+
+        if (heightChangeHandler != null) {
+            heightChangeHandler.accept(newHeight);
+        }
     }
 
     public void decreaseHeight() {
@@ -411,6 +421,10 @@ private Button createHeaderButton(String text, String tooltip) {
         setPrefHeight(newHeight);
 
         currentHeight = newHeight;
+
+        if (heightChangeHandler != null) {
+            heightChangeHandler.accept(newHeight);
+        }
     }
 
     public void appendOutput(String text) {

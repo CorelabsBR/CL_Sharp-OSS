@@ -32,6 +32,7 @@ import br.com.corelabs.npsharpfx.frontend.ui.window.panels.ThemeChooserPanel;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
+import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -670,7 +671,7 @@ registerActivity("debug",
         ========================================
         */
 
-        TitleBar titleBar = buildTitleBar();
+        titleBar = buildTitleBar();
 
         /*
         ========================================
@@ -734,7 +735,74 @@ registerActivity("debug",
         ========================================
         */
 
-        ((Region) editorManager.getView()).setMinSize(0, 0);
+        Node editorView = editorManager.getView();
+
+        ((Region) editorView).setMinSize(0, 0);
+
+        /*
+        ========================================
+        TERMINAL
+        ========================================
+        */
+
+        terminalPane =
+                new IntegratedTerminalPane();
+
+        terminalPane.setMinHeight(120);
+
+        terminalPane.setPrefHeight(220);
+
+        terminalPane.setMaxHeight(Double.MAX_VALUE);
+
+        terminalPane.setVisible(false);
+
+        terminalPane.setManaged(false);
+
+        terminalPane.setHeightChangeHandler(this::resizeTerminalPane);
+
+        /*
+        ========================================
+        EDITOR AREA
+        Editor + Terminal
+        ========================================
+        */
+
+        verticalSplit =
+                new SplitPane();
+
+        verticalSplit.getStyleClass()
+                .add("main-vertical-split");
+
+        verticalSplit.setOrientation(
+                javafx.geometry.Orientation.VERTICAL
+        );
+
+        terminalPane.setMinSize(0, 120);
+
+        verticalSplit.getItems().add(editorView);
+
+        verticalSplit.setDividerPositions(1.0);
+
+        SplitPane.setResizableWithParent(
+                editorView,
+                true
+        );
+
+        SplitPane.setResizableWithParent(
+                terminalPane,
+                false
+        );
+
+        centerArea = new BorderPane();
+
+        centerArea.setCenter(verticalSplit);
+
+        centerArea.setMinSize(0, 0);
+
+        centerArea.setMaxSize(
+                Double.MAX_VALUE,
+                Double.MAX_VALUE
+        );
 
         /*
         ========================================
@@ -752,7 +820,7 @@ registerActivity("debug",
 
                 leftSidebarArea,
 
-                editorManager.getView()
+                centerArea
         );
 
         horizontalSplit.setDividerPositions(0.18);
@@ -787,7 +855,7 @@ registerActivity("debug",
                 Priority.ALWAYS
         );
 
-        ((Region) editorManager.getView()).setMinWidth(0);
+        ((Region) editorView).setMinWidth(0);
 
         SplitPane.setResizableWithParent(
                 leftSidebarArea,
@@ -795,43 +863,8 @@ registerActivity("debug",
         );
 
         SplitPane.setResizableWithParent(
-                editorManager.getView(),
+                centerArea,
                 true
-        );
-
-        /*
-        ========================================
-        TERMINAL
-        ========================================
-        */
-
-        terminalPane =
-                new IntegratedTerminalPane();
-
-        terminalPane.setMinHeight(120);
-
-        terminalPane.setPrefHeight(220);
-
-        terminalPane.setMaxHeight(Double.MAX_VALUE);
-
-        terminalPane.setVisible(false);
-
-        terminalPane.setManaged(false);
-
-        /*
-        ========================================
-        SPLIT VERTICAL
-        ========================================
-        */
-
-        verticalSplit =
-                new SplitPane();
-
-        verticalSplit.getStyleClass()
-                .add("main-vertical-split");
-
-        verticalSplit.setOrientation(
-                javafx.geometry.Orientation.VERTICAL
         );
 
         /*
@@ -842,27 +875,13 @@ registerActivity("debug",
 
         horizontalSplit.setMinSize(0, 0);
 
-        terminalPane.setMinSize(0, 120);
-
-        verticalSplit.getItems().add(horizontalSplit);
-
-        verticalSplit.setDividerPositions(0.78);
-
-        SplitPane.setResizableWithParent(
-                horizontalSplit,
-                true
-        );
-
-        SplitPane.setResizableWithParent(
-                terminalPane,
-                true
-        );
-
         sidePanelHost.visibleProperty().addListener((obs, oldValue, newValue) -> updateSidebarLayout());
         horizontalSplit.widthProperty().addListener((obs, oldValue, newValue) -> updateSidebarLayout());
         terminalPane.visibleProperty().addListener((obs, oldValue, visible) -> {
-            if (!visible) {
-                hideTerminalPane();
+            if (!visible && verticalSplit.getItems().contains(terminalPane)) {
+                verticalSplit.getItems().remove(terminalPane);
+                verticalSplit.setDividerPositions(1.0);
+                statusBarManager.updateTerminalStatus("Terminal");
             }
         });
         updateSidebarLayout();
@@ -887,7 +906,7 @@ registerActivity("debug",
 
         root.setTop(titleBar);
 
-        root.setCenter(verticalSplit);
+        root.setCenter(horizontalSplit);
 
         root.setBottom(bottomContainer);
 
@@ -1615,10 +1634,34 @@ private void closeFolderFromExplorer() {
     private void showTerminalPane() {
         if (verticalSplit != null && terminalPane != null && !verticalSplit.getItems().contains(terminalPane)) {
             verticalSplit.getItems().add(terminalPane);
-            verticalSplit.setDividerPositions(0.72);
         }
+
         terminalPane.setManaged(true);
         terminalPane.setVisible(true);
+
+        if (verticalSplit != null) {
+            resizeTerminalPane(terminalPane.getPrefHeight());
+        }
+    }
+
+    private void resizeTerminalPane(double terminalHeight) {
+        if (verticalSplit == null || terminalPane == null || !verticalSplit.getItems().contains(terminalPane)) {
+            return;
+        }
+
+        double splitHeight = verticalSplit.getHeight();
+        if (splitHeight <= 0) {
+            Platform.runLater(() -> resizeTerminalPane(terminalHeight));
+            return;
+        }
+
+        double clampedHeight = Math.max(
+                terminalPane.getMinHeight(),
+                Math.min(terminalHeight, splitHeight * 0.75)
+        );
+
+        double dividerPosition = (splitHeight - clampedHeight) / splitHeight;
+        verticalSplit.setDividerPositions(Math.max(0.20, Math.min(0.90, dividerPosition)));
     }
 
     private void hideTerminalPane() {
@@ -1626,6 +1669,7 @@ private void closeFolderFromExplorer() {
             verticalSplit.getItems().remove(terminalPane);
             verticalSplit.setDividerPositions(1.0);
         }
+
         terminalPane.setManaged(false);
         terminalPane.setVisible(false);
         statusBarManager.updateTerminalStatus("Terminal");

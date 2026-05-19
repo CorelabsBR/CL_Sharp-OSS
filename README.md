@@ -4,6 +4,8 @@
 ![Bugs](https://img.shields.io/github/issues/CorelabsBR/NPSharp/bug.svg)
 ![Community Chat](https://img.shields.io/badge/chat-community-yellow.svg)
 
+
+
 ---
 
 ## O Repositório
@@ -120,10 +122,11 @@ Projeto segue código de conduta open-source padrão.
 Sem drama. Sem ego. Só código funcional.
 
 ---
-
 ## Licença
 
 Copyright (c) NPSharp Project  
 Licenciado sob **MIT License**
 
 Fork. Modifique. Distribua. Domine.
+
+
