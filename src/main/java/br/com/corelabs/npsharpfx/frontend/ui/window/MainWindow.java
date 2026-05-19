@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.prefs.Preferences;
 
-import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
 import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
+import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
@@ -35,6 +35,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -46,6 +47,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
+
 
 public class MainWindow {
 
@@ -365,56 +367,283 @@ registerActivity("debug",
 }
 
     private void buildLayout() {
+
         root = new BorderPane();
+
         root.getStyleClass().add("root-pane");
 
-        titleBar = buildTitleBar();
-        titleBar.setWorkspaceNameSupplier(() -> {
-    File root = explorerPane.getCurrentRootFolder();
+        /*
+        ========================================
+        TITLE BAR
+        ========================================
+        */
 
-    if (root == null) {
-        return "Nenhuma pasta aberta";
-    }
+        TitleBar titleBar = buildTitleBar();
 
-    return root.getAbsolutePath();
-});
-        titleBar.setWorkspaceRootSupplier(explorerPane::getCurrentRootFolder);
-        titleBar.setWorkspaceFilesSupplier(this::listWorkspaceFilesForQuickOpen);
-        titleBar.setQuickOpenFileAction(editorManager::openFileInTab);
+        /*
+        ========================================
+        ACTIVITY BAR
+        ========================================
+        */
 
-        VBox activityBar = activityBarManager.createActivityBar();
-        StackPane sidePanelHost = sidePanelManager.getSidePanelHost();
+        VBox activityBar =
+                activityBarManager.createActivityBar();
 
-        leftSidebarArea = new HBox(activityBar, sidePanelHost);
-        leftSidebarArea.getStyleClass().add("left-sidebar-area");
+        // ========================================
+        // SIDE PANEL
+        // ========================================
 
-        centerArea = new BorderPane();
-        centerArea.getStyleClass().add("center-area");
-        centerArea.setLeft(leftSidebarArea);
-        centerArea.setCenter(editorManager.getView());
+        StackPane sidePanelHost =
+                sidePanelManager.getSidePanelHost();
 
-        terminalPane = new IntegratedTerminalPane();
-        terminalPane.setVisible(false);
-        terminalPane.setManaged(false);
+        sidePanelHost.setMinWidth(0); 
 
-        bottomContainer = new VBox();
-        bottomContainer.getChildren().addAll(terminalPane, statusBarManager.createStatusBar());
+        sidePanelHost.setMaxWidth(Double.MAX_VALUE);
+
+        HBox.setHgrow(
+                sidePanelHost,
+                Priority.ALWAYS
+        );
+
+        activityBar.setMinWidth(48);
+
+        activityBar.setPrefWidth(48);
+
+        activityBar.setMaxWidth(48);
+
+        leftSidebarArea =
+                new HBox(
+                        activityBar,
+                        sidePanelHost
+                );
+
+        leftSidebarArea.setFillHeight(true);
+
+        leftSidebarArea.setMinWidth(0);
+
+        leftSidebarArea.setMaxWidth(Double.MAX_VALUE);
+
+        HBox.setHgrow(
+                leftSidebarArea,
+                Priority.ALWAYS
+        );
+
+        HBox.setHgrow(
+                sidePanelHost,
+                Priority.ALWAYS
+        );
+
+        leftSidebarArea.getStyleClass()
+                .add("left-sidebar-area");
+
+        /*
+        ========================================
+        IMPORTANTISSIMO
+        ========================================
+        */
+
+        ((Region) editorManager.getView()).setMinSize(0, 0);
+
+        /*
+        ========================================
+        SPLIT HORIZONTAL
+        ========================================
+        */
+
+        SplitPane horizontalSplit =
+                new SplitPane();
+
+        horizontalSplit.getStyleClass()
+                .add("main-horizontal-split");
+
+        horizontalSplit.getItems().addAll(
+
+                leftSidebarArea,
+
+                editorManager.getView()
+        );
+        leftSidebarArea.minWidthProperty().bind(
+        horizontalSplit.widthProperty()
+                .multiply(
+                        horizontalSplit.getDividers()
+                                .get(0)
+                                .positionProperty()
+                )
+    );
+
+    leftSidebarArea.prefWidthProperty().bind(
+            horizontalSplit.widthProperty()
+                    .multiply(
+                            horizontalSplit.getDividers()
+                                    .get(0)
+                                    .positionProperty()
+                    )
+    );
+
+        horizontalSplit.setDividerPositions(0.18);
+
+        horizontalSplit.getDividers().get(0).positionProperty().addListener(
+        (obs, oldVal, newVal) -> {
+
+            double max = 0.30;
+
+            if (newVal.doubleValue() > max) {
+
+                horizontalSplit.setDividerPositions(max);
+            }
+        }
+);
+
+
+        horizontalSplit.setMinSize(0, 0);
+
+        horizontalSplit.setMaxSize(
+                Double.MAX_VALUE,
+                Double.MAX_VALUE
+        );
+
+        HBox.setHgrow(
+                horizontalSplit,
+                Priority.ALWAYS
+        );
+
+        VBox.setVgrow(
+                horizontalSplit,
+                Priority.ALWAYS
+        );
+
+        ((Region) editorManager.getView()).setMinWidth(0);
+
+        SplitPane.setResizableWithParent(
+                leftSidebarArea,
+                true
+        );
+
+        SplitPane.setResizableWithParent(
+                editorManager.getView(),
+                true
+        );
+
+        /*
+        ========================================
+        TERMINAL
+        ========================================
+        */
+
+        terminalPane =
+                new IntegratedTerminalPane();
+
+        terminalPane.setMinHeight(120);
+
+        terminalPane.setPrefHeight(220);
+
+        terminalPane.setMaxHeight(Double.MAX_VALUE);
+
+        terminalPane.setVisible(true);
+
+        terminalPane.setManaged(true);
+
+        /*
+        ========================================
+        SPLIT VERTICAL
+        ========================================
+        */
+
+        SplitPane verticalSplit =
+                new SplitPane();
+
+        verticalSplit.getStyleClass()
+                .add("main-vertical-split");
+
+        verticalSplit.setOrientation(
+                javafx.geometry.Orientation.VERTICAL
+        );
+
+        /*
+        ========================================
+        IMPORTANTISSIMO
+        ========================================
+        */
+
+        horizontalSplit.setMinSize(0, 0);
+
+        terminalPane.setMinSize(0, 120);
+
+        verticalSplit.getItems().addAll(
+
+                horizontalSplit,
+
+                terminalPane
+        );
+
+        verticalSplit.setDividerPositions(0.78);
+
+        SplitPane.setResizableWithParent(
+                horizontalSplit,
+                true
+        );
+
+        SplitPane.setResizableWithParent(
+                terminalPane,
+                true
+        );
+
+        /*
+        ========================================
+        STATUS BAR
+        ========================================
+        */
+
+        bottomContainer =
+                new VBox(
+                        statusBarManager.createStatusBar()
+                );
+
+        /*
+        ========================================
+        ROOT
+        ========================================
+        */
 
         root.setTop(titleBar);
-        root.setCenter(centerArea);
+
+        root.setCenter(verticalSplit);
+
         root.setBottom(bottomContainer);
 
+        /*
+        ========================================
+        WALLPAPER
+        ========================================
+        */
+
         wallpaperLayer = new StackPane();
-        wallpaperLayer.getStyleClass().add("wallpaper-layer");
+
+        wallpaperLayer.getStyleClass()
+                .add("wallpaper-layer");
+
         wallpaperLayer.setMouseTransparent(true);
 
         wallpaperOverlay = new Rectangle();
+
         wallpaperOverlay.setMouseTransparent(true);
-        wallpaperOverlay.widthProperty().bind(root.widthProperty());
-        wallpaperOverlay.heightProperty().bind(root.heightProperty());
+
+        wallpaperOverlay.widthProperty()
+                .bind(root.widthProperty());
+
+        wallpaperOverlay.heightProperty()
+                .bind(root.heightProperty());
 
         appRoot = new StackPane();
-        appRoot.getChildren().addAll(wallpaperLayer, wallpaperOverlay, root);
+
+        appRoot.getChildren().addAll(
+
+                wallpaperLayer,
+
+                wallpaperOverlay,
+
+                root
+        );
     }
 
     private TitleBar buildTitleBar() {

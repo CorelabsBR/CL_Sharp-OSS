@@ -33,7 +33,7 @@ public class IntegratedTerminalPane extends BorderPane {
     private final List<TerminalSession> sessions = new ArrayList<>();
 
     private final double minHeight = 50;
-    private final double maxHeight = Double.MAX_VALUE;
+    private final double maxHeight = 600;
 
     private double currentHeight = 220;
     private boolean resizing = false;
@@ -52,11 +52,12 @@ private final TextField debugInputField = new TextField();
         setPrefHeight(currentHeight);
         setMinHeight(minHeight);
         setMaxHeight(maxHeight);
-
+        setMinSize(0, 0);
+        setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        tabPane.setMinSize(0, 0);
         HBox header = buildHeader();
 
         VBox topContainer = new VBox(
-                buildResizeHandle(),
                 header
         );
 
@@ -234,45 +235,6 @@ private Button createHeaderButton(String text, String tooltip) {
 
     return button;
 }
-
-    private VBox buildResizeHandle() {
-
-        VBox handle = new VBox();
-
-        handle.getStyleClass().add("terminal-resize-handle");
-
-        handle.setPrefHeight(5);
-
-        handle.setCursor(Cursor.V_RESIZE);
-
-        final double[] startY = new double[1];
-        final double[] startHeight = new double[1];
-
-        handle.setOnMousePressed(event -> {
-
-            startY[0] = event.getScreenY();
-
-            startHeight[0] = getPrefHeight();
-        });
-
-        handle.setOnMouseDragged(event -> {
-
-            double delta = startY[0] - event.getScreenY();
-
-            double newHeight = startHeight[0] + delta;
-
-            newHeight = Math.max(
-                    minHeight,
-                    Math.min(maxHeight, newHeight)
-            );
-
-            setPrefHeight(newHeight);
-
-            currentHeight = newHeight;
-        });
-
-        return handle;
-    }
 
     public void newTerminal() {
 

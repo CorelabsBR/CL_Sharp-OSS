@@ -19,7 +19,6 @@ public class SidePanelManager {
 
     private static final double SIDE_PANEL_PREF_WIDTH = 300;
     private static final double SIDE_PANEL_MIN_WIDTH = 260;
-    private static final double SIDE_PANEL_MAX_WIDTH = 420;
 
     private final StackPane sidePanelHost;
     private final Map<String, ActivityItem> activityItems;
@@ -33,14 +32,33 @@ public class SidePanelManager {
     }
 
     private StackPane createSidePanelHost() {
+
         StackPane host = new StackPane();
+
         host.getStyleClass().add("side-panel-host");
 
-        host.setPrefWidth(SIDE_PANEL_PREF_WIDTH);
-        host.setMinWidth(SIDE_PANEL_MIN_WIDTH);
-        host.setMaxWidth(SIDE_PANEL_MAX_WIDTH);
+        /*
+        ========================================
+        TAMANHO LIVRE
+        ========================================
+        */
+
+        host.setPrefWidth(280);
+
+        host.setMinWidth(0);
+
+        host.setMaxWidth(Double.MAX_VALUE);
+
+        /*
+        ========================================
+        RESPONSIVO
+        ========================================
+        */
+
+        HBox.setHgrow(host, Priority.ALWAYS);
 
         host.setVisible(false);
+
         host.setManaged(false);
 
         return host;
