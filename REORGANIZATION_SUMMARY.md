@@ -163,6 +163,9 @@ src/main/java/br/com/corelabs/npsharpfx/
 - **Frontend/ui consolidado**: Toda interface visual está organizada em subcategorias temáticas
 
 ---
+## iniciar o projeto
+& "C:\Program Files\Apache NetBeans\java\maven\bin\mvn.cmd" -f pom.xml clean javafx:run
+
 
 **Data**: 13 de Abril de 2026
 **Status**: ✅ Concluído com Sucesso
