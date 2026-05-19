@@ -171,8 +171,21 @@ public final class CSSThemeGenerator {
         css.append("}\n\n");
 
         css.append(".context-menu {\n");
-        css.append("    -fx-background-color: ").append(panelBg).append(";\n");
+        css.append("    -fx-background-color: ").append(panelBg).append(", ").append(panelBg).append(";\n");
+        css.append("    -fx-background-insets: 0, 1;\n");
         css.append("    -fx-border-color: ").append(borderColor).append(";\n");
+        css.append("}\n\n");
+
+        css.append(".context-menu .menu-item {\n");
+        css.append("    -fx-background-color: ").append(panelBg).append(";\n");
+        css.append("}\n\n");
+
+        css.append(".context-menu .menu-item:focused, .context-menu .menu-item:hover {\n");
+        css.append("    -fx-background-color: ").append(buttonHoverBg).append(";\n");
+        css.append("}\n\n");
+
+        css.append(".context-menu .menu-item .label {\n");
+        css.append("    -fx-text-fill: ").append(fg).append(";\n");
         css.append("}\n\n");
 
         css.append(".context-menu-item {\n");

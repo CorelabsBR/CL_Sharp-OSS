@@ -12,11 +12,17 @@ public class StatusBarManager {
     private final HBox statusBar;
     private final Label statusLabelLeft;
     private final Label statusLabelRight;
+    private final Label gitLabel;
+    private final Label debugLabel;
+    private final Label terminalLabel;
 
     public StatusBarManager() {
         this.statusBar = new HBox();
         this.statusLabelLeft = new Label("Pronto");
         this.statusLabelRight = new Label("NPSharp");
+        this.gitLabel = new Label("$(git) sem repo");
+        this.debugLabel = new Label("Debug");
+        this.terminalLabel = new Label("Terminal");
     }
 
     public HBox createStatusBar() {
@@ -30,11 +36,21 @@ public class StatusBarManager {
 
         statusLabelLeft.getStyleClass().add("status-label");
         statusLabelRight.getStyleClass().add("status-label");
+        gitLabel.getStyleClass().add("status-label");
+        debugLabel.getStyleClass().add("status-label");
+        terminalLabel.getStyleClass().add("status-label");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        statusBar.getChildren().addAll(statusLabelLeft, spacer, statusLabelRight);
+        statusBar.getChildren().addAll(
+                gitLabel,
+                statusLabelLeft,
+                spacer,
+                debugLabel,
+                terminalLabel,
+                statusLabelRight
+        );
         return statusBar;
     }
 
@@ -56,6 +72,42 @@ public class StatusBarManager {
 
     public String getStatusRight() {
         return statusLabelRight.getText();
+    }
+
+    public void updateGitStatus(String text) {
+        gitLabel.setText(text != null && !text.isBlank() ? text : "$(git) sem repo");
+    }
+
+    public void updateDebugStatus(String text) {
+        debugLabel.setText(text != null && !text.isBlank() ? text : "Debug");
+    }
+
+    public void updateTerminalStatus(String text) {
+        terminalLabel.setText(text != null && !text.isBlank() ? text : "Terminal");
+    }
+
+    public void setGitAction(Runnable action) {
+        gitLabel.setOnMouseClicked(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+    }
+
+    public void setDebugAction(Runnable action) {
+        debugLabel.setOnMouseClicked(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
+    }
+
+    public void setTerminalAction(Runnable action) {
+        terminalLabel.setOnMouseClicked(event -> {
+            if (action != null) {
+                action.run();
+            }
+        });
     }
 }
 

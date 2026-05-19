@@ -38,7 +38,7 @@ import javafx.stage.StageStyle;
 /*
 ========================================================
 TITLE BAR
-Barra de tÃ­tulo customizada da janela principal
+Barra de titulo customizada da janela principal
 ========================================================
 */
 
@@ -329,12 +329,6 @@ private String getWorkspaceNameForBar() {
             }
         });
 
-        commandBar.focusedProperty().addListener((obs, oldValue, focused) -> {
-            if (focused) {
-                openQuickOpen();
-            }
-        });
-
         commandBar.textProperty().addListener((obs, oldValue, newValue) -> {
             if (quickOpenPopup != null && quickOpenPopup.isShowing()) {
                 updateQuickOpenResults(newValue);
@@ -346,10 +340,22 @@ private String getWorkspaceNameForBar() {
                 openSelectedQuickOpenItem();
                 event.consume();
             } else if (event.getCode() == KeyCode.DOWN) {
-                if (quickOpenList != null && !quickOpenList.getItems().isEmpty()) {
-                    quickOpenList.requestFocus();
-                    quickOpenList.getSelectionModel().selectNext();
-                }
+                selectQuickOpenRelative(1);
+                event.consume();
+            } else if (event.getCode() == KeyCode.UP) {
+                selectQuickOpenRelative(-1);
+                event.consume();
+            } else if (event.getCode() == KeyCode.PAGE_DOWN) {
+                selectQuickOpenRelative(10);
+                event.consume();
+            } else if (event.getCode() == KeyCode.PAGE_UP) {
+                selectQuickOpenRelative(-10);
+                event.consume();
+            } else if (event.getCode() == KeyCode.HOME) {
+                selectQuickOpenIndex(0);
+                event.consume();
+            } else if (event.getCode() == KeyCode.END) {
+                selectQuickOpenIndex(quickOpenList == null ? -1 : quickOpenList.getItems().size() - 1);
                 event.consume();
             } else if (event.getCode() == KeyCode.ESCAPE) {
                 closeQuickOpen();
@@ -458,7 +464,7 @@ private String getWorkspaceNameForBar() {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Label arrow = new Label("â€º");
+        Label arrow = new Label(">");
         arrow.getStyleClass().add("context-menu-shortcut");
 
         HBox row = new HBox(label, spacer, arrow);
@@ -471,15 +477,23 @@ private String getWorkspaceNameForBar() {
     private VBox createMenuBox() {
         VBox menu = new VBox();
         menu.getStyleClass().add("context-menu");
-        if (menuStyleSupplier != null) {
-            String style = menuStyleSupplier.get();
-            if (style != null) menu.setStyle(style);
-        }
+        applyCurrentThemeStyle(menu);
         return menu;
     }
 
     public void setMenuStyleSupplier(java.util.function.Supplier<String> supplier) {
         this.menuStyleSupplier = supplier;
+    }
+
+    private void applyCurrentThemeStyle(Node node) {
+        if (node == null || menuStyleSupplier == null) {
+            return;
+        }
+
+        String style = menuStyleSupplier.get();
+        if (style != null && !style.isBlank()) {
+            node.setStyle(style);
+        }
     }
 
     private void bindSubmenu(HBox sourceRow, VBox submenu) {
@@ -555,30 +569,50 @@ private String getWorkspaceNameForBar() {
 
             quickOpenList = new ListView<>();
             quickOpenList.getStyleClass().add("quick-open-list");
+            applyCurrentThemeStyle(quickOpenList);
             quickOpenList.setPrefWidth(Math.max(commandBar.getWidth(), 420));
             quickOpenList.setPrefHeight(320);
-            quickOpenList.setCellFactory(list -> new ListCell<>() {
-                @Override
-                protected void updateItem(File file, boolean empty) {
-                    super.updateItem(file, empty);
+            Label placeholder = new Label("Nenhum arquivo encontrado");
+            placeholder.getStyleClass().add("quick-open-placeholder");
+            quickOpenList.setPlaceholder(placeholder);
+            quickOpenList.setCellFactory(list -> {
+                ListCell<File> cell = new ListCell<>() {
+                    @Override
+                    protected void updateItem(File file, boolean empty) {
+                        super.updateItem(file, empty);
 
-                    if (empty || file == null) {
-                        setText(null);
-                        setGraphic(null);
+                        if (empty || file == null) {
+                            setText(null);
+                            setGraphic(null);
+                            return;
+                        }
+
+                        setText(formatQuickOpenItem(file));
+                    }
+                };
+
+                cell.setOnMousePressed(event -> {
+                    if (cell.isEmpty() || cell.getItem() == null) {
                         return;
                     }
 
-                    setText(formatQuickOpenItem(file));
-                }
-            });
-            quickOpenList.setOnMouseClicked(event -> {
-                if (event.getClickCount() >= 2) {
-                    openSelectedQuickOpenItem();
-                }
+                    quickOpenList.getSelectionModel().select(cell.getIndex());
+                    quickOpenList.getFocusModel().focus(cell.getIndex());
+
+                    if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 2) {
+                        openSelectedQuickOpenItem();
+                        event.consume();
+                    }
+                });
+
+                return cell;
             });
             quickOpenList.setOnKeyPressed(event -> {
                 if (event.getCode() == KeyCode.ENTER) {
                     openSelectedQuickOpenItem();
+                    event.consume();
+                } else if (event.getCode() == KeyCode.UP && quickOpenList.getSelectionModel().getSelectedIndex() <= 0) {
+                    commandBar.requestFocus();
                     event.consume();
                 } else if (event.getCode() == KeyCode.ESCAPE) {
                     closeQuickOpen();
@@ -589,6 +623,7 @@ private String getWorkspaceNameForBar() {
             quickOpenPopup.getContent().add(quickOpenList);
         }
 
+        applyCurrentThemeStyle(quickOpenList);
         updateQuickOpenResults(commandBar.getText());
 
         if (!quickOpenPopup.isShowing()) {
@@ -616,6 +651,28 @@ private String getWorkspaceNameForBar() {
         }
     }
 
+    private void selectQuickOpenRelative(int delta) {
+        if (quickOpenList == null || quickOpenList.getItems().isEmpty()) {
+            return;
+        }
+
+        int current = quickOpenList.getSelectionModel().getSelectedIndex();
+        int next = current < 0 ? 0 : current + delta;
+        selectQuickOpenIndex(next);
+    }
+
+    private void selectQuickOpenIndex(int index) {
+        if (quickOpenList == null || quickOpenList.getItems().isEmpty()) {
+            return;
+        }
+
+        int max = quickOpenList.getItems().size() - 1;
+        int bounded = Math.max(0, Math.min(max, index));
+        quickOpenList.getSelectionModel().select(bounded);
+        quickOpenList.getFocusModel().focus(bounded);
+        quickOpenList.scrollTo(bounded);
+    }
+
     private void updateQuickOpenResults(String rawQuery) {
         if (quickOpenList == null) {
             return;
@@ -634,6 +691,7 @@ private String getWorkspaceNameForBar() {
                 : workspaceFilesSupplier.get();
 
         List<File> filtered = new ArrayList<>(files);
+        File previousSelection = quickOpenList.getSelectionModel().getSelectedItem();
         if (!query.isBlank()) {
             String normalizedQuery = normalizeQuickOpenText(query);
             filtered.removeIf(file -> !normalizeQuickOpenText(relativeWorkspacePath(file)).contains(normalizedQuery)
@@ -649,7 +707,14 @@ private String getWorkspaceNameForBar() {
         }
 
         quickOpenList.getItems().setAll(filtered);
-        if (!filtered.isEmpty()) {
+        if (filtered.isEmpty()) {
+            return;
+        }
+
+        int previousIndex = previousSelection == null ? -1 : filtered.indexOf(previousSelection);
+        if (previousIndex >= 0) {
+            quickOpenList.getSelectionModel().select(previousIndex);
+        } else {
             quickOpenList.getSelectionModel().select(0);
         }
     }
@@ -886,10 +951,11 @@ private String getWorkspaceNameForBar() {
 
         VBox box = new VBox(8);
         box.getStyleClass().add("context-menu");
+        applyCurrentThemeStyle(box);
         box.setPadding(new Insets(10));
         box.setPrefWidth(240);
 
-        Label title = new Label("Nova extensÃ£o");
+        Label title = new Label("Nova extensao");
         title.getStyleClass().add("context-menu-item");
 
         TextField extensionField = new TextField();
@@ -1006,12 +1072,12 @@ private String getWorkspaceNameForBar() {
 
         if (showCommandPaletteAction != null) {
             showCommandPaletteAction.run();
-            return;
         }
 
         updateStatus("Command palette");
         commandBar.selectAll();
         commandBar.requestFocus();
+        openQuickOpen();
     }
 
     private void showAbout() {

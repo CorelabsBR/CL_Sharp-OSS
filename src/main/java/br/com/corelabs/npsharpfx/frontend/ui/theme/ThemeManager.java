@@ -3,6 +3,7 @@ package br.com.corelabs.npsharpfx.frontend.ui.theme;
 // Classe File do Java usada para representar arquivos do sistema.
 // Aqui ela é usada para lidar com o wallpaper personalizado escolhido pelo usuário.
 import java.io.File;
+import java.util.Locale;
 
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
@@ -140,7 +141,7 @@ public class ThemeManager {
         boolean dark = theme.isDark();
         String defaultBg = dark ? "#0C1021" : "#FFFFFF";
         String defaultFg = dark ? "#F8F8F8" : "#333333";
-        String rootColor = theme.color("editor.background", defaultBg);
+        String rootColor = normalizeCssColor(theme.color("editor.background", defaultBg), defaultBg);
 
         // Gera estilo com looked-up colors para cascata CSS
         StringBuilder style = new StringBuilder();
@@ -196,11 +197,21 @@ public class ThemeManager {
 
         // Cores adicionais para eliminar hardcoded do CSS
         appendColor(style, theme, "theme-brand", "progressBar.background", theme.color("activityBar.activeBorder", accentFallback));
-        String brandColor = theme.color("progressBar.background", theme.color("activityBar.activeBorder", accentFallback));
-        style.append("theme-brand-hover: ").append(lighten(brandColor, 0.2)).append(";");
+        String brandColor = normalizeCssColor(theme.color("progressBar.background", theme.color("activityBar.activeBorder", accentFallback)), accentFallback);
+        style.append("-theme-brand-hover: ").append(lighten(brandColor, 0.2)).append(";");
         appendColor(style, theme, "theme-description-fg", "descriptionForeground", descFgFallback);
         appendColor(style, theme, "theme-prompt-fg", "input.placeholderForeground", promptFgFallback);
         appendColor(style, theme, "theme-error", "errorForeground", "#EF2929");
+        appendTokenColor(style, theme, "theme-token-string", "string", dark ? "#CE9178" : "#A31515");
+        appendTokenColor(style, theme, "theme-token-keyword", "keyword", dark ? "#C586C0" : "#0000FF");
+        appendTokenColor(style, theme, "theme-token-comment", "comment", dark ? "#6A9955" : "#008000");
+        appendTokenColor(style, theme, "theme-token-number", "number", dark ? "#B5CEA8" : "#098658");
+        appendTokenColor(style, theme, "theme-token-function", "function", dark ? "#DCDCAA" : "#795E26");
+        appendTokenColor(style, theme, "theme-token-variable", "variable", fgFallback);
+        appendTokenColor(style, theme, "theme-token-type", "type", dark ? "#4EC9B0" : "#267F99");
+        appendTokenColor(style, theme, "theme-token-constant", "constant", dark ? "#4FC1FF" : "#0070C1");
+        appendTokenColor(style, theme, "theme-token-punctuation", "punctuation", dark ? "#D4D4D4" : "#393A34");
+        appendTokenColor(style, theme, "theme-token-invalid", "invalid", "#FFFFFF");
 
         appRoot.setBackground(null);
         appRoot.setStyle(style.toString());
@@ -225,8 +236,33 @@ public class ThemeManager {
     }
 
     private void appendColor(StringBuilder sb, EditorTheme theme, String varName, String themeKey, String fallback) {
-        String color = theme.color(themeKey, fallback);
-        sb.append(varName).append(": ").append(color).append(";");
+        String color = normalizeCssColor(theme.color(themeKey, fallback), fallback);
+        sb.append("-").append(varName).append(": ").append(color).append(";");
+    }
+
+    private void appendTokenColor(StringBuilder sb, EditorTheme theme, String varName, String scope, String fallback) {
+        String color = normalizeCssColor(theme.tokenColor(scope, fallback), fallback);
+        sb.append("-").append(varName).append(": ").append(color).append(";");
+    }
+
+    private String normalizeCssColor(String color, String fallback) {
+        String candidate = color == null || color.isBlank() ? fallback : color.trim();
+        try {
+            Color parsed = Color.web(candidate);
+            if (parsed.getOpacity() < 1.0) {
+                int r = (int) Math.round(parsed.getRed() * 255);
+                int g = (int) Math.round(parsed.getGreen() * 255);
+                int b = (int) Math.round(parsed.getBlue() * 255);
+                return String.format(Locale.US, "rgba(%d,%d,%d,%.3f)", r, g, b, parsed.getOpacity());
+            }
+            return toHex(parsed);
+        } catch (Exception ignored) {
+            try {
+                return toHex(Color.web(fallback));
+            } catch (Exception fallbackError) {
+                return "#FFFFFF";
+            }
+        }
     }
 
     private String darkenOrLighten(String hexColor, boolean isDark) {

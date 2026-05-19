@@ -61,6 +61,8 @@ private static final double MIN_HEIGHT = 520;
     private BorderPane root;
     private BorderPane centerArea;
     private HBox leftSidebarArea;
+    private SplitPane horizontalSplit;
+    private SplitPane verticalSplit;
 
     private StackPane appRoot;
     private StackPane wallpaperLayer;
@@ -450,7 +452,7 @@ registerActivity("debug",
         ========================================
         */
 
-        SplitPane horizontalSplit =
+        horizontalSplit =
                 new SplitPane();
 
         horizontalSplit.getStyleClass()
@@ -462,23 +464,6 @@ registerActivity("debug",
 
                 editorManager.getView()
         );
-        leftSidebarArea.minWidthProperty().bind(
-        horizontalSplit.widthProperty()
-                .multiply(
-                        horizontalSplit.getDividers()
-                                .get(0)
-                                .positionProperty()
-                )
-    );
-
-    leftSidebarArea.prefWidthProperty().bind(
-            horizontalSplit.widthProperty()
-                    .multiply(
-                            horizontalSplit.getDividers()
-                                    .get(0)
-                                    .positionProperty()
-                    )
-    );
 
         horizontalSplit.setDividerPositions(0.18);
 
@@ -539,9 +524,9 @@ registerActivity("debug",
 
         terminalPane.setMaxHeight(Double.MAX_VALUE);
 
-        terminalPane.setVisible(true);
+        terminalPane.setVisible(false);
 
-        terminalPane.setManaged(true);
+        terminalPane.setManaged(false);
 
         /*
         ========================================
@@ -549,7 +534,7 @@ registerActivity("debug",
         ========================================
         */
 
-        SplitPane verticalSplit =
+        verticalSplit =
                 new SplitPane();
 
         verticalSplit.getStyleClass()
@@ -569,12 +554,7 @@ registerActivity("debug",
 
         terminalPane.setMinSize(0, 120);
 
-        verticalSplit.getItems().addAll(
-
-                horizontalSplit,
-
-                terminalPane
-        );
+        verticalSplit.getItems().add(horizontalSplit);
 
         verticalSplit.setDividerPositions(0.78);
 
@@ -587,6 +567,15 @@ registerActivity("debug",
                 terminalPane,
                 true
         );
+
+        sidePanelHost.visibleProperty().addListener((obs, oldValue, newValue) -> updateSidebarLayout());
+        horizontalSplit.widthProperty().addListener((obs, oldValue, newValue) -> updateSidebarLayout());
+        terminalPane.visibleProperty().addListener((obs, oldValue, visible) -> {
+            if (!visible) {
+                hideTerminalPane();
+            }
+        });
+        updateSidebarLayout();
 
         /*
         ========================================
@@ -644,6 +633,8 @@ registerActivity("debug",
 
                 root
         );
+
+        explorerPane.setMenuStyleSupplier(() -> appRoot == null ? "" : appRoot.getStyle());
     }
 
     private TitleBar buildTitleBar() {
@@ -659,7 +650,14 @@ registerActivity("debug",
         titleBar.setNewWindowAction(() -> new MainWindow(new Stage()).show());
         titleBar.setShowAboutAction(() -> statusBarManager.updateStatusLeft("NPSharpFX - CoreLabs"));
         titleBar.setStatusUpdater(statusBarManager::updateStatusLeft);
-        titleBar.setMenuStyleSupplier(() -> appRoot.getStyle());
+        titleBar.setMenuStyleSupplier(() -> appRoot == null ? "" : appRoot.getStyle());
+        titleBar.setWorkspaceNameSupplier(() -> {
+            File workspace = explorerPane == null ? null : explorerPane.getCurrentRootFolder();
+            return workspace == null ? "Nenhuma pasta aberta" : workspace.getAbsolutePath();
+        });
+        titleBar.setWorkspaceRootSupplier(() -> explorerPane == null ? null : explorerPane.getCurrentRootFolder());
+        titleBar.setWorkspaceFilesSupplier(this::listWorkspaceFilesForQuickOpen);
+        titleBar.setQuickOpenFileAction(this::openQuickOpenFile);
 
         titleBar.setNewTerminalAction(() -> {
             showTerminalPane();
@@ -696,6 +694,18 @@ registerActivity("debug",
         });
 
         return titleBar;
+    }
+
+    private void openQuickOpenFile(File file) {
+        if (file == null || !file.isFile()) {
+            return;
+        }
+
+        editorManager.openFileInTab(file);
+        sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange);
+        explorerPane.revealFile(file);
+        statusBarManager.updateStatusLeft("Arquivo aberto: " + file.getName());
+        statusBarManager.updateStatusRight("Explorer");
     }
 
     private List<File> listWorkspaceFilesForQuickOpen() {
@@ -962,13 +972,48 @@ private void closeFolderFromExplorer() {
     }
 
     private void showTerminalPane() {
+        if (verticalSplit != null && terminalPane != null && !verticalSplit.getItems().contains(terminalPane)) {
+            verticalSplit.getItems().add(terminalPane);
+            verticalSplit.setDividerPositions(0.72);
+        }
         terminalPane.setManaged(true);
         terminalPane.setVisible(true);
     }
 
     private void hideTerminalPane() {
+        if (verticalSplit != null && terminalPane != null) {
+            verticalSplit.getItems().remove(terminalPane);
+            verticalSplit.setDividerPositions(1.0);
+        }
         terminalPane.setManaged(false);
         terminalPane.setVisible(false);
+    }
+
+    private void updateSidebarLayout() {
+        if (leftSidebarArea == null || horizontalSplit == null) {
+            return;
+        }
+
+        boolean panelVisible = sidePanelManager != null
+                && sidePanelManager.getSidePanelHost().isVisible()
+                && sidePanelManager.getSidePanelHost().isManaged();
+
+        if (panelVisible) {
+            leftSidebarArea.setMinWidth(260);
+            leftSidebarArea.setPrefWidth(300);
+            leftSidebarArea.setMaxWidth(Double.MAX_VALUE);
+            if (horizontalSplit.getDividers().size() > 0) {
+                horizontalSplit.setDividerPositions(0.18);
+            }
+        } else {
+            leftSidebarArea.setMinWidth(48);
+            leftSidebarArea.setPrefWidth(48);
+            leftSidebarArea.setMaxWidth(48);
+            if (horizontalSplit.getDividers().size() > 0 && horizontalSplit.getWidth() > 0) {
+                double divider = 48 / horizontalSplit.getWidth();
+                horizontalSplit.setDividerPositions(Math.max(0.01, Math.min(0.12, divider)));
+            }
+        }
     }
 
     private void registerActivity(String id, Button button, Node content) {

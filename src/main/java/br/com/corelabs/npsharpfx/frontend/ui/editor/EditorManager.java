@@ -903,6 +903,14 @@ editor.setParagraphGraphicFactory(
             refreshStatusFromSelectedTab();
         });
 
+        tab.setOnSelectionChanged(event -> {
+            if (tab.isSelected()) {
+                refreshStatusFromSelectedTab();
+            }
+        });
+
+        tab.getStyleClass().add("editor-file-tab");
+
         return tab;
     }
 

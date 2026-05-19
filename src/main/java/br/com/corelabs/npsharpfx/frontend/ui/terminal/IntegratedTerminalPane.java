@@ -64,9 +64,7 @@ private final TextField debugInputField = new TextField();
         setTop(topContainer);
         setCenter(tabPane);
         setupDebugConsole();
-        showTerminalPanel();
-
-        newTerminal();
+        setCenter(tabPane);
     }
 
     public String waitInput() {
