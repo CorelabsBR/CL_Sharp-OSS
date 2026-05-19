@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -48,6 +50,7 @@ public class FileExplorerPane {
     private final VBox emptyState;
     private final HBox toolbar;
     private final StackPane contentHost;
+    private final Map<TreeItem<File>, String> compactLabels = new IdentityHashMap<>();
     private final Consumer<File> onFileOpen;
     private final Consumer<File> onFolderOpen;
     private final Stage stage;
@@ -81,7 +84,10 @@ public class FileExplorerPane {
 
                 TreeItem<File> currentItem = getTreeItem();
                 boolean expanded = currentItem != null && currentItem.isExpanded();
-                String name = file.getName();
+                String name = currentItem == null ? null : compactLabels.get(currentItem);
+                if (name == null || name.isBlank()) {
+                    name = file.getName();
+                }
                 setText(name == null || name.isBlank() ? file.getAbsolutePath() : name);
 
                 try {
@@ -188,6 +194,7 @@ public class FileExplorerPane {
             onFolderOpen.accept(folder);
         }
 
+        compactLabels.clear();
         TreeItem<File> rootItem = createNode(folder);
         rootItem.setExpanded(true);
         treeView.setRoot(rootItem);
@@ -197,6 +204,7 @@ public class FileExplorerPane {
 
     public void clearFolder() {
         currentRootFolder = null;
+        compactLabels.clear();
         treeView.setRoot(null);
         refreshVisibility();
     }
@@ -211,6 +219,7 @@ public class FileExplorerPane {
             return;
         }
 
+        compactLabels.clear();
         TreeItem<File> rootItem = createNode(currentRootFolder);
         rootItem.setExpanded(true);
         treeView.setRoot(rootItem);
@@ -293,11 +302,10 @@ public class FileExplorerPane {
         openFolderButton.setOnAction(event -> openFolderFromDialog());
 
         Label emptyTitle = new Label("Nenhuma pasta aberta");
-        emptyTitle.getStyleClass().add("welcome-title");
-        emptyTitle.setStyle("-fx-font-size: 18px;");
+        emptyTitle.getStyleClass().addAll("welcome-title", "explorer-empty-title");
 
         Label emptySubtitle = new Label("Abra uma pasta para exibir os arquivos no Explorer.");
-        emptySubtitle.getStyleClass().add("welcome-subtitle");
+        emptySubtitle.getStyleClass().addAll("welcome-subtitle", "explorer-empty-subtitle");
         emptySubtitle.setWrapText(true);
         emptySubtitle.setMaxWidth(220);
 
@@ -606,14 +614,32 @@ public class FileExplorerPane {
     }
 
     private TreeItem<File> createNode(File file) {
-        TreeItem<File> item = new TreeItem<>(file);
-        item.setExpanded(false);
-        item.setGraphic(FileIconManager.getIcon(file, false));
+        return createNode(file, false);
+    }
 
-        if (file.isDirectory()) {
+    private TreeItem<File> createNode(File file, boolean allowCompactFolders) {
+        File displayFile = file;
+        String compactLabel = null;
+
+        if (allowCompactFolders && file.isDirectory()) {
+            CompactFolder compactFolder = compactFolder(file);
+            displayFile = compactFolder.file();
+            compactLabel = compactFolder.label();
+        }
+
+        TreeItem<File> item = new TreeItem<>(displayFile);
+        item.setExpanded(false);
+        item.setGraphic(FileIconManager.getIcon(displayFile, false));
+
+        if (compactLabel != null) {
+            compactLabels.put(item, compactLabel);
+        }
+
+        if (displayFile.isDirectory()) {
+            File directory = displayFile;
             item.expandedProperty().addListener((obs, oldVal, expanded) ->
-                    item.setGraphic(FileIconManager.getIcon(file, expanded)));
-            item.getChildren().setAll(buildChildren(file));
+                    item.setGraphic(FileIconManager.getIcon(directory, expanded)));
+            item.getChildren().setAll(buildChildren(directory));
         }
 
         return item;
@@ -621,7 +647,7 @@ public class FileExplorerPane {
 
     @SuppressWarnings("unchecked")
     private TreeItem<File>[] buildChildren(File directory) {
-        File[] files = directory.listFiles(file -> !file.isHidden());
+        File[] files = visibleChildren(directory);
         if (files == null) {
             return new TreeItem[0];
         }
@@ -632,9 +658,39 @@ public class FileExplorerPane {
 
         TreeItem<File>[] items = new TreeItem[files.length];
         for (int i = 0; i < files.length; i++) {
-            items[i] = createNode(files[i]);
+            items[i] = createNode(files[i], true);
         }
         return items;
+    }
+
+    private CompactFolder compactFolder(File start) {
+        StringBuilder label = new StringBuilder(nameOrPath(start));
+        File current = start;
+
+        while (true) {
+            File[] children = visibleChildren(current);
+
+            if (children == null || children.length != 1 || !children[0].isDirectory()) {
+                break;
+            }
+
+            current = children[0];
+            label.append('/').append(nameOrPath(current));
+        }
+
+        return new CompactFolder(current, label.toString());
+    }
+
+    private File[] visibleChildren(File directory) {
+        return directory.listFiles(file -> !file.isHidden());
+    }
+
+    private String nameOrPath(File file) {
+        String name = file.getName();
+        return name == null || name.isBlank() ? file.getAbsolutePath() : name;
+    }
+
+    private record CompactFolder(File file, String label) {
     }
 
     private void collapseChildren(TreeItem<File> item) {

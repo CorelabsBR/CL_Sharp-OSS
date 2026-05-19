@@ -36,9 +36,9 @@ public class StatusBarManager {
 
         statusLabelLeft.getStyleClass().add("status-label");
         statusLabelRight.getStyleClass().add("status-label");
-        gitLabel.getStyleClass().add("status-label");
-        debugLabel.getStyleClass().add("status-label");
-        terminalLabel.getStyleClass().add("status-label");
+        gitLabel.getStyleClass().addAll("status-label", "status-label-git");
+        debugLabel.getStyleClass().addAll("status-label", "status-label-debug");
+        terminalLabel.getStyleClass().addAll("status-label", "status-label-terminal");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

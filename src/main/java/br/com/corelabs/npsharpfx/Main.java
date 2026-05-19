@@ -6,6 +6,7 @@ import java.nio.file.Path;
 
 import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeInstaller;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
 import br.com.corelabs.npsharpfx.frontend.ui.window.MainWindow;
 import javafx.application.Application;
@@ -44,7 +45,7 @@ private void initializeExtensionsAsync() {
         System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         System.out.println("");
 
-        Path appData = Path.of(System.getProperty("user.home"), ".npsharp");
+        Path appData = RuntimePaths.appDataDir();
 
         try {
             RuntimeRegistry registry = new RuntimeRegistry(appData);

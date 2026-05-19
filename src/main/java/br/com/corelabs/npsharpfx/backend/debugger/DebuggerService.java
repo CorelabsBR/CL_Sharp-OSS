@@ -8,13 +8,20 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.runtime.DebuggerProcess;
+import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
 import javafx.application.Platform;
 
 public class DebuggerService {
 
     private final Map<String, FileDebugger> debuggers = new HashMap<>();
+    private final RuntimeRegistry runtimeRegistry = new RuntimeRegistry(RuntimePaths.appDataDir());
+    private final DebuggerProcess debuggerProcess = new DebuggerProcess(runtimeRegistry);
 
     public DebuggerService() {
+        reloadRegistry();
         registerDefaults();
     }
 
@@ -33,8 +40,7 @@ public class DebuggerService {
                         line -> safeOutput(output, "[PORTUGOL] " + line)
                 );
 
-                safeOutput(output, "[DEBUG] Execução finalizada");
-
+                safeOutput(output, "[DEBUG] Execucao finalizada");
             } catch (Exception e) {
                 safeOutput(output, "[ERRO] " + e.getMessage());
                 e.printStackTrace();
@@ -55,7 +61,18 @@ public class DebuggerService {
     }
 
     public boolean supports(Path file) {
-        return debuggers.containsKey(getExtension(file));
+        if (file == null) {
+            return false;
+        }
+
+        reloadRegistry();
+
+        if (debuggers.containsKey(getExtension(file))) {
+            return true;
+        }
+
+        LanguageRuntime language = LanguageRuntime.fromFileName(file.getFileName().toString());
+        return language != null && language != LanguageRuntime.GIT && runtimeRegistry.isInstalled(language);
     }
 
     public void debug(
@@ -70,22 +87,58 @@ public class DebuggerService {
 
         String extension = getExtension(file);
         FileDebugger debugger = debuggers.get(extension);
+        LanguageRuntime language = LanguageRuntime.fromFileName(file.getFileName().toString());
 
-        if (debugger == null) {
+        if (debugger == null && language == null) {
             safeOutput(output, "[ERRO] Nenhum debugger encontrado para: " + extension);
             return;
         }
 
         safeOutput(output, "[DEBUG] Arquivo detectado: " + file.getFileName());
-        safeOutput(output, "[DEBUG] Extensão detectada: " + extension);
+        safeOutput(output, "[DEBUG] Extensao detectada: " + extension);
+        if (language != null) {
+            safeOutput(output, "[DEBUG] Runtime selecionado: " + language.displayName());
+        }
 
         Thread thread = new Thread(
-                () -> debugger.debug(file, output, input),
+                () -> {
+                    if (debugger != null) {
+                        debugger.debug(file, output, input);
+                    } else {
+                        runExternalRuntime(file, language, output);
+                    }
+                },
                 "npsharp-debugger-" + extension
         );
 
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private void runExternalRuntime(Path file, LanguageRuntime language, Consumer<String> output) {
+        try {
+            reloadRegistry();
+            debuggerProcess.runFile(file, new DebuggerProcess.OutputListener() {
+                @Override
+                public void onLine(String line) {
+                    safeOutput(output, "[" + language.displayName().toUpperCase() + "] " + line);
+                }
+
+                @Override
+                public void onExit(int code) {
+                    safeOutput(output, "[DEBUG] Processo finalizado com codigo " + code);
+                }
+            });
+        } catch (Exception e) {
+            safeOutput(output, "[ERRO] " + e.getMessage());
+        }
+    }
+
+    private void reloadRegistry() {
+        try {
+            runtimeRegistry.load();
+        } catch (Exception ignored) {
+        }
     }
 
     private static void safeOutput(Consumer<String> output, String text) {

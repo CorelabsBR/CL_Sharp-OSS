@@ -37,6 +37,7 @@ public final class DebuggerProcess {
 
         Map<String, String> env = builder.environment();
         env.put("NPSHARP_RUNTIME_HOME", runtime.rootPath().toString());
+        prependManagedBin(env);
 
         Process process = builder.start();
 
@@ -56,6 +57,7 @@ public final class DebuggerProcess {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(runtime.rootPath().toFile());
         builder.redirectErrorStream(true);
+        prependManagedBin(builder.environment());
 
         Process process = builder.start();
 
@@ -81,11 +83,17 @@ public final class DebuggerProcess {
             case PHP -> List.of(exe, source);
             case RUBY -> List.of(exe, source);
             case LUA -> List.of(exe, source);
+            case DART -> List.of(exe, source);
+            case R -> List.of(exe, source);
+            case PERL -> List.of(exe, source);
+            case SHELL -> List.of(exe, source);
+            case POWERSHELL -> List.of(exe, "-ExecutionPolicy", "Bypass", "-File", source);
             case GO -> List.of(exe, "run", source);
             case RUST -> List.of(exe, source);
             case CPP -> List.of(exe, source);
             case CSHARP -> List.of(exe, "run", "--project", file.getParent().toString());
             case KOTLIN -> List.of(exe, "-script", source);
+            case GIT -> throw new IllegalStateException("Git e uma ferramenta de projeto, nao um runtime de arquivo.");
             case PORTUGOL -> List.of("internal-portugol", source);
         };
     }
@@ -107,8 +115,21 @@ public final class DebuggerProcess {
             case RUBY -> List.of(runtime.debuggerPath().toString(), "--open", "--port", "0");
             case LUA -> List.of(exe, runtime.debuggerPath().toString());
             case KOTLIN -> List.of(exe, "-jar", runtime.debuggerPath().toString());
+            case DART, R, PERL, SHELL, POWERSHELL, GIT -> {
+                if (runtime.debuggerPath() == null) {
+                    throw new IllegalStateException("Debugger DAP nao configurado para " + lang.displayName());
+                }
+                yield List.of(runtime.debuggerPath().toString());
+            }
             case PORTUGOL -> List.of("internal-portugol-debugger");
         };
+    }
+
+    private void prependManagedBin(Map<String, String> env) {
+        Path binDir = RuntimePaths.toolBinDir(RuntimePaths.appDataDir());
+        String path = env.getOrDefault("PATH", "");
+
+        env.put("PATH", binDir + java.io.File.pathSeparator + path);
     }
 
     private void readOutput(Process process, OutputListener listener) {

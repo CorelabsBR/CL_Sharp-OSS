@@ -9,6 +9,9 @@ import java.util.prefs.Preferences;
 
 import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
@@ -36,6 +39,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -86,6 +90,10 @@ private static final double MIN_HEIGHT = 520;
     private FileExplorerPane explorerPane;
     private SearchPane searchPane;
     private TitleBar titleBar;
+    private VBox sourceControlList;
+    private Label sourceControlBranchLabel;
+    private Label sourceControlSummaryLabel;
+    private TextField sourceControlCommitField;
 
     private static final String PREF_WORKSPACE = "workspace";
     private static final String PREF_OPEN_FILES = "openFiles";
@@ -191,6 +199,7 @@ private final PortugolInterpreter portugolInterpreter =
             titleBar.updateWorkspaceNameInCommandBar();
         }
         statusBarManager.updateStatusLeft("Workspace salvo: " + workspace.getName());
+        refreshSourceControlPanel();
     }
 }
     private void prepareStage() {
@@ -270,8 +279,12 @@ private final PortugolInterpreter portugolInterpreter =
         registerActivity("git",
                 gitBtn,
                 sidePanelManager.wrapSidePanel("SOURCE CONTROL",
-                    settingsPanelBuilder.buildPlaceholderPanel("SOURCE CONTROL", "Controle de versão virá depois."),
+                    buildSourceControlPanel(),
                     () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
+        gitBtn.setOnAction(event -> {
+            sidePanelManager.toggleActivityPanel("git", this::updateStatusOnPanelChange);
+            refreshSourceControlPanel();
+        });
 
         Button debugBtn = activityBarManager.createActivityButton();
         Node debugIcon = Codicon.icon("/icons/codicons/debug-alt.svg");
@@ -306,7 +319,7 @@ registerActivity("debug",
         registerActivity("settings", settingsBtn, new StackPane());
 
         activityItems.forEach((id, item) -> {
-            if (!"settings".equals(id)) {
+            if (!"settings".equals(id) && !"git".equals(id)) {
                 item.button.setOnAction(
                         event -> sidePanelManager.toggleActivityPanel(id, this::updateStatusOnPanelChange));
             }
@@ -367,6 +380,191 @@ registerActivity("debug",
 
     return panel;
 }
+
+    private Node buildSourceControlPanel() {
+        VBox panel = new VBox(8);
+        panel.setPadding(new Insets(10));
+        panel.getStyleClass().add("settings-panel");
+
+        sourceControlBranchLabel = new Label("Repositorio nao detectado");
+        sourceControlBranchLabel.getStyleClass().add("settings-title");
+
+        sourceControlSummaryLabel = new Label("Abra uma pasta com Git para ver alteracoes.");
+        sourceControlSummaryLabel.setWrapText(true);
+        sourceControlSummaryLabel.getStyleClass().add("settings-description");
+
+        sourceControlCommitField = new TextField();
+        sourceControlCommitField.setPromptText("Mensagem de commit");
+        sourceControlCommitField.getStyleClass().add("search-input");
+
+        Button refreshButton = createSourceControlButton("Refresh");
+        refreshButton.setOnAction(event -> refreshSourceControlPanel());
+
+        Button stageAllButton = createSourceControlButton("Stage All");
+        stageAllButton.setOnAction(event -> {
+            GitResult result = runGitCommand("add", "-A");
+            statusBarManager.updateStatusLeft(result.success() ? "Alteracoes adicionadas ao stage" : firstLine(result.output()));
+            refreshSourceControlPanel();
+        });
+
+        Button commitButton = createSourceControlButton("Commit");
+        commitButton.setOnAction(event -> {
+            String message = sourceControlCommitField.getText() == null
+                    ? ""
+                    : sourceControlCommitField.getText().trim();
+            if (message.isBlank()) {
+                statusBarManager.updateStatusLeft("Informe uma mensagem de commit");
+                return;
+            }
+
+            GitResult result = runGitCommand("commit", "-m", message);
+            statusBarManager.updateStatusLeft(result.output().isBlank() ? "Commit executado" : firstLine(result.output()));
+            if (result.success()) {
+                sourceControlCommitField.clear();
+            }
+            refreshSourceControlPanel();
+        });
+
+        sourceControlList = new VBox(4);
+        sourceControlList.getStyleClass().add("source-control-list");
+
+        panel.getChildren().addAll(
+                sourceControlBranchLabel,
+                sourceControlSummaryLabel,
+                sourceControlCommitField,
+                refreshButton,
+                stageAllButton,
+                commitButton,
+                new Separator(),
+                sourceControlList
+        );
+
+        return panel;
+    }
+
+    private Button createSourceControlButton(String text) {
+        Button button = new Button(text);
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.getStyleClass().add("terminal-control-button");
+        return button;
+    }
+
+    private void refreshSourceControlPanel() {
+        if (sourceControlList == null || sourceControlBranchLabel == null || sourceControlSummaryLabel == null) {
+            return;
+        }
+
+        File workspace = explorerPane == null ? null : explorerPane.getCurrentRootFolder();
+        if (workspace == null || !workspace.isDirectory()) {
+            sourceControlBranchLabel.setText("Repositorio nao detectado");
+            sourceControlSummaryLabel.setText("Abra uma pasta com Git para ver alteracoes.");
+            sourceControlList.getChildren().clear();
+            statusBarManager.updateGitStatus("$(git) sem repo");
+            return;
+        }
+
+        GitResult branch = runGitCommand("branch", "--show-current");
+        GitResult status = runGitCommand("status", "--porcelain=v1", "-b");
+
+        if (!branch.success() && !status.success()) {
+            sourceControlBranchLabel.setText("Repositorio nao detectado");
+            sourceControlSummaryLabel.setText(firstLine(status.output().isBlank() ? branch.output() : status.output()));
+            sourceControlList.getChildren().clear();
+            statusBarManager.updateGitStatus("$(git) sem repo");
+            return;
+        }
+
+        String branchName = branch.output().trim();
+        if (branchName.isBlank()) {
+            branchName = "detached";
+        }
+
+        java.util.List<String> lines = status.output().lines().toList();
+        java.util.List<String> changes = lines.stream()
+                .filter(line -> !line.startsWith("##"))
+                .toList();
+
+        sourceControlBranchLabel.setText("Branch: " + branchName);
+        sourceControlSummaryLabel.setText(changes.isEmpty()
+                ? "Sem alteracoes"
+                : changes.size() + " arquivo(s) alterado(s)");
+        statusBarManager.updateGitStatus("$(git) " + branchName + (changes.isEmpty() ? "" : " *" + changes.size()));
+
+        sourceControlList.getChildren().clear();
+        if (changes.isEmpty()) {
+            Label clean = new Label("Working tree clean");
+            clean.getStyleClass().add("settings-description");
+            sourceControlList.getChildren().add(clean);
+            return;
+        }
+
+        for (String change : changes) {
+            Label row = new Label(formatGitChange(change));
+            row.getStyleClass().add("source-control-file");
+            sourceControlList.getChildren().add(row);
+        }
+    }
+
+    private String formatGitChange(String line) {
+        if (line == null || line.length() < 4) {
+            return line == null ? "" : line;
+        }
+
+        String status = line.substring(0, 2).trim();
+        String path = line.substring(3).trim();
+        if (status.isBlank()) {
+            status = "M";
+        }
+        return status + "  " + path;
+    }
+
+    private GitResult runGitCommand(String... args) {
+        File workspace = explorerPane == null ? null : explorerPane.getCurrentRootFolder();
+        if (workspace == null || !workspace.isDirectory()) {
+            return new GitResult(false, "Nenhum workspace aberto");
+        }
+
+        java.util.List<String> command = new java.util.ArrayList<>();
+        command.add(resolveGitExecutable());
+        command.addAll(java.util.List.of(args));
+
+        try {
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(workspace);
+            builder.redirectErrorStream(true);
+            Process process = builder.start();
+            String output;
+            try (InputStream input = process.getInputStream()) {
+                output = new String(input.readAllBytes(), java.nio.charset.Charset.defaultCharset()).trim();
+            }
+            int exit = process.waitFor();
+            return new GitResult(exit == 0, output);
+        } catch (Exception e) {
+            return new GitResult(false, e.getMessage() == null ? "Falha ao executar git" : e.getMessage());
+        }
+    }
+
+    private String resolveGitExecutable() {
+        try {
+            RuntimeRegistry registry = new RuntimeRegistry(RuntimePaths.appDataDir());
+            registry.load();
+            return registry.get(LanguageRuntime.GIT)
+                    .map(runtime -> runtime.executablePath().toString())
+                    .orElse("git");
+        } catch (Exception e) {
+            return "git";
+        }
+    }
+
+    private String firstLine(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        return text.lines().findFirst().orElse(text);
+    }
+
+    private record GitResult(boolean success, String output) {
+    }
 
     private void buildLayout() {
 
@@ -587,6 +785,7 @@ registerActivity("debug",
                 new VBox(
                         statusBarManager.createStatusBar()
                 );
+        configureStatusBarActions();
 
         /*
         ========================================
@@ -637,6 +836,22 @@ registerActivity("debug",
         explorerPane.setMenuStyleSupplier(() -> appRoot == null ? "" : appRoot.getStyle());
     }
 
+    private void configureStatusBarActions() {
+        statusBarManager.setGitAction(() -> {
+            sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
+            refreshSourceControlPanel();
+        });
+        statusBarManager.setDebugAction(() -> sidePanelManager.showSidePanel("debug", this::updateStatusOnPanelChange));
+        statusBarManager.setTerminalAction(() -> {
+            showTerminalPane();
+            if (!terminalPane.hasTerminal()) {
+                terminalPane.newTerminal();
+            } else {
+                terminalPane.focusCurrentTerminal();
+            }
+        });
+    }
+
     private TitleBar buildTitleBar() {
         TitleBar titleBar = new TitleBar(stage, editorManager);
         titleBar.setRunCurrentFileAction(this::runSelectedCode);
@@ -664,6 +879,7 @@ registerActivity("debug",
             terminalPane.newTerminal();
             statusBarManager.updateStatusLeft("Novo terminal");
             statusBarManager.updateStatusRight("Terminal");
+            statusBarManager.updateTerminalStatus("Terminal ativo");
         });
 
         titleBar.setSplitTerminalAction(() -> {
@@ -671,6 +887,7 @@ registerActivity("debug",
             terminalPane.splitTerminal();
             statusBarManager.updateStatusLeft("Terminal dividido");
             statusBarManager.updateStatusRight("Terminal");
+            statusBarManager.updateTerminalStatus("Terminal ativo");
         });
 
         titleBar.setKillTerminalAction(() -> {
@@ -680,6 +897,7 @@ registerActivity("debug",
             }
             statusBarManager.updateStatusLeft("Terminal encerrado");
             statusBarManager.updateStatusRight("Terminal");
+            statusBarManager.updateTerminalStatus(terminalPane.hasTerminal() ? "Terminal ativo" : "Terminal");
         });
 
         titleBar.setFocusTerminalAction(() -> {
@@ -691,6 +909,7 @@ registerActivity("debug",
             }
             statusBarManager.updateStatusLeft("Terminal focado");
             statusBarManager.updateStatusRight("Terminal");
+            statusBarManager.updateTerminalStatus("Terminal ativo");
         });
 
         return titleBar;
@@ -821,9 +1040,19 @@ public void runSelectedCode() {
 
     terminalPane.showDebugConsolePanel();
     terminalPane.clearDebugConsole();
+    statusBarManager.updateDebugStatus("Debug iniciando");
+    statusBarManager.updateTerminalStatus("Debug Console");
 
     if (file == null) {
         terminalPane.appendDebugOutput("[ERRO] Nenhum arquivo aberto.");
+        statusBarManager.updateDebugStatus("Debug erro");
+        return;
+    }
+
+    if (!debuggerService.supports(file.toPath())) {
+        terminalPane.appendDebugOutput("[ERRO] Nenhum debugger registrado para " + file.getName());
+        statusBarManager.updateDebugStatus("Debug indisponivel");
+        sidePanelManager.showSidePanel("debug", this::updateStatusOnPanelChange);
         return;
     }
 
@@ -832,6 +1061,8 @@ public void runSelectedCode() {
             terminalPane::appendDebugOutput,
             terminalPane::waitInput
     );
+    statusBarManager.updateDebugStatus("Debug ativo");
+    statusBarManager.updateStatusLeft("Debug iniciado: " + file.getName());
 }
 
     private void openThemeChooser() {
@@ -948,6 +1179,7 @@ public void runSelectedCode() {
         if (rootFolder != null) {
             searchPane.setWorkspaceRoot(rootFolder);
             titleBar.updateWorkspaceNameInCommandBar();
+            refreshSourceControlPanel();
         }
         
         statusBarManager.updateStatusRight("Explorer");
@@ -959,6 +1191,7 @@ private void closeFolderFromExplorer() {
     titleBar.updateWorkspaceNameInCommandBar();
 
     prefs.remove(PREF_WORKSPACE);
+    refreshSourceControlPanel();
 
     statusBarManager.updateStatusLeft("Pasta fechada");
     statusBarManager.updateStatusRight("Explorer");
@@ -987,6 +1220,7 @@ private void closeFolderFromExplorer() {
         }
         terminalPane.setManaged(false);
         terminalPane.setVisible(false);
+        statusBarManager.updateTerminalStatus("Terminal");
     }
 
     private void updateSidebarLayout() {

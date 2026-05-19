@@ -97,13 +97,17 @@ public final class PreferencesManager {
         return getAppDir().resolve("wallpapers");
     }
 
+    public static Path getConfigDir() {
+        return getAppDir().resolve("config");
+    }
+
     /**
      * Retorna o caminho do arquivo de configuração.
      *
      * ~/.npsharp/config.json
      */
     public static Path getConfigFile() {
-        return getAppDir().resolve("config.json");
+        return getConfigDir().resolve("config.json");
     }
 
     /**
@@ -130,6 +134,7 @@ public final class PreferencesManager {
              * Garante que diretório de wallpapers exista.
              */
             Files.createDirectories(getWallpaperDir());
+            Files.createDirectories(getConfigDir());
 
             /**
              * Caminho do arquivo de configuração.
@@ -201,6 +206,7 @@ public final class PreferencesManager {
              * Garante existência da pasta de wallpapers.
              */
             Files.createDirectories(getWallpaperDir());
+            Files.createDirectories(getConfigDir());
 
             /**
              * Abre arquivo de configuração para escrita.

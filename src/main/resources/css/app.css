@@ -618,6 +618,22 @@
     -fx-background-color: rgba(255, 255, 255, 0.12);
 }
 
+.source-control-list {
+    -fx-background-color: transparent;
+    -fx-spacing: 2;
+}
+
+.source-control-file {
+    -fx-text-fill: -theme-fg;
+    -fx-font-size: 12px;
+    -fx-padding: 5 8 5 8;
+    -fx-background-radius: 3;
+}
+
+.source-control-file:hover {
+    -fx-background-color: -theme-list-hover-bg;
+}
+
 /* =========================================================
    SCROLLBARS
    ========================================================= */
@@ -1831,4 +1847,487 @@
 
 .wallpaper-active .welcome-pane {
     -fx-background-color: transparent;
+}
+
+/* =========================================================
+   VS CODE POLISH PASS
+   ========================================================= */
+
+.root,
+.root-pane {
+    -fx-font-family: "Segoe UI", "Inter", "Arial", sans-serif;
+    -fx-font-size: 12px;
+    -fx-background-color: -theme-bg;
+}
+
+.tooltip {
+    -fx-background-color: -theme-input-bg;
+    -fx-text-fill: -theme-fg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-padding: 5 7 5 7;
+    -fx-font-size: 11px;
+}
+
+.title-bar {
+    -fx-min-height: 35px;
+    -fx-pref-height: 35px;
+    -fx-max-height: 35px;
+    -fx-padding: 0 0 0 10;
+    -fx-spacing: 6;
+}
+
+.title-menu {
+    -fx-font-size: 12px;
+    -fx-padding: 6 8 6 8;
+    -fx-background-radius: 3;
+}
+
+.title-menu:hover,
+.title-toolbar-button:hover {
+    -fx-background-color: rgba(127, 127, 127, 0.18);
+}
+
+.title-toolbar-button {
+    -fx-min-width: 28px;
+    -fx-pref-width: 28px;
+    -fx-max-width: 28px;
+    -fx-min-height: 28px;
+    -fx-pref-height: 28px;
+    -fx-max-height: 28px;
+    -fx-padding: 0;
+    -fx-background-radius: 4;
+}
+
+.title-toolbar-button-disabled {
+    -fx-opacity: 0.42;
+}
+
+.command-bar {
+    -fx-min-height: 25px;
+    -fx-pref-height: 25px;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-padding: 3 12 3 12;
+    -fx-font-size: 12px;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.16), 2, 0, 0, 1);
+}
+
+.command-bar:focused {
+    -fx-background-color: -theme-input-bg;
+    -fx-effect: dropshadow(gaussian, rgba(0,122,204,0.22), 8, 0, 0, 0);
+}
+
+.window-button {
+    -fx-min-height: 35px;
+    -fx-pref-height: 35px;
+    -fx-max-height: 35px;
+}
+
+.activity-bar {
+    -fx-min-width: 48px;
+    -fx-pref-width: 48px;
+    -fx-max-width: 48px;
+    -fx-padding: 2 0 2 0;
+}
+
+.activity-icon {
+    -fx-min-height: 47px;
+    -fx-pref-height: 47px;
+    -fx-max-height: 47px;
+    -fx-border-width: 0 0 0 2;
+}
+
+.activity-icon .codicon-svg,
+.activity-icon .svg-icon,
+.activity-icon .themed-icon {
+    -fx-opacity: 0.72;
+}
+
+.activity-icon:hover .codicon-svg,
+.activity-icon:hover .svg-icon,
+.activity-icon:hover .themed-icon,
+.activity-icon.active .codicon-svg,
+.activity-icon.active .svg-icon,
+.activity-icon.active .themed-icon {
+    -fx-opacity: 1;
+}
+
+.side-panel-host {
+    -fx-min-width: 245px;
+    -fx-pref-width: 300px;
+    -fx-background-color: -theme-sidebar-bg;
+}
+
+.side-panel-header {
+    -fx-min-height: 34px;
+    -fx-pref-height: 34px;
+    -fx-max-height: 34px;
+    -fx-padding: 0 8 0 14;
+}
+
+.panel-title {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.panel-section-title {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 12 5 12;
+}
+
+.explorer-toolbar {
+    -fx-min-height: 32px;
+    -fx-pref-height: 32px;
+    -fx-padding: 0 8 0 8;
+}
+
+.explorer-toolbar-button,
+.side-panel-collapse-button {
+    -fx-min-width: 26px;
+    -fx-pref-width: 26px;
+    -fx-max-width: 26px;
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
+    -fx-max-height: 26px;
+    -fx-background-radius: 4;
+}
+
+.explorer-content-host,
+.explorer-empty-state {
+    -fx-background-color: -theme-sidebar-bg;
+}
+
+.explorer-empty-state {
+    -fx-spacing: 10;
+}
+
+.explorer-empty-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.explorer-empty-subtitle {
+    -fx-font-size: 12px;
+    -fx-text-alignment: center;
+}
+
+.file-tree .tree-cell {
+    -fx-cell-size: 22px;
+    -fx-font-size: 12px;
+    -fx-padding: 0 7 0 7;
+    -fx-graphic-text-gap: 6;
+}
+
+.file-tree .tree-cell:selected {
+    -fx-background-color: -theme-list-active-bg;
+}
+
+.file-tree .tree-cell:focused {
+    -fx-background-insets: 0;
+}
+
+.editor-tabs {
+    -fx-tab-min-height: 34px;
+    -fx-tab-max-height: 34px;
+}
+
+.editor-tabs .tab {
+    -fx-padding: 7 12 7 12;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.editor-tabs .tab:selected {
+    -fx-border-width: 1 1 0 0;
+}
+
+.editor-tabs .tab-label {
+    -fx-font-size: 12px;
+}
+
+.editor-tabs .control-buttons-tab,
+.editor-tabs .tab-down-button {
+    -fx-background-color: -theme-bg;
+    -fx-background-radius: 0;
+}
+
+.editor-textarea {
+    -fx-font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 14px;
+}
+
+.editor-textarea .paragraph-box {
+    -fx-padding: 0 0 0 10;
+}
+
+.lineno {
+    -fx-background-color: -theme-bg;
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-family: "Cascadia Code", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-padding: 0 10 0 8;
+}
+
+.button,
+.terminal-control-button,
+.search-action-button,
+.welcome-action {
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.button {
+    -fx-padding: 5 10 5 10;
+}
+
+.button:hover {
+    -fx-background-color: -theme-list-hover-bg;
+}
+
+.button:pressed {
+    -fx-background-color: -theme-list-active-bg;
+}
+
+.button-primary,
+.search-action-button {
+    -fx-background-color: -theme-button-bg;
+    -fx-text-fill: -theme-button-fg;
+    -fx-border-color: transparent;
+}
+
+.button-primary:hover,
+.search-action-button:hover {
+    -fx-background-color: -theme-brand-hover;
+}
+
+.welcome-pane {
+    -fx-padding: 58 44 44 44;
+    -fx-spacing: 10;
+}
+
+.welcome-logo {
+    -fx-font-size: 42px;
+    -fx-background-radius: 6;
+    -fx-padding: 10 18 10 18;
+}
+
+.welcome-title {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+}
+
+.welcome-subtitle {
+    -fx-font-size: 13px;
+}
+
+.welcome-action {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 6 10 6 10;
+}
+
+.welcome-action:hover {
+    -fx-background-color: -theme-list-hover-bg;
+    -fx-border-color: transparent;
+}
+
+.integrated-terminal {
+    -fx-min-height: 120px;
+    -fx-background-color: -theme-terminal-bg;
+}
+
+.integrated-terminal-header {
+    -fx-min-height: 34px;
+    -fx-pref-height: 34px;
+    -fx-padding: 0;
+}
+
+.integrated-terminal-tab {
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 0 0;
+}
+
+.integrated-terminal-tab:hover,
+.integrated-terminal-tab-active {
+    -fx-text-fill: -theme-fg;
+}
+
+.integrated-terminal-shell-label {
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-size: 12px;
+}
+
+.terminal-control-button {
+    -fx-font-size: 12px;
+    -fx-padding: 4 7 4 7;
+}
+
+.terminal-output,
+.terminal-input {
+    -fx-font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 13px;
+}
+
+.terminal-input {
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-padding: 5 8 5 8;
+}
+
+.status-bar {
+    -fx-min-height: 23px;
+    -fx-pref-height: 23px;
+    -fx-max-height: 23px;
+    -fx-padding: 0 8 0 8;
+    -fx-spacing: 2;
+}
+
+.status-label {
+    -fx-font-size: 11px;
+    -fx-padding: 3 7 3 7;
+    -fx-background-radius: 0;
+}
+
+.status-label-git {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.status-label-debug,
+.status-label-terminal {
+    -fx-cursor: hand;
+}
+
+.settings-panel,
+.search-pane {
+    -fx-background-color: -theme-sidebar-bg;
+}
+
+.settings-title {
+    -fx-text-fill: -theme-fg;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.settings-description {
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-size: 12px;
+}
+
+.settings-menu-item {
+    -fx-min-height: 28px;
+    -fx-pref-height: 28px;
+    -fx-padding: 0 10 0 10;
+}
+
+.settings-menu-text {
+    -fx-font-size: 12px;
+}
+
+.settings-menu-shortcut {
+    -fx-font-size: 11px;
+}
+
+.search-pane {
+    -fx-padding: 10 10 8 10;
+    -fx-spacing: 7;
+}
+
+.search-input,
+.text-field,
+.text-area,
+.combo-box,
+.choice-box {
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-padding: 5 8 5 8;
+}
+
+.search-result-list,
+.list-view {
+    -fx-border-color: transparent;
+}
+
+.search-result-list .list-cell,
+.list-view .list-cell {
+    -fx-cell-size: 28px;
+}
+
+.context-menu {
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 4 0 4 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.42), 14, 0.18, 0, 3);
+}
+
+.context-menu-row {
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
+    -fx-padding: 4 12 4 12;
+}
+
+.context-menu-item {
+    -fx-font-size: 12px;
+}
+
+.context-menu-shortcut {
+    -fx-font-size: 11px;
+}
+
+.quick-open-list {
+    -fx-background-radius: 0 0 5 5;
+    -fx-border-radius: 0 0 5 5;
+    -fx-padding: 4 0 4 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.38), 18, 0.14, 0, 5);
+}
+
+.quick-open-list .list-cell {
+    -fx-padding: 7 12 7 12;
+    -fx-font-size: 12px;
+}
+
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-pref-width: 11px;
+    -fx-pref-height: 11px;
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: rgba(127, 127, 127, 0.34);
+    -fx-background-insets: 2;
+    -fx-background-radius: 999;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: rgba(127, 127, 127, 0.52);
+}
+
+.dialog-pane {
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 0;
+}
+
+.dialog-pane .header-panel {
+    -fx-padding: 14 16 8 16;
+}
+
+.dialog-pane .content {
+    -fx-padding: 12 16 12 16;
+}
+
+.dialog-pane .button-bar {
+    -fx-padding: 10 16 14 16;
 }

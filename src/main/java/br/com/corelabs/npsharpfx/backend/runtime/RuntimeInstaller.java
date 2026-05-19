@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -22,11 +24,15 @@ public final class RuntimeInstaller {
     }
 
     private final Path runtimesDir;
+    private final Path shimDir;
+    private final Path appDataDir;
     private final RuntimeRegistry registry;
     private final RuntimeManifest manifest;
 
     public RuntimeInstaller(Path appDataDir, RuntimeRegistry registry) {
-        this.runtimesDir = appDataDir.resolve("runtimes");
+        this.appDataDir = appDataDir;
+        this.runtimesDir = RuntimePaths.runtimesDir(appDataDir);
+        this.shimDir = RuntimePaths.toolBinDir(appDataDir);
         this.registry = registry;
         this.manifest = new RuntimeManifest();
     }
@@ -66,8 +72,14 @@ public final class RuntimeInstaller {
         }
 
         if (!hasDownloadUrl(def)) {
+            if (registerSystemRuntime(language, def, listener)) {
+                registry.save();
+                return;
+            }
+
             throw new UnavailableRuntimePackageException(
-                    "Pacote de " + language.displayName() + " ainda sem URL real no RuntimeManifest."
+                    language.displayName()
+                            + " nao encontrado. Instale a ferramenta no sistema ou configure uma URL no RuntimeManifest."
             );
         }
 
@@ -113,7 +125,7 @@ public final class RuntimeInstaller {
     }
 
     private void registerInternalPortugol(Listener listener) {
-        Path internal = Paths.get("internal-portugol");
+        Path internal = RuntimePaths.toolBinDir(appDataDir).resolve("internal-portugol");
 
         registry.register(new InstalledRuntime(
                 LanguageRuntime.PORTUGOL,
@@ -125,6 +137,116 @@ public final class RuntimeInstaller {
 
         listener.onLog("[RUNTIME] Portugol usa runtime interno do NPSharp.");
         listener.onProgress(LanguageRuntime.PORTUGOL, 1.0);
+    }
+
+    private boolean registerSystemRuntime(
+            LanguageRuntime language,
+            RuntimeManifest.PackageDef def,
+            Listener listener
+    ) throws IOException {
+        Optional<Path> executable = findFirstOnPath(language.executableCandidates());
+
+        if (executable.isEmpty()) {
+            return false;
+        }
+
+        Files.createDirectories(shimDir);
+
+        Path shim = createShim(language, executable.get());
+        Path debugger = resolveDebuggerFromPath(def.debuggerRelativePath());
+
+        registry.register(new InstalledRuntime(
+                language,
+                executable.get().getParent(),
+                shim,
+                debugger,
+                def.version()
+        ));
+
+        listener.onLog("[RUNTIME] " + language.displayName()
+                + " registrado via ferramenta existente: " + executable.get());
+        listener.onProgress(language, 1.0);
+        return true;
+    }
+
+    private Optional<Path> findFirstOnPath(String[] commandNames) {
+        for (String command : commandNames) {
+            Optional<Path> found = findOnPath(command);
+
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<Path> findOnPath(String command) {
+        String pathValue = System.getenv("PATH");
+
+        if (pathValue == null || pathValue.isBlank()) {
+            return Optional.empty();
+        }
+
+        boolean windows = RuntimeTarget.detect().os() == RuntimeTarget.Os.WINDOWS;
+        String[] extensions = windows
+                ? new String[] { "", ".exe", ".cmd", ".bat" }
+                : new String[] { "" };
+
+        for (String dir : pathValue.split(java.io.File.pathSeparator)) {
+            if (dir == null || dir.isBlank()) {
+                continue;
+            }
+
+            for (String ext : extensions) {
+                Path candidate = Paths.get(dir).resolve(command + ext).normalize();
+
+                if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
+                    return Optional.of(candidate.toAbsolutePath().normalize());
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Path createShim(LanguageRuntime language, Path target) throws IOException {
+        RuntimeTarget targetPlatform = RuntimeTarget.detect();
+
+        if (targetPlatform.os() == RuntimeTarget.Os.WINDOWS) {
+            Path shim = shimDir.resolve(language.id() + ".cmd");
+            String script = "@echo off\r\n"
+                    + "\"" + target.toAbsolutePath() + "\" %*\r\n";
+            Files.writeString(shim, script);
+            return shim;
+        }
+
+        Path shim = shimDir.resolve(language.id());
+        String script = "#!/usr/bin/env sh\n"
+                + "exec \"" + target.toAbsolutePath() + "\" \"$@\"\n";
+        Files.writeString(shim, script);
+        makeExecutable(shim);
+        return shim;
+    }
+
+    private Path resolveDebuggerFromPath(String debuggerRelativePath) {
+        if (debuggerRelativePath == null || debuggerRelativePath.isBlank()) {
+            return null;
+        }
+
+        String debuggerName = Paths.get(debuggerRelativePath).getFileName().toString();
+
+        if (debuggerName.isBlank()) {
+            return null;
+        }
+
+        String command = debuggerName;
+        int dot = command.toLowerCase(Locale.ROOT).lastIndexOf(".exe");
+        if (dot > 0) {
+            command = command.substring(0, dot);
+        }
+
+        return findOnPath(command).orElse(null);
     }
 
     private void download(
@@ -223,8 +345,7 @@ public final class RuntimeInstaller {
         String url = def.url();
         return url != null
                 && !url.isBlank()
-                && !"internal".equals(url)
-                && !url.startsWith("Colocar_a_merda_do_link");
+                && !"internal".equals(url);
     }
 
     private static final class UnavailableRuntimePackageException extends Exception {

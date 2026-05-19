@@ -17,7 +17,7 @@ public final class RuntimeRegistry {
     private final Map<LanguageRuntime, InstalledRuntime> installed = new EnumMap<>(LanguageRuntime.class);
 
     public RuntimeRegistry(Path appDataDir) {
-        this.configFile = appDataDir.resolve("runtime-registry.properties");
+        this.configFile = RuntimePaths.configDir(appDataDir).resolve("runtime-registry.properties");
     }
 
     public void load() throws IOException {
