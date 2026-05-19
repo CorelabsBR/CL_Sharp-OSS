@@ -2,7 +2,9 @@ package br.com.corelabs.npsharpfx.frontend.ui.window;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.prefs.Preferences;
@@ -37,10 +39,13 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -85,6 +90,9 @@ private static final double MIN_HEIGHT = 520;
     private IntegratedTerminalPane terminalPane;
     private VBox bottomContainer;
     private Popup settingsPopup;
+    private Popup commandPalettePopup;
+    private TextField commandPaletteInput;
+    private ListView<CommandAction> commandPaletteList;
 
     private EditorManager editorManager;
     private FileExplorerPane explorerPane;
@@ -544,6 +552,14 @@ registerActivity("debug",
         }
     }
 
+    private void runGitAndReport(String... args) {
+        GitResult result = runGitCommand(args);
+        statusBarManager.updateStatusLeft(result.output().isBlank()
+                ? (result.success() ? "Git executado" : "Falha ao executar Git")
+                : firstLine(result.output()));
+        refreshSourceControlPanel();
+    }
+
     private String resolveGitExecutable() {
         try {
             RuntimeRegistry registry = new RuntimeRegistry(RuntimePaths.appDataDir());
@@ -861,7 +877,7 @@ registerActivity("debug",
         titleBar.setToggleSidebarAction(() -> sidePanelManager.toggleSidebarVisibility(this::updateStatusOnPanelChange));
         titleBar.setShowSearchAction(() -> sidePanelManager.showSidePanel("search", this::updateStatusOnPanelChange));
         titleBar.setShowExplorerAction(() -> sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange));
-        titleBar.setShowCommandPaletteAction(() -> statusBarManager.updateStatusLeft("Command Palette ainda nÃƒÂ£o implementada"));
+        titleBar.setShowCommandPaletteAction(this::showCommandPalette);
         titleBar.setNewWindowAction(() -> new MainWindow(new Stage()).show());
         titleBar.setShowAboutAction(() -> statusBarManager.updateStatusLeft("NPSharpFX - CoreLabs"));
         titleBar.setStatusUpdater(statusBarManager::updateStatusLeft);
@@ -1018,6 +1034,10 @@ registerActivity("debug",
                     public void splitTerminal() { showTerminalPane(); terminalPane.splitTerminal(); }
                     @Override
                     public void runCurrentFile() { showTerminalPane();  MainWindow.this.runSelectedCode();; }
+                    @Override
+                    public void showCommandPalette() { MainWindow.this.showCommandPalette(); }
+                    @Override
+                    public void showQuickOpen() { MainWindow.this.focusQuickOpen(); }
                      
                 });
     }
@@ -1026,6 +1046,228 @@ registerActivity("debug",
     
 
     private File currentFile;
+
+    private void showCommandPalette() {
+        if (commandPalettePopup != null && commandPalettePopup.isShowing()) {
+            commandPalettePopup.hide();
+            return;
+        }
+
+        commandPaletteInput = new TextField();
+        commandPaletteInput.getStyleClass().add("command-palette-input");
+        commandPaletteInput.setPromptText("> Digite um comando");
+
+        commandPaletteList = new ListView<>();
+        commandPaletteList.getStyleClass().add("command-palette-list");
+        commandPaletteList.setPrefHeight(330);
+        commandPaletteList.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(CommandAction item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setText(null);
+                    return;
+                }
+
+                setText(item.label() + (item.shortcut().isBlank() ? "" : "    " + item.shortcut()));
+            }
+        });
+
+        commandPaletteInput.textProperty().addListener((obs, oldValue, newValue) -> updateCommandPaletteResults(newValue));
+        commandPaletteInput.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                runSelectedCommand();
+                event.consume();
+            } else if (event.getCode() == KeyCode.ESCAPE) {
+                commandPalettePopup.hide();
+                event.consume();
+            } else if (event.getCode() == KeyCode.DOWN) {
+                commandPaletteList.requestFocus();
+                commandPaletteList.getSelectionModel().selectNext();
+                event.consume();
+            }
+        });
+        commandPaletteList.setOnMouseClicked(event -> {
+            if (event.getClickCount() >= 2) {
+                runSelectedCommand();
+            }
+        });
+        commandPaletteList.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                runSelectedCommand();
+                event.consume();
+            } else if (event.getCode() == KeyCode.ESCAPE) {
+                commandPalettePopup.hide();
+                event.consume();
+            }
+        });
+
+        VBox content = new VBox(commandPaletteInput, commandPaletteList);
+        content.getStyleClass().add("command-palette");
+        content.setStyle(appRoot == null ? "" : appRoot.getStyle());
+        content.setPrefWidth(Math.min(720, Math.max(520, stage.getWidth() * 0.55)));
+
+        commandPalettePopup = new Popup();
+        commandPalettePopup.setAutoHide(true);
+        commandPalettePopup.setHideOnEscape(true);
+        commandPalettePopup.getContent().add(content);
+
+        updateCommandPaletteResults("");
+        commandPalettePopup.show(
+                stage,
+                stage.getX() + (stage.getWidth() - content.getPrefWidth()) / 2,
+                stage.getY() + 58
+        );
+        commandPaletteInput.requestFocus();
+    }
+
+    private void updateCommandPaletteResults(String query) {
+        if (commandPaletteList == null) {
+            return;
+        }
+
+        String normalizedQuery = normalizeCommandText(query);
+        List<CommandAction> filtered = commandActions().stream()
+                .filter(command -> normalizedQuery.isBlank()
+                        || normalizeCommandText(command.label()).contains(normalizedQuery)
+                        || normalizeCommandText(command.keywords()).contains(normalizedQuery))
+                .sorted(Comparator.comparing(command -> scoreCommand(command, normalizedQuery)))
+                .limit(60)
+                .toList();
+
+        commandPaletteList.getItems().setAll(filtered);
+        if (!filtered.isEmpty()) {
+            commandPaletteList.getSelectionModel().select(0);
+        }
+    }
+
+    private int scoreCommand(CommandAction command, String query) {
+        if (query == null || query.isBlank()) {
+            return 100;
+        }
+
+        String label = normalizeCommandText(command.label());
+        if (label.equals(query)) {
+            return 0;
+        }
+        if (label.startsWith(query)) {
+            return 10;
+        }
+        return label.contains(query) ? 20 : 50;
+    }
+
+    private void runSelectedCommand() {
+        CommandAction selected = commandPaletteList == null
+                ? null
+                : commandPaletteList.getSelectionModel().getSelectedItem();
+
+        if (selected == null) {
+            return;
+        }
+
+        if (commandPalettePopup != null) {
+            commandPalettePopup.hide();
+        }
+
+        selected.action().run();
+        statusBarManager.updateStatusLeft(selected.label());
+    }
+
+    private List<CommandAction> commandActions() {
+        List<CommandAction> commands = new ArrayList<>();
+
+        commands.add(new CommandAction("File: New File", "Ctrl+N", "novo arquivo", editorManager::newTab));
+        commands.add(new CommandAction("File: Open File...", "Ctrl+O", "abrir arquivo", editorManager::openFileFromDialog));
+        commands.add(new CommandAction("File: Open Folder...", "Ctrl+Shift+O", "abrir pasta workspace explorer", this::openFolderInExplorer));
+        commands.add(new CommandAction("File: Save", "Ctrl+S", "salvar", editorManager::saveCurrentFile));
+        commands.add(new CommandAction("File: Save As...", "Ctrl+Shift+S", "salvar como", editorManager::saveCurrentFileAs));
+        commands.add(new CommandAction("File: Save All", "", "salvar todos", editorManager::saveAll));
+        commands.add(new CommandAction("File: Close Editor", "Ctrl+W", "fechar aba", editorManager::closeCurrentTab));
+        commands.add(new CommandAction("File: Close Others", "", "fechar outras abas", editorManager::closeOtherTabs));
+        commands.add(new CommandAction("File: Close All Editors", "Ctrl+Shift+W", "fechar todas abas", editorManager::closeAllTabs));
+        commands.add(new CommandAction("File: Close Folder", "", "fechar pasta workspace", this::closeFolderFromExplorer));
+        commands.add(new CommandAction("File: Revert File", "", "reverter arquivo", editorManager::revertCurrentFile));
+
+        commands.add(new CommandAction("Edit: Undo", "Ctrl+Z", "desfazer", editorManager::undo));
+        commands.add(new CommandAction("Edit: Redo", "Ctrl+Y", "refazer", editorManager::redo));
+        commands.add(new CommandAction("Edit: Cut", "Ctrl+X", "recortar", editorManager::cut));
+        commands.add(new CommandAction("Edit: Copy", "Ctrl+C", "copiar", editorManager::copy));
+        commands.add(new CommandAction("Edit: Paste", "Ctrl+V", "colar", editorManager::paste));
+        commands.add(new CommandAction("Edit: Select All", "Ctrl+A", "selecionar tudo", editorManager::selectAll));
+        commands.add(new CommandAction("Edit: Duplicate Line", "Shift+Alt+Down", "duplicar linha", editorManager::duplicateCurrentLine));
+        commands.add(new CommandAction("Edit: Delete Line", "Ctrl+Shift+K", "deletar linha excluir linha", editorManager::deleteCurrentLine));
+
+        commands.add(new CommandAction("View: Explorer", "Ctrl+Shift+E", "painel explorer arquivos", () -> sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange)));
+        commands.add(new CommandAction("View: Search", "Ctrl+Shift+F", "painel busca pesquisar", () -> sidePanelManager.showSidePanel("search", this::updateStatusOnPanelChange)));
+        commands.add(new CommandAction("View: Source Control", "Ctrl+Shift+G", "git scm source control", () -> {
+            sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
+            refreshSourceControlPanel();
+        }));
+        commands.add(new CommandAction("View: Run and Debug", "Ctrl+Shift+D", "debug rodar", () -> sidePanelManager.showSidePanel("debug", this::updateStatusOnPanelChange)));
+        commands.add(new CommandAction("View: Extensions", "Ctrl+Shift+X", "extensoes plugins", () -> sidePanelManager.showSidePanel("extensions", this::updateStatusOnPanelChange)));
+        commands.add(new CommandAction("View: Toggle Sidebar", "Ctrl+B", "sidebar barra lateral", () -> sidePanelManager.toggleSidebarVisibility(this::updateStatusOnPanelChange)));
+        commands.add(new CommandAction("View: Focus Editor", "Ctrl+Tab", "editor foco", this::focusEditor));
+        commands.add(new CommandAction("View: Quick Open", "Ctrl+P", "arquivo rapido quick open", this::focusQuickOpen));
+
+        commands.add(new CommandAction("Terminal: New Terminal", "Ctrl+Shift+`", "terminal novo", () -> {
+            showTerminalPane();
+            terminalPane.newTerminal();
+        }));
+        commands.add(new CommandAction("Terminal: Split Terminal", "Ctrl+Shift+5", "terminal dividir", () -> {
+            showTerminalPane();
+            terminalPane.splitTerminal();
+        }));
+        commands.add(new CommandAction("Terminal: Kill Current Terminal", "", "terminal matar fechar", terminalPane::killCurrentTerminal));
+        commands.add(new CommandAction("Terminal: Clear Current Terminal", "", "terminal limpar", terminalPane::clearCurrentTerminal));
+        commands.add(new CommandAction("Terminal: Toggle Panel", "", "terminal painel", () -> {
+            if (terminalPane.isVisible()) {
+                hideTerminalPane();
+            } else {
+                showTerminalPane();
+                terminalPane.showTerminalPanel();
+            }
+        }));
+
+        commands.add(new CommandAction("Run: Start Debugging", "F5", "rodar executar debug", this::runSelectedCode));
+        commands.add(new CommandAction("Run: Open Debug Console", "", "debug console", () -> {
+            showTerminalPane();
+            terminalPane.showDebugConsolePanel();
+        }));
+
+        commands.add(new CommandAction("Preferences: Color Theme", "", "tema cores", this::openThemeChooser));
+        commands.add(new CommandAction("Preferences: Choose Wallpaper", "", "papel parede wallpaper", this::chooseWallpaper));
+        commands.add(new CommandAction("Preferences: Toggle Wallpaper", "", "wallpaper habilitar desabilitar", this::toggleWallpaper));
+        commands.add(new CommandAction("Preferences: Wallpaper Opacity +", "", "wallpaper opacidade aumentar", () -> adjustWallpaperOpacity(0.08)));
+        commands.add(new CommandAction("Preferences: Wallpaper Opacity -", "", "wallpaper opacidade diminuir", () -> adjustWallpaperOpacity(-0.08)));
+        commands.add(new CommandAction("Preferences: Remove Wallpaper", "", "wallpaper remover", this::clearWallpaper));
+
+        commands.add(new CommandAction("Git: Refresh", "", "git atualizar", this::refreshSourceControlPanel));
+        commands.add(new CommandAction("Git: Stage All", "", "git add stage", () -> {
+            runGitCommand("add", "-A");
+            refreshSourceControlPanel();
+        }));
+        commands.add(new CommandAction("Git: Pull", "", "git pull", () -> runGitAndReport("pull")));
+        commands.add(new CommandAction("Git: Push", "", "git push", () -> runGitAndReport("push")));
+
+        return commands;
+    }
+
+    private String normalizeCommandText(String text) {
+        return text == null
+                ? ""
+                : text.toLowerCase(java.util.Locale.ROOT).replace(':', ' ').trim();
+    }
+
+    private void focusQuickOpen() {
+        if (titleBar != null) {
+            titleBar.showQuickOpen();
+        }
+        statusBarManager.updateStatusLeft("Quick Open");
+    }
+
+    private record CommandAction(String label, String shortcut, String keywords, Runnable action) {
+    }
 
     private void restoreDefaultLayout() {
         sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange);
@@ -1091,11 +1333,18 @@ public void runSelectedCode() {
         menu.setStyle(appRoot.getStyle());
 
         menu.getChildren().addAll(
-                createPopupMenuItem("Command Palette...", "Ctrl+Shift+P", null),
-                createPopupMenuItem("Settings", "Ctrl+,", null),
-                createPopupMenuItem("Keyboard Shortcuts", "Ctrl+K Ctrl+S", null),
-                createPopupMenuItem("Snippets", null, null),
-                createPopupMenuItem("Tarefas", null, null),
+                createPopupMenuItem("Command Palette...", "Ctrl+Shift+P", () -> {
+                    settingsPopup.hide();
+                    showCommandPalette();
+                }),
+                createPopupMenuItem("Settings", "Ctrl+,", () -> statusBarManager.updateStatusLeft("Settings aberto")),
+                createPopupMenuItem("Keyboard Shortcuts", "Ctrl+K Ctrl+S", () -> statusBarManager.updateStatusLeft("Atalhos principais ativos")),
+                createPopupMenuItem("Snippets", null, () -> statusBarManager.updateStatusLeft("Snippets ainda usam templates de novo arquivo")),
+                createPopupMenuItem("Tarefas", null, () -> {
+                    settingsPopup.hide();
+                    showTerminalPane();
+                    terminalPane.showTerminalPanel();
+                }),
                 createPopupMenuItem("Temas", "Escolher", () -> {
                     settingsPopup.hide();
                     openThemeChooser();
@@ -1107,11 +1356,15 @@ public void runSelectedCode() {
                     settingsPopup.hide();
                     chooseWallpaper();
                 }),
+                createPopupMenuItem("Ativar/Desativar Wallpaper", null, () -> {
+                    settingsPopup.hide();
+                    toggleWallpaper();
+                }),
                 createPopupMenuItem("Remover Wallpaper", null, () -> {
                     settingsPopup.hide();
                     clearWallpaper();
                 }),
-                createPopupMenuItem("Perfis", null, null)
+                createPopupMenuItem("Perfis", null, () -> statusBarManager.updateStatusLeft("Perfil atual: Default"))
         );
 
         settingsPopup = new Popup();
@@ -1168,6 +1421,19 @@ public void runSelectedCode() {
     private void clearWallpaper() {
         themeManager.clearWallpaper(wallpaperLayer, wallpaperOverlay, appRoot);
         statusBarManager.updateStatusLeft("Wallpaper removido");
+    }
+
+    private void toggleWallpaper() {
+        boolean enabled = !themeManager.getPreferences().isWallpaperEnabled();
+        themeManager.setWallpaperEnabled(enabled, wallpaperLayer, wallpaperOverlay, appRoot);
+        statusBarManager.updateStatusLeft(enabled ? "Wallpaper ativado" : "Wallpaper desativado");
+    }
+
+    private void adjustWallpaperOpacity(double delta) {
+        double current = themeManager.getPreferences().getWallpaperOpacity();
+        double next = Math.max(0.0, Math.min(0.85, current + delta));
+        themeManager.setWallpaperOpacity(next, wallpaperLayer, wallpaperOverlay, appRoot);
+        statusBarManager.updateStatusLeft("Opacidade do wallpaper: " + (int) Math.round(next * 100) + "%");
     }
 
     private void openFolderInExplorer() {

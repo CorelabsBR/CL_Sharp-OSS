@@ -143,12 +143,24 @@ public void appendDebugOutput(String text) {
 
     terminal.getStyleClass().add("integrated-terminal-tab-active");
 
-    problems.setOnMouseClicked(e -> appendOutput("[Problems ainda não implementado]"));
-    output.setOnMouseClicked(e -> appendOutput("[Output ainda não implementado]"));
+    problems.setOnMouseClicked(e -> {
+        showTerminalPanel();
+        appendOutput("[Problems] Nenhum problema registrado nesta sessão.");
+    });
+    output.setOnMouseClicked(e -> {
+        showTerminalPanel();
+        appendOutput("[Output] Canal de saída ativo.");
+    });
 debugConsole.setOnMouseClicked(e -> showDebugConsolePanel());
 terminal.setOnMouseClicked(e -> showTerminalPanel());
-    ports.setOnMouseClicked(e -> appendOutput("[Ports ainda não implementado]"));
-    gitlens.setOnMouseClicked(e -> appendOutput("[GitLens ainda não implementado]"));
+    ports.setOnMouseClicked(e -> {
+        showTerminalPanel();
+        appendOutput("[Ports] Nenhuma porta encaminhada.");
+    });
+    gitlens.setOnMouseClicked(e -> {
+        showTerminalPanel();
+        appendOutput("[Git] Use o painel Source Control para branch, stage e commit.");
+    });
 
     Label currentShell = new Label("▣ powershell");
     currentShell.getStyleClass().add("integrated-terminal-shell-label");
@@ -157,7 +169,7 @@ terminal.setOnMouseClicked(e -> showTerminalPanel());
     newTerminalBtn.setOnAction(e -> newTerminal());
 
     Button dropdownBtn = createHeaderButton("⌄", "Selecionar Terminal");
-    dropdownBtn.setOnAction(e -> appendOutput("[Selecionar terminal ainda não implementado]"));
+    dropdownBtn.setOnAction(e -> showTerminalPanel());
 
     Button splitTerminalBtn = createHeaderButton("▥", "Dividir Terminal");
     splitTerminalBtn.setOnAction(e -> splitTerminal());
@@ -166,7 +178,7 @@ terminal.setOnMouseClicked(e -> showTerminalPanel());
     killTerminalBtn.setOnAction(e -> killCurrentTerminal());
 
     Button moreBtn = createHeaderButton("⋯", "Mais ações");
-    moreBtn.setOnAction(e -> appendOutput("[Mais ações ainda não implementado]"));
+    moreBtn.setOnAction(e -> appendOutput("[Terminal] Ações: novo, dividir, limpar ou fechar terminal."));
 
     Button maximizeBtn = createHeaderButton("□", "Maximizar painel");
     maximizeBtn.setOnAction(e -> increaseHeight());

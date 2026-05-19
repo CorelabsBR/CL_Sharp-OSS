@@ -24,6 +24,8 @@ public class ShortcutManager {
         void focusEditor();
         void splitTerminal();
         void runCurrentFile();
+        void showCommandPalette();
+        void showQuickOpen();
     }
 
     public ShortcutManager() {
@@ -116,6 +118,16 @@ public class ShortcutManager {
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.DIGIT5, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
                 windowActions::splitTerminal
+        );
+
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.P, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                windowActions::showCommandPalette
+        );
+
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.P, KeyCombination.CONTROL_DOWN),
+                windowActions::showQuickOpen
         );
 
         // Portugol execution

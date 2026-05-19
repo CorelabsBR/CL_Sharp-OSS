@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.FileIconManager;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -27,7 +28,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
@@ -51,6 +52,7 @@ public class FileExplorerPane {
     private final HBox toolbar;
     private final StackPane contentHost;
     private final Map<TreeItem<File>, String> compactLabels = new IdentityHashMap<>();
+    private final Map<TreeItem<File>, PendingCreate> pendingCreates = new IdentityHashMap<>();
     private final Consumer<File> onFileOpen;
     private final Consumer<File> onFolderOpen;
     private final Stage stage;
@@ -66,39 +68,12 @@ public class FileExplorerPane {
         this.treeView = new TreeView<>();
         this.treeView.getStyleClass().add("file-tree");
         this.treeView.setShowRoot(true);
+        this.treeView.setEditable(true);
         this.treeView.setMinWidth(0);
         this.treeView.setContextMenu(createWorkspaceContextMenu());
         VBox.setVgrow(treeView, Priority.ALWAYS);
 
-        this.treeView.setCellFactory(tv -> new TreeCell<>() {
-            @Override
-            protected void updateItem(File file, boolean empty) {
-                super.updateItem(file, empty);
-
-                if (empty || file == null) {
-                    setText(null);
-                    setGraphic(null);
-                    setContextMenu(null);
-                    return;
-                }
-
-                TreeItem<File> currentItem = getTreeItem();
-                boolean expanded = currentItem != null && currentItem.isExpanded();
-                String name = currentItem == null ? null : compactLabels.get(currentItem);
-                if (name == null || name.isBlank()) {
-                    name = file.getName();
-                }
-                setText(name == null || name.isBlank() ? file.getAbsolutePath() : name);
-
-                try {
-                    setGraphic(FileIconManager.getIcon(file, expanded));
-                } catch (Exception e) {
-                    setGraphic(null);
-                }
-
-                setContextMenu(createContextMenu(file));
-            }
-        });
+        this.treeView.setCellFactory(tv -> new ExplorerTreeCell());
 
         this.treeView.setOnMouseClicked(event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 2) {
@@ -118,12 +93,15 @@ public class FileExplorerPane {
 
         this.treeView.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
+                if (treeView.getEditingItem() != null) {
+                    return;
+                }
                 openSelectedItem();
                 event.consume();
             } else if (event.getCode() == KeyCode.F2) {
                 TreeItem<File> selected = treeView.getSelectionModel().getSelectedItem();
                 if (selected != null) {
-                    promptRename(selected.getValue());
+                    startInlineRename(selected);
                     event.consume();
                 }
             } else if (event.getCode() == KeyCode.DELETE) {
@@ -194,6 +172,7 @@ public class FileExplorerPane {
             onFolderOpen.accept(folder);
         }
 
+        pendingCreates.clear();
         compactLabels.clear();
         TreeItem<File> rootItem = createNode(folder);
         rootItem.setExpanded(true);
@@ -204,6 +183,7 @@ public class FileExplorerPane {
 
     public void clearFolder() {
         currentRootFolder = null;
+        pendingCreates.clear();
         compactLabels.clear();
         treeView.setRoot(null);
         refreshVisibility();
@@ -219,6 +199,7 @@ public class FileExplorerPane {
             return;
         }
 
+        pendingCreates.clear();
         compactLabels.clear();
         TreeItem<File> rootItem = createNode(currentRootFolder);
         rootItem.setExpanded(true);
@@ -323,10 +304,10 @@ public class FileExplorerPane {
         File baseDir = file.isDirectory() ? file : file.getParentFile();
 
         MenuItem newFile = new MenuItem("Novo arquivo");
-        newFile.setOnAction(event -> promptCreatePath(baseDir, false));
+        newFile.setOnAction(event -> startInlineCreate(baseDir, false));
 
         MenuItem newFolder = new MenuItem("Nova pasta");
-        newFolder.setOnAction(event -> promptCreatePath(baseDir, true));
+        newFolder.setOnAction(event -> startInlineCreate(baseDir, true));
 
         MenuItem open = new MenuItem(file.isDirectory() ? "Abrir pasta" : "Abrir arquivo");
         open.setOnAction(event -> {
@@ -338,7 +319,7 @@ public class FileExplorerPane {
         });
 
         MenuItem rename = new MenuItem("Renomear");
-        rename.setOnAction(event -> promptRename(file));
+        rename.setOnAction(event -> startInlineRenameForFile(file));
 
         MenuItem delete = new MenuItem("Excluir");
         delete.setOnAction(event -> confirmDelete(file));
@@ -361,10 +342,10 @@ public class FileExplorerPane {
         applyMenuStyle(menu);
 
         MenuItem newFile = new MenuItem("Novo arquivo");
-        newFile.setOnAction(event -> promptCreatePath(currentRootFolder, false));
+        newFile.setOnAction(event -> startInlineCreate(currentRootFolder, false));
 
         MenuItem newFolder = new MenuItem("Nova pasta");
-        newFolder.setOnAction(event -> promptCreatePath(currentRootFolder, true));
+        newFolder.setOnAction(event -> startInlineCreate(currentRootFolder, true));
 
         MenuItem refresh = new MenuItem("Atualizar");
         refresh.setOnAction(event -> refresh());
@@ -388,102 +369,182 @@ public class FileExplorerPane {
         if (baseDir == null || currentRootFolder == null) {
             return;
         }
-
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle(folder ? "Nova pasta" : "Novo arquivo");
-        dialog.setHeaderText(null);
-        dialog.setContentText(folder ? "Caminho da pasta:" : "Caminho do arquivo:");
-        dialog.getDialogPane().getStyleClass().add("themed-dialog");
-        applyDialogStyle(dialog);
-
-        Optional<String> result = dialog.showAndWait();
-        if (result.isEmpty()) {
-            return;
-        }
-
-        String rawPath = result.get().trim().replace('\\', '/');
-        if (rawPath.isBlank()) {
-            return;
-        }
-
-        try {
-            Path root = currentRootFolder.toPath().toRealPath().normalize();
-            Path base = baseDir.toPath().toRealPath().normalize();
-            Path target = base.resolve(rawPath).normalize();
-
-            if (!base.startsWith(root) || !target.startsWith(root)) {
-                showError("Caminho fora do workspace.");
-                return;
-            }
-
-            if (folder) {
-                if (Files.exists(target) && !Files.isDirectory(target)) {
-                    showError("Ja existe um arquivo com esse nome.");
-                    return;
-                }
-                Files.createDirectories(target);
-            } else {
-                Path parent = target.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-                if (Files.exists(target)) {
-                    showError("Ja existe um item com esse nome.");
-                    return;
-                }
-                Files.createFile(target);
-            }
-
-            refresh();
-            selectFile(target.toFile());
-
-            if (!folder && onFileOpen != null) {
-                onFileOpen.accept(target.toFile());
-            }
-        } catch (IOException | SecurityException e) {
-            showError("Nao foi possivel criar: " + e.getMessage());
-        }
+        startInlineCreate(baseDir, folder);
     }
 
     private void promptRename(File file) {
         if (file == null || currentRootFolder == null) {
             return;
         }
+        startInlineRenameForFile(file);
+    }
 
-        TextInputDialog dialog = new TextInputDialog(file.getName());
-        dialog.setTitle("Renomear");
-        dialog.setHeaderText(null);
-        dialog.setContentText("Novo nome:");
-        applyDialogStyle(dialog);
-
-        Optional<String> result = dialog.showAndWait();
-        if (result.isEmpty()) {
+    private void startInlineCreate(File baseDir, boolean folder) {
+        if (baseDir == null || currentRootFolder == null) {
             return;
         }
 
-        String newName = result.get().trim();
-        if (newName.isBlank()) {
+        File directory = baseDir.isDirectory() ? baseDir : baseDir.getParentFile();
+        if (directory == null || !directory.isDirectory()) {
             return;
+        }
+
+        TreeItem<File> parent = findItem(treeView.getRoot(), directory);
+        if (parent == null) {
+            parent = treeView.getRoot();
+            directory = currentRootFolder;
+        }
+
+        parent.setExpanded(true);
+
+        String defaultName = nextAvailableName(directory.toPath(), folder ? "New Folder" : "untitled");
+        File draftFile = directory.toPath().resolve(defaultName).toFile();
+        TreeItem<File> draftItem = new TreeItem<>(draftFile);
+        draftItem.setGraphic(FileIconManager.getIcon(draftFile, false));
+
+        pendingCreates.put(draftItem, new PendingCreate(directory, folder));
+        parent.getChildren().add(0, draftItem);
+        treeView.getSelectionModel().select(draftItem);
+        treeView.scrollTo(treeView.getRow(draftItem));
+
+        Platform.runLater(() -> treeView.edit(draftItem));
+    }
+
+    private void startInlineRenameForFile(File file) {
+        TreeItem<File> item = findItem(treeView.getRoot(), file);
+        if (item != null) {
+            startInlineRename(item);
+        }
+    }
+
+    private void startInlineRename(TreeItem<File> item) {
+        if (item == null || pendingCreates.containsKey(item)) {
+            return;
+        }
+
+        treeView.getSelectionModel().select(item);
+        treeView.scrollTo(treeView.getRow(item));
+        Platform.runLater(() -> treeView.edit(item));
+    }
+
+    private boolean commitInlineName(TreeItem<File> item, String rawName) {
+        if (item == null) {
+            return false;
+        }
+
+        String name = rawName == null ? "" : rawName.trim().replace('\\', '/');
+        if (name.isBlank()) {
+            cancelPendingCreate(item);
+            return false;
+        }
+
+        PendingCreate pendingCreate = pendingCreates.remove(item);
+        if (pendingCreate != null) {
+            return commitPendingCreate(item, pendingCreate, name);
+        }
+
+        return commitRename(item, name);
+    }
+
+    private boolean commitPendingCreate(TreeItem<File> item, PendingCreate pendingCreate, String name) {
+        try {
+            Path root = currentRootFolder.toPath().toRealPath().normalize();
+            Path base = pendingCreate.baseDir().toPath().toRealPath().normalize();
+            Path target = base.resolve(name).normalize();
+
+            if (!base.startsWith(root) || !target.startsWith(root)) {
+                showError("Caminho fora do workspace.");
+                cancelPendingCreate(item);
+                return false;
+            }
+
+            if (Files.exists(target)) {
+                showError("Ja existe um item com esse nome.");
+                cancelPendingCreate(item);
+                return false;
+            }
+
+            Path parent = target.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+
+            if (pendingCreate.folder()) {
+                Files.createDirectories(target);
+            } else {
+                Files.createFile(target);
+            }
+
+            refresh();
+            selectFile(target.toFile());
+
+            if (!pendingCreate.folder() && onFileOpen != null) {
+                onFileOpen.accept(target.toFile());
+            }
+
+            return true;
+        } catch (IOException | SecurityException e) {
+            showError("Nao foi possivel criar: " + e.getMessage());
+            cancelPendingCreate(item);
+            return false;
+        }
+    }
+
+    private boolean commitRename(TreeItem<File> item, String name) {
+        File file = item.getValue();
+        if (file == null || currentRootFolder == null || file.getName().equals(name)) {
+            return false;
         }
 
         try {
             Path root = currentRootFolder.toPath().toRealPath().normalize();
-            Path target = file.toPath().getParent().resolve(newName).normalize();
+            Path target = file.toPath().getParent().resolve(name).normalize();
+
             if (!target.startsWith(root)) {
                 showError("Caminho fora do workspace.");
-                return;
+                return false;
             }
             if (Files.exists(target)) {
                 showError("Ja existe um item com esse nome.");
-                return;
+                return false;
             }
 
             Files.move(file.toPath(), target);
             refresh();
             selectFile(target.toFile());
+            return true;
         } catch (IOException | SecurityException e) {
             showError("Nao foi possivel renomear: " + e.getMessage());
+            return false;
         }
+    }
+
+    private void cancelPendingCreate(TreeItem<File> item) {
+        if (item == null || !pendingCreates.containsKey(item)) {
+            return;
+        }
+
+        pendingCreates.remove(item);
+        TreeItem<File> parent = item.getParent();
+        if (parent != null) {
+            parent.getChildren().remove(item);
+        }
+    }
+
+    private String nextAvailableName(Path baseDir, String baseName) {
+        Path candidate = baseDir.resolve(baseName);
+        if (!Files.exists(candidate)) {
+            return baseName;
+        }
+
+        for (int i = 1; i < 1000; i++) {
+            String candidateName = baseName + "-" + i;
+            if (!Files.exists(baseDir.resolve(candidateName))) {
+                return candidateName;
+            }
+        }
+
+        return baseName + "-" + System.currentTimeMillis();
     }
 
     private void confirmDelete(File file) {
@@ -690,6 +751,121 @@ public class FileExplorerPane {
         return name == null || name.isBlank() ? file.getAbsolutePath() : name;
     }
 
+    private final class ExplorerTreeCell extends TreeCell<File> {
+
+        private TextField editor;
+
+        @Override
+        public void startEdit() {
+            TreeItem<File> item = getTreeItem();
+            if (item == null || getItem() == null) {
+                return;
+            }
+
+            super.startEdit();
+
+            editor = new TextField(initialEditText(item, getItem()));
+            editor.getStyleClass().add("explorer-inline-editor");
+            editor.setOnAction(event -> finishEdit());
+            editor.setOnKeyPressed(event -> {
+                if (event.getCode() == KeyCode.ESCAPE) {
+                    cancelEdit();
+                    event.consume();
+                }
+            });
+            editor.focusedProperty().addListener((obs, wasFocused, focused) -> {
+                if (!focused && isEditing()) {
+                    finishEdit();
+                }
+            });
+
+            setText(null);
+            setGraphic(editor);
+            Platform.runLater(() -> {
+                editor.requestFocus();
+                editor.selectAll();
+            });
+        }
+
+        @Override
+        public void cancelEdit() {
+            TreeItem<File> item = getTreeItem();
+            super.cancelEdit();
+            cancelPendingCreate(item);
+            render(getItem(), isEmpty());
+        }
+
+        @Override
+        protected void updateItem(File file, boolean empty) {
+            super.updateItem(file, empty);
+            render(file, empty);
+        }
+
+        private void finishEdit() {
+            TreeItem<File> item = getTreeItem();
+            String value = editor == null ? "" : editor.getText();
+            boolean committed = commitInlineName(item, value);
+
+            if (!committed) {
+                super.cancelEdit();
+                render(getItem(), isEmpty());
+                return;
+            }
+
+            super.cancelEdit();
+        }
+
+        private void render(File file, boolean empty) {
+            if (empty || file == null) {
+                setText(null);
+                setGraphic(null);
+                setContextMenu(null);
+                return;
+            }
+
+            if (isEditing() && editor != null) {
+                setText(null);
+                setGraphic(editor);
+                return;
+            }
+
+            TreeItem<File> currentItem = getTreeItem();
+            boolean expanded = currentItem != null && currentItem.isExpanded();
+            String name = displayName(currentItem, file);
+            setText(name);
+
+            try {
+                setGraphic(FileIconManager.getIcon(file, expanded));
+            } catch (Exception e) {
+                setGraphic(null);
+            }
+
+            setContextMenu(createContextMenu(file));
+        }
+
+        private String initialEditText(TreeItem<File> item, File file) {
+            PendingCreate pendingCreate = pendingCreates.get(item);
+            if (pendingCreate != null) {
+                return file.getName();
+            }
+
+            return file.getName() == null || file.getName().isBlank()
+                    ? file.getAbsolutePath()
+                    : file.getName();
+        }
+    }
+
+    private String displayName(TreeItem<File> item, File file) {
+        String name = item == null ? null : compactLabels.get(item);
+        if (name == null || name.isBlank()) {
+            name = file.getName();
+        }
+        return name == null || name.isBlank() ? file.getAbsolutePath() : name;
+    }
+
+    private record PendingCreate(File baseDir, boolean folder) {
+    }
+
     private record CompactFolder(File file, String label) {
     }
 
@@ -715,6 +891,10 @@ public class FileExplorerPane {
     }
 
     private TreeItem<File> findItem(TreeItem<File> item, File file) {
+        if (item == null || file == null) {
+            return null;
+        }
+
         if (item.getValue().equals(file)) {
             return item;
         }

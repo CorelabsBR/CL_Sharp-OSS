@@ -3,6 +3,9 @@ package br.com.corelabs.npsharpfx.frontend.ui.theme;
 // Classe File do Java usada para representar arquivos do sistema.
 // Aqui ela é usada para lidar com o wallpaper personalizado escolhido pelo usuário.
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
 import javafx.scene.image.Image;
@@ -332,8 +335,8 @@ public class ThemeManager {
             return;
         }
 
-        // Salva caminho absoluto do wallpaper
-        preferences.setCustomWallpaperPath(sourceFile.getAbsolutePath());
+        File storedWallpaper = copyWallpaperToAppDir(sourceFile);
+        preferences.setCustomWallpaperPath(storedWallpaper.getAbsolutePath());
 
         // Ativa uso do wallpaper
         preferences.setWallpaperEnabled(true);
@@ -343,6 +346,26 @@ public class ThemeManager {
 
         // Reaplica tema
         applyTheme(wallpaperLayer, overlay, appRoot);
+    }
+
+    private File copyWallpaperToAppDir(File sourceFile) {
+        try {
+            Files.createDirectories(PreferencesManager.getWallpaperDir());
+
+            String fileName = sourceFile.getName();
+            int dot = fileName.lastIndexOf('.');
+            String extension = dot >= 0 ? fileName.substring(dot) : ".img";
+            String baseName = dot >= 0 ? fileName.substring(0, dot) : fileName;
+            String safeBaseName = baseName.replaceAll("[^a-zA-Z0-9._-]", "_");
+            Path destination = PreferencesManager.getWallpaperDir()
+                    .resolve(safeBaseName + "-" + System.currentTimeMillis() + extension)
+                    .normalize();
+
+            Files.copy(sourceFile.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+            return destination.toFile();
+        } catch (Exception e) {
+            return sourceFile;
+        }
     }
 
     /**
@@ -399,6 +422,9 @@ public class ThemeManager {
      * @param overlay retângulo usado para escurecer/clariar o wallpaper
      */
     private void applyWallpaper(EditorTheme theme, StackPane wallpaperLayer, Rectangle overlay) {
+        if (wallpaperLayer == null || overlay == null) {
+            return;
+        }
 
         /**
          * Limpa background anterior do wallpaper.

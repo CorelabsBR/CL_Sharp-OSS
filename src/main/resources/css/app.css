@@ -1818,7 +1818,16 @@
    ========================================================= */
 
 .wallpaper-active .editor-textarea {
-    -fx-background-color: rgba(0, 0, 0, 0.3);
+    -fx-background-color: transparent;
+}
+
+.wallpaper-active .root-pane,
+.wallpaper-active .main-horizontal-split,
+.wallpaper-active .main-vertical-split,
+.wallpaper-active .editor-area,
+.wallpaper-active .editor-tabs,
+.wallpaper-active .center-area {
+    -fx-background-color: transparent;
 }
 
 .wallpaper-active .editor-textarea .paragraph-box {
@@ -1834,18 +1843,26 @@
 }
 
 .wallpaper-active .editor-tabs {
-    -fx-background-color: rgba(0, 0, 0, 0.4);
+    -fx-background-color: rgba(0, 0, 0, 0.18);
 }
 
 .wallpaper-active .editor-tabs .tab-header-background {
-    -fx-background-color: rgba(0, 0, 0, 0.4);
+    -fx-background-color: rgba(0, 0, 0, 0.22);
 }
 
 .wallpaper-active .editor-tabs .tab:selected {
-    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-background-color: rgba(0, 0, 0, 0.34);
+}
+
+.wallpaper-active .editor-tabs .tab {
+    -fx-background-color: rgba(0, 0, 0, 0.22);
 }
 
 .wallpaper-active .welcome-pane {
+    -fx-background-color: transparent;
+}
+
+.wallpaper-active .lineno {
     -fx-background-color: transparent;
 }
 
@@ -2028,6 +2045,17 @@
 
 .file-tree .tree-cell:focused {
     -fx-background-insets: 0;
+}
+
+.explorer-inline-editor {
+    -fx-background-color: -theme-input-bg;
+    -fx-text-fill: -theme-input-fg;
+    -fx-border-color: -theme-accent;
+    -fx-border-width: 1;
+    -fx-background-radius: 2;
+    -fx-border-radius: 2;
+    -fx-padding: 1 4 1 4;
+    -fx-font-size: 12px;
 }
 
 .editor-tabs {
@@ -2330,4 +2358,52 @@
 
 .dialog-pane .button-bar {
     -fx-padding: 10 16 14 16;
+}
+
+.command-palette {
+    -fx-background-color: -theme-input-bg;
+    -fx-border-color: -theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-padding: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.48), 24, 0.18, 0, 8);
+}
+
+.command-palette-input {
+    -fx-background-color: -theme-input-bg;
+    -fx-text-fill: -theme-input-fg;
+    -fx-prompt-text-fill: -theme-prompt-fg;
+    -fx-border-color: -theme-accent;
+    -fx-border-width: 0 0 1 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-padding: 8 10 9 10;
+    -fx-font-size: 14px;
+}
+
+.command-palette-list {
+    -fx-background-color: -theme-input-bg;
+    -fx-control-inner-background: -theme-input-bg;
+    -fx-border-color: transparent;
+    -fx-padding: 6 0 0 0;
+}
+
+.command-palette-list .virtual-flow,
+.command-palette-list .clipped-container,
+.command-palette-list .sheet {
+    -fx-background-color: -theme-input-bg;
+}
+
+.command-palette-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -theme-fg;
+    -fx-padding: 7 10 7 10;
+    -fx-font-size: 12px;
+}
+
+.command-palette-list .list-cell:hover,
+.command-palette-list .list-cell:selected {
+    -fx-background-color: -theme-list-active-bg;
+    -fx-text-fill: -theme-list-active-fg;
 }

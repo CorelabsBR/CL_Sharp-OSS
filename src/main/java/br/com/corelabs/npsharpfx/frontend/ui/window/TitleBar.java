@@ -237,6 +237,10 @@ private String getWorkspaceNameForBar() {
         this.quickOpenFileAction = quickOpenFileAction;
     }
 
+    public void showQuickOpen() {
+        openQuickOpen();
+    }
+
     private void build() {
 
         ImageView logo = new ImageView(
@@ -682,7 +686,7 @@ private String getWorkspaceNameForBar() {
 
         if (query.startsWith(">")) {
             quickOpenList.getItems().setAll(List.of());
-            updateStatus("Command Palette ainda nao implementada");
+        updateStatus("Command Palette");
             return;
         }
 
@@ -1072,6 +1076,8 @@ private String getWorkspaceNameForBar() {
 
         if (showCommandPaletteAction != null) {
             showCommandPaletteAction.run();
+            updateStatus("Command palette");
+            return;
         }
 
         updateStatus("Command palette");
