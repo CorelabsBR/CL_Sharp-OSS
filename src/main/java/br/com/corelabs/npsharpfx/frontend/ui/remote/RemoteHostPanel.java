@@ -21,6 +21,7 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -59,9 +60,9 @@ public class RemoteHostPanel extends VBox {
     }
 
     private void build() {
-        getStyleClass().add("settings-panel");
-        setPadding(new Insets(10));
-        setSpacing(8);
+        getStyleClass().addAll("settings-panel", "remote-host-panel");
+        setPadding(new Insets(0));
+        setSpacing(0);
 
         auth.getItems().setAll("password", "key");
         auth.getSelectionModel().select("password");
@@ -69,8 +70,12 @@ public class RemoteHostPanel extends VBox {
         password.getStyleClass().add("search-input");
         port.setText("22");
         remotePath.setText(".");
+        keyPath.setVisible(false);
+        keyPath.setManaged(false);
+        auth.setOnAction(e -> updateAuthFields());
 
         hostPicker.setMaxWidth(Double.MAX_VALUE);
+        hostPicker.getStyleClass().add("remote-host-picker");
         hostPicker.setCellFactory(view -> new ListCell<>() {
             @Override
             protected void updateItem(RemoteHostConfig item, boolean empty) {
@@ -81,11 +86,19 @@ public class RemoteHostPanel extends VBox {
         hostPicker.setButtonCell(hostPicker.getCellFactory().call(null));
         hostPicker.setOnAction(e -> fill(hostPicker.getSelectionModel().getSelectedItem()));
 
+        files.getStyleClass().add("remote-file-list");
         files.setCellFactory(view -> new ListCell<>() {
             @Override
             protected void updateItem(WorkspaceEntry item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? null : (item.directory() ? "[dir] " : "      ") + item.name());
+                if (empty || item == null) {
+                    setText(null);
+                    getStyleClass().removeAll("remote-dir-cell", "remote-file-cell");
+                    return;
+                }
+                setText((item.directory() ? ">  " : "   ") + item.name());
+                getStyleClass().removeAll("remote-dir-cell", "remote-file-cell");
+                getStyleClass().add(item.directory() ? "remote-dir-cell" : "remote-file-cell");
             }
         });
         files.setOnMouseClicked(e -> {
@@ -103,18 +116,68 @@ public class RemoteHostPanel extends VBox {
 
         output.setEditable(false);
         output.setPrefRowCount(5);
+        output.getStyleClass().add("remote-output");
+        command.getStyleClass().add("terminal-input");
 
         getChildren().addAll(
-                label("Hosts"), hostPicker,
-                name, host, port, username, auth, password, keyPath, remotePath,
-                row(button("Salvar Host", this::saveHost), button("Conectar", this::connect), button("Desconectar", this::disconnect)),
-                connection,
-                row(button("Subir", this::up), button("Novo Arquivo", this::newFile), button("Nova Pasta", this::newFolder), button("Renomear", this::rename), button("Excluir", this::delete)),
-                files,
-                command,
-                row(button("Executar", this::executeRemote), button("Reconectar", this::connect)),
-                output
+                header(),
+                section("Host", hostPicker, form(), row(button("Salvar", this::saveHost), primaryButton("Conectar", this::connect), button("Desconectar", this::disconnect))),
+                section("Arquivos", pathBar(), row(button("Subir", this::up), button("Novo Arquivo", this::newFile), button("Nova Pasta", this::newFolder), button("Renomear", this::rename), dangerButton("Excluir", this::delete)), files),
+                section("Terminal remoto", command, row(primaryButton("Executar", this::executeRemote), button("Reconectar", this::connect)), output)
         );
+    }
+
+    private VBox header() {
+        Label title = new Label("Remote Host");
+        title.getStyleClass().add("remote-title");
+        connection.getStyleClass().add("remote-status");
+        connection.setText("Desconectado");
+        VBox header = new VBox(4, title, connection);
+        header.getStyleClass().add("remote-header");
+        return header;
+    }
+
+    private VBox section(String title, javafx.scene.Node... nodes) {
+        Label label = new Label(title);
+        label.getStyleClass().add("remote-section-title");
+        VBox box = new VBox(8);
+        box.getStyleClass().add("remote-section");
+        box.getChildren().add(label);
+        box.getChildren().addAll(nodes);
+        return box;
+    }
+
+    private GridPane form() {
+        GridPane grid = new GridPane();
+        grid.getStyleClass().add("remote-form");
+        grid.setHgap(8);
+        grid.setVgap(8);
+        addFormRow(grid, 0, "Nome", name);
+        addFormRow(grid, 1, "Host", host);
+        addFormRow(grid, 2, "Porta", port);
+        addFormRow(grid, 3, "Usuario", username);
+        addFormRow(grid, 4, "Auth", auth);
+        addFormRow(grid, 5, "Senha", password);
+        addFormRow(grid, 6, "Chave", keyPath);
+        addFormRow(grid, 7, "Path", remotePath);
+        return grid;
+    }
+
+    private void addFormRow(GridPane grid, int row, String title, javafx.scene.Node field) {
+        Label label = new Label(title);
+        label.getStyleClass().add("remote-field-label");
+        GridPane.setHgrow(field, Priority.ALWAYS);
+        grid.add(label, 0, row);
+        grid.add(field, 1, row);
+    }
+
+    private HBox pathBar() {
+        Label path = new Label();
+        path.textProperty().bind(connection.textProperty());
+        path.getStyleClass().add("remote-path");
+        HBox box = new HBox(path);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
     private void loadHosts() {
@@ -129,6 +192,12 @@ public class RemoteHostPanel extends VBox {
 
     private void saveHost() {
         RemoteHostConfig config = readForm();
+        String validation = validate(config);
+        if (validation != null) {
+            statusConsumer.accept(validation);
+            connection.setText(validation);
+            return;
+        }
         hosts.removeIf(h -> h.displayName().equals(config.displayName()));
         hosts.add(config);
         try {
@@ -143,6 +212,12 @@ public class RemoteHostPanel extends VBox {
 
     private void connect() {
         RemoteHostConfig config = readForm();
+        String validation = validate(config);
+        if (validation != null) {
+            connection.setText(validation);
+            statusConsumer.accept(validation);
+            return;
+        }
         connection.setText("Conectando...");
         service.connectAsync(config, password.getText()).whenComplete((ignored, error) -> Platform.runLater(() -> {
             if (error != null) {
@@ -175,6 +250,7 @@ public class RemoteHostPanel extends VBox {
         }).whenComplete((entries, error) -> Platform.runLater(() -> {
             if (error != null) {
                 statusConsumer.accept("Falha ao listar remoto: " + friendly(error));
+                connection.setText("Erro ao listar: " + currentPath);
                 return;
             }
             files.getItems().setAll(entries);
@@ -209,7 +285,11 @@ public class RemoteHostPanel extends VBox {
         if (text == null || text.isBlank()) {
             return;
         }
-        output.appendText("$ " + text + System.lineSeparator());
+        if (!service.isConnected()) {
+            output.appendText("[remote] Host desconectado." + System.lineSeparator());
+            return;
+        }
+        output.appendText(currentPath + " $ " + text + System.lineSeparator());
         terminalService.executeAsync(text).whenComplete((result, error) -> Platform.runLater(() ->
                 output.appendText((error == null ? result : friendly(error)) + System.lineSeparator())));
     }
@@ -238,8 +318,7 @@ public class RemoteHostPanel extends VBox {
     }
 
     private void up() {
-        int idx = currentPath.lastIndexOf('/');
-        browse(idx > 0 ? currentPath.substring(0, idx) : ".");
+        browse(parentPath(currentPath));
     }
 
     private void mutate(RemoteMutation mutation) {
@@ -284,6 +363,15 @@ public class RemoteHostPanel extends VBox {
         auth.getSelectionModel().select(config.getAuthMethod());
         keyPath.setText(config.getPrivateKeyPath());
         remotePath.setText(config.getDefaultPath());
+        updateAuthFields();
+    }
+
+    private void updateAuthFields() {
+        boolean keyAuth = "key".equalsIgnoreCase(auth.getValue());
+        keyPath.setVisible(keyAuth);
+        keyPath.setManaged(keyAuth);
+        password.setVisible(!keyAuth);
+        password.setManaged(!keyAuth);
     }
 
     private TextField field(String prompt) {
@@ -306,9 +394,22 @@ public class RemoteHostPanel extends VBox {
         return button;
     }
 
+    private Button primaryButton(String text, Runnable action) {
+        Button button = button(text, action);
+        button.getStyleClass().add("remote-primary-button");
+        return button;
+    }
+
+    private Button dangerButton(String text, Runnable action) {
+        Button button = button(text, action);
+        button.getStyleClass().add("remote-danger-button");
+        return button;
+    }
+
     private HBox row(Button... buttons) {
         HBox row = new HBox(6, buttons);
         row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("remote-actions");
         return row;
     }
 
@@ -322,6 +423,32 @@ public class RemoteHostPanel extends VBox {
 
     private String join(String name) {
         return currentPath.endsWith("/") ? currentPath + name : currentPath + "/" + name;
+    }
+
+    private String parentPath(String path) {
+        if (path == null || path.isBlank() || ".".equals(path) || "/".equals(path)) {
+            return ".";
+        }
+        String clean = path.endsWith("/") && path.length() > 1 ? path.substring(0, path.length() - 1) : path;
+        int idx = clean.lastIndexOf('/');
+        if (idx <= 0) {
+            return clean.startsWith("/") ? "/" : ".";
+        }
+        return clean.substring(0, idx);
+    }
+
+    private String validate(RemoteHostConfig config) {
+        if (config.getHost() == null || config.getHost().isBlank()) {
+            return "Informe o host remoto.";
+        }
+        if (config.getUsername() == null || config.getUsername().isBlank()) {
+            return "Informe o usuario remoto.";
+        }
+        if ("key".equalsIgnoreCase(config.getAuthMethod())
+                && (config.getPrivateKeyPath() == null || config.getPrivateKeyPath().isBlank())) {
+            return "Informe o caminho da chave privada.";
+        }
+        return null;
     }
 
     private String friendly(Throwable error) {

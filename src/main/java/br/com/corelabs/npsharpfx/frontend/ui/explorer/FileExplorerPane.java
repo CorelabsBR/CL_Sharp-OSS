@@ -58,6 +58,7 @@ public class FileExplorerPane {
     private final Consumer<File> onFileOpen;
     private final Consumer<File> onFolderOpen;
     private final Stage stage;
+    private boolean renameRequestedFromMenu;
 
     private File currentRootFolder;
     private Supplier<String> menuStyleSupplier;
@@ -84,12 +85,6 @@ public class FileExplorerPane {
                 }
                 openSelectedItem();
                 event.consume();
-            } else if (event.getCode() == KeyCode.F2) {
-                TreeItem<File> selected = treeView.getSelectionModel().getSelectedItem();
-                if (selected != null) {
-                    startInlineRename(selected);
-                    event.consume();
-                }
             } else if (event.getCode() == KeyCode.DELETE) {
                 TreeItem<File> selected = treeView.getSelectionModel().getSelectedItem();
                 if (selected != null) {
@@ -240,13 +235,10 @@ public class FileExplorerPane {
         Label collapse = createToolbarButton("/icons/codicons/collapse-all.svg", "Recolher tudo");
         collapse.setOnMouseClicked(event -> collapseAll());
 
-        Label rename = createToolbarButton("/icons/codicons/rename.svg", "Renomear selecionado");
-        rename.setOnMouseClicked(event -> renameSelectedItem());
-
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox box = new HBox(4, spacer, newFile, newFolder, rename, refresh, collapse);
+        HBox box = new HBox(4, spacer, newFile, newFolder, refresh, collapse);
         box.getStyleClass().add("explorer-toolbar");
         box.setAlignment(Pos.CENTER_RIGHT);
         return box;
@@ -361,13 +353,6 @@ public class FileExplorerPane {
         startInlineCreate(baseDir, folder);
     }
 
-    private void promptRename(File file) {
-        if (file == null || currentRootFolder == null) {
-            return;
-        }
-        startInlineRenameForFile(file);
-    }
-
     private void startInlineCreate(File baseDir, boolean folder) {
         if (baseDir == null || currentRootFolder == null) {
             return;
@@ -406,13 +391,6 @@ public class FileExplorerPane {
         }
     }
 
-    private void renameSelectedItem() {
-        TreeItem<File> selected = treeView.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            startInlineRename(selected);
-        }
-    }
-
     private void startInlineRename(TreeItem<File> item) {
         if (item == null || pendingCreates.containsKey(item)) {
             return;
@@ -420,7 +398,11 @@ public class FileExplorerPane {
 
         treeView.getSelectionModel().select(item);
         treeView.scrollTo(treeView.getRow(item));
-        Platform.runLater(() -> treeView.edit(item));
+        renameRequestedFromMenu = true;
+        Platform.runLater(() -> {
+            treeView.edit(item);
+            renameRequestedFromMenu = false;
+        });
     }
 
     private boolean commitInlineName(TreeItem<File> item, String rawName) {
@@ -784,6 +766,9 @@ public class FileExplorerPane {
         public void startEdit() {
             TreeItem<File> item = getTreeItem();
             if (item == null || getItem() == null) {
+                return;
+            }
+            if (!renameRequestedFromMenu && !pendingCreates.containsKey(item)) {
                 return;
             }
 

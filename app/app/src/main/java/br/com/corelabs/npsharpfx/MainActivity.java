@@ -9,12 +9,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.Spannable;
+import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
+import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.View;
@@ -25,6 +28,7 @@ import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
@@ -43,13 +47,32 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import br.com.corelabs.npsharpfx.backend.editor.search.EditorSearchEngine;
+import br.com.corelabs.npsharpfx.backend.editor.search.ReplaceResult;
+import br.com.corelabs.npsharpfx.backend.editor.search.SearchMatch;
+import br.com.corelabs.npsharpfx.backend.editor.search.SearchOptions;
+import br.com.corelabs.npsharpfx.backend.editor.search.SearchResult;
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
 import br.com.corelabs.npsharpfx.backend.runtime.AndroidRuntimeManager;
 import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
+import br.com.corelabs.npsharpfx.backend.shell.ShellOutputListener;
+import br.com.corelabs.npsharpfx.backend.shell.ShellResult;
+import br.com.corelabs.npsharpfx.backend.shell.ShellRuntime;
+import br.com.corelabs.npsharpfx.backend.shell.ShellRuntimeInfo;
+import br.com.corelabs.npsharpfx.backend.terminal.AnsiTerminalRenderer;
+import br.com.corelabs.npsharpfx.backend.terminal.TerminalProcessListener;
+import br.com.corelabs.npsharpfx.backend.terminal.TerminalProcessManager;
+import br.com.corelabs.npsharpfx.backend.terminal.TerminalProcessState;
+import br.com.corelabs.npsharpfx.frontend.theme.mobile.ThemeInterpolation;
+import br.com.corelabs.npsharpfx.frontend.theme.mobile.ThemeJsonParser;
+import br.com.corelabs.npsharpfx.frontend.theme.mobile.ThemeManager;
+import br.com.corelabs.npsharpfx.frontend.theme.mobile.ThemeModel;
+import br.com.corelabs.npsharpfx.frontend.theme.mobile.ThemeObserver;
 
 public class MainActivity extends Activity {
 
@@ -89,9 +112,12 @@ public class MainActivity extends Activity {
     private TextView lineNumbers;
     private TextView sideTitle;
     private TextView fileTitle;
+    private TextView commandBarText;
     private TextView console;
     private ScrollView consoleScroll;
     private EditText terminalInput;
+    private View editorScrollView;
+    private LinearLayout welcomePane;
     private LinearLayout statusBarView;
     private TextView statusLeft;
     private TextView statusRight;
@@ -101,10 +127,25 @@ public class MainActivity extends Activity {
     private DocumentFile workspace;
     private DocumentFile currentFile;
     private AndroidRuntimeManager runtimeManager;
+    private TerminalProcessManager terminalProcessManager;
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "npsharp-search");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final EditorSearchEngine searchEngine = new EditorSearchEngine();
+    private SearchResult activeSearchResult = new SearchResult("", List.of(), -1, null);
+    private String activeSearchQuery = "";
+    private String activeReplacement = "";
+    private SearchOptions activeSearchOptions = SearchOptions.plainIgnoreCase();
+    private TextView searchCounter;
+    private final Runnable thisSearchRefresh = this::pesquisarEditorAtual;
     private boolean applyingHighlight;
     private boolean programaRodando;
     private boolean compactLayout;
     private boolean bottomExpanded;
+    private ThemeModel currentTheme = ThemeModel.Default;
+    private ThemeObserver themeObserver;
     private final LinkedBlockingQueue<String> entradasPrograma = new LinkedBlockingQueue<>();
     private final List<DocumentFile> openFiles = new ArrayList<>();
     private String activePanel = "explorer";
@@ -112,11 +153,17 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        compactLayout = getResources().getConfiguration().screenWidthDp < 700;
+        compactLayout = false;
         runtimeManager = new AndroidRuntimeManager(this);
+        ShellRuntime.initialize(this);
+        terminalProcessManager = new TerminalProcessManager(this);
         restoreWorkspace();
+        ThemeManager.initialize(this);
+        //a um dois, Xingú, três quatro,Brasil!
         restaurarTema();
         setContentView(buildUi());
+        themeObserver = theme -> runOnUiThread(() -> animateThemeTo(theme));
+        ThemeManager.addObserver(themeObserver, false);
         showPanel("explorer");
         if (workspace == null) {
             showNoWorkspace();
@@ -125,71 +172,83 @@ public class MainActivity extends Activity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        if (themeObserver != null) {
+            ThemeManager.removeObserver(themeObserver);
+        }
+        if (terminalProcessManager != null) terminalProcessManager.shutdown();
+        searchExecutor.shutdownNow();
+        super.onDestroy();
+    }
+
     private View buildUi() {
         root = vertical();
         root.setBackgroundColor(bg);
         root.addView(buildTop(), matchWrap());
         root.addView(buildWorkArea(), new LinearLayout.LayoutParams(-1, 0, 1));
-        root.addView(buildStatusBar(), new LinearLayout.LayoutParams(-1, dp(compactLayout ? 20 : 24)));
+        root.addView(buildStatusBar(), new LinearLayout.LayoutParams(-1, dp(24)));
         return root;
     }
 
     private View buildTop() {
-        LinearLayout top = vertical();
+        LinearLayout top = horizontal();
         top.setBackgroundColor(titleBg);
-
-        topBar = horizontal();
+        top.setMinimumHeight(dp(36));
+        top.setPadding(dp(8), 0, dp(4), 0);
+        topBar = top;
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setPadding(dp(compactLayout ? 2 : 6), dp(2), dp(compactLayout ? 2 : 6), dp(1));
         LinearLayout menu = topBar;
-        if (compactLayout) {
-            menu.addView(iconButton(R.drawable.ic_np_menu, "Arquivo", v -> menuArquivo()));
-            menu.addView(iconButton(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()));
-            menu.addView(iconButton(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()));
-            menu.addView(iconButton(R.drawable.ic_np_save, "Salvar", v -> salvarArquivo()));
-            menu.addView(iconButton(R.drawable.ic_np_play, "Executar", v -> executarArquivo()));
-            menu.addView(iconButton(R.drawable.ic_np_terminal, "Terminal", v -> focarTerminal()));
-            TextView compactTitle = label("NPSharp", 12, muted, Typeface.BOLD);
-            compactTitle.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-            menu.addView(compactTitle, new LinearLayout.LayoutParams(0, -2, 1));
-            menu.addView(iconButton(R.drawable.ic_np_more, "Paleta", v -> paletaComandos()));
-            top.addView(menu, matchWrap());
-            return top;
-        }
-        menu.addView(menuButton("Arquivo", v -> menuArquivo()));
-        menu.addView(menuButton("Editar", v -> menuEditar()));
-        menu.addView(menuButton("Exibir", v -> menuExibir()));
-        menu.addView(menuButton("Executar", v -> menuExecutar()));
-        menu.addView(menuButton("Terminal", v -> menuTerminal()));
-        TextView title = label("NPSharp", 13, muted, Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        menu.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        menu.addView(menuButton("Ajuda", v -> mostrarSobre()));
+        //QUANDO EU MORRER QUERO IR DE FALL E DE BERETTA!
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.npsharp_app);
+        logo.setAdjustViewBounds(true);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        menu.addView(logo, new LinearLayout.LayoutParams(dp(24), dp(24)));
+
+        menu.addView(titleMenuButton("File", v -> menuArquivo()));
+        menu.addView(titleMenuButton("Edit", v -> menuEditar()));
+        menu.addView(titleMenuButton("Selection", v -> menuEditar()));
+        menu.addView(titleMenuButton("View", v -> menuExibir()));
+        menu.addView(titleMenuButton("Go To", v -> abrirRapido()));
+        menu.addView(titleMenuButton("More", v -> menuExecutar()));
+
+        menu.addView(titleIconText("<", v -> status("Voltar", "NPSharp")));
+        menu.addView(titleIconText(">", v -> status("Avancar", "NPSharp")));
+
+        View leftSpacer = new View(this);
+        menu.addView(leftSpacer, new LinearLayout.LayoutParams(0, 1, 1));
 
         commandBar = horizontal();
         LinearLayout command = commandBar;
         command.setGravity(Gravity.CENTER_VERTICAL);
-        command.setPadding(dp(compactLayout ? 2 : 8), dp(2), dp(compactLayout ? 2 : 8), dp(compactLayout ? 2 : 5));
-        TextView center = label("Comandos e arquivos", 13, text, Typeface.NORMAL);
-        center.setGravity(Gravity.CENTER_VERTICAL);
-        center.setPadding(dp(compactLayout ? 6 : 12), dp(compactLayout ? 3 : 6), dp(compactLayout ? 6 : 12), dp(compactLayout ? 3 : 6));
-        center.setBackgroundColor(Color.rgb(60, 60, 64));
-        center.setOnClickListener(v -> paletaComandos());
-        command.addView(center, new LinearLayout.LayoutParams(0, -2, 1));
-        command.addView(iconButton(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()));
-        command.addView(iconButton(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()));
-        command.addView(iconButton(R.drawable.ic_np_save, "Salvar", v -> salvarArquivo()));
-        command.addView(iconButton(R.drawable.ic_np_play, "Executar", v -> executarArquivo()));
-        command.addView(iconButton(R.drawable.ic_np_more, "Paleta", v -> paletaComandos()));
+        command.setPadding(dp(10), 0, dp(10), 0);
+        command.setBackground(borderBg(Color.rgb(26, 26, 26), accent, dp(4), 1));
+        command.setMinimumHeight(dp(28));
+        command.setOnClickListener(v -> abrirRapido());
+        commandBarText = label(workspace == null ? "Nenhuma pasta aberta" : caminho(workspace), 13, text, Typeface.NORMAL);
+        commandBarText.setSingleLine(true);
+        command.addView(commandBarText, new LinearLayout.LayoutParams(-1, -2));
+        menu.addView(command, new LinearLayout.LayoutParams(dp(520), dp(28)));
 
-        top.addView(menu, matchWrap());
-        top.addView(command, matchWrap());
+        View rightSpacer = new View(this);
+        menu.addView(rightSpacer, new LinearLayout.LayoutParams(0, 1, 1));
+        //CHEGAR NO INFERNO E DAR UM TIRO NO CAPETAAAA!
+        menu.addView(titleIconText("|", v -> status("Split editor", "Layout")));
+        menu.addView(titleIconText("[]", v -> status("Editor layout", "Layout")));
+        menu.addView(titleIconText("[_]", v -> showPanel("explorer")));
+        menu.addView(titleIconText("||", v -> bottom("TERMINAL")));
+
+        menu.addView(titleIconText("-", v -> status("Minimizar indisponivel no Android", "Janela")));
+        menu.addView(titleIconText("[]", v -> status("Maximizar indisponivel no Android", "Janela")));
+        menu.addView(titleIconText("X", v -> finish()));
         return top;
     }
 
     private View buildWorkArea() {
         workArea = horizontal();
-        workArea.addView(buildActivityBar(), new LinearLayout.LayoutParams(dp(compactLayout ? 38 : 50), -1));
+        workArea.addView(buildActivityBar(), new LinearLayout.LayoutParams(dp(48), -1));
 
         View side = buildSidePanel();
         editorArea = buildEditorArea();
@@ -198,40 +257,48 @@ public class MainActivity extends Activity {
             workArea.addView(editorArea, new LinearLayout.LayoutParams(0, -1, 1));
             sidePanel.setVisibility(View.GONE);
         } else {
-            workArea.addView(side, new LinearLayout.LayoutParams(dp(270), -1));
+            workArea.addView(side, new LinearLayout.LayoutParams(dp(320), -1));
             workArea.addView(editorArea, new LinearLayout.LayoutParams(0, -1, 1));
         }
         return workArea;
     }
+    // E O CAPETA VAI GRITAR DESESPERADOO
 
     private View buildActivityBar() {
         activityBar = vertical();
         activityBar.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        activityBar.setBackgroundColor(Color.rgb(51, 51, 51));
-        activityBar.setPadding(0, dp(6), 0, 0);
+        activityBar.setBackgroundColor(Color.rgb(24, 24, 24));
+        activityBar.setPadding(0, dp(2), 0, dp(8));
         activityBar.addView(activity(R.drawable.ic_np_files, "explorer", "Explorer"));
         activityBar.addView(activity(R.drawable.ic_np_search, "search", "Busca"));
         activityBar.addView(activity(R.drawable.ic_np_branch, "git", "Git"));
         activityBar.addView(activity(R.drawable.ic_np_debug, "debug", "Executar"));
         activityBar.addView(activity(R.drawable.ic_np_extensions, "extensions", "Extensoes"));
+        View spacer = new View(this);
+        activityBar.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1));
         activityBar.addView(activity(R.drawable.ic_np_settings, "settings", "Config"));
         return activityBar;
     }
 
     private View buildSidePanel() {
         sidePanel = vertical();
-        sidePanel.setPadding(dp(7), dp(8), dp(7), dp(8));
+        sidePanel.setPadding(0, 0, 0, 0);
         sidePanel.setBackgroundColor(sideBg);
         sideTitle = label("EXPLORER", 12, muted, Typeface.BOLD);
-        sideTitle.setPadding(dp(4), 0, 0, dp(6));
+        sideTitle.setGravity(Gravity.CENTER_VERTICAL);
+        sideTitle.setPadding(dp(14), 0, dp(8), 0);
+        sideTitle.setBackgroundColor(sideBg);
         sideContent = vertical();
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(sideBg);
         scroll.addView(sideContent);
-        sidePanel.addView(sideTitle, matchWrap());
+        sidePanel.addView(sideTitle, new LinearLayout.LayoutParams(-1, dp(35)));
         sidePanel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         return sidePanel;
     }
+    //MEU DEUS DO CÉU TIRA DAQUI ESSE SOLDADOO!
 
+    
     private View buildEditorArea() {
         LinearLayout area = vertical();
         area.setBackgroundColor(bg);
@@ -239,6 +306,7 @@ public class MainActivity extends Activity {
         tabRow.setBackgroundColor(sideBg);
         if (compactLayout) tabRow.setVisibility(View.GONE);
         fileTitle = label("Sem arquivo", 12, text, Typeface.BOLD);
+        fileTitle.setSingleLine(true);
         fileTitle.setPadding(dp(compactLayout ? 6 : 10), dp(compactLayout ? 3 : 6), dp(compactLayout ? 6 : 10), dp(compactLayout ? 3 : 6));
         fileTitle.setBackgroundColor(titleBg);
         lineNumbers = label("1", compactLayout ? 13 : 14, muted, Typeface.NORMAL);
@@ -275,6 +343,10 @@ public class MainActivity extends Activity {
                 }
                 atualizarCursor();
                 atualizarNumerosLinha();
+                if (activeSearchQuery != null && !activeSearchQuery.isBlank()) {
+                    editor.removeCallbacks(thisSearchRefresh);
+                    editor.postDelayed(thisSearchRefresh, 320);
+                }
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -289,6 +361,7 @@ public class MainActivity extends Activity {
         editorLine.addView(editor, new LinearLayout.LayoutParams(-2, -2));
         v.addView(editorLine);
         h.addView(v);
+        editorScrollView = h;
         bottomPanel = vertical();
         bottomPanel.setBackgroundColor(panelBg);
         LinearLayout tabs = horizontal();
@@ -322,27 +395,88 @@ public class MainActivity extends Activity {
         bottomPanel.addView(bottomTitle, matchWrap());
         bottomPanel.addView(consoleScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         bottomPanel.addView(terminalInput, matchWrap());
+        welcomePane = buildWelcomePane();
         area.addView(tabRow, matchWrap());
         area.addView(fileTitle, matchWrap());
+        area.addView(welcomePane, new LinearLayout.LayoutParams(-1, 0, 1));
         area.addView(h, new LinearLayout.LayoutParams(-1, 0, 1));
         bottomPanelParams = new LinearLayout.LayoutParams(-1, 0);
         area.addView(bottomPanel, bottomPanelParams);
         setBottomExpanded(false);
         atualizarNumerosLinha();
+        updateEditorSurface();
         return area;
+    }
+
+    private LinearLayout buildWelcomePane() {
+        LinearLayout welcome = vertical();
+        welcome.setGravity(Gravity.CENTER);
+        welcome.setBackgroundColor(bg);
+        welcome.setPadding(dp(40), dp(24), dp(40), dp(24));
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.npsharp_wlclogo);
+        logo.setAdjustViewBounds(true);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        welcome.addView(logo, new LinearLayout.LayoutParams(dp(128), dp(128)));
+
+        TextView title = label("NPSharp", 28, text, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dp(12), 0, 0);
+        welcome.addView(title, wrapWrap());
+
+        TextView subtitle = label("Tecnologia sem limites.", 14, text, Typeface.NORMAL);
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setTextColor(muted);
+        subtitle.setPadding(0, dp(6), 0, dp(32));
+        welcome.addView(subtitle, wrapWrap());
+
+        welcome.addView(welcomeAction("Novo Arquivo", "Ctrl+N", v -> novoArquivo()), new LinearLayout.LayoutParams(dp(280), dp(36)));
+        welcome.addView(welcomeAction("Abrir Arquivo", "Ctrl+O", v -> abrirWorkspace()), new LinearLayout.LayoutParams(dp(280), dp(36)));
+        TextView save = label("Salvar Arquivo      Ctrl+S", 13, muted, Typeface.NORMAL);
+        save.setGravity(Gravity.CENTER);
+        save.setPadding(0, dp(18), 0, 0);
+        welcome.addView(save, wrapWrap());
+        return welcome;
+    }
+
+    private View welcomeAction(String action, String shortcut, View.OnClickListener listener) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(10), 0, dp(10), 0);
+        row.setOnClickListener(listener);
+        TextView left = label(action, 14, text, Typeface.NORMAL);
+        TextView right = label(shortcut, 14, text, Typeface.NORMAL);
+        right.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(right, new LinearLayout.LayoutParams(0, -2, 1));
+        return row;
     }
 
     private View buildStatusBar() {
         LinearLayout status = horizontal();
         statusBarView = status;
         status.setGravity(Gravity.CENTER_VERTICAL);
-        status.setPadding(dp(8), 0, dp(8), 0);
-        status.setBackgroundColor(accent);
-        statusLeft = label("Pronto", 11, Color.WHITE, Typeface.NORMAL);
-        statusRight = label("NPSharp Android", 11, Color.WHITE, Typeface.NORMAL);
+        status.setPadding(dp(10), 0, dp(10), 0);
+        status.setBackgroundColor(Color.rgb(13, 13, 13));
+        TextView git = label("$(git) sem repo", 12, Color.WHITE, Typeface.NORMAL);
+        git.setGravity(Gravity.CENTER_VERTICAL);
+        git.setPadding(dp(8), 0, dp(8), 0);
+        git.setBackgroundColor(Color.rgb(25, 25, 25));
+        statusLeft = label("Pronto", 12, Color.WHITE, Typeface.NORMAL);
+        statusRight = label("Debug    Terminal    NPSharp", 12, Color.WHITE, Typeface.NORMAL);
+        status.addView(git, new LinearLayout.LayoutParams(-2, -1));
         status.addView(statusLeft, new LinearLayout.LayoutParams(0, -2, 1));
         status.addView(statusRight, wrapWrap());
         return status;
+    }
+
+    private void updateEditorSurface() {
+        boolean hasFile = currentFile != null;
+        if (welcomePane != null) welcomePane.setVisibility(hasFile ? View.GONE : View.VISIBLE);
+        if (editorScrollView != null) editorScrollView.setVisibility(hasFile ? View.VISIBLE : View.GONE);
+        if (fileTitle != null) fileTitle.setVisibility(hasFile ? View.VISIBLE : View.GONE);
+        if (tabRow != null) tabRow.setVisibility(hasFile ? View.VISIBLE : View.GONE);
     }
 
     private void showPanel(String panel) {
@@ -378,10 +512,15 @@ public class MainActivity extends Activity {
 
     private View toolbarExplorer() {
         LinearLayout tb = horizontal();
-        tb.addView(iconPanel(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()), new LinearLayout.LayoutParams(0, dp(34), 1));
-        tb.addView(iconPanel(R.drawable.ic_np_new_folder, "Nova pasta", v -> novaPasta()), new LinearLayout.LayoutParams(0, dp(34), 1));
-        tb.addView(iconPanel(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()), new LinearLayout.LayoutParams(0, dp(34), 1));
-        tb.addView(iconPanel(R.drawable.ic_np_refresh, "Atualizar", v -> showPanel("explorer")), new LinearLayout.LayoutParams(0, dp(34), 1));
+        tb.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        tb.setPadding(dp(8), 0, dp(8), 0);
+        tb.setBackgroundColor(sideBg);
+        View spacer = new View(this);
+        tb.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1));
+        tb.addView(iconPanel(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()), new LinearLayout.LayoutParams(dp(30), dp(32)));
+        tb.addView(iconPanel(R.drawable.ic_np_new_folder, "Nova pasta", v -> novaPasta()), new LinearLayout.LayoutParams(dp(30), dp(32)));
+        tb.addView(iconPanel(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()), new LinearLayout.LayoutParams(dp(30), dp(32)));
+        tb.addView(iconPanel(R.drawable.ic_np_refresh, "Atualizar", v -> showPanel("explorer")), new LinearLayout.LayoutParams(dp(30), dp(32)));
         return tb;
     }
 
@@ -400,7 +539,10 @@ public class MainActivity extends Activity {
                 .thenComparing(f -> nome(f).toLowerCase(Locale.ROOT)));
         for (DocumentFile f : files) {
             TextView row = label((f.isDirectory() ? "▸ " : "  ") + nome(f), 13, text, Typeface.NORMAL);
-            row.setPadding(dp(6 + depth * 14), dp(7), dp(6), dp(7));
+            row.setSingleLine(true);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setMinHeight(dp(23));
+            row.setPadding(dp(10 + depth * 14), 0, dp(6), 0);
             row.setBackgroundColor(uriEquals(f, currentFile) ? Color.rgb(55, 55, 60) : sideBg);
             row.setOnClickListener(v -> {
                 if (f.isFile()) abrirArquivo(f);
@@ -435,10 +577,44 @@ public class MainActivity extends Activity {
         LinearLayout p = vertical();
         EditText busca = input("Buscar");
         EditText subst = input("Substituir");
+        LinearLayout options = horizontal();
+        Button regex = toggleButton(".*", false);
+        Button cs = toggleButton("Aa", false);
+        Button word = toggleButton("\\b", false);
+        options.addView(regex, new LinearLayout.LayoutParams(0, dp(34), 1));
+        options.addView(cs, new LinearLayout.LayoutParams(0, dp(34), 1));
+        options.addView(word, new LinearLayout.LayoutParams(0, dp(34), 1));
+        searchCounter = panelText("0 de 0", muted);
         p.addView(busca, matchWrap());
         p.addView(subst, matchWrap());
-        p.addView(panelButton("Buscar", v -> buscar(busca.getText().toString())), matchWrap());
-        p.addView(panelButton("Substituir tudo", v -> substituirTudo(busca.getText().toString(), subst.getText().toString())), matchWrap());
+        p.addView(options, matchWrap());
+        p.addView(searchCounter, matchWrap());
+        p.addView(panelButton("Buscar proximo", v -> buscarProximo()), matchWrap());
+        p.addView(panelButton("Buscar anterior", v -> buscarAnterior()), matchWrap());
+        p.addView(panelButton("Substituir", v -> substituirAtual()), matchWrap());
+        p.addView(panelButton("Substituir tudo", v -> substituirTudoEditor()), matchWrap());
+        Runnable schedule = () -> {
+            activeSearchQuery = busca.getText().toString();
+            activeReplacement = subst.getText().toString();
+            activeSearchOptions = new SearchOptions(regex.isSelected(), cs.isSelected(), word.isSelected(), true);
+            editor.removeCallbacks(this::pesquisarEditorAtual);
+            editor.postDelayed(this::pesquisarEditorAtual, 260);
+        };
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { schedule.run(); }
+            @Override public void afterTextChanged(Editable s) {}
+        };
+        busca.addTextChangedListener(watcher);
+        subst.addTextChangedListener(watcher);
+        View.OnClickListener refreshOptions = v -> {
+            v.setSelected(!v.isSelected());
+            v.setBackgroundColor(v.isSelected() ? accent : titleBg);
+            schedule.run();
+        };
+        regex.setOnClickListener(refreshOptions);
+        cs.setOnClickListener(refreshOptions);
+        word.setOnClickListener(refreshOptions);
         return p;
     }
 
@@ -455,7 +631,10 @@ public class MainActivity extends Activity {
         LinearLayout p = vertical();
         p.addView(panelButton("Executar arquivo atual", v -> executarArquivo()), matchWrap());
         p.addView(panelButton("Reiniciar", v -> executarArquivo()), matchWrap());
-        p.addView(panelButton("Parar", v -> appendConsole("[Debug] parado")), matchWrap());
+        p.addView(panelButton("Parar", v -> {
+            cancelarTerminal();
+            appendConsole("[Debug] parado");
+        }), matchWrap());
         p.addView(panelButton("Limpar console", v -> console.setText("")), matchWrap());
         p.addView(panelButton("Status dos runtimes", v -> mostrarRuntimesNoConsole()), matchWrap());
         p.addView(panelButton("Instalar/registrar runtimes", v -> instalarRuntimesAndroid()), matchWrap());
@@ -479,8 +658,10 @@ public class MainActivity extends Activity {
         p.addView(panelButton("Abrir workspace", v -> abrirWorkspace()), matchWrap());
         p.addView(panelButton("Paleta de comandos", v -> paletaComandos()), matchWrap());
         p.addView(panelButton("Abrir rapido", v -> abrirRapido()), matchWrap());
+        p.addView(panelButton("Runtime shell", v -> mostrarShellRuntime()), matchWrap());
         p.addView(panelButton("Tema", v -> escolherTema()), matchWrap());
         p.addView(panelText("Pressione e segure arquivo/pasta para abrir o menu.", muted), matchWrap());
+        p.addView(panelText("Shell atual: " + shellRuntimeLabel(), muted), matchWrap());
         return p;
     }
 
@@ -516,8 +697,10 @@ public class MainActivity extends Activity {
             currentFile = null;
             openFiles.clear();
             prefs().edit().remove(PREF_CURRENT_FILE_URI).remove(PREF_CURSOR).apply();
+            if (commandBarText != null) commandBarText.setText(caminho(workspace));
+            updateEditorSurface();
             showPanel("explorer");
-            openFirstFile();
+            status("Workspace salvo: " + nome(workspace), "Explorer");
         }
     }
 
@@ -577,7 +760,8 @@ public class MainActivity extends Activity {
             currentFile = file;
             rememberOpenFile(file);
             editor.setText(read(file));
-            fileTitle.setText(caminho(file));
+            fileTitle.setText(tituloArquivo(file));
+            updateEditorSurface();
             restaurarCursorSeMesmoArquivo(file);
             atualizarAbas();
             aplicarHighlight();
@@ -662,46 +846,123 @@ public class MainActivity extends Activity {
             }, "npsharp-android-portugol").start();
             return;
         }
+        if (runtime == LanguageRuntime.SHELL || nome(currentFile).toLowerCase(Locale.ROOT).endsWith(".sh")) {
+            bottom("TERMINAL");
+            appendConsole("[Shell] executando arquivo: " + tituloArquivo(currentFile));
+            executarShellAndroid(editor.getText().toString());
+            return;
+        }
         AndroidRuntimeManager.RuntimeStatus runtimeStatus = runtimeManager.status(runtime);
         appendConsole("[Runtime] " + runtimeStatus.language().displayName() + ": " + runtimeStatus.message());
         appendConsole("[Android] Abra este workspace no desktop para executar/debugar esse runtime externo.");
     }
 
     private void buscar(String query) {
-        if (query == null || query.isBlank() || workspace == null) return;
-        console.setText("");
-        int[] count = {0};
-        for (DocumentFile file : arquivosTexto(workspace)) {
-            try {
-                String[] lines = read(file).split("\\R", -1);
-                for (int i = 0; i < lines.length; i++) {
-                    if (lines[i].toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))) {
-                        count[0]++;
-                        appendConsole(caminho(file) + ":" + (i + 1) + "  " + lines[i].trim());
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        status(count[0] + " resultado(s)", "Busca");
+        activeSearchQuery = query == null ? "" : query;
+        pesquisarEditorAtual();
     }
 
     private void substituirTudo(String search, String replace) {
-        if (search == null || search.isBlank() || workspace == null) return;
-        int changed = 0;
-        for (DocumentFile file : arquivosTexto(workspace)) {
-            try {
-                String old = read(file);
-                String next = old.replace(search, replace == null ? "" : replace);
-                if (!old.equals(next)) {
-                    write(file, next);
-                    changed++;
+        activeSearchQuery = search == null ? "" : search;
+        activeReplacement = replace == null ? "" : replace;
+        substituirTudoEditor();
+    }
+
+    private void pesquisarEditorAtual() {
+        String query = activeSearchQuery;
+        String textSnapshot = editor == null ? "" : editor.getText().toString();
+        int cursor = editor == null ? 0 : Math.max(0, editor.getSelectionStart());
+        SearchOptions options = activeSearchOptions;
+        searchExecutor.submit(() -> {
+            SearchResult result = searchEngine.find(textSnapshot, query, options, cursor);
+            runOnUiThread(() -> {
+                activeSearchResult = result;
+                aplicarHighlight();
+                aplicarSearchHighlights(result);
+                atualizarSearchCounter();
+                if (result.hasError()) status("Busca invalida: " + result.getError(), "Busca");
+                else status(result.getMatches().size() + " resultado(s)", "Busca");
+            });
+        });
+    }
+
+    private void buscarProximo() {
+        if (activeSearchResult == null || activeSearchResult.getMatches().isEmpty()) return;
+        int next = activeSearchResult.getSelectedIndex() + 1;
+        if (next >= activeSearchResult.getMatches().size()) next = 0;
+        selecionarMatch(next);
+    }
+
+    private void buscarAnterior() {
+        if (activeSearchResult == null || activeSearchResult.getMatches().isEmpty()) return;
+        int prev = activeSearchResult.getSelectedIndex() - 1;
+        if (prev < 0) prev = activeSearchResult.getMatches().size() - 1;
+        selecionarMatch(prev);
+    }
+
+    private void selecionarMatch(int index) {
+        if (activeSearchResult == null || index < 0 || index >= activeSearchResult.getMatches().size()) return;
+        SearchMatch match = activeSearchResult.getMatches().get(index);
+        activeSearchResult = new SearchResult(activeSearchResult.getQuery(), activeSearchResult.getMatches(), index, activeSearchResult.getError());
+        editor.requestFocus();
+        editor.setSelection(match.getStart(), match.getEnd());
+        atualizarSearchCounter();
+    }
+
+    private void substituirAtual() {
+        if (activeSearchResult == null || activeSearchResult.getMatches().isEmpty()) return;
+        int selected = Math.max(0, activeSearchResult.getSelectedIndex());
+        ReplaceResult result = searchEngine.replaceCurrent(editor.getText().toString(), activeSearchResult, activeReplacement, selected, activeSearchOptions);
+        if (result.getReplacements() > 0) {
+            editor.getText().replace(0, editor.length(), result.getText());
+            editor.setSelection(Math.min(result.getCursor(), editor.length()));
+            pesquisarEditorAtual();
+        }
+    }
+
+    private void substituirTudoEditor() {
+        String query = activeSearchQuery;
+        String replacement = activeReplacement;
+        String textSnapshot = editor == null ? "" : editor.getText().toString();
+        int cursor = editor == null ? 0 : Math.max(0, editor.getSelectionStart());
+        SearchOptions options = activeSearchOptions;
+        searchExecutor.submit(() -> {
+            ReplaceResult result = searchEngine.replaceAll(textSnapshot, query, replacement, options, cursor);
+            runOnUiThread(() -> {
+                if (result.getError() != null) {
+                    status("Substituir falhou: " + result.getError(), "Substituir");
+                    return;
                 }
-            } catch (Exception ignored) {
+                editor.getText().replace(0, editor.length(), result.getText());
+                editor.setSelection(Math.min(result.getCursor(), editor.length()));
+                pesquisarEditorAtual();
+                status(result.getReplacements() + " substituicao(oes)", "Substituir");
+            });
+        });
+    }
+
+    private void aplicarSearchHighlights(SearchResult result) {
+        if (editor == null || result == null) return;
+        Editable editable = editor.getText();
+        BackgroundColorSpan[] oldSpans = editable.getSpans(0, editable.length(), BackgroundColorSpan.class);
+        for (BackgroundColorSpan span : oldSpans) editable.removeSpan(span);
+        int normal = shade(currentTheme.getEditorSelection(), -0.30f);
+        int active = currentTheme.getEditorSelection();
+        List<SearchMatch> matches = result.getMatches();
+        for (int i = 0; i < matches.size(); i++) {
+            SearchMatch match = matches.get(i);
+            if (match.getStart() >= 0 && match.getEnd() <= editable.length()) {
+                editable.setSpan(new BackgroundColorSpan(i == result.getSelectedIndex() ? active : normal),
+                        match.getStart(), match.getEnd(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
-        if (currentFile != null) abrirArquivo(currentFile);
-        status(changed + " arquivo(s) alterado(s)", "Substituir");
+    }
+
+    private void atualizarSearchCounter() {
+        if (searchCounter == null || activeSearchResult == null) return;
+        int total = activeSearchResult.getMatches().size();
+        int selected = total == 0 ? 0 : activeSearchResult.getSelectedIndex() + 1;
+        searchCounter.setText(selected + " de " + total);
     }
 
     private void menuArquivoExplorer(DocumentFile file) {
@@ -792,18 +1053,10 @@ public class MainActivity extends Activity {
 
     private void escolherTema() {
         try {
-            String[] allThemes = getAssets().list("themes");
-            List<String> themes = new ArrayList<>();
-            if (allThemes != null) {
-                for (String theme : allThemes) {
-                    if (theme.endsWith(".json") && !"package.json".equals(theme)) themes.add(theme);
-                }
-            }
-            themes.sort(String::compareTo);
-            String[] finalThemes = themes.toArray(new String[0]);
+            String[] finalThemes = ThemeManager.availableThemeNames();
             new AlertDialog.Builder(this)
                     .setTitle("Tema de cores")
-                    .setItems(finalThemes, (d, which) -> aplicarTema(finalThemes[which]))
+                    .setItems(finalThemes, (d, which) -> aplicarTema(ThemeManager.assetNameAt(which)))
                     .show();
         } catch (Exception e) {
             status("Erro ao listar temas", "Tema");
@@ -812,12 +1065,9 @@ public class MainActivity extends Activity {
 
     private void aplicarTema(String assetName) {
         try {
-            String json = readAsset("themes/" + assetName);
-            applyThemeJson(json);
-            prefs().edit().putString(PREF_THEME, assetName).apply();
-            refreshColors();
-            aplicarHighlight();
-            status("Tema aplicado: " + assetName, "Tema");
+            if (!ThemeManager.setThemeByAsset(assetName)) {
+                status("Tema nao encontrado: " + assetName, "Tema");
+            }
         } catch (Exception e) {
             applyDefaultTheme();
             refreshColors();
@@ -826,66 +1076,80 @@ public class MainActivity extends Activity {
     }
 
     private void restaurarTema() {
-        String theme = prefs().getString(PREF_THEME, null);
-        if (theme == null) return;
-        try {
-            String json = readAsset("themes/" + theme);
-            applyThemeJson(json);
-        } catch (Exception ignored) {
-            applyDefaultTheme();
-        }
+        applyThemeModel(ThemeManager.getCurrentTheme());
     }
 
     private void applyDefaultTheme() {
-        bg = DEFAULT_BG;
-        sideBg = DEFAULT_SIDE_BG;
-        panelBg = DEFAULT_PANEL_BG;
-        titleBg = DEFAULT_TITLE_BG;
-        text = DEFAULT_TEXT;
-        muted = DEFAULT_MUTED;
-        accent = DEFAULT_ACCENT;
+        applyThemeModel(ThemeModel.Default);
     }
 
     private void applyThemeJson(String json) {
-        int nextBg = color(json, "editor.background", DEFAULT_BG);
-        int nextText = color(json, "editor.foreground", readableOn(nextBg));
-        int nextSide = color(json, "sideBar.background", shade(nextBg, 0.12f));
-        int nextTitle = color(json, "titleBar.activeBackground", shade(nextBg, 0.20f));
-        int nextPanel = color(json, "panel.background", shade(nextBg, -0.06f));
-        int nextAccent = color(json, "statusBar.background", color(json, "focusBorder", DEFAULT_ACCENT));
+        applyThemeModel(ThemeJsonParser.parse("inline.json", json));
+    }
 
-        bg = nextBg;
-        text = ensureContrast(nextText, bg);
-        sideBg = nextSide;
-        titleBg = nextTitle;
-        panelBg = nextPanel;
-        accent = nextAccent;
-        muted = ensureContrast(shade(text, textIsDark(text) ? 0.35f : -0.35f), sideBg);
+    private void animateThemeTo(ThemeModel theme) {
+        if (root == null) {
+            applyThemeModel(theme);
+            return;
+        }
+        ThemeModel from = currentTheme == null ? ThemeModel.Default : currentTheme;
+        ThemeInterpolation.animate(from, theme, frame -> runOnUiThread(() -> {
+            applyThemeModel(frame);
+            refreshColors();
+            aplicarHighlight();
+        }));
+        status("Tema aplicado: " + theme.getName(), "Tema");
+    }
+
+    private void applyThemeModel(ThemeModel theme) {
+        currentTheme = theme;
+        bg = theme.getEditorBackground();
+        text = ensureContrast(theme.getEditorForeground(), bg);
+        sideBg = theme.getSideBarBackground();
+        titleBg = theme.getTitleBarBackground();
+        panelBg = theme.getTerminalBackground();
+        accent = theme.getFocusBorder();
+        muted = theme.getTextMuted();
     }
 
     private void refreshColors() {
         root.setBackgroundColor(bg);
         if (topBar != null) topBar.setBackgroundColor(titleBg);
-        if (commandBar != null) commandBar.setBackgroundColor(titleBg);
-        if (activityBar != null) activityBar.setBackgroundColor(shade(sideBg, -0.10f));
+        if (commandBar != null) commandBar.setBackground(borderBg(currentTheme.getSurfaceElevated(), currentTheme.getFocusBorder(), dp((int) currentTheme.getInputRadius()), 1));
+        if (commandBarText != null) commandBarText.setTextColor(text);
+        if (activityBar != null) activityBar.setBackgroundColor(currentTheme.getNavBarBackground());
         sidePanel.setBackgroundColor(sideBg);
+        if (sideTitle != null) {
+            sideTitle.setBackgroundColor(sideBg);
+            sideTitle.setTextColor(currentTheme.getSideBarForeground());
+        }
         tabRow.setBackgroundColor(sideBg);
+        if (welcomePane != null) welcomePane.setBackgroundColor(bg);
         editor.setBackgroundColor(bg);
         editor.setTextColor(text);
-        if (lineNumbers != null) {
-            lineNumbers.setBackgroundColor(shade(bg, -0.08f));
-            lineNumbers.setTextColor(muted);
+        editor.setHighlightColor(currentTheme.getEditorSelection());
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            if (editor.getTextCursorDrawable() != null) {
+                editor.getTextCursorDrawable().setTint(currentTheme.getEditorCursor());
+            }
         }
-        fileTitle.setBackgroundColor(titleBg);
-        fileTitle.setTextColor(text);
+        if (lineNumbers != null) {
+            lineNumbers.setBackgroundColor(currentTheme.getEditorGutterBackground());
+            lineNumbers.setTextColor(currentTheme.getEditorLineNumber());
+        }
+        fileTitle.setBackgroundColor(currentTheme.getTabActiveBackground());
+        fileTitle.setTextColor(currentTheme.getTabActiveForeground());
         bottomPanel.setBackgroundColor(panelBg);
         if (consoleScroll != null) consoleScroll.setBackgroundColor(panelBg);
         console.setBackgroundColor(panelBg);
-        console.setTextColor(text);
-        terminalInput.setBackgroundColor(shade(panelBg, 0.08f));
-        terminalInput.setTextColor(text);
+        console.setTextColor(currentTheme.getTerminalForeground());
+        console.setHighlightColor(currentTheme.getTerminalSelection());
+        terminalInput.setBackgroundColor(currentTheme.getSurfaceElevated());
+        terminalInput.setTextColor(currentTheme.getTerminalForeground());
         terminalInput.setHintTextColor(muted);
-        if (statusBarView != null) statusBarView.setBackgroundColor(accent);
+        if (statusBarView != null) statusBarView.setBackgroundColor(currentTheme.getStatusBarBackground());
+        if (statusLeft != null) statusLeft.setTextColor(currentTheme.getStatusBarForeground());
+        if (statusRight != null) statusRight.setTextColor(currentTheme.getStatusBarForeground());
         recolorChildren(root);
         boolean editorVisible = editorArea != null && editorArea.getVisibility() == View.VISIBLE;
         if (!compactLayout || !editorVisible) {
@@ -896,14 +1160,18 @@ public class MainActivity extends Activity {
     private void recolorChildren(View view) {
         if (view instanceof Button) {
             Button button = (Button) view;
-            button.setTextColor(text);
+            button.setTextColor(currentTheme.getButtonForeground());
         } else if (view instanceof ImageButton) {
-            ((ImageButton) view).setColorFilter(text);
+            ((ImageButton) view).setColorFilter(currentTheme.getSideBarForeground());
         } else if (view instanceof TextView
                 && view != editor
                 && view != console
                 && view != statusLeft
-                && view != statusRight) {
+                && view != statusRight
+                && view != sideTitle
+                && view != lineNumbers
+                && view != fileTitle
+                && view != commandBarText) {
             ((TextView) view).setTextColor(text);
         }
         if (view instanceof LinearLayout) {
@@ -954,6 +1222,7 @@ public class MainActivity extends Activity {
             if (currentFile == null) {
                 editor.setText("");
                 fileTitle.setText("Sem arquivo");
+                updateEditorSurface();
             } else {
                 abrirArquivo(currentFile);
                 return;
@@ -982,6 +1251,8 @@ public class MainActivity extends Activity {
         editor.setText("");
         tabRow.removeAllViews();
         console.setText("");
+        if (commandBarText != null) commandBarText.setText("Nenhuma pasta aberta");
+        updateEditorSurface();
         showNoWorkspace();
     }
 
@@ -1106,7 +1377,7 @@ public class MainActivity extends Activity {
         if (editor == null) return;
         applyingHighlight = true;
         Editable editable = editor.getText();
-        AndroidSyntax.apply(editable, text);
+        AndroidSyntax.apply(editable, currentTheme);
         applyingHighlight = false;
     }
 
@@ -1159,8 +1430,8 @@ public class MainActivity extends Activity {
     }
 
     private void menuTerminal() {
-        menu("Terminal", new String[] {"Mostrar terminal", "Ocultar painel", "Focar entrada", "Limpar", "Listar workspace", "Ajuda"},
-                new Runnable[] {this::focarTerminal, () -> setBottomExpanded(false), this::focarTerminal, () -> console.setText(""), this::listarWorkspaceNoConsole, this::ajudaTerminal});
+        menu("Terminal", new String[] {"Mostrar terminal", "Cancelar processo", "Ocultar painel", "Focar entrada", "Limpar", "Listar workspace", "Runtime shell", "Ajuda"},
+                new Runnable[] {this::focarTerminal, this::cancelarTerminal, () -> setBottomExpanded(false), this::focarTerminal, () -> console.setText(""), this::listarWorkspaceNoConsole, this::mostrarShellRuntime, this::ajudaTerminal});
     }
 
     private void mostrarSobre() {
@@ -1222,6 +1493,15 @@ public class MainActivity extends Activity {
         String lower = comando.toLowerCase(Locale.ROOT);
         if ("ajuda".equals(lower) || "help".equals(lower)) {
             ajudaTerminal();
+        } else if ("shell".equals(lower)) {
+            mostrarShellRuntime();
+        } else if ("shell redetect".equals(lower) || "shell detectar".equals(lower)) {
+            ShellRuntimeInfo info = br.com.corelabs.npsharpfx.backend.shell.ShellRuntimeManager.getInstance(this).redetectRuntime();
+            appendConsole("[Terminal] Runtime shell redetectado: " + info.getName() + " (" + info.getExecutablePath() + ")");
+        } else if (lower.startsWith("shell ")) {
+            appendConsole("[Terminal] Configurar shell por caminho foi removido.");
+            appendConsole("[Terminal] Android bloqueia exec cross-app, incluindo /data/data/com.termux/.");
+            appendConsole("[Terminal] Use o runtime detectado automaticamente: " + shellRuntimeLabel());
         } else if ("limpar".equals(lower) || "clear".equals(lower) || "cls".equals(lower)) {
             console.setText("");
         } else if ("ls".equals(lower) || "dir".equals(lower)) {
@@ -1266,43 +1546,60 @@ public class MainActivity extends Activity {
     }
 
     private void ajudaTerminal() {
-        appendConsole("[Terminal] ativo. Comandos: ajuda, limpar, ls, pwd, cat, abrir <nome>, code <arquivo>, salvar, executar, runtimes, instalar runtimes, editor, terminal, explorer, append <texto>.");
-        appendConsole("[Terminal] Comandos desconhecidos tentam rodar via /system/bin/sh -c.");
+        appendConsole("[Terminal] ativo. Comandos: ajuda, limpar, ls, pwd, cat, abrir <nome>, code <arquivo>, salvar, executar, runtimes, instalar runtimes, editor, terminal, explorer, append <texto>, shell.");
+        appendConsole("[Terminal] Comandos desconhecidos rodam via runtime NPSharp: " + shellRuntimeLabel() + ".");
+        appendConsole("[Terminal] Termux/caminhos privados de outros apps nao sao usados: Android sandbox + SELinux bloqueiam exec cross-app.");
         appendConsole("[Terminal] Durante leia() do Portugol, o texto digitado vira entrada do programa.");
     }
 
     private void executarShellAndroid(String comando) {
-        appendConsole("[Shell] " + comando);
-        new Thread(() -> {
-            Process process = null;
-            try {
-                process = new ProcessBuilder("/system/bin/sh", "-c", comando)
-                        .redirectErrorStream(true)
-                        .start();
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        String output = line;
-                        runOnUiThread(() -> appendConsole(output));
-                    }
-                }
-                boolean finished = process.waitFor(8, TimeUnit.SECONDS);
-                if (!finished) {
-                    process.destroy();
-                    runOnUiThread(() -> appendConsole("[Shell] interrompido por timeout."));
-                    return;
-                }
-                int exitCode = process.exitValue();
-                runOnUiThread(() -> appendConsole("[Shell] codigo de saida: " + exitCode));
-            } catch (Exception e) {
-                String message = primeiraLinha(e.getMessage());
-                runOnUiThread(() -> appendConsole("[Shell] falhou: " + message));
-            } finally {
-                if (process != null) {
-                    process.destroy();
+        appendConsole("[Shell:" + shellRuntimeLabel() + "] " + comando);
+        terminalProcessManager.execute(comando, new TerminalProcessListener() {
+            @Override public void onStdout(String output) {
+                appendConsoleAnsi(output);
+            }
+            @Override public void onStderr(String output) {
+                appendConsoleAnsi(output);
+            }
+            @Override public void onLog(String text) {
+                appendConsole(text);
+            }
+            @Override public void onStateChanged(TerminalProcessState state) {
+                status("Terminal: " + state, "Terminal");
+                if (state != TerminalProcessState.RUNNING) {
+                    terminalInput.setHint("> terminal ativo");
                 }
             }
-        }, "npsharp-android-shell").start();
+            @Override public void onFinished(ShellResult result) {
+                appendConsole("[Shell] codigo de saida: " + result.getExitCode() + " (" + result.getExecutionTimeMs() + "ms)");
+            }
+        }, 60_000L);
+    }
+
+    private void cancelarTerminal() {
+        if (terminalProcessManager != null && terminalProcessManager.isAlive()) {
+            terminalProcessManager.sendCtrlC();
+            appendConsole("[Terminal] processo cancelado.");
+        } else {
+            appendConsole("[Terminal] nenhum processo ativo.");
+        }
+        terminalInput.setHint("> terminal ativo");
+        status("Terminal parado", "Terminal");
+    }
+
+    private String shellRuntimeLabel() {
+        ShellRuntimeInfo info = ShellRuntime.runtimeInfo();
+        return info.getName() + " @ " + info.getExecutablePath();
+    }
+
+    private void mostrarShellRuntime() {
+        ShellRuntimeInfo info = ShellRuntime.runtimeInfo();
+        bottom("TERMINAL");
+        appendConsole("[Terminal] Runtime ativo: " + info.getName());
+        appendConsole("[Terminal] Caminho: " + info.getExecutablePath());
+        appendConsole("[Terminal] Tipo: " + info.getType());
+        appendConsole("[Terminal] ABI: " + (android.os.Build.SUPPORTED_ABIS.length == 0 ? "desconhecida" : android.os.Build.SUPPORTED_ABIS[0]));
+        appendConsole("[Terminal] Ordem de fallback: /system/bin/sh -> /system/bin/toybox sh -> assets/bin -> shell interno.");
     }
 
     private void mostrarRuntimesNoConsole() {
@@ -1453,6 +1750,38 @@ public class MainActivity extends Activity {
         return f == null ? "" : f.getUri().toString().replace("%2F", "/");
     }
 
+    private String tituloArquivo(DocumentFile file) {
+        if (file == null) return "Sem arquivo";
+        String relative = caminhoRelativo(file);
+        return abreviarMeio(relative == null || relative.isBlank() ? nome(file) : relative, 64);
+    }
+
+    private String caminhoRelativo(DocumentFile file) {
+        String filePath = ultimoSegmentoUri(file);
+        if (filePath.isBlank()) return nome(file);
+        String workspacePath = ultimoSegmentoUri(workspace);
+        if (!workspacePath.isBlank() && filePath.startsWith(workspacePath)) {
+            String relative = filePath.substring(workspacePath.length());
+            while (relative.startsWith("/") || relative.startsWith(":")) {
+                relative = relative.substring(1);
+            }
+            return relative.isBlank() ? nome(file) : relative;
+        }
+        int slash = filePath.lastIndexOf('/');
+        return slash >= 0 && slash + 1 < filePath.length() ? filePath.substring(slash + 1) : filePath;
+    }
+
+    private String ultimoSegmentoUri(DocumentFile file) {
+        if (file == null || file.getUri() == null || file.getUri().getLastPathSegment() == null) return "";
+        return Uri.decode(file.getUri().getLastPathSegment()).replace('\\', '/');
+    }
+
+    private String abreviarMeio(String value, int max) {
+        if (value == null || value.length() <= max) return value == null ? "" : value;
+        int keep = Math.max(12, (max - 3) / 2);
+        return value.substring(0, keep) + "..." + value.substring(value.length() - keep);
+    }
+
     private boolean uriEquals(DocumentFile a, DocumentFile b) {
         return a != null && b != null && a.getUri().equals(b.getUri());
     }
@@ -1460,6 +1789,7 @@ public class MainActivity extends Activity {
     private String linguagem(DocumentFile f) {
         String n = nome(f).toLowerCase(Locale.ROOT);
         if (n.endsWith(".gol") || n.endsWith(".por") || n.endsWith(".portugol") || n.endsWith(".alg")) return "Portugol";
+        if (n.endsWith(".sh")) return "Shell";
         if (n.endsWith(".java")) return "Java";
         if (n.endsWith(".kt")) return "Kotlin";
         if (n.endsWith(".js")) return "JavaScript";
@@ -1535,6 +1865,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void appendConsoleAnsi(String text) {
+        if (text == null || text.isEmpty()) return;
+        SpannableStringBuilder builder = new SpannableStringBuilder(console.getText());
+        AnsiTerminalRenderer.appendAnsi(builder, text, currentTheme.getTerminalForeground());
+        console.setText(builder);
+        if (consoleScroll != null) {
+            consoleScroll.post(() -> consoleScroll.fullScroll(View.FOCUS_DOWN));
+        }
+    }
+
     private void status(String left, String right) {
         if (statusLeft != null) statusLeft.setText(left == null ? "" : left);
         if (statusRight != null && right != null && !right.isBlank()) statusRight.setText(right);
@@ -1553,6 +1893,25 @@ public class MainActivity extends Activity {
 
     private Button menuButton(String s, View.OnClickListener l) {
         return button(s, l, 12, Color.TRANSPARENT);
+    }
+
+    private TextView titleMenuButton(String s, View.OnClickListener l) {
+        TextView b = label(s, 13, text, Typeface.NORMAL);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(8), 0, dp(8), 0);
+        b.setMinHeight(dp(34));
+        b.setOnClickListener(l);
+        return b;
+    }
+
+    private TextView titleIconText(String s, View.OnClickListener l) {
+        TextView b = label(s, 14, muted, Typeface.NORMAL);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(dp(32));
+        b.setMinHeight(dp(34));
+        b.setOnClickListener(l);
+        return b;
     }
 
     private ImageButton iconButton(int drawableRes, String desc, View.OnClickListener l) {
@@ -1581,6 +1940,12 @@ public class MainActivity extends Activity {
         return button(s, l, 12, titleBg);
     }
 
+    private Button toggleButton(String s, boolean selected) {
+        Button b = button(s, null, 12, selected ? accent : titleBg);
+        b.setSelected(selected);
+        return b;
+    }
+
     private Button button(String s, View.OnClickListener l, int sp, int color) {
         Button b = new Button(this);
         b.setText(s);
@@ -1589,6 +1954,14 @@ public class MainActivity extends Activity {
         b.setBackgroundColor(color);
         b.setOnClickListener(l);
         return b;
+    }
+
+    private GradientDrawable borderBg(int fill, int stroke, int radius, int strokeWidth) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(radius);
+        drawable.setStroke(strokeWidth, stroke);
+        return drawable;
     }
 
     private ImageButton activity(int drawableRes, String panel, String desc) {
@@ -1669,19 +2042,19 @@ public class MainActivity extends Activity {
                         + "|(\\b[A-Za-z_$][A-Za-z0-9_$]*(?=\\s*\\())",
                 Pattern.CASE_INSENSITIVE);
 
-        static void apply(Spannable text, int defaultColor) {
+        static void apply(Spannable text, ThemeModel theme) {
             ForegroundColorSpan[] oldSpans = text.getSpans(0, text.length(), ForegroundColorSpan.class);
             for (ForegroundColorSpan span : oldSpans) {
                 text.removeSpan(span);
             }
             Matcher m = TOKEN.matcher(text.toString());
             while (m.find()) {
-                int c = defaultColor;
-                if (m.group(1) != null) c = Color.rgb(106, 153, 85);
-                else if (m.group(2) != null) c = Color.rgb(206, 145, 120);
-                else if (m.group(3) != null) c = Color.rgb(181, 206, 168);
-                else if (m.group(4) != null) c = Color.rgb(86, 156, 214);
-                else if (m.group(6) != null) c = Color.rgb(220, 220, 170);
+                int c = theme.getEditorForeground();
+                if (m.group(1) != null) c = theme.getSyntaxComment();
+                else if (m.group(2) != null) c = theme.getSyntaxString();
+                else if (m.group(3) != null) c = theme.getSyntaxNumber();
+                else if (m.group(4) != null) c = theme.getSyntaxKeyword();
+                else if (m.group(6) != null) c = theme.getSyntaxFunction();
                 text.setSpan(new ForegroundColorSpan(c), m.start(), m.end(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }

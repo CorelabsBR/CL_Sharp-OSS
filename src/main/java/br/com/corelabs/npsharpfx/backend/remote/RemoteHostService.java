@@ -1,6 +1,7 @@
 package br.com.corelabs.npsharpfx.backend.remote;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
@@ -143,18 +144,35 @@ public class RemoteHostService {
         channel.setInputStream(null);
         ByteArrayOutputStream error = new ByteArrayOutputStream();
         channel.setErrStream(error);
-        channel.connect(10000);
-        String output;
-        try (var input = channel.getInputStream()) {
+        try (InputStream input = channel.getInputStream()) {
+            channel.connect(10000);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
             while (!channel.isClosed()) {
-                Thread.sleep(50);
+                while (input.available() > 0) {
+                    int read = input.read(buffer, 0, Math.min(buffer.length, input.available()));
+                    if (read < 0) {
+                        break;
+                    }
+                    output.write(buffer, 0, read);
+                }
+                Thread.sleep(25);
             }
-            output = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            while (input.available() > 0) {
+                int read = input.read(buffer, 0, Math.min(buffer.length, input.available()));
+                if (read < 0) {
+                    break;
+                }
+                output.write(buffer, 0, read);
+            }
+            String out = output.toString(StandardCharsets.UTF_8);
+            String err = error.toString(StandardCharsets.UTF_8);
+            return err.isBlank() ? out : out + System.lineSeparator() + err;
         } finally {
-            channel.disconnect();
+            if (channel.isConnected()) {
+                channel.disconnect();
+            }
         }
-        String err = error.toString(StandardCharsets.UTF_8);
-        return err.isBlank() ? output : output + System.lineSeparator() + err;
     }
 
     private void ensureConnected() throws Exception {
