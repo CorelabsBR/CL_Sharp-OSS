@@ -116,6 +116,8 @@ public class EditorManager {
 
     // aba -> tipo de quebra de linha (LF / CRLF)
     private final Map<Tab, String> tabLineEndings = new HashMap<>();
+    private final Map<Tab, Consumer<String>> tabVirtualSaveHandlers = new HashMap<>();
+    private final Map<Tab, String> tabVirtualUris = new HashMap<>();
 
     /* =========================================
        LISTA DE ARQUIVOS RECENTES
@@ -334,6 +336,34 @@ public File getCurrentFile() {
         }
     }
 
+    public void openVirtualFile(String displayName, String uri, String content, Consumer<String> saveHandler) {
+        if (uri == null || uri.isBlank()) {
+            updateStatus("Arquivo remoto invalido");
+            return;
+        }
+
+        for (Map.Entry<Tab, String> entry : tabVirtualUris.entrySet()) {
+            if (uri.equals(entry.getValue())) {
+                tabPane.getSelectionModel().select(entry.getKey());
+                updateStatus("Arquivo remoto ja aberto: " + displayName);
+                return;
+            }
+        }
+
+        String safeName = displayName == null || displayName.isBlank() ? uri : displayName;
+        String initialContent = content == null ? "" : content;
+        Tab tab = createEditorTab(safeName, initialContent, null, true, getExtension(safeName), detectLineEnding(initialContent));
+        tabVirtualUris.put(tab, uri);
+        if (saveHandler != null) {
+            tabVirtualSaveHandlers.put(tab, saveHandler);
+        }
+        tabPane.getTabs().add(tab);
+        tabPane.getSelectionModel().select(tab);
+        updateWelcomeVisibility();
+        updateStatus("Arquivo remoto aberto: " + safeName);
+        refreshStatusFromSelectedTab();
+    }
+
     /* =========================================
        SALVA O ARQUIVO DA ABA ATUAL
        Se ainda nÃ£o tiver arquivo associado,
@@ -350,7 +380,12 @@ public File getCurrentFile() {
         File file = tabFiles.get(selectedTab);
 
         if (file == null) {
-            saveCurrentFileAs();
+            Consumer<String> virtualSave = tabVirtualSaveHandlers.get(selectedTab);
+            if (virtualSave != null) {
+                writeVirtualTab(selectedTab, editor, virtualSave);
+            } else {
+                saveCurrentFileAs();
+            }
             return;
         }
 
@@ -1004,6 +1039,22 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
         }
     }
 
+    private void writeVirtualTab(Tab tab, CodeArea editor, Consumer<String> saveHandler) {
+        try {
+            String text = editor.getText();
+            String normalized = applyStoredLineEnding(text, tabLineEndings.getOrDefault(tab, "LF"));
+            saveHandler.accept(normalized);
+            tabDirtyState.put(tab, false);
+            tabInitialContent.put(tab, normalized);
+            tabLineEndings.put(tab, detectLineEnding(normalized));
+            updateTabTitle(tab);
+            updateStatus("Arquivo remoto salvo: " + buildSuggestedFileName(tab));
+            refreshStatusFromSelectedTab();
+        } catch (Exception e) {
+            updateStatus("Erro ao salvar arquivo remoto: " + (e.getMessage() == null ? "falha desconhecida" : e.getMessage()));
+        }
+    }
+
     /* =========================================
        ADICIONA ARQUIVO Ã€ LISTA DE RECENTES
        Move para o topo se jÃ¡ existir
@@ -1030,6 +1081,17 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
         File file = tabFiles.get(tab);
         if (file != null) {
             return file.getName();
+        }
+
+        if (tabVirtualUris.containsKey(tab) && tab.getText() != null && !tab.getText().isBlank()) {
+            String text = tab.getText();
+            if (text.startsWith("â— ")) {
+                text = text.substring(2);
+            }
+            if (text.startsWith("*")) {
+                text = text.substring(1);
+            }
+            return text;
         }
 
         String currentTitle = tab.getText();
@@ -1195,7 +1257,12 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
 
             File file = tabFiles.get(tab);
             if (file == null) {
-                saveCurrentFileAs();
+                Consumer<String> virtualSave = tabVirtualSaveHandlers.get(tab);
+                if (virtualSave != null) {
+                    writeVirtualTab(tab, tabEditors.get(tab), virtualSave);
+                } else {
+                    saveCurrentFileAs();
+                }
             } else {
                 writeTabToFile(tab, tabEditors.get(tab), file);
             }
@@ -1220,6 +1287,8 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
         tabSuggestedExtensions.remove(tab);
         tabInitialContent.remove(tab);
         tabLineEndings.remove(tab);
+        tabVirtualSaveHandlers.remove(tab);
+        tabVirtualUris.remove(tab);
 
         if (associatedFile != null) {
             openTabs.remove(associatedFile.getAbsolutePath());
@@ -1315,6 +1384,7 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
 
         CodeArea editor = tabEditors.get(selectedTab);
         File file = tabFiles.get(selectedTab);
+        boolean remote = tabVirtualUris.containsKey(selectedTab);
 
         String fileName = (file != null) ? file.getName() : buildSuggestedFileName(selectedTab);
         boolean dirty = Boolean.TRUE.equals(tabDirtyState.get(selectedTab));
@@ -1335,6 +1405,7 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
                 + "    Ln " + line + ", Col " + column
                 + (selectedChars > 0 ? ("    Sel " + selectedChars) : "")
                 + "    " + fileName
+                + (remote ? "    remoto" : "")
                 + "    " + (dirty ? "modificado" : "salvo");
 
         updateStatus(status);
@@ -1633,4 +1704,3 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
     return "Plain Text";
 }
 }
-

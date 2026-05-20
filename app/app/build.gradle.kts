@@ -28,6 +28,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
     buildFeatures {
         viewBinding = true
@@ -42,6 +43,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation(libs.navigation.fragment)
     implementation(libs.navigation.ui)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

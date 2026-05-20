@@ -14,9 +14,13 @@ import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
 import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
+import br.com.corelabs.npsharpfx.backend.git.GitService;
+import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
+import br.com.corelabs.npsharpfx.frontend.ui.git.SourceControlPanel;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
+import br.com.corelabs.npsharpfx.frontend.ui.remote.RemoteHostPanel;
 import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane;
 import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane.SearchQuery;
 import br.com.corelabs.npsharpfx.frontend.ui.search.SearchResult;
@@ -103,6 +107,9 @@ private static final double MIN_HEIGHT = 520;
     private Label sourceControlBranchLabel;
     private Label sourceControlSummaryLabel;
     private TextField sourceControlCommitField;
+    private GitService gitService;
+    private SourceControlPanel sourceControlPanel;
+    private final RemoteHostService remoteHostService = new RemoteHostService();
 
     private static final String PREF_WORKSPACE = "workspace";
     private static final String PREF_OPEN_FILES = "openFiles";
@@ -228,6 +235,13 @@ private final PortugolInterpreter portugolInterpreter =
 
     private void createManagers() {
 
+    gitService = new GitService(resolveGitExecutable());
+    gitService.setLogConsumer(line -> Platform.runLater(() -> {
+        if (terminalPane != null) {
+            terminalPane.appendOutput("[git] " + line);
+        }
+    }));
+
     editorManager = new EditorManager(
             stage,
             this::updateEditorStatus
@@ -258,12 +272,9 @@ private final PortugolInterpreter portugolInterpreter =
 }
 
     private void createPanels() {
-        System.out.println("[MainWindow] Creating panels with icons...");
-        
         Button explorerBtn = activityBarManager.createActivityButton();
         Node explorerIcon = Codicon.icon("/icons/codicons/files.svg");
         explorerBtn.setGraphic(explorerIcon);
-        System.out.println("[MainWindow] Explorer icon loaded: " + explorerIcon);
         
         registerActivity("explorer",
                 explorerBtn,
@@ -273,7 +284,6 @@ private final PortugolInterpreter portugolInterpreter =
         Button searchBtn = activityBarManager.createActivityButton();
         Node searchIcon = Codicon.icon("/icons/codicons/search.svg");
         searchBtn.setGraphic(searchIcon);
-        System.out.println("[MainWindow] Search icon loaded: " + searchIcon);
         
         registerActivity("search",
                 searchBtn,
@@ -283,7 +293,6 @@ private final PortugolInterpreter portugolInterpreter =
         Button gitBtn = activityBarManager.createActivityButton();
         Node gitIcon = Codicon.icon("/icons/codicons/source-control.svg");
         gitBtn.setGraphic(gitIcon);
-        System.out.println("[MainWindow] Git icon loaded: " + gitIcon);
         
         registerActivity("git",
                 gitBtn,
@@ -295,10 +304,18 @@ private final PortugolInterpreter portugolInterpreter =
             refreshSourceControlPanel();
         });
 
+        Button remoteBtn = activityBarManager.createActivityButton();
+        Node remoteIcon = Codicon.icon("/icons/codicons/remote-explorer.svg");
+        remoteBtn.setGraphic(remoteIcon);
+        registerActivity("remote",
+                remoteBtn,
+                sidePanelManager.wrapSidePanel("REMOTE HOST",
+                    buildRemoteHostPanel(),
+                    () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
+
         Button debugBtn = activityBarManager.createActivityButton();
         Node debugIcon = Codicon.icon("/icons/codicons/debug-alt.svg");
         debugBtn.setGraphic(debugIcon);
-        System.out.println("[MainWindow] Debug icon loaded: " + debugIcon);
         
 registerActivity("debug",
         debugBtn,
@@ -312,7 +329,6 @@ registerActivity("debug",
         Button extBtn = activityBarManager.createActivityButton();
         Node extIcon = Codicon.icon("/icons/codicons/extensions.svg");
         extBtn.setGraphic(extIcon);
-        System.out.println("[MainWindow] Extensions icon loaded: " + extIcon);
         
         registerActivity("extensions",
                 extBtn,
@@ -323,7 +339,6 @@ registerActivity("debug",
         Button settingsBtn = activityBarManager.createActivityButton();
         Node settingsIcon = Codicon.icon("/icons/codicons/settings-gear.svg");
         settingsBtn.setGraphic(settingsIcon);
-        System.out.println("[MainWindow] Settings icon loaded: " + settingsIcon);
         
         registerActivity("settings", settingsBtn, new StackPane());
 
@@ -335,8 +350,6 @@ registerActivity("debug",
         });
 
         settingsBtn.setOnAction(event -> showSettingsPopup(settingsBtn));
-        
-        System.out.println("[MainWindow] Panels created successfully");
     }
 
     private Node buildRunAndDebugPanel() {
@@ -416,6 +429,16 @@ registerActivity("debug",
         return panel;
     }
 
+    private Node buildRemoteHostPanel() {
+        return new RemoteHostPanel(
+                remoteHostService,
+                statusBarManager::updateStatusLeft,
+                (displayName, uri, content, saveHandler) -> {
+                    editorManager.openVirtualFile(displayName, uri, content, saveHandler);
+                    statusBarManager.updateStatusRight("Remote");
+                });
+    }
+
     private void refreshExtensionsPanel() {
         ActivityItem item = activityItems.get("extensions");
         if (item == null) {
@@ -467,6 +490,22 @@ registerActivity("debug",
     }
 
     private Node buildSourceControlPanel() {
+        sourceControlPanel = new SourceControlPanel(
+                gitService,
+                () -> explorerPane == null ? null : explorerPane.getCurrentRootFolder(),
+                statusBarManager::updateStatusLeft,
+                statusBarManager::updateGitStatus,
+                text -> {
+                    showTerminalPane();
+                    if (!terminalPane.hasTerminal()) {
+                        terminalPane.newTerminal();
+                    }
+                    terminalPane.appendOutput(text == null ? "" : text);
+                });
+        return sourceControlPanel;
+    }
+
+    private Node buildLegacySourceControlPanel() {
         VBox panel = new VBox(8);
         panel.setPadding(new Insets(10));
         panel.getStyleClass().add("settings-panel");
@@ -535,6 +574,10 @@ registerActivity("debug",
     }
 
     private void refreshSourceControlPanel() {
+        if (sourceControlPanel != null) {
+            sourceControlPanel.refresh();
+            return;
+        }
         if (sourceControlList == null || sourceControlBranchLabel == null || sourceControlSummaryLabel == null) {
             return;
         }
@@ -1299,6 +1342,7 @@ registerActivity("debug",
             sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
             refreshSourceControlPanel();
         }));
+        commands.add(new CommandAction("View: Remote Host", "", "ssh remoto servidor host", () -> sidePanelManager.showSidePanel("remote", this::updateStatusOnPanelChange)));
         commands.add(new CommandAction("View: Run and Debug", "Ctrl+Shift+D", "debug rodar", () -> sidePanelManager.showSidePanel("debug", this::updateStatusOnPanelChange)));
         commands.add(new CommandAction("View: Extensions", "Ctrl+Shift+X", "extensoes plugins", () -> sidePanelManager.showSidePanel("extensions", this::updateStatusOnPanelChange)));
         commands.add(new CommandAction("View: Toggle Sidebar", "Ctrl+B", "sidebar barra lateral", () -> sidePanelManager.toggleSidebarVisibility(this::updateStatusOnPanelChange)));
@@ -1352,11 +1396,17 @@ registerActivity("debug",
 
         commands.add(new CommandAction("Git: Refresh", "", "git atualizar", this::refreshSourceControlPanel));
         commands.add(new CommandAction("Git: Stage All", "", "git add stage", () -> {
-            runGitCommand("add", "-A");
+            sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
             refreshSourceControlPanel();
         }));
-        commands.add(new CommandAction("Git: Pull", "", "git pull", () -> runGitAndReport("pull")));
-        commands.add(new CommandAction("Git: Push", "", "git push", () -> runGitAndReport("push")));
+        commands.add(new CommandAction("Git: Pull", "", "git pull", () -> {
+            sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
+            statusBarManager.updateStatusLeft("Use Pull no painel Source Control");
+        }));
+        commands.add(new CommandAction("Git: Push", "", "git push", () -> {
+            sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
+            statusBarManager.updateStatusLeft("Use Push no painel Source Control");
+        }));
 
         return commands;
     }
@@ -1775,6 +1825,7 @@ private void closeFolderFromExplorer() {
             case "explorer" -> "Explorer";
             case "search" -> "Busca";
             case "git" -> "Git";
+            case "remote" -> "Remote Host";
             case "debug" -> "Debug";
             case "extensions" -> "ExtensÃƒÂµes";
             case "settings" -> "ConfiguraÃƒÂ§ÃƒÂµes";     
@@ -1782,5 +1833,3 @@ private void closeFolderFromExplorer() {
         };
     }
 }
-
-

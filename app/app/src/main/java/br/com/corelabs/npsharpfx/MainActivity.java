@@ -11,20 +11,20 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.DocumentsContract;
-import android.content.res.Configuration;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.Spannable;
-import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.ArrayAdapter;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
@@ -43,10 +43,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.runtime.AndroidRuntimeManager;
+import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
 
 public class MainActivity extends Activity {
 
@@ -56,14 +59,21 @@ public class MainActivity extends Activity {
     private static final String PREF_CURRENT_FILE_URI = "current_file_uri";
     private static final String PREF_CURSOR = "cursor";
     private static final String PREF_THEME = "theme";
+    private static final int DEFAULT_BG = 0xff1e1e1e;
+    private static final int DEFAULT_SIDE_BG = 0xff252526;
+    private static final int DEFAULT_PANEL_BG = 0xff181818;
+    private static final int DEFAULT_TITLE_BG = 0xff2d2d30;
+    private static final int DEFAULT_TEXT = 0xffdcdcdc;
+    private static final int DEFAULT_MUTED = 0xff969696;
+    private static final int DEFAULT_ACCENT = 0xff007acc;
 
-    private int bg = Color.rgb(30, 30, 30);
-    private int sideBg = Color.rgb(37, 37, 38);
-    private int panelBg = Color.rgb(24, 24, 24);
-    private int titleBg = Color.rgb(45, 45, 48);
-    private int text = Color.rgb(220, 220, 220);
-    private int muted = Color.rgb(150, 150, 150);
-    private int accent = Color.rgb(0, 122, 204);
+    private int bg = DEFAULT_BG;
+    private int sideBg = DEFAULT_SIDE_BG;
+    private int panelBg = DEFAULT_PANEL_BG;
+    private int titleBg = DEFAULT_TITLE_BG;
+    private int text = DEFAULT_TEXT;
+    private int muted = DEFAULT_MUTED;
+    private int accent = DEFAULT_ACCENT;
 
     private LinearLayout root;
     private LinearLayout topBar;
@@ -76,9 +86,11 @@ public class MainActivity extends Activity {
     private LinearLayout tabRow;
     private LinearLayout bottomPanel;
     private EditText editor;
+    private TextView lineNumbers;
     private TextView sideTitle;
     private TextView fileTitle;
     private TextView console;
+    private ScrollView consoleScroll;
     private EditText terminalInput;
     private LinearLayout statusBarView;
     private TextView statusLeft;
@@ -88,17 +100,20 @@ public class MainActivity extends Activity {
 
     private DocumentFile workspace;
     private DocumentFile currentFile;
+    private AndroidRuntimeManager runtimeManager;
     private boolean applyingHighlight;
     private boolean programaRodando;
     private boolean compactLayout;
     private boolean bottomExpanded;
     private final LinkedBlockingQueue<String> entradasPrograma = new LinkedBlockingQueue<>();
+    private final List<DocumentFile> openFiles = new ArrayList<>();
     private String activePanel = "explorer";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         compactLayout = getResources().getConfiguration().screenWidthDp < 700;
+        runtimeManager = new AndroidRuntimeManager(this);
         restoreWorkspace();
         restaurarTema();
         setContentView(buildUi());
@@ -128,16 +143,16 @@ public class MainActivity extends Activity {
         topBar.setPadding(dp(compactLayout ? 2 : 6), dp(2), dp(compactLayout ? 2 : 6), dp(1));
         LinearLayout menu = topBar;
         if (compactLayout) {
-            menu.addView(iconButton("A", "Arquivo", v -> menuArquivo()));
-            menu.addView(iconButton("+", "Novo arquivo", v -> novoArquivo()));
-            menu.addView(iconButton("D", "Abrir workspace", v -> abrirWorkspace()));
-            menu.addView(iconButton("S", "Salvar", v -> salvarArquivo()));
-            menu.addView(iconButton("R", "Executar", v -> executarArquivo()));
-            menu.addView(iconButton("T", "Terminal", v -> focarTerminal()));
+            menu.addView(iconButton(R.drawable.ic_np_menu, "Arquivo", v -> menuArquivo()));
+            menu.addView(iconButton(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()));
+            menu.addView(iconButton(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()));
+            menu.addView(iconButton(R.drawable.ic_np_save, "Salvar", v -> salvarArquivo()));
+            menu.addView(iconButton(R.drawable.ic_np_play, "Executar", v -> executarArquivo()));
+            menu.addView(iconButton(R.drawable.ic_np_terminal, "Terminal", v -> focarTerminal()));
             TextView compactTitle = label("NPSharp", 12, muted, Typeface.BOLD);
             compactTitle.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
             menu.addView(compactTitle, new LinearLayout.LayoutParams(0, -2, 1));
-            menu.addView(iconButton("...", "Paleta", v -> paletaComandos()));
+            menu.addView(iconButton(R.drawable.ic_np_more, "Paleta", v -> paletaComandos()));
             top.addView(menu, matchWrap());
             return top;
         }
@@ -145,7 +160,7 @@ public class MainActivity extends Activity {
         menu.addView(menuButton("Editar", v -> menuEditar()));
         menu.addView(menuButton("Exibir", v -> menuExibir()));
         menu.addView(menuButton("Executar", v -> menuExecutar()));
-        menu.addView(menuButton("Terminal", v -> focarTerminal()));
+        menu.addView(menuButton("Terminal", v -> menuTerminal()));
         TextView title = label("NPSharp", 13, muted, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         menu.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
@@ -161,11 +176,11 @@ public class MainActivity extends Activity {
         center.setBackgroundColor(Color.rgb(60, 60, 64));
         center.setOnClickListener(v -> paletaComandos());
         command.addView(center, new LinearLayout.LayoutParams(0, -2, 1));
-        command.addView(iconButton("+", "Novo arquivo", v -> novoArquivo()));
-        command.addView(iconButton("D", "Abrir workspace", v -> abrirWorkspace()));
-        command.addView(iconButton("S", "Salvar", v -> salvarArquivo()));
-        command.addView(iconButton("R", "Executar", v -> executarArquivo()));
-        command.addView(iconButton("...", "Paleta", v -> paletaComandos()));
+        command.addView(iconButton(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()));
+        command.addView(iconButton(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()));
+        command.addView(iconButton(R.drawable.ic_np_save, "Salvar", v -> salvarArquivo()));
+        command.addView(iconButton(R.drawable.ic_np_play, "Executar", v -> executarArquivo()));
+        command.addView(iconButton(R.drawable.ic_np_more, "Paleta", v -> paletaComandos()));
 
         top.addView(menu, matchWrap());
         top.addView(command, matchWrap());
@@ -194,12 +209,12 @@ public class MainActivity extends Activity {
         activityBar.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         activityBar.setBackgroundColor(Color.rgb(51, 51, 51));
         activityBar.setPadding(0, dp(6), 0, 0);
-        activityBar.addView(activity("F", "explorer", "Explorer"));
-        activityBar.addView(activity("B", "search", "Busca"));
-        activityBar.addView(activity("G", "git", "Git"));
-        activityBar.addView(activity("R", "debug", "Executar"));
-        activityBar.addView(activity("X", "extensions", "Extensoes"));
-        activityBar.addView(activity("C", "settings", "Config"));
+        activityBar.addView(activity(R.drawable.ic_np_files, "explorer", "Explorer"));
+        activityBar.addView(activity(R.drawable.ic_np_search, "search", "Busca"));
+        activityBar.addView(activity(R.drawable.ic_np_branch, "git", "Git"));
+        activityBar.addView(activity(R.drawable.ic_np_debug, "debug", "Executar"));
+        activityBar.addView(activity(R.drawable.ic_np_extensions, "extensions", "Extensoes"));
+        activityBar.addView(activity(R.drawable.ic_np_settings, "settings", "Config"));
         return activityBar;
     }
 
@@ -226,12 +241,28 @@ public class MainActivity extends Activity {
         fileTitle = label("Sem arquivo", 12, text, Typeface.BOLD);
         fileTitle.setPadding(dp(compactLayout ? 6 : 10), dp(compactLayout ? 3 : 6), dp(compactLayout ? 6 : 10), dp(compactLayout ? 3 : 6));
         fileTitle.setBackgroundColor(titleBg);
+        lineNumbers = label("1", compactLayout ? 13 : 14, muted, Typeface.NORMAL);
+        lineNumbers.setTypeface(Typeface.MONOSPACE);
+        lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
+        lineNumbers.setPadding(dp(6), dp(compactLayout ? 6 : 10), dp(6), dp(compactLayout ? 6 : 10));
+        lineNumbers.setBackgroundColor(shade(bg, -0.08f));
+        lineNumbers.setMinWidth(dp(38));
         editor = new EditText(this);
         editor.setGravity(Gravity.START | Gravity.TOP);
         editor.setMinLines(24);
+        editor.setSingleLine(false);
+        editor.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        editor.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        editor.setFocusable(true);
+        editor.setFocusableInTouchMode(true);
+        editor.setCursorVisible(true);
+        editor.setOnClickListener(v -> editor.requestFocus());
         editor.setTextSize(compactLayout ? 13 : 14);
         editor.setTypeface(Typeface.MONOSPACE);
         editor.setTextColor(text);
+        editor.setHintTextColor(muted);
         editor.setBackgroundColor(bg);
         editor.setPadding(dp(compactLayout ? 6 : 12), dp(compactLayout ? 6 : 10), dp(compactLayout ? 6 : 12), dp(compactLayout ? 6 : 10));
         editor.setHorizontallyScrolling(true);
@@ -243,12 +274,20 @@ public class MainActivity extends Activity {
                     editor.postDelayed(MainActivity.this::aplicarHighlight, 180);
                 }
                 atualizarCursor();
+                atualizarNumerosLinha();
             }
             @Override public void afterTextChanged(Editable s) {}
         });
         HorizontalScrollView h = new HorizontalScrollView(this);
         ScrollView v = new ScrollView(this);
-        v.addView(editor);
+        v.setFillViewport(true);
+        h.setFillViewport(true);
+        LinearLayout editorLine = horizontal();
+        editorLine.setBaselineAligned(false);
+        editorLine.setBackgroundColor(bg);
+        editorLine.addView(lineNumbers, new LinearLayout.LayoutParams(dp(compactLayout ? 38 : 46), -2));
+        editorLine.addView(editor, new LinearLayout.LayoutParams(-2, -2));
+        v.addView(editorLine);
         h.addView(v);
         bottomPanel = vertical();
         bottomPanel.setBackgroundColor(panelBg);
@@ -261,8 +300,14 @@ public class MainActivity extends Activity {
         console = label("", 12, text, Typeface.NORMAL);
         console.setTypeface(Typeface.MONOSPACE);
         console.setPadding(dp(10), dp(6), dp(10), dp(8));
+        console.setTextIsSelectable(true);
+        consoleScroll = new ScrollView(this);
+        consoleScroll.setFillViewport(true);
+        consoleScroll.addView(console, matchWrap());
         terminalInput = new EditText(this);
         terminalInput.setSingleLine(true);
+        terminalInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        terminalInput.setImeOptions(EditorInfo.IME_ACTION_SEND | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         terminalInput.setTextColor(text);
         terminalInput.setHintTextColor(muted);
         terminalInput.setTextSize(13);
@@ -275,7 +320,7 @@ public class MainActivity extends Activity {
         });
         bottomPanel.addView(tabs, matchWrap());
         bottomPanel.addView(bottomTitle, matchWrap());
-        bottomPanel.addView(console, new LinearLayout.LayoutParams(-1, 0, 1));
+        bottomPanel.addView(consoleScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         bottomPanel.addView(terminalInput, matchWrap());
         area.addView(tabRow, matchWrap());
         area.addView(fileTitle, matchWrap());
@@ -283,6 +328,7 @@ public class MainActivity extends Activity {
         bottomPanelParams = new LinearLayout.LayoutParams(-1, 0);
         area.addView(bottomPanel, bottomPanelParams);
         setBottomExpanded(false);
+        atualizarNumerosLinha();
         return area;
     }
 
@@ -332,10 +378,10 @@ public class MainActivity extends Activity {
 
     private View toolbarExplorer() {
         LinearLayout tb = horizontal();
-        tb.addView(iconPanel("+", "Novo arquivo", v -> novoArquivo()), new LinearLayout.LayoutParams(0, -2, 1));
-        tb.addView(iconPanel("P", "Nova pasta", v -> novaPasta()), new LinearLayout.LayoutParams(0, -2, 1));
-        tb.addView(iconPanel("A", "Abrir workspace", v -> abrirWorkspace()), new LinearLayout.LayoutParams(0, -2, 1));
-        tb.addView(iconPanel("↻", "Atualizar", v -> showPanel("explorer")), new LinearLayout.LayoutParams(0, -2, 1));
+        tb.addView(iconPanel(R.drawable.ic_np_add_file, "Novo arquivo", v -> novoArquivo()), new LinearLayout.LayoutParams(0, dp(34), 1));
+        tb.addView(iconPanel(R.drawable.ic_np_new_folder, "Nova pasta", v -> novaPasta()), new LinearLayout.LayoutParams(0, dp(34), 1));
+        tb.addView(iconPanel(R.drawable.ic_np_folder_open, "Abrir workspace", v -> abrirWorkspace()), new LinearLayout.LayoutParams(0, dp(34), 1));
+        tb.addView(iconPanel(R.drawable.ic_np_refresh, "Atualizar", v -> showPanel("explorer")), new LinearLayout.LayoutParams(0, dp(34), 1));
         return tb;
     }
 
@@ -411,16 +457,19 @@ public class MainActivity extends Activity {
         p.addView(panelButton("Reiniciar", v -> executarArquivo()), matchWrap());
         p.addView(panelButton("Parar", v -> appendConsole("[Debug] parado")), matchWrap());
         p.addView(panelButton("Limpar console", v -> console.setText("")), matchWrap());
-        p.addView(panelText("Portugol roda internamente. Outros runtimes precisam de toolchain Android.", muted), matchWrap());
+        p.addView(panelButton("Status dos runtimes", v -> mostrarRuntimesNoConsole()), matchWrap());
+        p.addView(panelButton("Instalar/registrar runtimes", v -> instalarRuntimesAndroid()), matchWrap());
+        p.addView(panelText("Portugol roda internamente. Runtimes desktop externos ficam marcados como limitados no Android.", muted), matchWrap());
         return p;
     }
 
     private View painelExtensoes() {
         LinearLayout p = vertical();
-        p.addView(panelText("Suporte instalado", text), matchWrap());
-        for (String s : new String[] {"Portugol interno", "Highlighter multi-linguagem", "Busca em workspace", "Temas em assets"}) {
+        p.addView(panelText("Servicos Android ativos", text), matchWrap());
+        for (String s : new String[] {"Portugol interno", "Highlighter multi-linguagem", "Busca/substituicao em workspace", "Temas em assets", "Explorer SAF", "Terminal integrado"}) {
             p.addView(panelText("- " + s, muted), matchWrap());
         }
+        p.addView(panelButton("Status dos runtimes", v -> mostrarRuntimesNoConsole()), matchWrap());
         p.addView(panelButton("Escolher tema", v -> escolherTema()), matchWrap());
         return p;
     }
@@ -465,6 +514,7 @@ public class MainActivity extends Activity {
             prefs().edit().putString(PREF_WORKSPACE_URI, uri.toString()).apply();
             workspace = DocumentFile.fromTreeUri(this, uri);
             currentFile = null;
+            openFiles.clear();
             prefs().edit().remove(PREF_CURRENT_FILE_URI).remove(PREF_CURSOR).apply();
             showPanel("explorer");
             openFirstFile();
@@ -514,7 +564,10 @@ public class MainActivity extends Activity {
         DocumentFile created = folder
                 ? parent.createDirectory(cleanName)
                 : parent.createFile(mimeForFile(cleanName), displayNameForNewFile(cleanName));
-        if (created != null && created.isFile()) abrirArquivo(created);
+        if (created != null && created.isFile()) {
+            abrirArquivo(created);
+            return;
+        }
         showPanel("explorer");
     }
 
@@ -522,13 +575,14 @@ public class MainActivity extends Activity {
         try {
             salvarArquivo();
             currentFile = file;
+            rememberOpenFile(file);
             editor.setText(read(file));
             fileTitle.setText(caminho(file));
             restaurarCursorSeMesmoArquivo(file);
             atualizarAbas();
             aplicarHighlight();
             showPanel("explorer");
-            focarEditor();
+            mostrarEditor();
             salvarSessao();
             status("Aberto: " + nome(file), linguagem(file));
         } catch (Exception e) {
@@ -536,13 +590,18 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void focarEditor() {
+    private void mostrarEditor() {
         if (compactLayout) {
             sidePanel.setVisibility(View.GONE);
             if (editorArea != null) editorArea.setVisibility(View.VISIBLE);
             setBottomExpanded(false);
         }
-        editor.requestFocus();
+        hideKeyboard();
+    }
+
+    private void focarEditor() {
+        mostrarEditor();
+        editor.clearFocus();
     }
 
     private void focarTerminal() {
@@ -551,7 +610,8 @@ public class MainActivity extends Activity {
             if (editorArea != null) editorArea.setVisibility(View.VISIBLE);
         }
         bottom("TERMINAL");
-        abrirTecladoTerminal();
+        terminalInput.clearFocus();
+        hideKeyboard();
     }
 
     private void salvarArquivo() {
@@ -572,6 +632,7 @@ public class MainActivity extends Activity {
             appendConsole("[Erro] Nenhum arquivo aberto.");
             return;
         }
+        LanguageRuntime runtime = runtimeManager.detectFromName(nome(currentFile));
         if ("Portugol".equals(linguagem(currentFile))) {
             String codigo = editor.getText().toString();
             entradasPrograma.clear();
@@ -601,8 +662,9 @@ public class MainActivity extends Activity {
             }, "npsharp-android-portugol").start();
             return;
         }
-        appendConsole("[Android] Runtime externo nao esta disponivel neste ambiente.");
-        appendConsole("[Android] O editor, temas, busca, explorer e Portugol estao ativos.");
+        AndroidRuntimeManager.RuntimeStatus runtimeStatus = runtimeManager.status(runtime);
+        appendConsole("[Runtime] " + runtimeStatus.language().displayName() + ": " + runtimeStatus.message());
+        appendConsole("[Android] Abra este workspace no desktop para executar/debugar esse runtime externo.");
     }
 
     private void buscar(String query) {
@@ -679,6 +741,7 @@ public class MainActivity extends Activity {
                 .setMessage("Excluir " + nome(file) + "?")
                 .setPositiveButton("Excluir", (d, w) -> {
                     file.delete();
+                    openFiles.removeIf(open -> uriEquals(open, file));
                     if (uriEquals(file, currentFile)) {
                         currentFile = null;
                         editor.setText("");
@@ -712,6 +775,8 @@ public class MainActivity extends Activity {
         commands.add(new CommandAction("Terminal: Listar workspace", this::listarWorkspaceNoConsole));
         commands.add(new CommandAction("Terminal: Ajuda", this::ajudaTerminal));
         commands.add(new CommandAction("Tema: Escolher tema", this::escolherTema));
+        commands.add(new CommandAction("Runtime: Status", this::mostrarRuntimesNoConsole));
+        commands.add(new CommandAction("Runtime: Instalar/registrar", this::instalarRuntimesAndroid));
         commands.add(new CommandAction("Executar: Iniciar debug", this::executarArquivo));
         searchableDialog("Paleta de comandos", commands);
     }
@@ -748,17 +813,14 @@ public class MainActivity extends Activity {
     private void aplicarTema(String assetName) {
         try {
             String json = readAsset("themes/" + assetName);
-            bg = color(json, "editor.background", bg);
-            text = color(json, "editor.foreground", text);
-            sideBg = color(json, "sideBar.background", shade(bg, 0.12f));
-            titleBg = color(json, "titleBar.activeBackground", shade(bg, 0.20f));
-            panelBg = color(json, "panel.background", shade(bg, -0.06f));
-            accent = color(json, "statusBar.background", color(json, "focusBorder", Color.rgb(0, 122, 204)));
+            applyThemeJson(json);
             prefs().edit().putString(PREF_THEME, assetName).apply();
             refreshColors();
             aplicarHighlight();
             status("Tema aplicado: " + assetName, "Tema");
         } catch (Exception e) {
+            applyDefaultTheme();
+            refreshColors();
             status("Erro ao aplicar tema", "Tema");
         }
     }
@@ -768,14 +830,37 @@ public class MainActivity extends Activity {
         if (theme == null) return;
         try {
             String json = readAsset("themes/" + theme);
-            bg = color(json, "editor.background", bg);
-            text = color(json, "editor.foreground", text);
-            sideBg = color(json, "sideBar.background", shade(bg, 0.12f));
-            titleBg = color(json, "titleBar.activeBackground", shade(bg, 0.20f));
-            panelBg = color(json, "panel.background", shade(bg, -0.06f));
-            accent = color(json, "statusBar.background", color(json, "focusBorder", accent));
+            applyThemeJson(json);
         } catch (Exception ignored) {
+            applyDefaultTheme();
         }
+    }
+
+    private void applyDefaultTheme() {
+        bg = DEFAULT_BG;
+        sideBg = DEFAULT_SIDE_BG;
+        panelBg = DEFAULT_PANEL_BG;
+        titleBg = DEFAULT_TITLE_BG;
+        text = DEFAULT_TEXT;
+        muted = DEFAULT_MUTED;
+        accent = DEFAULT_ACCENT;
+    }
+
+    private void applyThemeJson(String json) {
+        int nextBg = color(json, "editor.background", DEFAULT_BG);
+        int nextText = color(json, "editor.foreground", readableOn(nextBg));
+        int nextSide = color(json, "sideBar.background", shade(nextBg, 0.12f));
+        int nextTitle = color(json, "titleBar.activeBackground", shade(nextBg, 0.20f));
+        int nextPanel = color(json, "panel.background", shade(nextBg, -0.06f));
+        int nextAccent = color(json, "statusBar.background", color(json, "focusBorder", DEFAULT_ACCENT));
+
+        bg = nextBg;
+        text = ensureContrast(nextText, bg);
+        sideBg = nextSide;
+        titleBg = nextTitle;
+        panelBg = nextPanel;
+        accent = nextAccent;
+        muted = ensureContrast(shade(text, textIsDark(text) ? 0.35f : -0.35f), sideBg);
     }
 
     private void refreshColors() {
@@ -787,9 +872,14 @@ public class MainActivity extends Activity {
         tabRow.setBackgroundColor(sideBg);
         editor.setBackgroundColor(bg);
         editor.setTextColor(text);
+        if (lineNumbers != null) {
+            lineNumbers.setBackgroundColor(shade(bg, -0.08f));
+            lineNumbers.setTextColor(muted);
+        }
         fileTitle.setBackgroundColor(titleBg);
         fileTitle.setTextColor(text);
         bottomPanel.setBackgroundColor(panelBg);
+        if (consoleScroll != null) consoleScroll.setBackgroundColor(panelBg);
         console.setBackgroundColor(panelBg);
         console.setTextColor(text);
         terminalInput.setBackgroundColor(shade(panelBg, 0.08f));
@@ -797,13 +887,18 @@ public class MainActivity extends Activity {
         terminalInput.setHintTextColor(muted);
         if (statusBarView != null) statusBarView.setBackgroundColor(accent);
         recolorChildren(root);
-        showPanel(activePanel);
+        boolean editorVisible = editorArea != null && editorArea.getVisibility() == View.VISIBLE;
+        if (!compactLayout || !editorVisible) {
+            showPanel(activePanel);
+        }
     }
 
     private void recolorChildren(View view) {
         if (view instanceof Button) {
             Button button = (Button) view;
             button.setTextColor(text);
+        } else if (view instanceof ImageButton) {
+            ((ImageButton) view).setColorFilter(text);
         } else if (view instanceof TextView
                 && view != editor
                 && view != console
@@ -825,17 +920,47 @@ public class MainActivity extends Activity {
 
     private void atualizarAbas() {
         tabRow.removeAllViews();
-        if (workspace == null) return;
-        List<DocumentFile> files = arquivosTexto(workspace);
+        if (workspace == null || openFiles.isEmpty()) return;
+        List<DocumentFile> files = new ArrayList<>(openFiles);
         int max = Math.min(6, files.size());
         for (int i = 0; i < max; i++) {
             DocumentFile f = files.get(i);
-            TextView tab = label(nome(f) + (uriEquals(f, currentFile) ? "  x" : ""), 12, uriEquals(f, currentFile) ? text : muted, uriEquals(f, currentFile) ? Typeface.BOLD : Typeface.NORMAL);
+            TextView tab = label(nome(f), 12, uriEquals(f, currentFile) ? text : muted, uriEquals(f, currentFile) ? Typeface.BOLD : Typeface.NORMAL);
             tab.setPadding(dp(12), dp(7), dp(12), dp(7));
             tab.setBackgroundColor(uriEquals(f, currentFile) ? bg : titleBg);
             tab.setOnClickListener(v -> abrirArquivo(f));
+            tab.setOnLongClickListener(v -> {
+                fecharAba(f);
+                return true;
+            });
             tabRow.addView(tab, wrapWrap());
         }
+    }
+
+    private void rememberOpenFile(DocumentFile file) {
+        if (file == null) return;
+        for (DocumentFile open : openFiles) {
+            if (uriEquals(open, file)) return;
+        }
+        openFiles.add(file);
+    }
+
+    private void fecharAba(DocumentFile file) {
+        if (file == null) return;
+        if (uriEquals(file, currentFile)) salvarArquivo();
+        openFiles.removeIf(open -> uriEquals(open, file));
+        if (uriEquals(file, currentFile)) {
+            currentFile = openFiles.isEmpty() ? null : openFiles.get(openFiles.size() - 1);
+            if (currentFile == null) {
+                editor.setText("");
+                fileTitle.setText("Sem arquivo");
+            } else {
+                abrirArquivo(currentFile);
+                return;
+            }
+        }
+        atualizarAbas();
+        salvarSessao();
     }
 
     private void openFirstFile() {
@@ -848,6 +973,7 @@ public class MainActivity extends Activity {
         salvarArquivo();
         workspace = null;
         currentFile = null;
+        openFiles.clear();
         prefs().edit()
                 .remove(PREF_WORKSPACE_URI)
                 .remove(PREF_CURRENT_FILE_URI)
@@ -978,12 +1104,9 @@ public class MainActivity extends Activity {
 
     private void aplicarHighlight() {
         if (editor == null) return;
-        int sel = Math.max(0, editor.getSelectionStart());
-        SpannableStringBuilder b = new SpannableStringBuilder(editor.getText().toString());
-        AndroidSyntax.apply(b);
         applyingHighlight = true;
-        editor.setText(b);
-        editor.setSelection(Math.min(sel, editor.length()));
+        Editable editable = editor.getText();
+        AndroidSyntax.apply(editable, text);
         applyingHighlight = false;
     }
 
@@ -996,6 +1119,23 @@ public class MainActivity extends Activity {
             if (s.charAt(i) == '\n') { line++; col = 1; } else col++;
         }
         statusRight.setText(linguagem(currentFile) + "  Ln " + line + ", Col " + col);
+    }
+
+    private void atualizarNumerosLinha() {
+        if (lineNumbers == null || editor == null) return;
+        String value = editor.getText().toString();
+        int lines = 1;
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == '\n') {
+                lines++;
+            }
+        }
+        StringBuilder numbers = new StringBuilder(lines * 4);
+        for (int i = 1; i <= lines; i++) {
+            if (i > 1) numbers.append('\n');
+            numbers.append(i);
+        }
+        lineNumbers.setText(numbers);
     }
 
     private void menuArquivo() {
@@ -1030,32 +1170,39 @@ public class MainActivity extends Activity {
     }
 
     private void bottom(String name) {
+        if (compactLayout) {
+            sidePanel.setVisibility(View.GONE);
+            if (editorArea != null) editorArea.setVisibility(View.VISIBLE);
+        }
         setBottomExpanded(true);
         bottomTitle.setText(name);
         if ("PROBLEMAS".equals(name)) console.setText("[Problemas] Nenhum problema encontrado.\n");
         if ("PORTAS".equals(name)) console.setText("[Portas] Nenhuma porta encaminhada.\n");
         if ("GIT".equals(name)) listarWorkspaceNoConsole();
         if ("TERMINAL".equals(name) && console.getText().length() == 0) ajudaTerminal();
-        if ("TERMINAL".equals(name) && terminalInput != null) abrirTecladoTerminal();
+        hideKeyboard();
     }
 
     private void setBottomExpanded(boolean expanded) {
         bottomExpanded = expanded;
         if (console == null || terminalInput == null || bottomPanelParams == null) return;
         bottomPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        console.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        if (consoleScroll != null) consoleScroll.setVisibility(expanded ? View.VISIBLE : View.GONE);
         terminalInput.setVisibility(expanded ? View.VISIBLE : View.GONE);
         bottomPanelParams.height = expanded ? dp(compactLayout ? 170 : 220) : 0;
         bottomPanel.setLayoutParams(bottomPanelParams);
     }
 
-    private void abrirTecladoTerminal() {
-        if (terminalInput == null) return;
-        terminalInput.postDelayed(() -> {
-            terminalInput.requestFocus();
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) imm.showSoftInput(terminalInput, InputMethodManager.SHOW_IMPLICIT);
-        }, 80);
+    private void hideKeyboard() {
+        View focused = getCurrentFocus();
+        if (focused == null) {
+            focused = root;
+        }
+        if (focused == null) return;
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
+        }
     }
 
     private void enviarTerminal() {
@@ -1079,6 +1226,10 @@ public class MainActivity extends Activity {
             console.setText("");
         } else if ("ls".equals(lower) || "dir".equals(lower)) {
             listarWorkspaceNoConsole();
+        } else if ("runtimes".equals(lower) || "runtime".equals(lower)) {
+            mostrarRuntimesNoConsole();
+        } else if ("instalar runtimes".equals(lower) || "install runtimes".equals(lower)) {
+            instalarRuntimesAndroid();
         } else if ("salvar".equals(lower) || "save".equals(lower)) {
             salvarArquivo();
         } else if ("executar".equals(lower) || "run".equals(lower)) {
@@ -1101,14 +1252,76 @@ public class MainActivity extends Activity {
             editor.append(comando.substring(7));
             editor.append("\n");
             status("Texto inserido pelo terminal", linguagem(currentFile));
+        } else if ("pwd".equals(lower)) {
+            appendConsole(workspace == null ? "Sem workspace aberto" : caminho(workspace));
+        } else if ("cat".equals(lower) || "type".equals(lower)) {
+            if (currentFile == null) {
+                appendConsole("[Terminal] Nenhum arquivo aberto.");
+            } else {
+                appendConsole(editor.getText().toString());
+            }
         } else {
-            appendConsole("[Terminal] Comando desconhecido. Digite 'ajuda'.");
+            executarShellAndroid(comando);
         }
     }
 
     private void ajudaTerminal() {
-        appendConsole("[Terminal] ativo. Comandos: ajuda, limpar, ls, abrir <nome>, code <arquivo>, salvar, executar, editor, terminal, explorer, append <texto>.");
+        appendConsole("[Terminal] ativo. Comandos: ajuda, limpar, ls, pwd, cat, abrir <nome>, code <arquivo>, salvar, executar, runtimes, instalar runtimes, editor, terminal, explorer, append <texto>.");
+        appendConsole("[Terminal] Comandos desconhecidos tentam rodar via /system/bin/sh -c.");
         appendConsole("[Terminal] Durante leia() do Portugol, o texto digitado vira entrada do programa.");
+    }
+
+    private void executarShellAndroid(String comando) {
+        appendConsole("[Shell] " + comando);
+        new Thread(() -> {
+            Process process = null;
+            try {
+                process = new ProcessBuilder("/system/bin/sh", "-c", comando)
+                        .redirectErrorStream(true)
+                        .start();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        String output = line;
+                        runOnUiThread(() -> appendConsole(output));
+                    }
+                }
+                boolean finished = process.waitFor(8, TimeUnit.SECONDS);
+                if (!finished) {
+                    process.destroy();
+                    runOnUiThread(() -> appendConsole("[Shell] interrompido por timeout."));
+                    return;
+                }
+                int exitCode = process.exitValue();
+                runOnUiThread(() -> appendConsole("[Shell] codigo de saida: " + exitCode));
+            } catch (Exception e) {
+                String message = primeiraLinha(e.getMessage());
+                runOnUiThread(() -> appendConsole("[Shell] falhou: " + message));
+            } finally {
+                if (process != null) {
+                    process.destroy();
+                }
+            }
+        }, "npsharp-android-shell").start();
+    }
+
+    private void mostrarRuntimesNoConsole() {
+        bottom("DEBUG");
+        console.setText("");
+        for (AndroidRuntimeManager.RuntimeStatus runtimeStatus : runtimeManager.list()) {
+            appendConsole(runtimeStatus.language().displayName() + " [" + runtimeStatus.state() + "] " + runtimeStatus.version());
+            appendConsole("  " + runtimeStatus.message());
+        }
+        status("Runtimes atualizados", "Runtime");
+    }
+
+    private void instalarRuntimesAndroid() {
+        bottom("DEBUG");
+        console.setText("");
+        for (String line : runtimeManager.installAllCommon()) {
+            appendConsole(line);
+        }
+        status("Registro de runtimes concluido", "Runtime");
     }
 
     private void abrirPorNome(String nome) {
@@ -1287,6 +1500,26 @@ public class MainActivity extends Activity {
         return Color.rgb(clampColor(r), clampColor(g), clampColor(b));
     }
 
+    private int readableOn(int background) {
+        return textIsDark(background) ? Color.rgb(245, 245, 245) : Color.rgb(32, 32, 32);
+    }
+
+    private int ensureContrast(int foreground, int background) {
+        double diff = Math.abs(luminance(foreground) - luminance(background));
+        if (diff >= 0.42d) {
+            return foreground;
+        }
+        return readableOn(background);
+    }
+
+    private boolean textIsDark(int color) {
+        return luminance(color) < 0.5d;
+    }
+
+    private double luminance(int color) {
+        return (0.2126d * Color.red(color) + 0.7152d * Color.green(color) + 0.0722d * Color.blue(color)) / 255d;
+    }
+
     private int clampColor(int value) {
         return Math.max(0, Math.min(255, value));
     }
@@ -1297,6 +1530,9 @@ public class MainActivity extends Activity {
 
     private void appendConsole(String line) {
         console.append(line + "\n");
+        if (consoleScroll != null) {
+            consoleScroll.post(() -> consoleScroll.fullScroll(View.FOCUS_DOWN));
+        }
     }
 
     private void status(String left, String right) {
@@ -1319,16 +1555,26 @@ public class MainActivity extends Activity {
         return button(s, l, 12, Color.TRANSPARENT);
     }
 
-    private Button iconButton(String s, String desc, View.OnClickListener l) {
-        Button b = button(s, l, 13, Color.TRANSPARENT);
-        b.setContentDescription(desc);
-        return b;
+    private ImageButton iconButton(int drawableRes, String desc, View.OnClickListener l) {
+        return imageButton(drawableRes, desc, Color.TRANSPARENT, l);
     }
 
-    private Button iconPanel(String s, String desc, View.OnClickListener l) {
-        Button b = button(s, l, 12, titleBg);
-        b.setContentDescription(desc);
-        return b;
+    private ImageButton iconPanel(int drawableRes, String desc, View.OnClickListener l) {
+        return imageButton(drawableRes, desc, titleBg, l);
+    }
+
+    private ImageButton imageButton(int drawableRes, String desc, int background, View.OnClickListener l) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(drawableRes);
+        button.setColorFilter(text);
+        button.setBackgroundColor(background);
+        button.setContentDescription(desc);
+        button.setPadding(dp(8), dp(6), dp(8), dp(6));
+        button.setScaleType(ImageButton.ScaleType.CENTER);
+        button.setOnClickListener(l);
+        button.setMinimumWidth(dp(34));
+        button.setMinimumHeight(dp(32));
+        return button;
     }
 
     private Button panelButton(String s, View.OnClickListener l) {
@@ -1345,13 +1591,11 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    private TextView activity(String icon, String panel, String desc) {
-        TextView v = label(icon, 18, text, Typeface.BOLD);
-        v.setGravity(Gravity.CENTER);
-        v.setPadding(0, dp(12), 0, dp(12));
-        v.setContentDescription(desc);
-        v.setOnClickListener(x -> showPanel(panel));
-        return v;
+    private ImageButton activity(int drawableRes, String panel, String desc) {
+        ImageButton button = imageButton(drawableRes, desc, Color.TRANSPARENT, x -> showPanel(panel));
+        button.setPadding(dp(10), dp(10), dp(10), dp(10));
+        button.setMinimumHeight(dp(44));
+        return button;
     }
 
     private TextView bottomTab(String s) {
@@ -1425,16 +1669,20 @@ public class MainActivity extends Activity {
                         + "|(\\b[A-Za-z_$][A-Za-z0-9_$]*(?=\\s*\\())",
                 Pattern.CASE_INSENSITIVE);
 
-        static void apply(SpannableStringBuilder b) {
-            Matcher m = TOKEN.matcher(b.toString());
+        static void apply(Spannable text, int defaultColor) {
+            ForegroundColorSpan[] oldSpans = text.getSpans(0, text.length(), ForegroundColorSpan.class);
+            for (ForegroundColorSpan span : oldSpans) {
+                text.removeSpan(span);
+            }
+            Matcher m = TOKEN.matcher(text.toString());
             while (m.find()) {
-                int c = Color.rgb(220, 220, 220);
+                int c = defaultColor;
                 if (m.group(1) != null) c = Color.rgb(106, 153, 85);
                 else if (m.group(2) != null) c = Color.rgb(206, 145, 120);
                 else if (m.group(3) != null) c = Color.rgb(181, 206, 168);
                 else if (m.group(4) != null) c = Color.rgb(86, 156, 214);
                 else if (m.group(6) != null) c = Color.rgb(220, 220, 170);
-                b.setSpan(new ForegroundColorSpan(c), m.start(), m.end(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(new ForegroundColorSpan(c), m.start(), m.end(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
     }

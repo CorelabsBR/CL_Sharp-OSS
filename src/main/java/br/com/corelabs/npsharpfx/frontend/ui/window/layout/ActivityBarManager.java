@@ -30,6 +30,7 @@ public class ActivityBarManager {
         ActivityItem explorer = activityItems.get("explorer");
         ActivityItem search = activityItems.get("search");
         ActivityItem git = activityItems.get("git");
+        ActivityItem remote = activityItems.get("remote");
         ActivityItem debug = activityItems.get("debug");
         ActivityItem extensions = activityItems.get("extensions");
         ActivityItem settings = activityItems.get("settings");
@@ -37,15 +38,11 @@ public class ActivityBarManager {
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        activityBar.getChildren().addAll(
-                explorer.button,
-                search.button,
-                git.button,
-                debug.button,
-                extensions.button,
-                spacer,
-                settings.button
-        );
+        activityBar.getChildren().addAll(explorer.button, search.button, git.button);
+        if (remote != null) {
+            activityBar.getChildren().add(remote.button);
+        }
+        activityBar.getChildren().addAll(debug.button, extensions.button, spacer, settings.button);
 
         return activityBar;
     }
@@ -81,5 +78,4 @@ public class ActivityBarManager {
         }
     }
 }
-
 

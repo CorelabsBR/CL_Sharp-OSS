@@ -2452,3 +2452,49 @@
     -fx-background-color: -theme-list-active-bg;
     -fx-text-fill: -theme-list-active-fg;
 }
+
+.source-control-panel,
+.source-control-list {
+    -fx-background-color: -theme-sidebar-bg;
+}
+
+.source-control-message {
+    -fx-background-color: -theme-input-bg;
+    -fx-control-inner-background: -theme-input-bg;
+    -fx-text-fill: -theme-input-fg;
+    -fx-prompt-text-fill: -theme-prompt-fg;
+    -fx-border-color: -theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+}
+
+.source-control-repo {
+    -fx-padding: 8 0 8 0;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.source-control-file-row,
+.source-control-conflict-row {
+    -fx-padding: 5 6 5 6;
+    -fx-background-radius: 4;
+}
+
+.source-control-file-row:hover,
+.source-control-conflict-row:hover {
+    -fx-background-color: -theme-list-hover-bg;
+}
+
+.source-control-conflict-row {
+    -fx-border-color: -theme-error;
+    -fx-border-width: 0 0 0 2;
+}
+
+.source-control-badge {
+    -fx-min-width: 22px;
+    -fx-pref-width: 22px;
+    -fx-alignment: center;
+    -fx-font-weight: bold;
+    -fx-text-fill: -theme-accent;
+}
