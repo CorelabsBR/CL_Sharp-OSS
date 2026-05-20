@@ -2,6 +2,7 @@ package br.com.corelabs.npsharpfx.frontend.ui.terminal;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -11,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.DoubleConsumer;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -22,7 +25,9 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -39,6 +44,7 @@ public class IntegratedTerminalPane extends BorderPane {
     private double currentHeight = 220;
     private boolean resizing = false;
     private DoubleConsumer heightChangeHandler;
+    private Supplier<File> workingDirectorySupplier;
     private java.util.function.Consumer<String> inputListener;
     private final BorderPane debugConsolePane = new BorderPane();
 private final TextArea debugOutputArea = new TextArea();
@@ -80,6 +86,10 @@ private final TextField debugInputField = new TextField();
 
 public void setHeightChangeHandler(DoubleConsumer heightChangeHandler) {
     this.heightChangeHandler = heightChangeHandler;
+}
+
+public void setWorkingDirectorySupplier(Supplier<File> workingDirectorySupplier) {
+    this.workingDirectorySupplier = workingDirectorySupplier;
 }
 
 private void setupDebugConsole() {
@@ -168,7 +178,7 @@ terminal.setOnMouseClicked(e -> showTerminalPanel());
         appendOutput("[Git] Use o painel Source Control para branch, stage e commit.");
     });
 
-    Label currentShell = new Label("powershell");
+    Label currentShell = new Label(resolveShellLabel());
     currentShell.getStyleClass().add("integrated-terminal-shell-label");
 
     Button newTerminalBtn = createHeaderButton("+", "Novo Terminal");
@@ -252,6 +262,55 @@ private Button createHeaderButton(String text, String tooltip) {
     return button;
 }
 
+private static String resolveShellLabel() {
+    String os = System.getProperty(
+            "os.name",
+            ""
+    ).toLowerCase(Locale.ROOT);
+
+    if (os.contains("win")) {
+        return findWindowsBash() == null ? "cmd" : "bash";
+    }
+
+    return "bash";
+}
+
+private static File findWindowsBash() {
+    String configuredShell = System.getenv("NPSHARP_TERMINAL");
+    if (configuredShell != null && !configuredShell.isBlank()) {
+        File configured = new File(configuredShell);
+        if (configured.isFile()) {
+            return configured;
+        }
+    }
+
+    String path = System.getenv("PATH");
+    if (path != null && !path.isBlank()) {
+        for (String entry : path.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            File bash = new File(entry, "bash.exe");
+            if (bash.isFile()) {
+                return bash;
+            }
+        }
+    }
+
+    List<String> candidates = List.of(
+            "C:\\Program Files\\Git\\bin\\bash.exe",
+            "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+            "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+            "C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe"
+    );
+
+    for (String candidate : candidates) {
+        File bash = new File(candidate);
+        if (bash.isFile()) {
+            return bash;
+        }
+    }
+
+    return null;
+}
+
     public void newTerminal() {
 
         TerminalSession session =
@@ -260,7 +319,7 @@ private Button createHeaderButton(String text, String tooltip) {
 
         sessions.add(session);
 
-        Tab tab = new Tab("powershell");
+        Tab tab = new Tab(resolveShellLabel());
 
         tab.setClosable(true);
 
@@ -453,12 +512,12 @@ private Button createHeaderButton(String text, String tooltip) {
     private final boolean debugger;
 
     public boolean isDebugger() {
-    return debugger;
-}
+        return debugger;
+    }
 
     private final TextArea outputArea = new TextArea();
 
-    private final TextField inputField = new TextField();
+    private final TextArea terminalArea = outputArea;
 
     private final BorderPane view = new BorderPane();
 
@@ -466,86 +525,90 @@ private Button createHeaderButton(String text, String tooltip) {
 
     private BufferedWriter writer;
 
+    private int commandStart = 0;
+
+    private File currentDirectory =
+            resolveInitialDirectory();
+
+    private boolean commandRunning = false;
+
     private TerminalSession(boolean debugger) {
 
         this.debugger = debugger;
 
-        outputArea.setEditable(false);
+        outputArea.setEditable(true);
+
+        outputArea.setFocusTraversable(true);
 
         outputArea.setWrapText(false);
 
         outputArea.getStyleClass().add("terminal-output");
 
-        inputField.setPromptText(
-                debugger
-                        ? "Entrada do programa..."
-                        : "Digite um comando e pressione Enter..."
-        );
-
-        inputField.getStyleClass().add("terminal-input");
-
-        HBox inputBox = new HBox(inputField);
-
-        inputBox.setPadding(new Insets(8));
-
-        HBox.setHgrow(
-                inputField,
-                Priority.ALWAYS
-        );
-
         view.setCenter(outputArea);
-
-        view.setBottom(inputBox);
 
         view.getStyleClass().add("terminal-session");
 
         Platform.runLater(() -> view.setUserData(this));
 
-        inputField.setOnAction(e -> {
+        terminalArea.setTextFormatter(new TextFormatter<>(createTerminalEditGuard()));
 
-            String command = inputField.getText();
-
-            if (command == null) {
-                return;
-            }
-
-            appendLine("> " + command);
-
-            inputField.clear();
-
-            /*
-             * DEBUG CONSOLE
-             */
-            if (debugger) {
-
-                inputQueue.offer(command);
-
+        terminalArea.setOnKeyPressed(event -> {
+            if (commandRunning) {
+                event.consume();
                 return;
             }
 
             /*
-             * TERMINAL NORMAL
+             * NÃO DEIXA APAGAR O PROMPT
              */
-            if (command.isBlank() || writer == null) {
-                return;
+            if (event.getCode() == KeyCode.BACK_SPACE) {
+
+                if (terminalArea.getCaretPosition()
+                        <= commandStart) {
+
+                    event.consume();
+                }
             }
 
-            try {
+            /*
+             * NÃO DEIXA MOVER PRA ESQUERDA
+             */
+            if (event.getCode() == KeyCode.LEFT) {
 
-                writer.write(command);
+                if (terminalArea.getCaretPosition()
+                        <= commandStart) {
 
-                writer.newLine();
+                    event.consume();
+                }
+            }
 
-                writer.flush();
+            /*
+             * ENTER
+             */
+            if (event.getCode() == KeyCode.ENTER) {
 
-            } catch (IOException ex) {
+                event.consume();
 
-                appendLine(
-                        "[erro] Falha ao enviar comando: "
-                                + ex.getMessage()
-                );
+                processCommand();
             }
         });
+
+        /*
+         * BLOQUEIA CURSOR ANTES DO PROMPT
+         */
+        terminalArea.caretPositionProperty()
+                .addListener((obs, oldV, newV) -> {
+
+                    if (newV.intValue() < commandStart) {
+
+                        Platform.runLater(() ->
+                                terminalArea.positionCaret(
+                                        commandStart
+                                )
+                        );
+                    }
+                });
+
     }
 
     public BorderPane getView() {
@@ -555,13 +618,15 @@ private Button createHeaderButton(String text, String tooltip) {
 
     public void requestInputFocus() {
 
-        Platform.runLater(inputField::requestFocus);
+        Platform.runLater(terminalArea::requestFocus);
     }
 
     public void start() {
 
+        appendPrompt();
+
         /*
-         * DEBUG NÃƒÆ’Ã†â€™O ABRE CMD
+         * DEBUG NÃO ABRE SHELL
          */
         if (debugger) {
 
@@ -570,55 +635,197 @@ private Button createHeaderButton(String text, String tooltip) {
             return;
         }
 
-        try {
+        // Commands are executed per request so the UI prompt never fights cmd/bash prompts.
+    }
 
-            ProcessBuilder pb = new ProcessBuilder(
-                    resolveShellCommand()
-            );
-
-            pb.redirectErrorStream(true);
-
-            process = pb.start();
-
-            writer = new BufferedWriter(
-                    new OutputStreamWriter(
-                            process.getOutputStream(),
-                            resolveCharset()
-                    )
-            );
-
-            Thread readerThread = new Thread(
-                    this::readOutputLoop,
-                    "terminal-reader"
-            );
-
-            readerThread.setDaemon(true);
-
-            readerThread.start();
-
-        } catch (IOException e) {
-
-            appendLine(
-                    "[erro] Nao foi possivel iniciar terminal: "
-                            + e.getMessage()
-            );
+    private void processCommand() {
+        if (commandRunning) {
+            return;
         }
+
+        String fullText =
+                terminalArea.getText();
+
+        String command =
+                fullText.substring(
+                                Math.min(commandStart, fullText.length())
+                        )
+                        .trim();
+
+        appendRaw(System.lineSeparator());
+
+        /*
+         * DEBUG CONSOLE
+         */
+        if (debugger) {
+
+            inputQueue.offer(command);
+
+            appendPrompt();
+
+            return;
+        }
+
+        /*
+         * TERMINAL NORMAL
+         */
+        if (command.isBlank()) {
+
+            appendPrompt();
+
+            return;
+        }
+
+        if (isClearCommand(command)) {
+            clear();
+            return;
+        }
+
+        if (isChangeDirectoryCommand(command)) {
+            updateCurrentDirectory(command);
+            appendPrompt();
+            return;
+        }
+
+        runCommand(command);
+    }
+
+    private UnaryOperator<TextFormatter.Change> createTerminalEditGuard() {
+        return change -> {
+            if (!change.isContentChange()) {
+                return change;
+            }
+
+            if (change.getRangeStart() < commandStart) {
+                return null;
+            }
+
+            return change;
+        };
+    }
+
+    private void runCommand(String command) {
+        commandRunning = true;
+        terminalArea.setEditable(false);
+
+        Thread commandThread = new Thread(
+                () -> {
+                    try {
+                        ProcessBuilder pb = new ProcessBuilder(resolveCommand(command));
+                        pb.directory(currentDirectory);
+                        pb.redirectErrorStream(true);
+
+                        Process commandProcess = pb.start();
+
+                        try (
+                                BufferedReader reader =
+                                        new BufferedReader(
+                                                new InputStreamReader(
+                                                        commandProcess.getInputStream(),
+                                                        resolveCharset()
+                                                )
+                                        )
+                        ) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                if (!isWindowsStartupBanner(line)) {
+                                    appendLine(line);
+                                }
+                            }
+                        }
+
+                        commandProcess.waitFor();
+                    } catch (IOException e) {
+                        appendLine("[erro] Falha ao executar comando: " + e.getMessage());
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        appendLine("[erro] Comando interrompido.");
+                    } finally {
+                        appendPrompt();
+                    }
+                },
+                "terminal-command"
+        );
+
+        commandThread.setDaemon(true);
+        commandThread.start();
+    }
+
+    private List<String> resolveCommand(String command) {
+        String os = System.getProperty(
+                "os.name",
+                ""
+        ).toLowerCase(Locale.ROOT);
+
+        if (!os.contains("win")) {
+            return List.of("/bin/bash", "-lc", command);
+        }
+
+        File bash = findWindowsBash();
+        if (bash != null) {
+            return List.of(bash.getAbsolutePath(), "-lc", command);
+        }
+
+        return List.of("cmd.exe", "/D", "/Q", "/C", normalizeCmdCommand(command));
+    }
+
+    private String normalizeCmdCommand(String command) {
+        String trimmed = command == null ? "" : command.trim();
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+
+        if (lower.equals("pwd")) {
+            return "cd";
+        }
+
+        if (lower.equals("ls")) {
+            return "dir";
+        }
+
+        if (lower.startsWith("ls ")) {
+            return "dir " + trimmed.substring(3);
+        }
+
+        if (lower.equals("clear")) {
+            return "cls";
+        }
+
+        return command;
+    }
+
+    private boolean isChangeDirectoryCommand(String command) {
+        String trimmed = command == null ? "" : command.trim().toLowerCase(Locale.ROOT);
+
+        return trimmed.equals("cd")
+                || trimmed.equals("cd ~")
+                || trimmed.equals("cd..")
+                || trimmed.startsWith("cd ")
+                || trimmed.startsWith("chdir ");
+    }
+
+    private boolean isClearCommand(String command) {
+        String trimmed = command == null ? "" : command.trim().toLowerCase(Locale.ROOT);
+        return trimmed.equals("clear") || trimmed.equals("cls");
     }
 
     private void readOutputLoop() {
 
         try (
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(
-                                process.getInputStream(),
-                                resolveCharset()
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        process.getInputStream(),
+                                        resolveCharset()
+                                )
                         )
-                )
         ) {
 
             String line;
 
             while ((line = reader.readLine()) != null) {
+
+                if (isWindowsStartupBanner(line)) {
+                    continue;
+                }
 
                 appendLine(line);
             }
@@ -632,29 +839,192 @@ private Button createHeaderButton(String text, String tooltip) {
         }
     }
 
+    private boolean isWindowsStartupBanner(String line) {
+        String normalized = line == null
+                ? ""
+                : line.trim().toLowerCase(Locale.ROOT);
+
+        return normalized.startsWith("microsoft windows [version")
+                || normalized.startsWith("(c) microsoft corporation. all rights reserved");
+    }
+
+    private File resolveInitialDirectory() {
+        File directory = workingDirectorySupplier == null
+                ? null
+                : workingDirectorySupplier.get();
+
+        if (directory != null && directory.isFile()) {
+            directory = directory.getParentFile();
+        }
+
+        if (directory == null || !directory.isDirectory()) {
+            directory = new File(System.getProperty("user.dir"));
+        }
+
+        try {
+            return directory.getCanonicalFile();
+        } catch (IOException ignored) {
+            return directory.getAbsoluteFile();
+        }
+    }
+
+    private void appendPrompt() {
+
+        Platform.runLater(() -> {
+
+            String user =
+                    System.getProperty("user.name");
+
+            String host = "npsharp";
+
+            try {
+                host = java.net.InetAddress
+                        .getLocalHost()
+                        .getHostName();
+            } catch (Exception ignored) {
+            }
+
+            String path = currentDirectory
+                    .getAbsolutePath()
+                    .replace("\\", "/");
+
+            String home = System.getProperty("user.home")
+                    .replace("\\", "/");
+
+            if (path.startsWith(home)) {
+                path = "~" + path.substring(home.length());
+            }
+
+            /*
+            * PROMPT ESTILO LINUX
+            *
+            * ┌──(kelvin@npsharp)-[~/Projetos]
+            * └─$
+            */
+
+            String prompt =
+                    "┌──("
+                    + user
+                    + "@"
+                    + host
+                    + ")-["
+                    + path
+                    + "]"
+                    + System.lineSeparator()
+                    + "└─$ ";
+
+            terminalArea.setEditable(true);
+
+            terminalArea.appendText(prompt);
+
+            commandStart =
+                    terminalArea.getText().length();
+
+            terminalArea.positionCaret(commandStart);
+
+            commandRunning = false;
+
+            terminalArea.requestFocus();
+        });
+    }
+
+    private void updateCurrentDirectory(String command) {
+        String trimmed = command == null ? "" : command.trim();
+
+        if (trimmed.equals("cd") || trimmed.equals("cd ~")) {
+            currentDirectory = new File(System.getProperty("user.home")).getAbsoluteFile();
+            return;
+        }
+
+        if (trimmed.equals("cd..")) {
+            targetParentDirectory();
+            return;
+        }
+
+        if (!trimmed.startsWith("cd ") && !trimmed.startsWith("chdir ")) {
+            return;
+        }
+
+        String target = trimmed.startsWith("chdir ")
+                ? trimmed.substring(6).trim()
+                : trimmed.substring(3).trim();
+
+        if (target.toLowerCase(Locale.ROOT).startsWith("/d ")) {
+            target = target.substring(3).trim();
+        }
+
+        if (target.isBlank()) {
+            return;
+        }
+
+        if ((target.startsWith("\"") && target.endsWith("\""))
+                || (target.startsWith("'") && target.endsWith("'"))) {
+            target = target.substring(1, target.length() - 1);
+        }
+
+        File nextDirectory = new File(target);
+        if (!nextDirectory.isAbsolute()) {
+            nextDirectory = new File(currentDirectory, target);
+        }
+
+        try {
+            nextDirectory = nextDirectory.getCanonicalFile();
+        } catch (IOException ignored) {
+            nextDirectory = nextDirectory.getAbsoluteFile();
+        }
+
+        if (nextDirectory.isDirectory()) {
+            currentDirectory = nextDirectory;
+        }
+    }
+
+    private void targetParentDirectory() {
+        File parent = currentDirectory.getParentFile();
+        if (parent != null && parent.isDirectory()) {
+            currentDirectory = parent;
+        }
+    }
+
+    private void appendRaw(String text) {
+
+        Platform.runLater(() -> {
+
+            terminalArea.appendText(text);
+
+            terminalArea.positionCaret(
+                    terminalArea.getText().length()
+            );
+        });
+    }
+
     private void appendLine(String text) {
 
         Platform.runLater(() -> {
 
-            outputArea.appendText(
+            terminalArea.appendText(
                     text + System.lineSeparator()
             );
 
-            outputArea.positionCaret(
-                    outputArea.getText().length()
+            terminalArea.positionCaret(
+                    terminalArea.getText().length()
             );
         });
     }
 
     public void clear() {
 
-        Platform.runLater(outputArea::clear);
+        Platform.runLater(() -> {
+
+            terminalArea.clear();
+
+            appendPrompt();
+        });
     }
 
     public void destroy() {
 
         /*
-         * DEBUG NÃƒÆ’Ã†â€™O TEM PROCESSO
+         * DEBUG NÃO TEM PROCESSO
          */
         if (debugger) {
             return;
@@ -674,7 +1044,8 @@ private Button createHeaderButton(String text, String tooltip) {
         } catch (Exception ignored) {
         }
 
-        if (process != null && process.isAlive()) {
+        if (process != null
+                && process.isAlive()) {
 
             process.destroy();
         }
@@ -689,13 +1060,18 @@ private Button createHeaderButton(String text, String tooltip) {
 
         if (os.contains("win")) {
 
-            return List.of(
-                    "cmd.exe",
-                    "/Q"
-            );
+            File bash = findWindowsBash();
+            if (bash != null) {
+                return List.of(
+                        bash.getAbsolutePath(),
+                        "-i"
+                );
+            }
+
+            return List.of("cmd.exe", "/Q");
         }
 
-        return List.of("/bin/bash");
+        return List.of("/bin/bash", "-i");
     }
 
     private static Charset resolveCharset() {
@@ -706,6 +1082,10 @@ private Button createHeaderButton(String text, String tooltip) {
         ).toLowerCase(Locale.ROOT);
 
         if (os.contains("win")) {
+
+            if (findWindowsBash() != null) {
+                return StandardCharsets.UTF_8;
+            }
 
             try {
 
