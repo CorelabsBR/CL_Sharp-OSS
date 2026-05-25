@@ -803,6 +803,7 @@ registerActivity("debug",
         terminalPane.setManaged(false);
 
         terminalPane.setHeightChangeHandler(this::resizeTerminalPane);
+        terminalPane.setWorkingDirectorySupplier(this::getTerminalWorkingDirectory);
 
         /*
         ========================================
@@ -1681,6 +1682,29 @@ private void closeFolderFromExplorer() {
             editorManager.getTabPane().requestFocus();
             statusBarManager.updateStatusRight("Editor");
         }
+    }
+
+    private File getTerminalWorkingDirectory() {
+        File currentFile = editorManager == null
+                ? null
+                : editorManager.getCurrentFile();
+
+        if (currentFile != null && currentFile.isFile()) {
+            File parent = currentFile.getParentFile();
+            if (parent != null && parent.isDirectory()) {
+                return parent;
+            }
+        }
+
+        File workspace = explorerPane == null
+                ? null
+                : explorerPane.getCurrentRootFolder();
+
+        if (workspace != null && workspace.isDirectory()) {
+            return workspace;
+        }
+
+        return new File(System.getProperty("user.dir"));
     }
 
     private void showTerminalPane() {
