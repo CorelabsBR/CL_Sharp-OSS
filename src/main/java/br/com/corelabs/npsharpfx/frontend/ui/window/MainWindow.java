@@ -30,6 +30,7 @@ import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager.ActivityItem;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.SidePanelManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.StatusBarManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.VSCodeLayoutAnimator;
 import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SearchHelper;
 import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
 import br.com.corelabs.npsharpfx.frontend.ui.window.panels.ThemeChooserPanel;
@@ -1257,6 +1258,7 @@ registerActivity("debug",
                 stage.getX() + (stage.getWidth() - content.getPrefWidth()) / 2,
                 stage.getY() + 58
         );
+        VSCodeLayoutAnimator.fadeSlideIn(content, 0, -8);
         commandPaletteInput.requestFocus();
     }
 
@@ -1688,6 +1690,7 @@ private void closeFolderFromExplorer() {
 
         terminalPane.setManaged(true);
         terminalPane.setVisible(true);
+        VSCodeLayoutAnimator.fadeSlideIn(terminalPane, 0, 12);
 
         if (verticalSplit != null) {
             resizeTerminalPane(terminalPane.getPrefHeight());
@@ -1711,13 +1714,19 @@ private void closeFolderFromExplorer() {
         );
 
         double dividerPosition = (splitHeight - clampedHeight) / splitHeight;
-        verticalSplit.setDividerPositions(Math.max(0.20, Math.min(0.90, dividerPosition)));
+        VSCodeLayoutAnimator.animateDivider(verticalSplit, 0, Math.max(0.20, Math.min(0.90, dividerPosition)));
     }
 
     private void hideTerminalPane() {
-        if (verticalSplit != null && terminalPane != null) {
-            verticalSplit.getItems().remove(terminalPane);
-            verticalSplit.setDividerPositions(1.0);
+        if (verticalSplit != null && terminalPane != null && verticalSplit.getItems().contains(terminalPane)) {
+            VSCodeLayoutAnimator.animateDivider(verticalSplit, 0, 1.0);
+            VSCodeLayoutAnimator.fadeSlideOut(terminalPane, 0, 12, () -> {
+                verticalSplit.getItems().remove(terminalPane);
+                terminalPane.setManaged(false);
+                terminalPane.setVisible(false);
+                statusBarManager.updateTerminalStatus("Terminal");
+            });
+            return;
         }
 
         terminalPane.setManaged(false);
@@ -1739,7 +1748,7 @@ private void closeFolderFromExplorer() {
             leftSidebarArea.setPrefWidth(300);
             leftSidebarArea.setMaxWidth(Double.MAX_VALUE);
             if (horizontalSplit.getDividers().size() > 0) {
-                horizontalSplit.setDividerPositions(0.18);
+                VSCodeLayoutAnimator.animateDivider(horizontalSplit, 0, 0.18);
             }
         } else {
             leftSidebarArea.setMinWidth(48);
@@ -1747,13 +1756,27 @@ private void closeFolderFromExplorer() {
             leftSidebarArea.setMaxWidth(48);
             if (horizontalSplit.getDividers().size() > 0 && horizontalSplit.getWidth() > 0) {
                 double divider = 48 / horizontalSplit.getWidth();
-                horizontalSplit.setDividerPositions(Math.max(0.01, Math.min(0.12, divider)));
+                VSCodeLayoutAnimator.animateDivider(horizontalSplit, 0, Math.max(0.01, Math.min(0.12, divider)));
             }
         }
     }
 
     private void registerActivity(String id, Button button, Node content) {
         activityItems.put(id, new ActivityItem(id, button, content));
+        activityBarManager.installTooltip(id, getActivityTooltip(id));
+    }
+
+    private String getActivityTooltip(String id) {
+        return switch (id) {
+            case "explorer" -> "Explorer (Ctrl+Shift+E)";
+            case "search" -> "Search (Ctrl+Shift+F)";
+            case "git" -> "Source Control";
+            case "remote" -> "Remote Explorer";
+            case "debug" -> "Run and Debug (F5)";
+            case "extensions" -> "Extensions";
+            case "settings" -> "Manage";
+            default -> id == null ? "" : id;
+        };
     }
 
     private List<SearchResult> searchInOpenTabs(SearchQuery query) {

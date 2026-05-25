@@ -24,6 +24,7 @@ public class SidePanelManager {
     private final Map<String, ActivityItem> activityItems;
 
     private String activePanelId;
+    private String lastPanelId = "explorer";
     private Button activeActivityButton;
 
     public SidePanelManager(Map<String, ActivityItem> activityItems) {
@@ -92,6 +93,8 @@ public class SidePanelManager {
 
         setActiveActivityButton(item.button);
         activePanelId = panelId;
+        lastPanelId = panelId;
+        VSCodeLayoutAnimator.fadeSlideIn(sidePanelHost, -10, 0);
 
         if (onStatusUpdate != null) {
             onStatusUpdate.run();
@@ -99,23 +102,34 @@ public class SidePanelManager {
     }
 
     public void hideSidePanel(Runnable onStatusUpdate) {
-        sidePanelHost.getChildren().clear();
-        sidePanelHost.setManaged(false);
-        sidePanelHost.setVisible(false);
+        if (!sidePanelHost.isVisible()) {
+            clearActiveActivityButton();
+            activePanelId = null;
+            if (onStatusUpdate != null) {
+                onStatusUpdate.run();
+            }
+            return;
+        }
 
         clearActiveActivityButton();
         activePanelId = null;
 
-        if (onStatusUpdate != null) {
-            onStatusUpdate.run();
-        }
+        VSCodeLayoutAnimator.fadeSlideOut(sidePanelHost, -10, 0, () -> {
+            sidePanelHost.getChildren().clear();
+            sidePanelHost.setManaged(false);
+            sidePanelHost.setVisible(false);
+
+            if (onStatusUpdate != null) {
+                onStatusUpdate.run();
+            }
+        });
     }
 
     public void toggleSidebarVisibility(Runnable onStatusUpdate) {
         if (sidePanelHost.isVisible()) {
             hideSidePanel(onStatusUpdate);
         } else {
-            String panelToOpen = activePanelId != null ? activePanelId : "explorer";
+            String panelToOpen = activePanelId != null ? activePanelId : lastPanelId;
             showSidePanel(panelToOpen, onStatusUpdate);
         }
     }

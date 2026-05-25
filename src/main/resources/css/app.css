@@ -2615,3 +2615,433 @@
 .remote-danger-button {
     -fx-text-fill: -theme-error;
 }
+
+/* =========================================================
+   VS CODE OSS DESKTOP SHELL REFINEMENT
+   Passada final de densidade visual: shell compacto, bordas
+   discretas, estados de foco e superficies sem cara JavaFX.
+   ========================================================= */
+
+.root-pane,
+.app-root,
+.center-area {
+    -fx-font-family: "Segoe UI", "Inter", "Arial", sans-serif;
+    -fx-font-size: 12px;
+    -fx-background-color: -theme-bg;
+}
+
+.title-bar {
+    -fx-min-height: 35px;
+    -fx-pref-height: 35px;
+    -fx-max-height: 35px;
+    -fx-background-color: -theme-titlebar-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 0 0 8;
+    -fx-spacing: 8;
+}
+
+.title-menu {
+    -fx-text-fill: -theme-titlebar-fg;
+    -fx-padding: 4 7 4 7;
+    -fx-background-radius: 4;
+}
+
+.title-menu:hover,
+.title-toolbar-button:hover,
+.window-button:hover {
+    -fx-background-color: -theme-highlight;
+}
+
+.window-button-close:hover {
+    -fx-background-color: #e81123;
+    -fx-text-fill: white;
+}
+
+.command-bar {
+    -fx-background-color: -theme-input-bg;
+    -fx-border-color: -theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-text-fill: -theme-input-fg;
+    -fx-prompt-text-fill: -theme-prompt-fg;
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 12px;
+}
+
+.command-bar:focused {
+    -fx-border-color: -theme-accent;
+}
+
+.left-sidebar-area {
+    -fx-background-color: -theme-activitybar-bg;
+}
+
+.activity-bar {
+    -fx-background-color: -theme-activitybar-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 4 0 4 0;
+    -fx-spacing: 0;
+}
+
+.activity-icon {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 0 2;
+    -fx-padding: 0;
+    -fx-opacity: 0.72;
+}
+
+.activity-icon:hover {
+    -fx-background-color: -theme-highlight;
+    -fx-opacity: 0.95;
+}
+
+.activity-icon.active {
+    -fx-border-color: -theme-accent;
+    -fx-opacity: 1.0;
+}
+
+.activity-icon:pressed {
+    -fx-background-color: -theme-list-active-bg;
+}
+
+.vscode-tooltip {
+    -fx-background-color: -theme-input-bg;
+    -fx-text-fill: -theme-fg;
+    -fx-border-color: -theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-padding: 5 8 5 8;
+    -fx-font-size: 11px;
+}
+
+.side-panel-host {
+    -fx-background-color: -theme-sidebar-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 1 0 0;
+}
+
+.side-panel {
+    -fx-background-color: -theme-sidebar-bg;
+}
+
+.side-panel-header {
+    -fx-min-height: 35px;
+    -fx-pref-height: 35px;
+    -fx-max-height: 35px;
+    -fx-padding: 0 8 0 12;
+    -fx-background-color: -theme-sidebar-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.panel-title {
+    -fx-text-fill: -theme-sidebar-fg;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.side-panel-collapse-button,
+.terminal-control-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-border-width: 0;
+    -fx-text-fill: -theme-fg;
+    -fx-padding: 4 7 4 7;
+}
+
+.side-panel-collapse-button:hover,
+.terminal-control-button:hover {
+    -fx-background-color: -theme-highlight;
+}
+
+.tree-view,
+.list-view,
+.table-view {
+    -fx-background-color: -theme-sidebar-bg;
+    -fx-control-inner-background: -theme-sidebar-bg;
+    -fx-border-width: 0;
+}
+
+.tree-cell,
+.list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -theme-sidebar-fg;
+    -fx-padding: 2 8 2 8;
+    -fx-cell-size: 22px;
+}
+
+.tree-cell:hover,
+.list-cell:hover {
+    -fx-background-color: -theme-list-hover-bg;
+}
+
+.tree-cell:selected,
+.list-cell:selected {
+    -fx-background-color: -theme-list-active-bg;
+    -fx-text-fill: -theme-list-active-fg;
+}
+
+.main-horizontal-split,
+.main-vertical-split {
+    -fx-background-color: -theme-bg;
+    -fx-padding: 0;
+}
+
+.main-horizontal-split > .split-pane-divider,
+.main-vertical-split > .split-pane-divider {
+    -fx-background-color: -theme-border;
+    -fx-padding: 0 0.5 0 0.5;
+}
+
+.main-vertical-split > .split-pane-divider {
+    -fx-padding: 0.5 0 0.5 0;
+}
+
+.editor-tabs {
+    -fx-background-color: -theme-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 0 1 0;
+}
+
+.editor-tabs .tab-header-area {
+    -fx-padding: 0;
+}
+
+.editor-tabs .tab-header-background {
+    -fx-background-color: -theme-bg;
+}
+
+.editor-tabs .tab {
+    -fx-background-color: -theme-tab-inactive-bg;
+    -fx-background-radius: 0;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 0 9 0 9;
+    -fx-pref-height: 35px;
+}
+
+.editor-tabs .tab:hover {
+    -fx-background-color: -theme-tab-hover-bg;
+}
+
+.editor-tabs .tab:selected {
+    -fx-background-color: -theme-bg;
+    -fx-border-color: -theme-accent -theme-border transparent transparent;
+    -fx-border-width: 1 1 0 0;
+}
+
+.editor-tabs .tab-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -theme-tab-inactive-fg;
+}
+
+.editor-tabs .tab:selected .tab-label {
+    -fx-text-fill: -theme-tab-active-fg;
+}
+
+.editor-tabs .tab-close-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 3;
+    -fx-scale-x: 0.82;
+    -fx-scale-y: 0.82;
+}
+
+.editor-tabs .tab-close-button:hover {
+    -fx-background-color: -theme-highlight;
+}
+
+.integrated-terminal {
+    -fx-background-color: -theme-terminal-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 1 0 0 0;
+}
+
+.integrated-terminal-header {
+    -fx-background-color: -theme-panel-bg;
+    -fx-border-color: -theme-border;
+    -fx-border-width: 0 0 1 0;
+    -fx-min-height: 33px;
+    -fx-pref-height: 33px;
+    -fx-padding: 0 8 0 10;
+}
+
+.integrated-terminal-title,
+.integrated-terminal-shell-label {
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-size: 11px;
+}
+
+.integrated-terminal-tab,
+.bottom-panel-tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-text-fill: -theme-description-fg;
+    -fx-padding: 6 10 6 10;
+    -fx-font-size: 11px;
+}
+
+.integrated-terminal-tab:hover,
+.bottom-panel-tab:hover {
+    -fx-background-color: -theme-highlight;
+    -fx-text-fill: -theme-fg;
+}
+
+.integrated-terminal-tab-active,
+.bottom-panel-tab-active {
+    -fx-border-color: -theme-accent;
+    -fx-text-fill: -theme-fg;
+}
+
+.terminal-output,
+.terminal-input,
+.styled-text-area,
+.code-area {
+    -fx-font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", "Consolas", monospace;
+    -fx-font-size: 13px;
+    -fx-font-smoothing-type: lcd;
+}
+
+.status-bar {
+    -fx-background-color: -theme-statusbar-bg;
+    -fx-border-width: 0;
+    -fx-padding: 0 8 0 8;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+    -fx-max-height: 22px;
+}
+
+.status-label {
+    -fx-text-fill: -theme-statusbar-fg;
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+}
+
+.status-label:hover {
+    -fx-background-color: rgba(255,255,255,0.14);
+}
+
+.command-palette {
+    -fx-background-color: -theme-input-bg;
+    -fx-border-color: -theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-padding: 8 8 6 8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.52), 28, 0.22, 0, 9);
+}
+
+.command-palette-input {
+    -fx-background-color: transparent;
+    -fx-border-color: -theme-accent;
+    -fx-border-width: 0 0 1 0;
+    -fx-background-radius: 0;
+    -fx-text-fill: -theme-input-fg;
+    -fx-prompt-text-fill: -theme-prompt-fg;
+    -fx-padding: 8 10 9 10;
+    -fx-font-size: 13px;
+}
+
+.command-palette-list,
+.quick-open-list {
+    -fx-background-color: -theme-input-bg;
+    -fx-control-inner-background: -theme-input-bg;
+    -fx-border-width: 0;
+}
+
+.command-palette-list .list-cell,
+.quick-open-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -theme-fg;
+    -fx-padding: 7 10 7 10;
+    -fx-font-size: 12px;
+    -fx-cell-size: 28px;
+}
+
+.command-palette-list .list-cell:hover,
+.command-palette-list .list-cell:selected,
+.quick-open-list .list-cell:hover,
+.quick-open-list .list-cell:selected {
+    -fx-background-color: -theme-list-active-bg;
+    -fx-text-fill: -theme-list-active-fg;
+}
+
+.context-menu {
+    -fx-background-color: -theme-input-bg;
+    -fx-border-color: -theme-input-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 4 0 4 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.44), 18, 0.16, 0, 6);
+}
+
+.context-menu-row {
+    -fx-background-radius: 3;
+}
+
+.context-menu-row:hover {
+    -fx-background-color: -theme-list-active-bg;
+}
+
+.context-menu-item {
+    -fx-text-fill: -theme-fg;
+    -fx-font-size: 12px;
+}
+
+.context-menu-shortcut {
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-size: 11px;
+}
+
+.source-control-panel,
+.remote-host-panel,
+.settings-panel,
+.search-panel {
+    -fx-background-color: -theme-sidebar-bg;
+}
+
+.source-control-file-row,
+.source-control-conflict-row,
+.remote-file-list .list-cell,
+.runtime-row {
+    -fx-background-radius: 3;
+    -fx-padding: 4 7 4 7;
+}
+
+.source-control-file-row:hover,
+.source-control-conflict-row:hover,
+.remote-file-list .list-cell:hover,
+.runtime-row:hover {
+    -fx-background-color: -theme-list-hover-bg;
+}
+
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 10px;
+    -fx-pref-height: 10px;
+}
+
+.scroll-bar .track,
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: rgba(121,121,121,0.36);
+    -fx-background-radius: 999;
+    -fx-background-insets: 2;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: rgba(121,121,121,0.58);
+}

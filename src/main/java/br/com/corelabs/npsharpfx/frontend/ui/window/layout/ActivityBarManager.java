@@ -3,6 +3,7 @@ package br.com.corelabs.npsharpfx.frontend.ui.window.layout;
 import java.util.Map;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -63,6 +64,18 @@ public class ActivityBarManager {
         button.setMaxHeight(BUTTON_SIZE);
 
         return button;
+    }
+
+    public void installTooltip(String id, String text) {
+        ActivityItem item = activityItems.get(id);
+        if (item == null || item.button == null || text == null || text.isBlank()) {
+            return;
+        }
+
+        Tooltip tooltip = new Tooltip(text);
+        tooltip.getStyleClass().add("vscode-tooltip");
+        tooltip.setShowDelay(javafx.util.Duration.millis(220));
+        Tooltip.install(item.button, tooltip);
     }
 
     public static class ActivityItem {
