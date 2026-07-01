@@ -1,13 +1,16 @@
+#ifndef MyAppVersion
+#define MyAppVersion "development"
+#endif
+
 #define MyAppName "NPSharp"
-#define MyAppVersion "stable v2026.4.0"
 #define MyAppPublisher "CoreLabs"
 #define MyAppLauncher "run-npsharp.bat"
 
 [Setup]
 AppId={{8A27B871-BFF8-4D93-A96B-8659C4473E27}
-AppName=NPSharp
+AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppPublisher=CoreLabs
+AppPublisher={#MyAppPublisher}
 AppPublisherURL=https://corelabs.dev.br
 AppSupportURL=https://corelabs.dev.br
 AppUpdatesURL=https://github.com/CorelabsBR/CL_NPSharp/releases
@@ -18,19 +21,24 @@ OutputDir=..\dist\installer
 OutputBaseFilename=NPSharp-Setup
 Compression=lzma
 SolidCompression=yes
+UninstallDisplayName={#MyAppName}
 WizardStyle=modern
-UninstallDisplayName=NPSharp
+LicenseFile=..\LICENSE
+
 #ifexist "..\src\main\resources\icons\app.ico"
 SetupIconFile=..\src\main\resources\icons\app.ico
+UninstallDisplayIcon={app}\app.ico
 #endif
-LicenseFile=LICENSE
-WizardStyle=modern
+
+[Languages]
+Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "..\dist\windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
 #ifexist "..\src\main\resources\icons\app.ico"
 Source: "..\src\main\resources\icons\app.ico"; DestDir: "{app}"; DestName: "app.ico"; Flags: ignoreversion
 #endif
