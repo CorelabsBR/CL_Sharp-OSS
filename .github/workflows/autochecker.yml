@@ -253,24 +253,30 @@ jobs:
         shell: powershell
         run: |
           if (!(Test-Path "LICENSE")) {
-            @'
-            MIT License
+            $license = @"
+          MIT License
 
-            Copyright (c) 2025-present CoreLabs
+          Copyright (c) 2025-present CoreLabs
 
-            Permission is hereby granted, free of charge, to any person obtaining a copy
-            of this software and associated documentation files (the "Software"), to deal
-            in the Software without restriction.
+          Permission is hereby granted, free of charge, to any person obtaining a copy
+          of this software and associated documentation files (the "Software"), to deal
+          in the Software without restriction.
 
-            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-            '@ | Set-Content LICENSE -Encoding UTF8
+          THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+          "@
+            $license = $license -replace "(?m)^          ", ""
+            Set-Content -Path "LICENSE" -Value $license -Encoding UTF8
           }
-
       - name: Build wizard installer EXE
         shell: powershell
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc installer\NPSharp.iss
+          & $iscc "/DMyAppVersion=${{ needs.validate.outputs.version }}" installer\NPSharp.iss
+
+          if (!(Test-Path "dist\installer\NPSharp-Setup.exe")) {
+            throw "Inno Setup failed: NPSharp-Setup.exe was not generated."
+          }
+
           Rename-Item dist\installer\NPSharp-Setup.exe "NPSharp-${{ needs.validate.outputs.version }}-Setup.exe"
 
       - uses: actions/upload-artifact@v4
