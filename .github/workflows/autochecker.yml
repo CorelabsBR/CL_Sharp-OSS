@@ -71,7 +71,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "changed_files=$CHANGED" >> "$GITHUB_OUTPUT"
 
-  linux-deb:
+  linux:
     needs: validate
     runs-on: ubuntu-latest
     steps:
@@ -83,9 +83,11 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Build JAR
+      - name: Build Linux dist
+        shell: bash
         run: |
           mvn -B clean package
+
           mkdir -p dist/linux/lib
           cp target/*.jar dist/linux/NPSharp.jar
           mvn -q dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=dist/linux/lib
@@ -96,6 +98,7 @@ jobs:
           VERSION="${{ needs.validate.outputs.version }}"
           CLEAN_VERSION="${VERSION#v}"
 
+          rm -rf pkg
           mkdir -p pkg/DEBIAN
           mkdir -p pkg/opt/npsharp/lib
           mkdir -p pkg/usr/bin
@@ -104,7 +107,7 @@ jobs:
           mkdir -p pkg/usr/share/pixmaps
 
           cp dist/linux/NPSharp.jar pkg/opt/npsharp/
-          cp -r dist/linux/lib pkg/opt/npsharp/
+          cp -r dist/linux/lib/* pkg/opt/npsharp/lib/
 
           cp src/main/resources/icons/app.png pkg/usr/share/icons/hicolor/256x256/apps/npsharp.png
           cp src/main/resources/icons/app.png pkg/usr/share/pixmaps/npsharp.png
@@ -160,12 +163,45 @@ jobs:
           EOF
 
           dpkg-deb --build pkg "NPSharp-${VERSION}-linux-amd64.deb"
+
+      - name: Build Linux portable
+        shell: bash
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+
+          rm -rf portable
+          mkdir -p portable/NPSharp-linux-x64/lib
+
+          cp dist/linux/NPSharp.jar portable/NPSharp-linux-x64/
+          cp -r dist/linux/lib/* portable/NPSharp-linux-x64/lib/
+          cp src/main/resources/icons/app.png portable/NPSharp-linux-x64/app.png
+
+          if [ -f LICENSE ]; then
+            cp LICENSE portable/NPSharp-linux-x64/LICENSE
+          fi
+
+          cat > portable/NPSharp-linux-x64/npsharp <<'EOF'
+          #!/usr/bin/env bash
+          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+          java --module-path "$APP_DIR/lib" \
+            --add-modules javafx.controls,javafx.graphics,javafx.swing \
+            -cp "$APP_DIR/NPSharp.jar:$APP_DIR/lib/*" \
+            br.com.corelabs.npsharpfx.Main
+          EOF
+          sed -i 's/^          //' portable/NPSharp-linux-x64/npsharp
+          chmod +x portable/NPSharp-linux-x64/npsharp
+
+          cd portable
+          zip -r "../NPSharp-${VERSION}-linux-x64-portable.zip" NPSharp-linux-x64
+
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-deb
-          path: NPSharp-*-linux-amd64.deb
-          
-  windows-installer:
+          name: linux-artifacts
+          path: |
+            NPSharp-*-linux-amd64.deb
+            NPSharp-*-linux-x64-portable.zip
+
+  windows:
     needs: validate
     runs-on: windows-latest
     steps:
@@ -198,6 +234,21 @@ jobs:
           if errorlevel 1 pause
           '@ | Set-Content dist/windows/run-npsharp.bat -Encoding ASCII
 
+      - name: Build Windows portable
+        shell: powershell
+        run: |
+          $version = "${{ needs.validate.outputs.version }}"
+
+          New-Item -ItemType Directory -Force portable/NPSharp-windows-x64 | Out-Null
+          Copy-Item -Recurse dist/windows/* portable/NPSharp-windows-x64/
+          Copy-Item src/main/resources/icons/app.png portable/NPSharp-windows-x64/app.png
+
+          if (Test-Path LICENSE) {
+            Copy-Item LICENSE portable/NPSharp-windows-x64/LICENSE
+          }
+
+          Compress-Archive -Path portable/NPSharp-windows-x64 -DestinationPath "NPSharp-$version-windows-x64-portable.zip" -Force
+
       - name: Build wizard installer EXE
         shell: powershell
         run: |
@@ -207,11 +258,13 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: dist/installer/*.exe
+          name: windows-artifacts
+          path: |
+            dist/installer/*.exe
+            NPSharp-*-windows-x64-portable.zip
 
   release:
-    needs: [validate, linux-deb, windows-installer]
+    needs: [validate, linux, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -227,6 +280,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.validate.outputs.version }}
           CHANGED_FILES: ${{ needs.validate.outputs.changed_files }}
+        shell: bash
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"

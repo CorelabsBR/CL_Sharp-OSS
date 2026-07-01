@@ -8,6 +8,11 @@ AppId={{8A27B871-BFF8-4D93-A96B-8659C4473E27}
 AppName=NPSharp
 AppVersion={#MyAppVersion}
 AppPublisher=CoreLabs
+AppName=NPSharp
+AppPublisher=CoreLabs
+AppPublisherURL=https://corelabs.dev.br
+AppSupportURL=https://corelabs.dev.br
+AppUpdatesURL=https://github.com/CorelabsBR/CL_NPSharp/releases
 DefaultDirName={autopf}\NPSharp
 DefaultGroupName=NPSharp
 DisableProgramGroupPage=yes
@@ -20,6 +25,8 @@ UninstallDisplayName=NPSharp
 #ifexist "..\src\main\resources\icons\app.ico"
 SetupIconFile=..\src\main\resources\icons\app.ico
 #endif
+LicenseFile=LICENSE
+WizardStyle=modern
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
