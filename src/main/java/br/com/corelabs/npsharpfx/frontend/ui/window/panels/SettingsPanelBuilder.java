@@ -42,7 +42,7 @@ public Node buildSettingsPanel(
             clearWallpaperButton
     );
 // sabemos que me motivou. presente no commit f0655d6.
-    Button appearanceButton = createSettingsMenuItem("Appearance", "›", onAppearanceClick);
+    Button appearanceButton = createSettingsMenuItem("Aparencia", "›", onAppearanceClick);
 
     content.getChildren().addAll(
             createSettingsMenuItem("Command Palette..."),

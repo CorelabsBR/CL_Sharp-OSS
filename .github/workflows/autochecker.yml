@@ -1,0 +1,215 @@
+name: NPSharp Build Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changed_files: ${{ steps.version.outputs.changed_files }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Validate compile
+        run: mvn -B clean compile
+
+      - name: Calculate version
+        id: version
+        shell: bash
+        run: |
+          YEAR="$(date +%Y)"
+          LAST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="v${YEAR}.0.0"
+          fi
+
+          BASE="${LAST_TAG#v}"
+          LAST_YEAR="$(echo "$BASE" | cut -d. -f1)"
+          LAST_MAJOR="$(echo "$BASE" | cut -d. -f2)"
+          LAST_PATCH="$(echo "$BASE" | cut -d. -f3)"
+
+          if git rev-parse "$LAST_TAG" >/dev/null 2>&1; then
+            CHANGED="$(git diff --name-only "$LAST_TAG"..HEAD | wc -l | tr -d ' ')"
+          else
+            CHANGED=999
+          fi
+
+          if [ "$LAST_YEAR" != "$YEAR" ]; then
+            MAJOR=0
+            PATCH=0
+          elif [ "$CHANGED" -gt 10 ]; then
+            MAJOR=$((LAST_MAJOR + 1))
+            PATCH=0
+          else
+            MAJOR="$LAST_MAJOR"
+            PATCH=$((LAST_PATCH + 1))
+          fi
+
+          VERSION="v${YEAR}.${MAJOR}.${PATCH}"
+
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "changed_files=$CHANGED" >> "$GITHUB_OUTPUT"
+
+  linux-deb:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Build JAR
+        run: |
+          mvn -B clean package
+          mkdir -p dist/linux/lib
+          cp target/*.jar dist/linux/NPSharp.jar
+          mvn -q dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=dist/linux/lib
+
+      - name: Build DEB
+        shell: bash
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          CLEAN_VERSION="${VERSION#v}"
+
+          mkdir -p pkg/DEBIAN
+          mkdir -p pkg/opt/npsharp/lib
+          mkdir -p pkg/usr/bin
+          mkdir -p pkg/usr/share/applications
+
+          cp dist/linux/NPSharp.jar pkg/opt/npsharp/
+          cp -r dist/linux/lib pkg/opt/npsharp/
+
+          cat > pkg/usr/bin/npsharp <<'EOF'
+          #!/usr/bin/env bash
+          java --module-path "/opt/npsharp/lib" \
+            --add-modules javafx.controls,javafx.graphics,javafx.swing \
+            -cp "/opt/npsharp/NPSharp.jar:/opt/npsharp/lib/*" \
+            br.com.corelabs.npsharpfx.Main
+          EOF
+          chmod +x pkg/usr/bin/npsharp
+
+          cat > pkg/usr/share/applications/npsharp.desktop <<'EOF'
+          [Desktop Entry]
+          Name=NPSharp
+          Comment=CoreLabs NPSharp Editor
+          Exec=npsharp
+          Terminal=false
+          Type=Application
+          Categories=Development;IDE;
+          EOF
+
+          cat > pkg/DEBIAN/control <<EOF
+          Package: npsharp
+          Version: ${CLEAN_VERSION}
+          Section: devel
+          Priority: optional
+          Architecture: amd64
+          Maintainer: CoreLabs
+          Depends: openjdk-17-jre | openjdk-21-jre
+          Description: NPSharp editor by CoreLabs
+          EOF
+
+          dpkg-deb --build pkg "NPSharp-${VERSION}-linux-amd64.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: NPSharp-*-linux-amd64.deb
+
+  windows-installer:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y
+
+      - name: Build Windows dist
+        shell: powershell
+        run: |
+          mvn -B clean package
+
+          New-Item -ItemType Directory -Force dist/windows/lib | Out-Null
+          Copy-Item target/*.jar dist/windows/NPSharp.jar
+          mvn -q dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=dist/windows/lib
+
+          @'
+          @echo off
+          setlocal
+          set "APP_DIR=%~dp0"
+          javaw --module-path "%APP_DIR%lib" --add-modules javafx.controls,javafx.graphics,javafx.swing -cp "%APP_DIR%NPSharp.jar;%APP_DIR%lib\*" br.com.corelabs.npsharpfx.Main
+          if errorlevel 1 pause
+          '@ | Set-Content dist/windows/run-npsharp.bat -Encoding ASCII
+
+      - name: Build wizard installer EXE
+        shell: powershell
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc installer\NPSharp.iss
+          Rename-Item dist\installer\NPSharp-Setup.exe "NPSharp-${{ needs.validate.outputs.version }}-Setup.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/installer/*.exe
+
+  release:
+    needs: [validate, linux-deb, windows-installer]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create tag and GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          CHANGED_FILES: ${{ needs.validate.outputs.changed_files }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+          gh release create "$VERSION" artifacts/**/* \
+            --title "NPSharp $VERSION" \
+            --notes "Build automático da main. Arquivos alterados desde a última tag: $CHANGED_FILES."

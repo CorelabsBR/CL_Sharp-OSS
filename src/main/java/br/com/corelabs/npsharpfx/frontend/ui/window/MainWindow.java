@@ -413,7 +413,7 @@ registerActivity("debug",
         panel.setPadding(new Insets(12));
         panel.getStyleClass().add("settings-panel");
 
-        Label title = new Label("Installed Tools");
+        Label title = new Label("Ferramentas Instaladas");
         title.getStyleClass().add("settings-title");
 
         Label description = new Label("Runtimes and command-line tools used by run, debug and source control.");
