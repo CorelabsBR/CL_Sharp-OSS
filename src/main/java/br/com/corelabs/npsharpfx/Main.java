@@ -8,13 +8,16 @@ package br.com.corelabs.npsharpfx;
 // Classe File usada para manipular arquivos do sistema.
 // Aqui seria usada para criar um "lock file" e impedir duas instâncias do programa.
 import java.nio.file.Path;
+import java.util.Objects;
 
 import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeInstaller;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
+import br.com.corelabs.npsharpfx.config.BuildMode;
 import br.com.corelabs.npsharpfx.frontend.ui.window.MainWindow;
 import javafx.application.Application;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 
@@ -37,6 +40,21 @@ public class Main extends Application {
 @Override
 public void start(Stage stage) {
     initializeExtensionsAsync();
+
+    String iconPath = BuildMode.isDevelopment()
+            ? "/icons/dev.png"
+            : "/icons/app.png";
+
+    stage.getIcons().clear();
+    stage.getIcons().add(new Image(
+            Objects.requireNonNull(getClass().getResourceAsStream(iconPath))
+    ));
+
+    if (BuildMode.isDevelopment()) {
+        stage.setTitle("NPSharp [DEV]");
+    } else {
+        stage.setTitle("NPSharp");
+    }
 
     MainWindow window = new MainWindow(stage);
     window.show();
