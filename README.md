@@ -11,7 +11,7 @@
 É a experiência completa do editor, mas construída para desenvolvedores de verdade, por um desenvolvedor que não aceita ficar abaixo de ninguém.
 Aqui a ferramenta trabalha no seu nível — acima do resto.
 
-O Notepad Sharp é atualizado Mensalmente, com novas funcionalidades ou Fixes de Bugs. Você pode baixar-lo em Windows,MacOS, e linux, no [Site oficial](https://npsharp.corelabs.dev.br/download)
+O Notepad Sharp é atualizado Mensalmente, com novas funcionalidades ou Fixes de Bugs. Você pode baixar-lo em Windows,MacOS, e linux, no [Site oficial](https://npsharp.corelabs.dev.br#download)
 
 A motivação do NPSHARP é simples e direta: criar um editor que seja **realmente independente**, **controlado pelo desenvolvedor**, **aberto ao público**, e que permita evolução contínua sem depender de decisões corporativas ou licenças restritivas.
 O que está aqui é o ponto de partida. É o esqueleto, o motor cru, a base verificável.
@@ -32,7 +32,7 @@ Este repositório contém:
 Este repositório **não** é a versão distribuída no site npsharp.girelli.dev.br.
 
 ## O que NÃO é este repositório
-A versão oferecida no [site](https://npsharp.girelli.dev.br)
+A versão oferecida no [site](https://npsharp.corelabs.dev.br)
 
 É outro software. Compartilha origem, mas segue caminho próprio.
 
@@ -72,12 +72,12 @@ Existem várias formas de participar do desenvolvimento do NPSHARP:
 Se você deseja contribuir diretamente para o código-fonte,
 consulte o guia completo de contribuição deste projeto:
 
-* [Como compilar e executar a partir do código-fonte](https://npsharp.girelli.dev.br)
-* [Fluxo de desenvolvimento: depuração, testes e organização interna](https://npsharp.girelli.dev.br)
-* [Diretrizes de codificação usadas neste projeto](https://npsharp.girelli.dev.br)
-* [Como enviar Pull Requests para revisão](https://npsharp.girelli.dev.br)
-* [Onde encontrar tarefas e pontos do projeto que precisam de ajuda](https://npsharp.girelli.dev.br)
-* [Como contribuir com traduções da interface](https://npsharp.girelli.dev.br)
+* [Como compilar e executar a partir do código-fonte](https://npsharp.corelabs.dev.br)
+* [Fluxo de desenvolvimento: depuração, testes e organização interna](https://npsharp.corelabs.dev.br)
+* [Diretrizes de codificação usadas neste projeto](https://npsharp.corelabs.dev.br)
+* [Como enviar Pull Requests para revisão](https://npsharp.corelabs.dev.br)
+* [Onde encontrar tarefas e pontos do projeto que precisam de ajuda](https://npsharp.corelabs.dev.br)
+* [Como contribuir com traduções da interface](https://npsharp.corelabs.dev.br)
 
 O NPSHARP é um projeto independente.
 Toda contribuição é bem-vinda, desde que siga as diretrizes e respeite a filosofia do editor:
