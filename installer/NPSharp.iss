@@ -1,5 +1,5 @@
 #define MyAppName "NPSharp"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "stable v2026.4.0"
 #define MyAppPublisher "CoreLabs"
 #define MyAppLauncher "run-npsharp.bat"
 
@@ -7,8 +7,6 @@
 AppId={{8A27B871-BFF8-4D93-A96B-8659C4473E27}
 AppName=NPSharp
 AppVersion={#MyAppVersion}
-AppPublisher=CoreLabs
-AppName=NPSharp
 AppPublisher=CoreLabs
 AppPublisherURL=https://corelabs.dev.br
 AppSupportURL=https://corelabs.dev.br
