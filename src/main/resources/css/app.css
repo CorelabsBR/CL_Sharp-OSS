@@ -2234,6 +2234,31 @@
     -fx-cursor: hand;
 }
 
+.status-label-errors,
+.status-label-warnings {
+    -fx-cursor: hand;
+}
+
+.status-label-errors {
+    -fx-text-fill: #ffccd2;
+}
+
+.status-label-warnings {
+    -fx-text-fill: #ffe2a3;
+}
+
+.status-label-build {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.status-label-editor-location {
+    -fx-text-fill: -theme-statusbar-fg;
+}
+
+.problems-table .table-row-cell {
+    -fx-cell-size: 24px;
+}
+
 .settings-panel,
 .search-pane {
     -fx-background-color: -theme-sidebar-bg;
@@ -3090,5 +3115,25 @@
 .wallpaper-active .editor-tabs .tab-down-button {
     -fx-background-color: transparent;
 }
+.settings-view-root {
+    -fx-background-color: -theme-bg;
+}
 
+.settings-category-list {
+    -fx-background-color: -theme-sidebar-bg;
+}
 
+.settings-page {
+    -fx-background-color: -theme-bg;
+}
+
+.settings-page-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -theme-fg;
+}
+
+.settings-field-label {
+    -fx-text-fill: -theme-description-fg;
+    -fx-font-size: 12px;
+}

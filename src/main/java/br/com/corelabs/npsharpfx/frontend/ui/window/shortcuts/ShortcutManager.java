@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) CoreLabs. Todos os direitos reservados.
+ * Licenciado sob os termos da licença Proprietária CoreLabs.
+ * Consulte o arquivo LICENSE na raiz do projeto para mais informações.
+ */
 package br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts;
 
 import javafx.scene.Scene;
@@ -26,6 +31,7 @@ public class ShortcutManager {
         void focusEditor();
         void splitTerminal();
         void runCurrentFile();
+        void compileProject();
         void showCommandPalette();
         void showQuickOpen();
     }
@@ -148,6 +154,11 @@ public class ShortcutManager {
                 windowActions::runCurrentFile
         );
 
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                windowActions::compileProject
+        );
+
         // Tab focus
         scene.setOnKeyPressed(event -> {
             if (event.isControlDown() && event.getCode() == KeyCode.TAB) {
@@ -157,4 +168,3 @@ public class ShortcutManager {
         });
     }
 }
-

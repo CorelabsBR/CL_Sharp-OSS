@@ -79,6 +79,34 @@
                     <mainClass>br.com.corelabs.npsharpfx.Main</mainClass>
                 </configuration>
             </plugin>
+            <plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-checkstyle-plugin</artifactId>
+    <version>3.4.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>10.17.0</version>
+        </dependency>
+    </dependencies>
+    <configuration>
+        <configLocation>config/checkstyle/checkstyle.xml</configLocation>
+        <encoding>UTF-8</encoding>
+        <consoleOutput>true</consoleOutput>
+        <failsOnError>true</failsOnError>
+        <includeTestSourceDirectory>true</includeTestSourceDirectory>
+    </configuration>
+    <executions>
+        <execution>
+            <id>checkstyle-validate</id>
+            <phase>validate</phase>
+            <goals>
+                <goal>check</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
         </plugins>
     </build>
 

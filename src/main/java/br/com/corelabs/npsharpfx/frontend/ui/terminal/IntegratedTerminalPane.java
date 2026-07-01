@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) CoreLabs. Todos os direitos reservados.
+ * Licenciado sob os termos da licença Proprietária CoreLabs.
+ * Consulte o arquivo LICENSE na raiz do projeto para mais informações.
+ */
 package br.com.corelabs.npsharpfx.frontend.ui.terminal;
 
 import java.io.BufferedReader;
@@ -10,10 +15,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -21,6 +29,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
@@ -45,6 +56,9 @@ public class IntegratedTerminalPane extends BorderPane {
     private final BorderPane debugConsolePane = new BorderPane();
 private final TextArea debugOutputArea = new TextArea();
 private final TextField debugInputField = new TextField();
+    private final BorderPane problemsPane = new BorderPane();
+    private final TableView<EditorDiagnostic> problemsTable = new TableView<>();
+    private Consumer<EditorDiagnostic> problemOpenAction;
 
     private final java.util.concurrent.BlockingQueue<String> inputQueue =
         new java.util.concurrent.LinkedBlockingQueue<>();
@@ -68,6 +82,7 @@ private final TextField debugInputField = new TextField();
         setTop(topContainer);
         setCenter(tabPane);
         setupDebugConsole();
+        setupProblemsPane();
         setCenter(tabPane);
     }
 
@@ -118,6 +133,59 @@ private void setupDebugConsole() {
     debugConsolePane.setBottom(inputBox);
 }
 
+@SuppressWarnings("unchecked")
+private void setupProblemsPane() {
+    problemsTable.getStyleClass().add("problems-table");
+    problemsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+    problemsTable.setPlaceholder(new Label("No problems"));
+
+    TableColumn<EditorDiagnostic, String> severity = new TableColumn<>("Severity");
+    severity.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getSeverity()));
+    severity.setPrefWidth(90);
+
+    TableColumn<EditorDiagnostic, String> file = new TableColumn<>("File");
+    file.setCellValueFactory(cell -> new SimpleStringProperty(fileLabel(cell.getValue())));
+    file.setPrefWidth(190);
+
+    TableColumn<EditorDiagnostic, String> line = new TableColumn<>("Line");
+    line.setCellValueFactory(cell -> new SimpleStringProperty(String.valueOf(cell.getValue().getLine())));
+    line.setPrefWidth(70);
+
+    TableColumn<EditorDiagnostic, String> column = new TableColumn<>("Column");
+    column.setCellValueFactory(cell -> new SimpleStringProperty(String.valueOf(cell.getValue().getColumn())));
+    column.setPrefWidth(80);
+
+    TableColumn<EditorDiagnostic, String> message = new TableColumn<>("Message");
+    message.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getMessage()));
+    message.setPrefWidth(420);
+
+    TableColumn<EditorDiagnostic, String> source = new TableColumn<>("Source");
+    source.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getSource()));
+    source.setPrefWidth(120);
+
+    problemsTable.getColumns().setAll(severity, file, line, column, message, source);
+    problemsTable.setRowFactory(table -> {
+        TableRow<EditorDiagnostic> row = new TableRow<>();
+        row.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && !row.isEmpty() && problemOpenAction != null) {
+                problemOpenAction.accept(row.getItem());
+            }
+        });
+        return row;
+    });
+
+    problemsPane.setCenter(problemsTable);
+}
+
+private String fileLabel(EditorDiagnostic diagnostic) {
+    if (diagnostic == null || diagnostic.getFile() == null) {
+        return "";
+    }
+
+    java.nio.file.Path fileName = diagnostic.getFile().getFileName();
+    return fileName == null ? diagnostic.getFile().toString() : fileName.toString();
+}
+
 public void showDebugConsolePanel() {
     setCenter(debugConsolePane);
     debugInputField.requestFocus();
@@ -131,6 +199,18 @@ public void showTerminalPanel() {
     }
 
     focusCurrentTerminal();
+}
+
+public void showProblemsPanel() {
+    setCenter(problemsPane);
+}
+
+public void setProblems(List<EditorDiagnostic> diagnostics) {
+    Platform.runLater(() -> problemsTable.getItems().setAll(diagnostics == null ? List.of() : diagnostics));
+}
+
+public void setProblemOpenAction(Consumer<EditorDiagnostic> problemOpenAction) {
+    this.problemOpenAction = problemOpenAction;
 }
 
 public void clearDebugConsole() {
@@ -156,8 +236,7 @@ public void appendDebugOutput(String text) {
     terminal.getStyleClass().add("integrated-terminal-tab-active");
 
     problems.setOnMouseClicked(e -> {
-        showTerminalPanel();
-        appendOutput("[Problems] Nenhum problema registrado nesta sessao.");
+        showProblemsPanel();
     });
     output.setOnMouseClicked(e -> {
         showTerminalPanel();
@@ -190,7 +269,7 @@ terminal.setOnMouseClicked(e -> showTerminalPanel());
     killTerminalBtn.setOnAction(e -> killCurrentTerminal());
 
     Button moreBtn = createHeaderButton("...", "Mais acoes");
-    moreBtn.setOnAction(e -> appendOutput("[Terminal] AÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes: novo, dividir, limpar ou fechar terminal."));
+    moreBtn.setOnAction(e -> appendOutput("[Terminal] Ações: novo, dividir, limpar ou fechar terminal."));
 
     Button maximizeBtn = createHeaderButton("^", "Maximizar painel");
     maximizeBtn.setOnAction(e -> increaseHeight());

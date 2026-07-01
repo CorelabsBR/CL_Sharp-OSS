@@ -100,9 +100,14 @@ jobs:
           mkdir -p pkg/opt/npsharp/lib
           mkdir -p pkg/usr/bin
           mkdir -p pkg/usr/share/applications
+          mkdir -p pkg/usr/share/icons/hicolor/256x256/apps
+          mkdir -p pkg/usr/share/pixmaps
 
           cp dist/linux/NPSharp.jar pkg/opt/npsharp/
           cp -r dist/linux/lib pkg/opt/npsharp/
+
+          cp src/main/resources/icons/app.png pkg/usr/share/icons/hicolor/256x256/apps/npsharp.png
+          cp src/main/resources/icons/app.png pkg/usr/share/pixmaps/npsharp.png
 
           cat > pkg/usr/bin/npsharp <<'EOF'
           #!/usr/bin/env bash
@@ -111,17 +116,37 @@ jobs:
             -cp "/opt/npsharp/NPSharp.jar:/opt/npsharp/lib/*" \
             br.com.corelabs.npsharpfx.Main
           EOF
+          sed -i 's/^          //' pkg/usr/bin/npsharp
           chmod +x pkg/usr/bin/npsharp
 
           cat > pkg/usr/share/applications/npsharp.desktop <<'EOF'
           [Desktop Entry]
+          Version=1.0
           Name=NPSharp
+          GenericName=Code Editor
           Comment=CoreLabs NPSharp Editor
           Exec=npsharp
+          Icon=npsharp
           Terminal=false
           Type=Application
           Categories=Development;IDE;
+          StartupNotify=true
           EOF
+          sed -i 's/^          //' pkg/usr/share/applications/npsharp.desktop
+
+          cat > pkg/DEBIAN/postinst <<'EOF'
+          #!/bin/sh
+          set -e
+          if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+          fi
+          if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q /usr/share/applications || true
+          fi
+          exit 0
+          EOF
+          sed -i 's/^          //' pkg/DEBIAN/postinst
+          chmod 755 pkg/DEBIAN/postinst
 
           cat > pkg/DEBIAN/control <<EOF
           Package: npsharp
@@ -135,12 +160,6 @@ jobs:
           EOF
 
           dpkg-deb --build pkg "NPSharp-${VERSION}-linux-amd64.deb"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-deb
-          path: NPSharp-*-linux-amd64.deb
-
   windows-installer:
     needs: validate
     runs-on: windows-latest

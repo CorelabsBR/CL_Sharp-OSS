@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) CoreLabs. Todos os direitos reservados.
+ * Licenciado sob os termos da licença Proprietária CoreLabs.
+ * Consulte o arquivo LICENSE na raiz do projeto para mais informações.
+ */
 package br.com.corelabs.npsharpfx.frontend.ui.window.panels;
 
 import javafx.geometry.Insets;
@@ -11,9 +16,12 @@ import javafx.scene.layout.VBox;
 
 public class SettingsPanelBuilder {
     
+    
 
 public Node buildSettingsPanel(
+        Runnable openCommandPalette,
         Runnable onAppearanceClick,
+        Runnable openSettingsView,
         Runnable onThemesClick,
         Runnable onWallpaperClick,
         Runnable onRemoveWallpaperClick) {
@@ -27,6 +35,7 @@ public Node buildSettingsPanel(
     appearanceSubmenu.getStyleClass().add("settings-submenu");
     appearanceSubmenu.setVisible(false);
     appearanceSubmenu.setManaged(false);
+    Button commandPaletteButton = createSettingsMenuItem("Command Palette...", "Ctrl+Shift+P", openCommandPalette);
 
     Button colorThemeButton = createSettingsMenuItem("Color Theme...", "Escolher", onThemesClick);
     Button wallpaperButton = createSettingsMenuItem("Wallpaper...", "Escolher", onWallpaperClick);
@@ -37,6 +46,7 @@ public Node buildSettingsPanel(
     clearWallpaperButton.getStyleClass().add("settings-submenu-item");
 
     appearanceSubmenu.getChildren().addAll(
+            commandPaletteButton,
             colorThemeButton,
             wallpaperButton,
             clearWallpaperButton
@@ -45,23 +55,22 @@ public Node buildSettingsPanel(
     Button appearanceButton = createSettingsMenuItem("Aparencia", "›", onAppearanceClick);
 
     content.getChildren().addAll(
-            createSettingsMenuItem("Command Palette..."),
-            createSettingsMenuItem("Settings", "Ctrl+,"),
-            createSettingsMenuItem("Keyboard Shortcuts", "Ctrl+K Ctrl+S"),
-            createSettingsMenuItem("Snippets"),
-            createSettingsMenuItem("Tasks"),
+        commandPaletteButton,
+        createSettingsMenuItem("Settings", "Ctrl+,", openSettingsView),
+        createSettingsMenuItem("Keyboard Shortcuts", "Ctrl+K Ctrl+S"),
+        createSettingsMenuItem("Snippets"),
+        createSettingsMenuItem("Tasks"),
 
-            new Separator(),
+        new Separator(),
 
-            appearanceButton,
-            appearanceSubmenu,
+        appearanceButton,
+        appearanceSubmenu,
 
-            new Separator(),
+        new Separator(),
 
-            createSettingsMenuItem("Backup and Sync Settings..."),
-            createSettingsMenuItem("Download Update (1)")
-    );
-
+        createSettingsMenuItem("Backup and Sync Settings..."),
+        createSettingsMenuItem("Download Update (1)")
+)       ;
     ScrollPane scrollPane = new ScrollPane(content);
     scrollPane.setFitToWidth(true);
     scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -85,6 +94,7 @@ public Node buildSettingsPanel(
     private Button createSettingsMenuItem(String text, String shortcut) {
         return createSettingsMenuItem(text, shortcut, null);
     }
+    
 
     private Button createSettingsMenuItem(String text, String shortcut, Runnable action) {
         Button button = new Button();

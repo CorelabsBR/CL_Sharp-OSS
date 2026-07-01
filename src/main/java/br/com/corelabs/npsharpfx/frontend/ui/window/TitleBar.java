@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) CoreLabs. Todos os direitos reservados.
+ * Licenciado sob os termos da licença Proprietária CoreLabs.
+ * Consulte o arquivo LICENSE na raiz do projeto para mais informações.
+ */
 package br.com.corelabs.npsharpfx.frontend.ui.window;
 
 import java.io.File;
@@ -263,6 +268,9 @@ private String getWorkspaceNameForBar() {
     public void setQuickOpenFileAction(Consumer<File> quickOpenFileAction) {
         this.quickOpenFileAction = quickOpenFileAction;
     }
+    public void showCommandPalette() {
+    openCommandPalette();
+    }   
 
     public void showQuickOpen() {
         openQuickOpen();
@@ -928,7 +936,6 @@ private String getWorkspaceNameForBar() {
 
 
         menu.getChildren().addAll(
-                createMenuItem("Command Palette...", "Ctrl+Shift+P", this::openCommandPalette),
                 createMenuItem("Open View...", null, this::openViewPicker),
                 createMenuItem("Explorer", "Ctrl+Shift+E", () -> runAction(showExplorerAction, "Explorer")),
                 createMenuItem("Search", "Ctrl+Shift+F", () -> runAction(showSearchAction, "Search")),

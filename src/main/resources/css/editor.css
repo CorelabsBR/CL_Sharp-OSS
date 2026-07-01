@@ -31,3 +31,71 @@
 .paragraph-box:has-caret .lineno .text {
     -fx-fill: -fx-text-inner-color;
 }
+
+/* ErrorLens decorations. Messages are virtual nodes; they never change editor text. */
+.errorlens-line-error {
+    -fx-background-color: rgba(120, 24, 32, 0.34);
+}
+
+.errorlens-line-warning {
+    -fx-background-color: rgba(148, 96, 24, 0.30);
+}
+
+.errorlens-line-info,
+.errorlens-line-hint {
+    -fx-background-color: rgba(36, 92, 150, 0.26);
+}
+
+.errorlens-graphic {
+    -fx-background-color: transparent;
+}
+
+.errorlens-gutter {
+    -fx-alignment: center-left;
+}
+
+.errorlens-gutter-error {
+    -fx-text-fill: #ff6b7a;
+    -fx-font-weight: bold;
+}
+
+.errorlens-gutter-warning {
+    -fx-text-fill: #f5b84b;
+    -fx-font-weight: bold;
+}
+
+.errorlens-gutter-info,
+.errorlens-gutter-hint {
+    -fx-text-fill: #66b4ff;
+    -fx-font-weight: bold;
+}
+
+.errorlens-message-error,
+.errorlens-message-warning,
+.errorlens-message-info,
+.errorlens-message-hint {
+    -fx-padding: 1 8 1 8;
+    -fx-background-radius: 3;
+    -fx-font-family: "Cascadia Code", "Consolas", monospace;
+    -fx-font-size: 12px;
+}
+
+.errorlens-message-error {
+    -fx-text-fill: #ff7b8a;
+    -fx-background-color: rgba(120, 24, 32, 0.30);
+}
+
+.errorlens-message-warning {
+    -fx-text-fill: #ffd166;
+    -fx-background-color: rgba(148, 96, 24, 0.28);
+}
+
+.errorlens-message-info,
+.errorlens-message-hint {
+    -fx-text-fill: #8cc8ff;
+    -fx-background-color: rgba(36, 92, 150, 0.24);
+}
+
+.diagnostic-flash-line {
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+}

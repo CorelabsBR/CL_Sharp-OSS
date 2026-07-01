@@ -1,8 +1,14 @@
+/**
+ * Copyright (c) CoreLabs. Todos os direitos reservados.
+ * Licenciado sob os termos da licença Proprietária CoreLabs.
+ * Consulte o arquivo LICENSE na raiz do projeto para mais informações.
+ */
 package br.com.corelabs.npsharpfx.frontend.ui.editor;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,6 +26,10 @@ import org.fxmisc.richtext.model.StyleSpans;
 
 import br.com.corelabs.npsharpfx.backend.engine.editor.SyntaxHighlighter;
 import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchResult;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.ErrorLensRenderer;
+import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
@@ -32,7 +42,6 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import org.fxmisc.richtext.LineNumberFactory;
 
 /*
 ========================================================
@@ -77,6 +86,7 @@ public class EditorManager {
     ========================================= */
 
     private static final int MAX_RECENT_FILES = 20;
+    private static final String DIAGNOSTIC_FLASH_STYLE = "diagnostic-flash-line";
 
     /* =========================================
        REFERÃŠNCIAS PRINCIPAIS
@@ -84,6 +94,7 @@ public class EditorManager {
 
     private final Stage stage;
     private final Consumer<String> statusUpdater;
+    private final DiagnosticsService diagnosticsService;
 
     /* =========================================
        COMPONENTES VISUAIS PRINCIPAIS
@@ -120,6 +131,10 @@ public class EditorManager {
     private final Map<Tab, String> tabLineEndings = new HashMap<>();
     private final Map<Tab, Consumer<String>> tabVirtualSaveHandlers = new HashMap<>();
     private final Map<Tab, String> tabVirtualUris = new HashMap<>();
+    private final Map<Tab, ErrorLensRenderer> tabErrorLensRenderers = new HashMap<>();
+
+    private boolean errorLensEnabled = true;
+    private Consumer<File> fileSavedListener;
 
     /* =========================================
        LISTA DE ARQUIVOS RECENTES
@@ -137,9 +152,11 @@ public class EditorManager {
        CONSTRUTOR
     ========================================= */
 
-    public EditorManager(Stage stage, Consumer<String> statusUpdater) {
+    public EditorManager(Stage stage, Consumer<String> statusUpdater, DiagnosticsService diagnosticsService) {
         this.stage = stage;
         this.statusUpdater = statusUpdater;
+        this.diagnosticsService = diagnosticsService == null ? new DiagnosticsService() : diagnosticsService;
+        this.diagnosticsService.addListener(() -> Platform.runLater(this::renderAllErrorLens));
 
         // cria o container de abas
         this.tabPane = new TabPane();
@@ -148,6 +165,9 @@ public class EditorManager {
 
         // sempre que muda a aba selecionada, atualiza status
         this.tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            if (newTab != null) {
+                renderErrorLensForTab(newTab);
+            }
             refreshStatusFromSelectedTab();
         });
 
@@ -877,15 +897,6 @@ editor.getStylesheets().add(
                 getClass().getResource("/css/editor.css")
         ).toExternalForm()
 );
-/*
-========================================
-LINE NUMBERS
-========================================
-*/
-
-editor.setParagraphGraphicFactory(
-        LineNumberFactory.get(editor)
-);
         // remove o background branco hardcoded do GenericStyledArea
         // para que o CSS consiga controlar a cor de fundo
         editor.setBackground(null);
@@ -917,6 +928,8 @@ editor.setParagraphGraphicFactory(
                 tabSuggestedExtensions.put(tab, ext);
             }
         }
+
+        registerDiagnostics(tab, editor);
 
         tabLineEndings.put(tab, lineEnding);
         tabDirtyState.put(tab, false);
@@ -952,6 +965,7 @@ editor.setParagraphGraphicFactory(
         // aplica syntax highlighting inicial
         String lang = detectLanguage(tab, title);
         applyHighlighting(editor, lang);
+        renderErrorLensForTab(tab);
 
         // re-aplica highlighting com debounce ao editar
         editor.multiPlainChanges()
@@ -959,6 +973,7 @@ editor.setParagraphGraphicFactory(
                 .subscribe(ignore -> {
                     String currentLang = detectLanguage(tab, buildSuggestedFileName(tab));
                     applyHighlighting(editor, currentLang);
+                    renderErrorLensForTab(tab);
                 });
 
         // fechamento com confirmaÃ§Ã£o
@@ -977,6 +992,7 @@ editor.setParagraphGraphicFactory(
 
         tab.setOnSelectionChanged(event -> {
             if (tab.isSelected()) {
+                renderErrorLensForTab(tab);
                 refreshStatusFromSelectedTab();
             }
         });
@@ -1042,6 +1058,115 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
 
     refreshStatusFromSelectedTab();
 }
+
+    public void setErrorLensEnabled(boolean enabled) {
+        errorLensEnabled = enabled;
+
+        for (Tab tab : getAllTabs()) {
+            renderErrorLensForTab(tab);
+        }
+    }
+
+    public boolean isErrorLensEnabled() {
+        return errorLensEnabled;
+    }
+
+    public void setFileSavedListener(Consumer<File> fileSavedListener) {
+        this.fileSavedListener = fileSavedListener;
+    }
+
+    public void setDiagnosticsForCurrentEditor(List<EditorDiagnostic> diagnostics) {
+        Tab selectedTab = tabPane.getSelectionModel().getSelectedItem();
+        if (selectedTab == null) {
+            return;
+        }
+
+        File file = tabFiles.get(selectedTab);
+        if (file == null) {
+            return;
+        }
+
+        diagnosticsService.setDiagnostics(file.toPath(), diagnostics);
+        renderErrorLensForTab(selectedTab);
+    }
+
+    public void clearDiagnosticsForCurrentEditor() {
+        setDiagnosticsForCurrentEditor(List.of());
+    }
+
+    private void registerDiagnostics(Tab tab, CodeArea editor) {
+        tabErrorLensRenderers.put(tab, new ErrorLensRenderer(editor, () -> diagnosticsForTab(tab)));
+    }
+
+    private void renderErrorLensForTab(Tab tab) {
+        ErrorLensRenderer renderer = tabErrorLensRenderers.get(tab);
+        if (renderer == null) {
+            return;
+        }
+
+        renderer.render(errorLensEnabled);
+    }
+
+    private void renderAllErrorLens() {
+        for (Tab tab : getAllTabs()) {
+            renderErrorLensForTab(tab);
+        }
+    }
+
+    private List<EditorDiagnostic> diagnosticsForTab(Tab tab) {
+        File file = tabFiles.get(tab);
+        if (file == null) {
+            return List.of();
+        }
+
+        return diagnosticsService.getDiagnosticsForFile(file.toPath());
+    }
+
+    public void openDiagnostic(EditorDiagnostic diagnostic) {
+        if (diagnostic == null || diagnostic.getFile() == null) {
+            return;
+        }
+
+        Path path = diagnostic.getFile();
+        File file = path.toFile();
+        if (file.isFile()) {
+            openFileInTab(file);
+        }
+
+        Tab selectedTab = tabPane.getSelectionModel().getSelectedItem();
+        goToPosition(selectedTab, diagnostic.getLine(), diagnostic.getColumn());
+        flashDiagnosticLine(selectedTab, diagnostic.getLine());
+    }
+
+    private void flashDiagnosticLine(Tab tab, int line) {
+        CodeArea editor = tabEditors.get(tab);
+        if (editor == null) {
+            return;
+        }
+
+        int paragraph = Math.max(0, line - 1);
+        if (paragraph >= editor.getParagraphs().size()) {
+            return;
+        }
+
+        Collection<String> currentStyle = editor.getParagraph(paragraph).getParagraphStyle();
+        List<String> nextStyle = new ArrayList<>(currentStyle == null ? List.of() : currentStyle);
+        if (!nextStyle.contains(DIAGNOSTIC_FLASH_STYLE)) {
+            nextStyle.add(DIAGNOSTIC_FLASH_STYLE);
+        }
+        editor.setParagraphStyle(paragraph, nextStyle);
+
+        javafx.animation.PauseTransition pause =
+                new javafx.animation.PauseTransition(javafx.util.Duration.millis(1200));
+        pause.setOnFinished(event -> {
+            Collection<String> style = editor.getParagraph(paragraph).getParagraphStyle();
+            List<String> restored = new ArrayList<>(style == null ? List.of() : style);
+            restored.remove(DIAGNOSTIC_FLASH_STYLE);
+            editor.setParagraphStyle(paragraph, restored);
+        });
+        pause.play();
+    }
+
     /* =========================================
        ESCREVE O CONTEÃšDO DA ABA EM DISCO
     ========================================= */
@@ -1067,6 +1192,8 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
 
             updateTabTitle(tab);
             addRecentFile(file);
+            renderErrorLensForTab(tab);
+            notifyFileSaved(file);
 
             updateStatus("Arquivo salvo: " + file.getName());
             refreshStatusFromSelectedTab();
@@ -1085,10 +1212,17 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
             tabInitialContent.put(tab, normalized);
             tabLineEndings.put(tab, detectLineEnding(normalized));
             updateTabTitle(tab);
+            renderErrorLensForTab(tab);
             updateStatus("Arquivo remoto salvo: " + buildSuggestedFileName(tab));
             refreshStatusFromSelectedTab();
         } catch (Exception e) {
             updateStatus("Erro ao salvar arquivo remoto: " + (e.getMessage() == null ? "falha desconhecida" : e.getMessage()));
+        }
+    }
+
+    private void notifyFileSaved(File file) {
+        if (fileSavedListener != null && file != null) {
+            fileSavedListener.accept(file);
         }
     }
 
@@ -1326,6 +1460,7 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
         tabLineEndings.remove(tab);
         tabVirtualSaveHandlers.remove(tab);
         tabVirtualUris.remove(tab);
+        tabErrorLensRenderers.remove(tab);
 
         if (associatedFile != null) {
             openTabs.remove(associatedFile.getAbsolutePath());
@@ -1380,7 +1515,7 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
             }
         }
 
-        tab.setText(dirty ? "â— " + baseName : baseName);
+        tab.setText(dirty ? "* " + baseName : baseName);
     }
 
     /* =========================================
@@ -1433,17 +1568,11 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
         IndexRange selection = editor.getSelection();
         int selectedChars = Math.max(0, selection.getLength());
 
-        String language = detectLanguage(selectedTab, fileName);
-        String lineEnding = tabLineEndings.getOrDefault(selectedTab, "LF");
-
-        String status = "UTF-8"
-                + "    " + language
-                + "    " + lineEnding
-                + "    Ln " + line + ", Col " + column
-                + (selectedChars > 0 ? ("    Sel " + selectedChars) : "")
-                + "    " + fileName
-                + (remote ? "    remoto" : "")
-                + "    " + (dirty ? "modificado" : "salvo");
+        String status = fileName
+                + "  Ln " + line + ", Col " + column
+                + (selectedChars > 0 ? ("  Sel " + selectedChars) : "")
+                + (remote ? "  remoto" : "")
+                + (dirty ? "  modificado" : "");
 
         updateStatus(status);
     }

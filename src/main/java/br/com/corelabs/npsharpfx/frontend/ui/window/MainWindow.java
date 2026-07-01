@@ -1,7 +1,14 @@
+/**
+ * Copyright (c) CoreLabs. Todos os direitos reservados.
+ * Licenciado sob os termos da licença Proprietária CoreLabs.
+ * Consulte o arquivo LICENSE na raiz do projeto para mais informações.
+ */
 package br.com.corelabs.npsharpfx.frontend.ui.window;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -9,34 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.prefs.Preferences;
 
-import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
-import br.com.corelabs.npsharpfx.backend.git.GitService;
-import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
-import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
-import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
-import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
-import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
-import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
-import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
-import br.com.corelabs.npsharpfx.frontend.ui.git.SourceControlPanel;
-import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
-import br.com.corelabs.npsharpfx.frontend.ui.remote.RemoteHostPanel;
-import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane;
-import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane.SearchQuery;
-import br.com.corelabs.npsharpfx.frontend.ui.search.SearchResult;
-import br.com.corelabs.npsharpfx.frontend.ui.terminal.IntegratedTerminalPane;
-import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
-import br.com.corelabs.npsharpfx.frontend.ui.theme.VSCodeThemeEntry;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager.ActivityItem;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.SidePanelManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.StatusBarManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.VSCodeLayoutAnimator;
-import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SearchHelper;
-import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
-import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
-import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -62,6 +42,41 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
+import javafx.util.Duration;
+
+//aqui vai imports de arquivos. seu mongo
+import br.com.corelabs.npsharpfx.frontend.settings.SettingsView;
+import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
+import br.com.corelabs.npsharpfx.backend.git.GitService;
+import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
+import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.JavaDiagnosticsRunner;
+import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
+import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
+import br.com.corelabs.npsharpfx.frontend.ui.git.SourceControlPanel;
+import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
+import br.com.corelabs.npsharpfx.frontend.ui.remote.RemoteHostPanel;
+import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane;
+import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane.SearchQuery;
+import br.com.corelabs.npsharpfx.frontend.ui.search.SearchResult;
+import br.com.corelabs.npsharpfx.frontend.ui.terminal.IntegratedTerminalPane;
+import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
+import br.com.corelabs.npsharpfx.frontend.ui.theme.VSCodeThemeEntry;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager.ActivityItem;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.SidePanelManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.StatusBarManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.VSCodeLayoutAnimator;
+import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SearchHelper;
+import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
+import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
+import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
 
 
 public class MainWindow {
@@ -114,10 +129,17 @@ private static final double MIN_HEIGHT = 520;
     private TextField sourceControlCommitField;
     private GitService gitService;
     private SourceControlPanel sourceControlPanel;
+    private Node previousCenterContent;
+    private boolean settingsViewOpen = false;
     private final RemoteHostService remoteHostService = new RemoteHostService();
+    private final DiagnosticsService diagnosticsService = new DiagnosticsService();
+    private final JavaDiagnosticsRunner javaDiagnosticsRunner = new JavaDiagnosticsRunner(diagnosticsService);
+    private final PauseTransition diagnosticsDebounce = new PauseTransition(Duration.millis(1200));
+    private boolean errorLensEnabled = true;
 
     private static final String PREF_WORKSPACE = "workspace";
     private static final String PREF_OPEN_FILES = "openFiles";
+
 
     private final Preferences prefs =
         Preferences.userNodeForPackage(MainWindow.class);
@@ -135,8 +157,47 @@ private static final double MIN_HEIGHT = 520;
         this.shortcutManager = new ShortcutManager();
         this.searchHelper = new SearchHelper();
         this.settingsPanelBuilder = new SettingsPanelBuilder();
+        this.diagnosticsDebounce.setOnFinished(event -> compileProject());
+        this.diagnosticsService.addListener(() -> Platform.runLater(this::refreshDiagnosticsUi));
         configureStage();
     }
+    private void openSettingsView() {
+    if (centerArea == null) {
+        statusBarManager.updateStatusLeft("Settings indisponivel: centerArea nao inicializado");
+        return;
+    }
+
+    if (!settingsViewOpen) {
+        previousCenterContent = centerArea.getCenter();
+    }
+
+    SettingsView settingsView = new SettingsView();
+
+    Node view = settingsView.build(this::hideSettingsView);
+    view.getStyleClass().add("settings-full-view");
+
+    centerArea.setCenter(view);
+    settingsViewOpen = true;
+
+    statusBarManager.updateStatusLeft("Settings aberto");
+    statusBarManager.updateStatusRight("Settings");
+}
+
+private void hideSettingsView() {
+    if (centerArea == null) {
+        return;
+    }
+
+    if (previousCenterContent != null) {
+        centerArea.setCenter(previousCenterContent);
+    }
+
+    previousCenterContent = null;
+    settingsViewOpen = false;
+
+    statusBarManager.updateStatusLeft("Settings fechado");
+    statusBarManager.updateStatusRight("Ready");
+}
 
     private void saveSession() {
     File workspace = explorerPane.getCurrentRootFolder();
@@ -249,8 +310,11 @@ private void restoreSession() {
 
     editorManager = new EditorManager(
             stage,
-            this::updateEditorStatus
+            this::updateEditorStatus,
+            diagnosticsService
     );
+    editorManager.setErrorLensEnabled(errorLensEnabled);
+    editorManager.setFileSavedListener(this::scheduleDiagnosticsAfterSave);
 
     /*
     ========================================
@@ -621,7 +685,7 @@ registerActivity("debug",
         sourceControlSummaryLabel.setText(changes.isEmpty()
                 ? "Sem alteracoes"
                 : changes.size() + " arquivo(s) alterado(s)");
-        statusBarManager.updateGitStatus("$(git) " + branchName + (changes.isEmpty() ? "" : " *" + changes.size()));
+        statusBarManager.updateGitStatus(branchName + (changes.isEmpty() ? "" : " *" + changes.size()));
 
         sourceControlList.getChildren().clear();
         if (changes.isEmpty()) {
@@ -808,6 +872,8 @@ registerActivity("debug",
 
         terminalPane.setHeightChangeHandler(this::resizeTerminalPane);
         terminalPane.setWorkingDirectorySupplier(this::getTerminalWorkingDirectory);
+        terminalPane.setProblemOpenAction(editorManager::openDiagnostic);
+        terminalPane.setProblems(diagnosticsService.getAllDiagnostics());
 
         /*
         ========================================
@@ -986,6 +1052,9 @@ appRoot.getChildren().add(root);
     }
 
     private void configureStatusBarActions() {
+        statusBarManager.setProblemsAction(this::showProblemsPane);
+        statusBarManager.updateDiagnosticsCounts(0, 0);
+        statusBarManager.updateBuildStatus(JavaDiagnosticsRunner.BuildStatus.IDLE.label());
         statusBarManager.setGitAction(() -> {
             sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
             refreshSourceControlPanel();
@@ -1181,6 +1250,8 @@ appRoot.getChildren().add(root);
                     public void splitTerminal() { showTerminalPane(); terminalPane.splitTerminal(); }
                     @Override
                     public void runCurrentFile() { showTerminalPane(); MainWindow.this.runSelectedCode(); }
+                    @Override
+                    public void compileProject() { MainWindow.this.compileProject(); }
                     @Override
                     public void showCommandPalette() { MainWindow.this.showCommandPalette(); }
                     @Override
@@ -1384,6 +1455,7 @@ appRoot.getChildren().add(root);
             showTerminalPane();
             terminalPane.showDebugConsolePanel();
         }));
+        commands.add(new CommandAction("Build: Compile Project", "Ctrl+Shift+B", "compilar projeto build compile maven", this::compileProject));
 
         commands.add(new CommandAction("Preferences: Color Theme", "", "tema cores", this::openThemeChooser));
         commands.add(new CommandAction("Preferences: Wallpaper", "", "papel parede wallpaper background", this::chooseWallpaper));
@@ -1391,6 +1463,7 @@ appRoot.getChildren().add(root);
         commands.add(new CommandAction("Preferences: Wallpaper Opacity +", "", "wallpaper opacidade aumentar", () -> adjustWallpaperOpacity(0.08)));
         commands.add(new CommandAction("Preferences: Wallpaper Opacity -", "", "wallpaper opacidade diminuir", () -> adjustWallpaperOpacity(-0.08)));
         commands.add(new CommandAction("Preferences: Clear Wallpaper", "", "wallpaper remover limpar", this::clearWallpaper));
+        commands.add(new CommandAction("Preferences: ErrorLens Toggle", "", "errorlens alternar diagnosticos diagnostics erro aviso", this::toggleErrorLens));
 
         commands.add(new CommandAction("Runtime: Rescan PATH", "", "runtime path ferramenta linguagem git debug", this::rescanRuntimePaths));
         for (LanguageRuntime language : LanguageRuntime.values()) {
@@ -1655,7 +1728,9 @@ private void showSettingsPopup(Node anchor) {
     final Node[] menuRef = new Node[1];
 
     Node menu = settingsPanelBuilder.buildSettingsPanel(
+        titleBar::showCommandPalette,
             () -> showAppearancePopup(menuRef[0]),
+            this::openSettingsView,
             this::openThemeChooser,
             this::chooseWallpaper,
             this::clearWallpaper
@@ -1787,6 +1862,12 @@ private void hideAppearancePopup() {
         statusBarManager.updateStatusLeft("Opacidade do wallpaper: " + (int) Math.round(next * 100) + "%");
     }
 
+    private void toggleErrorLens() {
+        errorLensEnabled = !errorLensEnabled;
+        editorManager.setErrorLensEnabled(errorLensEnabled);
+        statusBarManager.updateStatusLeft(errorLensEnabled ? "ErrorLens ativado" : "ErrorLens desativado");
+    }
+
     private void rescanRuntimePaths() {
         try {
             RuntimeRegistry registry = new RuntimeRegistry(RuntimePaths.appDataDir());
@@ -1903,6 +1984,99 @@ private void closeFolderFromExplorer() {
         if (verticalSplit != null) {
             resizeTerminalPane(terminalPane.getPrefHeight());
         }
+    }
+
+    private void showProblemsPane() {
+        showTerminalPane();
+        terminalPane.showProblemsPanel();
+        terminalPane.setProblems(diagnosticsService.getAllDiagnostics());
+        statusBarManager.updateTerminalStatus("Problems");
+        statusBarManager.updateStatusLeft("Problems");
+    }
+
+    private void compileProject() {
+        Path buildRoot = resolveBuildRoot();
+        if (buildRoot == null) {
+            Path diagnosticFile = Path.of(System.getProperty("user.dir")).toAbsolutePath().resolve("pom.xml");
+            diagnosticsService.setDiagnostics(diagnosticFile, List.of(new EditorDiagnostic(
+                    diagnosticFile,
+                    1,
+                    1,
+                    EditorDiagnostic.ERROR,
+                    "pom.xml nao encontrado para compilar o projeto",
+                    "maven"
+            )));
+            statusBarManager.updateBuildStatus(JavaDiagnosticsRunner.BuildStatus.FAILED.label());
+            statusBarManager.updateStatusLeft("pom.xml nao encontrado");
+            return;
+        }
+
+        javaDiagnosticsRunner.compileProject(
+                buildRoot,
+                status -> Platform.runLater(() -> {
+                    statusBarManager.updateBuildStatus(status.label());
+                    if (status == JavaDiagnosticsRunner.BuildStatus.COMPILING) {
+                        statusBarManager.updateStatusLeft("Compilando projeto...");
+                    }
+                }),
+                (success, output) -> Platform.runLater(() -> {
+                    refreshDiagnosticsUi();
+                    statusBarManager.updateStatusLeft(success
+                            ? "Build OK"
+                            : "Build Failed" + (output == null || output.isBlank() ? "" : ": " + firstLine(output)));
+                })
+        );
+    }
+
+    private void scheduleDiagnosticsAfterSave(File file) {
+        if (file == null || !file.isFile() || !file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".java")) {
+            return;
+        }
+
+        diagnosticsDebounce.playFromStart();
+    }
+
+    private void refreshDiagnosticsUi() {
+        List<EditorDiagnostic> diagnostics = diagnosticsService.getAllDiagnostics();
+        statusBarManager.updateDiagnosticsCounts(
+                diagnosticsService.countErrors(),
+                diagnosticsService.countWarnings()
+        );
+        if (terminalPane != null) {
+            terminalPane.setProblems(diagnostics);
+        }
+    }
+
+    private Path resolveBuildRoot() {
+        File workspace = explorerPane == null ? null : explorerPane.getCurrentRootFolder();
+        Path root = findPomRoot(workspace == null ? null : workspace.toPath());
+        if (root != null) {
+            return root;
+        }
+
+        File currentFile = editorManager == null ? null : editorManager.getCurrentFile();
+        root = findPomRoot(currentFile == null ? null : currentFile.toPath());
+        if (root != null) {
+            return root;
+        }
+
+        return findPomRoot(Path.of(System.getProperty("user.dir")));
+    }
+
+    private Path findPomRoot(Path start) {
+        if (start == null) {
+            return null;
+        }
+
+        Path current = Files.isRegularFile(start) ? start.getParent() : start;
+        while (current != null) {
+            if (Files.isRegularFile(current.resolve("pom.xml"))) {
+                return current.toAbsolutePath().normalize();
+            }
+            current = current.getParent();
+        }
+
+        return null;
     }
 
     private void resizeTerminalPane(double terminalHeight) {
@@ -2042,7 +2216,7 @@ private void closeFolderFromExplorer() {
 }
 
     private void updateEditorStatus(String text) {
-        statusBarManager.updateStatusLeft(text);
+        statusBarManager.updateEditorLocation(text);
     }
 
     private void updateStatusOnPanelChange() {
