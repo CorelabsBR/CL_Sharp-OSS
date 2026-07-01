@@ -311,6 +311,11 @@ jobs:
           git tag "$VERSION"
           git push origin "$VERSION"
 
-          gh release create "$VERSION" artifacts/**/* \
+          mapfile -t ASSETS < <(find artifacts -type f \( -name "*.deb" -o -name "*.exe" -o -name "*.zip" \))
+
+          printf 'Assets encontrados:\n'
+          printf '%s\n' "${ASSETS[@]}"
+
+          gh release create "$VERSION" "${ASSETS[@]}" \
             --title "NPSharp $VERSION" \
             --notes "Build automático da main. Arquivos alterados desde a última tag: $CHANGED_FILES."
