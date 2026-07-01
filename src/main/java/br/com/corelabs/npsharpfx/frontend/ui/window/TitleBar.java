@@ -75,7 +75,9 @@ public class TitleBar extends HBox {
     private Label selectionMenu;
     private Label viewMenu;
     private Label goMenu;
-    private Label moreMenu;
+    private Label runMenu;
+    private Label terminalMenu;
+    private Label helpMenu;
     private Supplier<String> workspaceNameSupplier;
 
     private Label backButton;
@@ -94,7 +96,12 @@ public class TitleBar extends HBox {
     private Runnable toggleSidebarAction;
     private Runnable showSearchAction;
     private Runnable showExplorerAction;
+    private Runnable showSourceControlAction;
+    private Runnable showRunAndDebugAction;
     private Runnable showCommandPaletteAction;
+    private Runnable openColorThemeAction;
+    private Runnable openWallpaperAction;
+    private Runnable clearWallpaperAction;
     private Runnable newWindowAction;
     private Runnable showAboutAction;
     private Supplier<File> workspaceRootSupplier;
@@ -161,8 +168,28 @@ public class TitleBar extends HBox {
         this.showExplorerAction = showExplorerAction;
     }
 
+    public void setShowSourceControlAction(Runnable showSourceControlAction) {
+        this.showSourceControlAction = showSourceControlAction;
+    }
+
+    public void setShowRunAndDebugAction(Runnable showRunAndDebugAction) {
+        this.showRunAndDebugAction = showRunAndDebugAction;
+    }
+
     public void setShowCommandPaletteAction(Runnable showCommandPaletteAction) {
         this.showCommandPaletteAction = showCommandPaletteAction;
+    }
+
+    public void setOpenColorThemeAction(Runnable openColorThemeAction) {
+        this.openColorThemeAction = openColorThemeAction;
+    }
+
+    public void setOpenWallpaperAction(Runnable openWallpaperAction) {
+        this.openWallpaperAction = openWallpaperAction;
+    }
+
+    public void setClearWallpaperAction(Runnable clearWallpaperAction) {
+        this.clearWallpaperAction = clearWallpaperAction;
     }
 
     public void setNewWindowAction(Runnable newWindowAction) {
@@ -254,8 +281,10 @@ private String getWorkspaceNameForBar() {
         editMenu = createMenuLabel("Edit", this::openEditMenu);
         selectionMenu = createMenuLabel("Selection", this::openSelectionMenu);
         viewMenu = createMenuLabel("View", this::openViewMenu);
-        goMenu = createMenuLabel("Go To", this::openGoMenu);
-        moreMenu = createMenuLabel("More", this::openMoreMenu);
+        goMenu = createMenuLabel("Go", this::openGoMenu);
+        runMenu = createMenuLabel("Run", this::openRunMenu);
+        terminalMenu = createMenuLabel("Terminal", this::openTerminalMenu);
+        helpMenu = createMenuLabel("Help", this::openHelpMenu);
 
         backButton = createToolbarButton(null, "/icons/codicons/arrow-left.svg");
         forwardButton = createToolbarButton(null, "/icons/codicons/arrow-right.svg");
@@ -304,7 +333,9 @@ private String getWorkspaceNameForBar() {
                 selectionMenu,
                 viewMenu,
                 goMenu,
-                moreMenu,
+                runMenu,
+                terminalMenu,
+                helpMenu,
 
                 backButton,
                 forwardButton,
@@ -475,6 +506,12 @@ private String getWorkspaceNameForBar() {
         row.getStyleClass().add("context-menu-row");
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(6, 12, 6, 12));
+        return row;
+    }
+
+    private HBox createNestedMenuItem(String text, String shortcut, Runnable action) {
+        HBox row = createMenuItem(text, shortcut, action);
+        row.setPadding(new Insets(6, 12, 6, 28));
         return row;
     }
 
@@ -888,13 +925,23 @@ private String getWorkspaceNameForBar() {
 
     private void openViewMenu() {
         VBox menu = createMenuBox();
+
+
         menu.getChildren().addAll(
-                createMenuItem("Paleta de Comandos", "Ctrl+Shift+P", this::openCommandPalette),
+                createMenuItem("Command Palette...", "Ctrl+Shift+P", this::openCommandPalette),
+                createMenuItem("Open View...", null, this::openViewPicker),
                 createMenuItem("Explorer", "Ctrl+Shift+E", () -> runAction(showExplorerAction, "Explorer")),
-                createMenuItem("Pesquisar", "Ctrl+Shift+F", () -> runAction(showSearchAction, "Search")),
-                createMenuItem("Desativar Barra Lateral", "Ctrl+B", () -> runAction(toggleSidebarAction, "Toggle sidebar"))
+                createMenuItem("Search", "Ctrl+Shift+F", () -> runAction(showSearchAction, "Search")),
+                createMenuItem("Source Control", "Ctrl+Shift+G", () -> runAction(showSourceControlAction, "Source Control")),
+                createMenuItem("Run and Debug", "Ctrl+Shift+D", () -> runAction(showRunAndDebugAction, "Run and Debug")),
+                createMenuItem("Terminal", "Ctrl+Shift+`", () -> runAction(focusTerminalAction, "Terminal"))
         );
         showMenuBelow(viewMenu, menu);
+    }
+
+    private void openViewPicker() {
+        closeAllMenus();
+        openCommandPalette();
     }
 
     private void openGoMenu() {
@@ -906,40 +953,36 @@ private String getWorkspaceNameForBar() {
         );
         showMenuBelow(goMenu, menu);
     }
-    private void openMoreMenu() {
+    private void openRunMenu() {
         VBox menu = createMenuBox();
-
-        HBox runRow = createSubmenuItem("Rodar");
-        VBox runMenu = createMenuBox();
-        runMenu.getChildren().addAll(
-               createMenuItem("Rodar", "F5", () -> runAction(runCurrentFileAction, "Rodar")),
+        menu.getChildren().addAll(
+                createMenuItem("Start Debugging", "F5", () -> runAction(runCurrentFileAction, "Run")),
                 createMenuItem("Rodar sem Debuggar", "Ctrl+F5", () -> updateStatus("Run without debugging")),
                 createMenuItem("Parar", "Shift+F5", () -> updateStatus("Stop debugging"))
         );
-        bindSubmenu(runRow, runMenu);
+        showMenuBelow(runMenu, menu);
+    }
 
-        HBox terminalRow = createSubmenuItem("Terminal");
-        VBox terminalMenu = createMenuBox();
-        terminalMenu.getChildren().addAll(
+    private void openTerminalMenu() {
+        VBox menu = createMenuBox();
+        menu.getChildren().addAll(
                 createMenuItem("Novo Terminal", "Ctrl+Shift+`", () -> runAction(newTerminalAction, "New terminal")),
                 createMenuItem("Dividir Terminal", "Ctrl+Shift+5", () -> runAction(splitTerminalAction, "Split terminal")),
                 createMenuItem("Matar Terminal", null, () -> runAction(killTerminalAction, "Kill terminal")),
                 new Separator(),
                 createMenuItem("Focus Terminal", null, () -> runAction(focusTerminalAction, "Focus terminal"))
         );
-        bindSubmenu(terminalRow, terminalMenu);
+        showMenuBelow(terminalMenu, menu);
+    }
 
-        HBox helpRow = createSubmenuItem("Help");
-        VBox helpMenu = createMenuBox();
-        helpMenu.getChildren().addAll(
+    private void openHelpMenu() {
+        VBox menu = createMenuBox();
+        menu.getChildren().addAll(
                 createMenuItem("Welcome", null, () -> updateStatus("Welcome")),
                 createMenuItem("Show All Commands", "Ctrl+Shift+P", this::openCommandPalette),
                 createMenuItem("About NPSharp", null, this::showAbout)
         );
-        bindSubmenu(helpRow, helpMenu);
-
-        menu.getChildren().addAll(runRow, terminalRow, helpRow);
-        showMenuBelow(moreMenu, menu);
+        showMenuBelow(helpMenu, menu);
     }
 
     private void newTextFile() {
@@ -1285,4 +1328,3 @@ private String getWorkspaceNameForBar() {
         }
     }
 }
-

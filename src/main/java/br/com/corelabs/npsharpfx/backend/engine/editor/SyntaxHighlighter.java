@@ -16,7 +16,6 @@ public final class SyntaxHighlighter {
     private static final Collection<String> DEFAULT_STYLE = Collections.singleton("syntax-default");
 
     private static final String IDENT = "[A-Za-z_$][A-Za-z0-9_$]*";
-    private static final String QUALIFIED_IDENT = "[A-Za-z_$][A-Za-z0-9_$.]*";
     private static final String FUNCTION_CALL = "\\b" + IDENT + "(?=\\s*\\()";
     private static final String CONSTANT = "\\b([A-Z][A-Z0-9_]{2,}|true|false|null|undefined|None|nil|NULL)\\b";
     private static final String NUMBER = "(?<![\\w.])-?(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[fFdDlLuU]|i8|i16|i32|i64|u8|u16|u32|u64|usize|isize)?\\b";

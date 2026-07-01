@@ -9,10 +9,14 @@ public class RemoteTerminalService {
         this.service = service;
     }
 
+    public String execute(String command) throws Exception {
+        return service.execute(command);
+    }
+
     public CompletableFuture<String> executeAsync(String command) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return service.execute(command);
+                return execute(command);
             } catch (Exception e) {
                 return "[remote] " + (e.getMessage() == null ? "Falha ao executar comando." : e.getMessage());
             }

@@ -10,12 +10,12 @@ import java.util.Objects;
 import java.util.prefs.Preferences;
 
 import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
+import br.com.corelabs.npsharpfx.backend.git.GitService;
 import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
 import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
-import br.com.corelabs.npsharpfx.backend.git.GitService;
-import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
 import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
 import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
 import br.com.corelabs.npsharpfx.frontend.ui.git.SourceControlPanel;
@@ -26,6 +26,7 @@ import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane.SearchQuery;
 import br.com.corelabs.npsharpfx.frontend.ui.search.SearchResult;
 import br.com.corelabs.npsharpfx.frontend.ui.terminal.IntegratedTerminalPane;
 import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
+import br.com.corelabs.npsharpfx.frontend.ui.theme.VSCodeThemeEntry;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager.ActivityItem;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.SidePanelManager;
@@ -33,7 +34,6 @@ import br.com.corelabs.npsharpfx.frontend.ui.window.layout.StatusBarManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.layout.VSCodeLayoutAnimator;
 import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SearchHelper;
 import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
-import br.com.corelabs.npsharpfx.frontend.ui.window.panels.ThemeChooserPanel;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
@@ -90,15 +90,19 @@ private static final double MIN_HEIGHT = 520;
     private final StatusBarManager statusBarManager;
     private final ShortcutManager shortcutManager;
     private final SearchHelper searchHelper;
+    @SuppressWarnings("unused")
     private final SettingsPanelBuilder settingsPanelBuilder;
-    private final ThemeChooserPanel themeChooserPanel;
 
     private IntegratedTerminalPane terminalPane;
     private VBox bottomContainer;
     private Popup settingsPopup;
     private Popup commandPalettePopup;
+    private Popup appearancePopup;
     private TextField commandPaletteInput;
     private ListView<CommandAction> commandPaletteList;
+    private Popup colorThemePopup;
+    private TextField colorThemeInput;
+    private ListView<VSCodeThemeEntry> colorThemeList;
 
     private EditorManager editorManager;
     private FileExplorerPane explorerPane;
@@ -131,7 +135,6 @@ private static final double MIN_HEIGHT = 520;
         this.shortcutManager = new ShortcutManager();
         this.searchHelper = new SearchHelper();
         this.settingsPanelBuilder = new SettingsPanelBuilder();
-        this.themeChooserPanel = new ThemeChooserPanel(themeManager);
         configureStage();
     }
 
@@ -203,7 +206,8 @@ private void restoreSession() {
     }
 }
 
-private final PortugolInterpreter portugolInterpreter =
+    @SuppressWarnings("unused")
+    private final PortugolInterpreter portugolInterpreter =
         new PortugolInterpreter();
 
     private void setWorkspaceAndPersist(File workspace) {
@@ -838,16 +842,38 @@ registerActivity("debug",
                 false
         );
 
-        centerArea = new BorderPane();
+       /*
+========================================
+WALLPAPER DO WORKBENCH / EDITOR
+========================================
+*/
 
-        centerArea.setCenter(verticalSplit);
+wallpaperLayer = new StackPane();
+wallpaperLayer.getStyleClass().add("wallpaper-layer");
+wallpaperLayer.setMouseTransparent(true);
 
-        centerArea.setMinSize(0, 0);
+wallpaperOverlay = new Rectangle();
+wallpaperOverlay.setMouseTransparent(true);
 
-        centerArea.setMaxSize(
-                Double.MAX_VALUE,
-                Double.MAX_VALUE
-        );
+StackPane editorWallpaperHost = new StackPane();
+editorWallpaperHost.getStyleClass().addAll("workbench-wallpaper-host", "editor-wallpaper-host");
+
+editorWallpaperHost.getChildren().addAll(
+        wallpaperLayer,
+        wallpaperOverlay,
+        verticalSplit
+);
+
+wallpaperLayer.prefWidthProperty().bind(editorWallpaperHost.widthProperty());
+wallpaperLayer.prefHeightProperty().bind(editorWallpaperHost.heightProperty());
+
+wallpaperOverlay.widthProperty().bind(editorWallpaperHost.widthProperty());
+wallpaperOverlay.heightProperty().bind(editorWallpaperHost.heightProperty());
+
+centerArea = new BorderPane();
+centerArea.setCenter(editorWallpaperHost);
+centerArea.setMinSize(0, 0);
+centerArea.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         /*
         ========================================
@@ -949,45 +975,12 @@ registerActivity("debug",
         ========================================
         */
 
-        root.setTop(titleBar);
+root.setTop(titleBar);
+root.setCenter(horizontalSplit);
+root.setBottom(bottomContainer);
 
-        root.setCenter(horizontalSplit);
-
-        root.setBottom(bottomContainer);
-
-        /*
-        ========================================
-        WALLPAPER
-        ========================================
-        */
-
-        wallpaperLayer = new StackPane();
-
-        wallpaperLayer.getStyleClass()
-                .add("wallpaper-layer");
-
-        wallpaperLayer.setMouseTransparent(true);
-
-        wallpaperOverlay = new Rectangle();
-
-        wallpaperOverlay.setMouseTransparent(true);
-
-        wallpaperOverlay.widthProperty()
-                .bind(root.widthProperty());
-
-        wallpaperOverlay.heightProperty()
-                .bind(root.heightProperty());
-
-        appRoot = new StackPane();
-
-        appRoot.getChildren().addAll(
-
-                wallpaperLayer,
-
-                wallpaperOverlay,
-
-                root
-        );
+appRoot = new StackPane();
+appRoot.getChildren().add(root);
 
         explorerPane.setMenuStyleSupplier(() -> appRoot == null ? "" : appRoot.getStyle());
     }
@@ -1017,7 +1010,12 @@ registerActivity("debug",
         titleBar.setToggleSidebarAction(() -> sidePanelManager.toggleSidebarVisibility(this::updateStatusOnPanelChange));
         titleBar.setShowSearchAction(() -> sidePanelManager.showSidePanel("search", this::updateStatusOnPanelChange));
         titleBar.setShowExplorerAction(() -> sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange));
+        titleBar.setShowSourceControlAction(this::showSourceControlView);
+        titleBar.setShowRunAndDebugAction(() -> sidePanelManager.showSidePanel("debug", this::updateStatusOnPanelChange));
         titleBar.setShowCommandPaletteAction(this::showCommandPalette);
+        titleBar.setOpenColorThemeAction(this::openThemeChooser);
+        titleBar.setOpenWallpaperAction(this::chooseWallpaper);
+        titleBar.setClearWallpaperAction(this::clearWallpaper);
         titleBar.setNewWindowAction(() -> new MainWindow(new Stage()).show());
         titleBar.setShowAboutAction(() -> statusBarManager.updateStatusLeft("NPSharpFX - CoreLabs"));
         titleBar.setStatusUpdater(statusBarManager::updateStatusLeft);
@@ -1081,6 +1079,11 @@ registerActivity("debug",
         explorerPane.revealFile(file);
         statusBarManager.updateStatusLeft("Arquivo aberto: " + file.getName());
         statusBarManager.updateStatusRight("Explorer");
+    }
+
+    private void showSourceControlView() {
+        sidePanelManager.showSidePanel("git", this::updateStatusOnPanelChange);
+        refreshSourceControlPanel();
     }
 
     private List<File> listWorkspaceFilesForQuickOpen() {
@@ -1158,6 +1161,10 @@ registerActivity("debug",
                     public void closeCurrentTab() { editorManager.closeCurrentTab(); }
                     @Override
                     public void closeAllTabs() { editorManager.closeAllTabs(); }
+                    @Override
+                    public void goToStartOfFile() { editorManager.goToStartOfFile(); }
+                    @Override
+                    public void goToEndOfFile() { editorManager.goToEndOfFile(); }
                 },
                 new WindowActions() {
                     @Override
@@ -1173,7 +1180,7 @@ registerActivity("debug",
                     @Override
                     public void splitTerminal() { showTerminalPane(); terminalPane.splitTerminal(); }
                     @Override
-                    public void runCurrentFile() { showTerminalPane();  MainWindow.this.runSelectedCode();; }
+                    public void runCurrentFile() { showTerminalPane(); MainWindow.this.runSelectedCode(); }
                     @Override
                     public void showCommandPalette() { MainWindow.this.showCommandPalette(); }
                     @Override
@@ -1185,6 +1192,7 @@ registerActivity("debug",
         new DebuggerService();
     
 
+    @SuppressWarnings("unused")
     private File currentFile;
 
     private void showCommandPalette() {
@@ -1378,11 +1386,11 @@ registerActivity("debug",
         }));
 
         commands.add(new CommandAction("Preferences: Color Theme", "", "tema cores", this::openThemeChooser));
-        commands.add(new CommandAction("Preferences: Choose Wallpaper", "", "papel parede wallpaper", this::chooseWallpaper));
+        commands.add(new CommandAction("Preferences: Wallpaper", "", "papel parede wallpaper background", this::chooseWallpaper));
         commands.add(new CommandAction("Preferences: Toggle Wallpaper", "", "wallpaper habilitar desabilitar", this::toggleWallpaper));
         commands.add(new CommandAction("Preferences: Wallpaper Opacity +", "", "wallpaper opacidade aumentar", () -> adjustWallpaperOpacity(0.08)));
         commands.add(new CommandAction("Preferences: Wallpaper Opacity -", "", "wallpaper opacidade diminuir", () -> adjustWallpaperOpacity(-0.08)));
-        commands.add(new CommandAction("Preferences: Remove Wallpaper", "", "wallpaper remover", this::clearWallpaper));
+        commands.add(new CommandAction("Preferences: Clear Wallpaper", "", "wallpaper remover limpar", this::clearWallpaper));
 
         commands.add(new CommandAction("Runtime: Rescan PATH", "", "runtime path ferramenta linguagem git debug", this::rescanRuntimePaths));
         for (LanguageRuntime language : LanguageRuntime.values()) {
@@ -1469,80 +1477,256 @@ public void runSelectedCode() {
 }
 
     private void openThemeChooser() {
-        javafx.scene.Node themeChooserContent = themeChooserPanel.buildThemeChooserPanel(
-                wallpaperLayer,
-                wallpaperOverlay,
-                appRoot,
-                () -> statusBarManager.updateStatusLeft("Tema aplicado")
-        );
-
-        StackPane sidePanelHost = sidePanelManager.getSidePanelHost();
-        sidePanelHost.getChildren().setAll(sidePanelManager.wrapSidePanel("THEMES", themeChooserContent,
-                () -> sidePanelManager.hideSidePanel(this::updateStatusOnPanelChange)));
-        sidePanelHost.setManaged(true);
-        sidePanelHost.setVisible(true);
-    }
-
-    private void showSettingsPopup(Node anchor) {
-        if (settingsPopup != null && settingsPopup.isShowing()) {
-            settingsPopup.hide();
+        if (colorThemePopup != null && colorThemePopup.isShowing()) {
+            colorThemePopup.hide();
             return;
         }
 
-        VBox menu = new VBox();
-        menu.getStyleClass().add("context-menu");
-        menu.setStyle(appRoot.getStyle());
+        if (settingsPopup != null && settingsPopup.isShowing()) {
+            settingsPopup.hide();
+        }
 
-        menu.getChildren().addAll(
-                createPopupMenuItem("Command Palette...", "Ctrl+Shift+P", () -> {
-                    settingsPopup.hide();
-                    showCommandPalette();
-                }),
-                createPopupMenuItem("Settings", "Ctrl+,", () -> statusBarManager.updateStatusLeft("Settings aberto")),
-                createPopupMenuItem("Keyboard Shortcuts", "Ctrl+K Ctrl+S", () -> statusBarManager.updateStatusLeft("Atalhos principais ativos")),
-                createPopupMenuItem("Snippets", null, () -> statusBarManager.updateStatusLeft("Snippets ainda usam templates de novo arquivo")),
-                createPopupMenuItem("Tarefas", null, () -> {
-                    settingsPopup.hide();
-                    showTerminalPane();
-                    terminalPane.showTerminalPanel();
-                }),
-                createPopupMenuItem("Configurar ferramentas no PATH", null, () -> {
-                    settingsPopup.hide();
-                    showCommandPalette();
-                    commandPaletteInput.setText("Runtime: ");
-                    commandPaletteInput.positionCaret(commandPaletteInput.getText().length());
-                }),
-                createPopupMenuItem("Temas", "Escolher", () -> {
-                    settingsPopup.hide();
-                    openThemeChooser();
-                }),
-                new Separator(),
-                createPopupMenuItem("Backup e sincronizar configuraÃƒÂ§ÃƒÂµes", null, null),
-                new Separator(),
-                createPopupMenuItem("Wallpapers", "Escolher", () -> {
-                    settingsPopup.hide();
-                    chooseWallpaper();
-                }),
-                createPopupMenuItem("Ativar/Desativar Wallpaper", null, () -> {
-                    settingsPopup.hide();
-                    toggleWallpaper();
-                }),
-                createPopupMenuItem("Remover Wallpaper", null, () -> {
-                    settingsPopup.hide();
-                    clearWallpaper();
-                }),
-                createPopupMenuItem("Perfis", null, () -> statusBarManager.updateStatusLeft("Perfil atual: Default"))
+        colorThemeInput = new TextField();
+        colorThemeInput.getStyleClass().add("command-palette-input");
+        colorThemeInput.setPromptText("Select Color Theme");
+
+        colorThemeList = new ListView<>();
+        colorThemeList.getStyleClass().add("command-palette-list");
+        colorThemeList.setPrefHeight(340);
+        colorThemeList.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(VSCodeThemeEntry item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setText(null);
+                    return;
+                }
+
+                String marker = themeManager.isThemeActive(item.getId()) ? "* " : "  ";
+                String type = item.isDark() ? "Dark" : "Light";
+                setText(marker + item.getLabel() + "    " + type);
+            }
+        });
+
+        colorThemeInput.textProperty().addListener((obs, oldValue, newValue) -> updateColorThemeResults(newValue));
+        colorThemeInput.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                applySelectedColorTheme();
+                event.consume();
+            } else if (event.getCode() == KeyCode.ESCAPE) {
+                hideColorThemePopup();
+                event.consume();
+            } else if (event.getCode() == KeyCode.DOWN) {
+                moveColorThemeSelection(1);
+                colorThemeList.requestFocus();
+                event.consume();
+            } else if (event.getCode() == KeyCode.UP) {
+                moveColorThemeSelection(-1);
+                colorThemeList.requestFocus();
+                event.consume();
+            }
+        });
+
+        colorThemeList.setOnMouseClicked(event -> {
+            if (colorThemeList.getSelectionModel().getSelectedItem() != null) {
+                applySelectedColorTheme();
+                event.consume();
+            }
+        });
+        colorThemeList.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                applySelectedColorTheme();
+                event.consume();
+            } else if (event.getCode() == KeyCode.ESCAPE) {
+                hideColorThemePopup();
+                event.consume();
+            } else if (event.getCode() == KeyCode.DOWN) {
+                moveColorThemeSelection(1);
+                event.consume();
+            } else if (event.getCode() == KeyCode.UP) {
+                moveColorThemeSelection(-1);
+                event.consume();
+            }
+        });
+
+        VBox content = new VBox(colorThemeInput, colorThemeList);
+        content.getStyleClass().add("command-palette");
+        content.setStyle(appRoot == null ? "" : appRoot.getStyle());
+        content.setPrefWidth(Math.min(720, Math.max(520, stage.getWidth() * 0.55)));
+
+        colorThemePopup = new Popup();
+        colorThemePopup.setAutoHide(true);
+        colorThemePopup.setHideOnEscape(true);
+        colorThemePopup.getContent().add(content);
+
+        updateColorThemeResults("");
+        colorThemePopup.show(
+                stage,
+                stage.getX() + (stage.getWidth() - content.getPrefWidth()) / 2,
+                stage.getY() + 58
         );
-
-        settingsPopup = new Popup();
-        settingsPopup.setAutoHide(true);
-        settingsPopup.setHideOnEscape(true);
-        settingsPopup.getContent().add(menu);
-
-        Bounds bounds = anchor.localToScreen(anchor.getBoundsInLocal());
-        settingsPopup.show(stage, bounds.getMaxX() + 2, bounds.getMinY());
+        VSCodeLayoutAnimator.fadeSlideIn(content, 0, -8);
+        colorThemeInput.requestFocus();
     }
 
+    private void updateColorThemeResults(String query) {
+        if (colorThemeList == null) {
+            return;
+        }
+
+        String normalizedQuery = normalizeCommandText(query);
+        List<VSCodeThemeEntry> filtered = themeManager.getRegistry().getEntries().stream()
+                .filter(entry -> normalizedQuery.isBlank() || colorThemeMatches(entry, normalizedQuery))
+                .toList();
+
+        colorThemeList.getItems().setAll(filtered);
+        selectActiveOrFirstColorTheme();
+    }
+
+    private boolean colorThemeMatches(VSCodeThemeEntry entry, String query) {
+        String searchable = normalizeCommandText(entry.getLabel())
+                + " " + normalizeCommandText(entry.getId())
+                + " " + normalizeCommandText(entry.getUiTheme())
+                + (entry.isDark() ? " dark escuro" : " light claro");
+        return searchable.contains(query);
+    }
+
+    private void selectActiveOrFirstColorTheme() {
+        if (colorThemeList == null || colorThemeList.getItems().isEmpty()) {
+            return;
+        }
+
+        int activeIndex = -1;
+        for (int i = 0; i < colorThemeList.getItems().size(); i++) {
+            if (themeManager.isThemeActive(colorThemeList.getItems().get(i).getId())) {
+                activeIndex = i;
+                break;
+            }
+        }
+
+        int index = activeIndex >= 0 ? activeIndex : 0;
+        colorThemeList.getSelectionModel().select(index);
+        colorThemeList.scrollTo(index);
+    }
+
+    private void moveColorThemeSelection(int delta) {
+        if (colorThemeList == null || colorThemeList.getItems().isEmpty()) {
+            return;
+        }
+
+        int current = colorThemeList.getSelectionModel().getSelectedIndex();
+        int max = colorThemeList.getItems().size() - 1;
+        int next = current < 0 ? 0 : Math.max(0, Math.min(max, current + delta));
+
+        colorThemeList.getSelectionModel().select(next);
+        colorThemeList.getFocusModel().focus(next);
+        colorThemeList.scrollTo(next);
+    }
+
+    private void applySelectedColorTheme() {
+        VSCodeThemeEntry selected = colorThemeList == null
+                ? null
+                : colorThemeList.getSelectionModel().getSelectedItem();
+
+        if (selected == null) {
+            return;
+        }
+
+        themeManager.setTheme(selected.getId(), wallpaperLayer, wallpaperOverlay, appRoot);
+        hideColorThemePopup();
+        statusBarManager.updateStatusLeft("Tema aplicado: " + selected.getLabel());
+    }
+
+    private void hideColorThemePopup() {
+        if (colorThemePopup != null) {
+            colorThemePopup.hide();
+        }
+    }
+
+private void showSettingsPopup(Node anchor) {
+    hideAppearancePopup();
+
+    if (settingsPopup != null && settingsPopup.isShowing()) {
+        settingsPopup.hide();
+        return;
+    }
+
+    final Node[] menuRef = new Node[1];
+
+    Node menu = settingsPanelBuilder.buildSettingsPanel(
+            () -> showAppearancePopup(menuRef[0]),
+            this::openThemeChooser,
+            this::chooseWallpaper,
+            this::clearWallpaper
+    );
+
+    menuRef[0] = menu;
+
+    if (menu instanceof Region region) {
+        region.setPrefWidth(320);
+        region.setMaxHeight(520);
+    }
+
+    menu.getStyleClass().add("context-menu");
+    menu.setStyle(appRoot == null ? "" : appRoot.getStyle());
+
+    settingsPopup = new Popup();
+    settingsPopup.setAutoHide(true);
+    settingsPopup.setHideOnEscape(true);
+    settingsPopup.setOnHidden(event -> hideAppearancePopup());
+    settingsPopup.getContent().add(menu);
+
+    Bounds bounds = anchor.localToScreen(anchor.getBoundsInLocal());
+    settingsPopup.show(stage, bounds.getMaxX() + 2, bounds.getMinY());
+}
+
+private void showAppearancePopup(Node anchor) {
+    if (anchor == null) {
+        return;
+    }
+
+    if (appearancePopup != null && appearancePopup.isShowing()) {
+        appearancePopup.hide();
+        return;
+    }
+
+    VBox menu = new VBox();
+    menu.getStyleClass().add("context-menu");
+    menu.setStyle(appRoot == null ? "" : appRoot.getStyle());
+
+    menu.getChildren().addAll(
+            createPopupMenuItem("Color Theme...", "Escolher", () -> {
+                hideAppearancePopup();
+                if (settingsPopup != null) settingsPopup.hide();
+                openThemeChooser();
+            }),
+            createPopupMenuItem("Wallpaper...", "Escolher", () -> {
+                hideAppearancePopup();
+                if (settingsPopup != null) settingsPopup.hide();
+                chooseWallpaper();
+            }),
+            createPopupMenuItem("Clear Wallpaper", null, () -> {
+                hideAppearancePopup();
+                if (settingsPopup != null) settingsPopup.hide();
+                clearWallpaper();
+            })
+    );
+
+    appearancePopup = new Popup();
+    appearancePopup.setAutoHide(true);
+    appearancePopup.setHideOnEscape(true);
+    appearancePopup.getContent().add(menu);
+
+    Bounds bounds = anchor.localToScreen(anchor.getBoundsInLocal());
+    appearancePopup.show(stage, bounds.getMaxX() + 2, bounds.getMinY());
+}
+
+private void hideAppearancePopup() {
+    if (appearancePopup != null) {
+        appearancePopup.hide();
+    }
+}
     private HBox createPopupMenuItem(String text, String shortcut, Runnable action) {
         Label label = new Label(text);
         label.getStyleClass().add("context-menu-item");
@@ -1572,10 +1756,10 @@ public void runSelectedCode() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Escolher wallpaper");
         chooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg", "*.webp")
+                new FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg", "*.gif")
         );
 
-        var file = chooser.showOpenDialog(stage);
+        File file = chooser.showOpenDialog(stage);
         if (file == null) {
             statusBarManager.updateStatusLeft("Escolha de wallpaper cancelada");
             return;
@@ -1767,19 +1951,23 @@ private void closeFolderFromExplorer() {
                 && sidePanelManager.getSidePanelHost().isVisible()
                 && sidePanelManager.getSidePanelHost().isManaged();
 
+        final double activityBarWidth = 48;
         if (panelVisible) {
-            leftSidebarArea.setMinWidth(260);
-            leftSidebarArea.setPrefWidth(300);
+            double leftWidth = activityBarWidth + sidePanelManager.getPreferredWidth();
+            leftSidebarArea.setMinWidth(activityBarWidth + sidePanelManager.getMinWidth());
+            leftSidebarArea.setPrefWidth(leftWidth);
             leftSidebarArea.setMaxWidth(Double.MAX_VALUE);
-            if (horizontalSplit.getDividers().size() > 0) {
-                VSCodeLayoutAnimator.animateDivider(horizontalSplit, 0, 0.18);
+
+            if (!horizontalSplit.getDividers().isEmpty() && horizontalSplit.getWidth() > 0) {
+                double dividerPos = Math.max(0.01, Math.min(0.5, leftWidth / horizontalSplit.getWidth()));
+                VSCodeLayoutAnimator.animateDivider(horizontalSplit, 0, dividerPos);
             }
         } else {
-            leftSidebarArea.setMinWidth(48);
-            leftSidebarArea.setPrefWidth(48);
-            leftSidebarArea.setMaxWidth(48);
-            if (horizontalSplit.getDividers().size() > 0 && horizontalSplit.getWidth() > 0) {
-                double divider = 48 / horizontalSplit.getWidth();
+            leftSidebarArea.setMinWidth(activityBarWidth);
+            leftSidebarArea.setPrefWidth(activityBarWidth);
+            leftSidebarArea.setMaxWidth(activityBarWidth);
+            if (!horizontalSplit.getDividers().isEmpty() && horizontalSplit.getWidth() > 0) {
+                double divider = activityBarWidth / horizontalSplit.getWidth();
                 VSCodeLayoutAnimator.animateDivider(horizontalSplit, 0, Math.max(0.01, Math.min(0.12, divider)));
             }
         }

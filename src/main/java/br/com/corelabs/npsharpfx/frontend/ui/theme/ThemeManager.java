@@ -109,8 +109,9 @@ public class ThemeManager {
      * Permite acessar informações como label, uiTheme, etc.
      */
     public VSCodeThemeEntry getCurrentThemeEntry() {
+        String selectedThemeId = resolveSelectedThemeId();
         for (VSCodeThemeEntry entry : registry.getEntries()) {
-            if (entry.getId().equals(preferences.getSelectedThemeId())) {
+            if (entry.getId().equals(selectedThemeId)) {
                 return entry;
             }
         }
@@ -124,7 +125,19 @@ public class ThemeManager {
      * @return true se o tema é o ativo, false caso contrário
      */
     public boolean isThemeActive(String themeId) {
-        return themeId.equals(preferences.getSelectedThemeId());
+        return themeId != null && themeId.equals(resolveSelectedThemeId());
+    }
+
+    private String resolveSelectedThemeId() {
+        String selectedThemeId = preferences.getSelectedThemeId();
+        if (selectedThemeId != null && !selectedThemeId.isBlank()) {
+            return selectedThemeId;
+        }
+
+        return registry.getEntries().stream()
+                .map(VSCodeThemeEntry::getId)
+                .findFirst()
+                .orElse("");
     }
 
     /**
@@ -221,8 +234,7 @@ public class ThemeManager {
 
         // Classe CSS para wallpaper ativo
         appRoot.getStyleClass().remove("wallpaper-active");
-        String wpPath = preferences.getCustomWallpaperPath();
-        if (preferences.isWallpaperEnabled() && wpPath != null && !wpPath.isBlank()) {
+        if (hasActiveWallpaper()) {
             appRoot.getStyleClass().add("wallpaper-active");
         }
 
@@ -376,6 +388,7 @@ public class ThemeManager {
      */
     public void clearWallpaper(StackPane wallpaperLayer, Rectangle overlay, StackPane appRoot) {
         preferences.setCustomWallpaperPath(null);
+        preferences.setWallpaperEnabled(false);
         PreferencesManager.save(preferences);
         applyTheme(wallpaperLayer, overlay, appRoot);
     }
@@ -456,6 +469,9 @@ public class ThemeManager {
          * não aplica wallpaper.
          */
         if (!file.exists() || !file.isFile()) {
+            preferences.setCustomWallpaperPath(null);
+            preferences.setWallpaperEnabled(false);
+            PreferencesManager.save(preferences);
             overlay.setFill(Color.TRANSPARENT);
             return;
         }
@@ -507,5 +523,21 @@ public class ThemeManager {
          */
         overlay.setFill(Color.web(overlayColor, opacity));
     }
-}
 
+    private boolean hasActiveWallpaper() {
+        String path = preferences.getCustomWallpaperPath();
+        if (!preferences.isWallpaperEnabled() || path == null || path.isBlank()) {
+            return false;
+        }
+
+        File file = new File(path);
+        if (file.exists() && file.isFile()) {
+            return true;
+        }
+
+        preferences.setCustomWallpaperPath(null);
+        preferences.setWallpaperEnabled(false);
+        PreferencesManager.save(preferences);
+        return false;
+    }
+}

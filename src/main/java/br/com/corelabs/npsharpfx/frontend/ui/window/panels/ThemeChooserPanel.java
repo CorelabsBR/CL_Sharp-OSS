@@ -45,20 +45,24 @@ public class ThemeChooserPanel {
 
         content.getChildren().addAll(filterField, list);
 
-        for (VSCodeThemeEntry entry : themeManager.getRegistry().getEntries()) {
-            HBox themeRow = createThemeRow(entry, wallpaperLayer, wallpaperOverlay, appRoot, onThemeSelected);
-            list.getChildren().add(themeRow);
-        }
+        Runnable[] refreshList = new Runnable[1];
+        refreshList[0] = () -> {
+            list.getChildren().clear();
+            for (VSCodeThemeEntry entry : themeManager.getRegistry().getEntries()) {
+                HBox themeRow = createThemeRow(entry, wallpaperLayer, wallpaperOverlay, appRoot, () -> {
+                    if (onThemeSelected != null) {
+                        onThemeSelected.run();
+                    }
+                    refreshList[0].run();
+                });
+                list.getChildren().add(themeRow);
+            }
+            applyFilter(list, filterField.getText());
+        };
+        refreshList[0].run();
 
         filterField.textProperty().addListener((obs, oldValue, newValue) -> {
-            String query = newValue == null ? "" : newValue.toLowerCase(Locale.ROOT).trim();
-
-            for (javafx.scene.Node row : list.getChildren()) {
-                String haystack = row.getUserData() == null ? "" : row.getUserData().toString();
-                boolean visible = query.isBlank() || haystack.contains(query);
-                row.setManaged(visible);
-                row.setVisible(visible);
-            }
+            applyFilter(list, newValue);
         });
 
         ScrollPane scrollPane = new ScrollPane(content);
@@ -66,6 +70,17 @@ public class ThemeChooserPanel {
         scrollPane.getStyleClass().add("theme-chooser-scroll");
 
         return scrollPane;
+    }
+
+    private void applyFilter(VBox list, String rawQuery) {
+        String query = rawQuery == null ? "" : rawQuery.toLowerCase(Locale.ROOT).trim();
+
+        for (javafx.scene.Node row : list.getChildren()) {
+            String haystack = row.getUserData() == null ? "" : row.getUserData().toString();
+            boolean visible = query.isBlank() || haystack.contains(query);
+            row.setManaged(visible);
+            row.setVisible(visible);
+        }
     }
 
     private HBox createThemeRow(

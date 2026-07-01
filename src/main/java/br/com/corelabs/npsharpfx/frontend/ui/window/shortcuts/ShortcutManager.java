@@ -14,6 +14,8 @@ public class ShortcutManager {
         void saveCurrentFileAs();
         void closeCurrentTab();
         void closeAllTabs();
+        void goToStartOfFile();
+        void goToEndOfFile();
     }
 
     public interface WindowActions {
@@ -65,6 +67,16 @@ public class ShortcutManager {
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.W, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
                 editorActions::closeAllTabs
+        );
+
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.HOME, KeyCombination.CONTROL_DOWN),
+                editorActions::goToStartOfFile
+        );
+
+        scene.getAccelerators().put(
+                new KeyCodeCombination(KeyCode.END, KeyCombination.CONTROL_DOWN),
+                editorActions::goToEndOfFile
         );
 
         // Window operations
@@ -145,5 +157,4 @@ public class ShortcutManager {
         });
     }
 }
-
 

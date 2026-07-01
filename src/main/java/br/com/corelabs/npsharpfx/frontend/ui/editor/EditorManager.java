@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.model.StyleSpans;
 
@@ -24,6 +25,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.IndexRange;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.input.KeyEvent;
@@ -736,6 +738,36 @@ public File getCurrentFile() {
         }
     }
 
+    public void goToStartOfFile() {
+        CodeArea editor = getSelectedEditor();
+        if (editor == null) {
+            return;
+        }
+
+        editor.requestFocus();
+        editor.moveTo(0);
+        editor.showParagraphAtTop(0);
+        editor.requestFollowCaret();
+
+        refreshStatusFromSelectedTab();
+    }
+
+    public void goToEndOfFile() {
+        CodeArea editor = getSelectedEditor();
+        if (editor == null) {
+            return;
+        }
+
+        int lastParagraph = Math.max(0, editor.getParagraphs().size() - 1);
+
+        editor.requestFocus();
+        editor.moveTo(editor.getLength());
+        editor.showParagraphAtBottom(lastParagraph);
+        editor.requestFollowCaret();
+
+        refreshStatusFromSelectedTab();
+    }
+
     /* =========================================
        DUPLICA A LINHA ATUAL
     ========================================= */
@@ -861,7 +893,12 @@ editor.setParagraphGraphicFactory(
         // cria aba
         Tab tab = new Tab(title);
         tab.setClosable(closable);
-        tab.setContent(editor);
+
+        VirtualizedScrollPane<CodeArea> scrollPane = new VirtualizedScrollPane<>(editor);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.getStyleClass().add("editor-scroll-pane");
+        tab.setContent(scrollPane);
 
         // registra editor
         tabEditors.put(tab, editor);

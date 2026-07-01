@@ -96,7 +96,7 @@ public class SearchHelper {
             from = end;
         }
     }
-
+// Parei de mentir pra mim mesmo que programar seria meu trabalho 24/7. hora de correr atrás da farda
     public int getLineNumber(String text, int position) {
         int lineNumber = 1;
         for (int i = 0; i < position && i < text.length(); i++) {

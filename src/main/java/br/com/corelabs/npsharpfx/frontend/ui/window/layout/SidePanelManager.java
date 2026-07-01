@@ -44,7 +44,7 @@ public class SidePanelManager {
         ========================================
         */
 
-        host.setPrefWidth(280);
+        host.setPrefWidth(SIDE_PANEL_PREF_WIDTH);
 
         host.setMinWidth(0);
 
@@ -63,6 +63,14 @@ public class SidePanelManager {
         host.setManaged(false);
 
         return host;
+    }
+
+    public double getPreferredWidth() {
+        return SIDE_PANEL_PREF_WIDTH;
+    }
+
+    public double getMinWidth() {
+        return SIDE_PANEL_MIN_WIDTH;
     }
 
     public StackPane getSidePanelHost() {

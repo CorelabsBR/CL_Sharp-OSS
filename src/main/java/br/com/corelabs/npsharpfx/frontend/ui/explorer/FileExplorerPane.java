@@ -743,24 +743,22 @@ public class FileExplorerPane {
         private TextField editor;
 
         private ExplorerTreeCell() {
-            setOnMouseClicked(event -> {
-                if (event.getButton() != MouseButton.PRIMARY || isEmpty() || getTreeItem() == null) {
-                    return;
-                }
-
-                TreeItem<File> item = getTreeItem();
-                treeView.getSelectionModel().select(item);
-
-                if (event.getClickCount() == 1) {
-                    openDelay.stop();
-                } else if (event.getClickCount() == 2) {
-                    openDelay.stop();
-                    openDelay.setOnFinished(finished -> openTreeItem(item));
-                    openDelay.playFromStart();
-                    event.consume();
-                }
-            });
+    setOnMouseClicked(event -> {
+        if (event.getButton() != MouseButton.PRIMARY
+                || isEmpty()
+                || getTreeItem() == null) {
+            return;
         }
+
+        TreeItem<File> item = getTreeItem();
+        treeView.getSelectionModel().select(item);
+
+        if (event.getClickCount() >= 1) {
+            openTreeItem(item);
+            event.consume();
+        }
+    });
+}
 
         @Override
         public void startEdit() {

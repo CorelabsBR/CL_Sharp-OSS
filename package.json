@@ -1,0 +1,12 @@
+{
+  "name": "npsharpfx",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:linux": "bash scripts/dev-linux.sh",
+    "dev:win": "scripts\\dev-windows.bat",
+    "build:linux": "bash scripts/build-linux.sh",
+    "build:win": "scripts\\build-windows.bat",
+    "package": "scripts\\package-windows-innosetup.bat"
+  }
+}

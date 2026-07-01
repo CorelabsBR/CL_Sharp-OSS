@@ -2,6 +2,7 @@ package br.com.corelabs.npsharpfx.frontend.ui.remote;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
 import br.com.corelabs.npsharpfx.backend.filesystem.WorkspaceEntry;
@@ -9,7 +10,7 @@ import br.com.corelabs.npsharpfx.backend.remote.RemoteHostConfig;
 import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
 import br.com.corelabs.npsharpfx.backend.remote.RemoteHostStore;
 import br.com.corelabs.npsharpfx.backend.remote.RemoteTerminalService;
-import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -85,6 +86,11 @@ public class RemoteHostPanel extends VBox {
         });
         hostPicker.setButtonCell(hostPicker.getCellFactory().call(null));
         hostPicker.setOnAction(e -> fill(hostPicker.getSelectionModel().getSelectedItem()));
+        hostPicker.setOnMouseClicked(e -> {
+            if (e.getClickCount() >= 2) {
+                connect();
+            }
+        });
 
         files.getStyleClass().add("remote-file-list");
         files.setCellFactory(view -> new ListCell<>() {
@@ -218,18 +224,19 @@ public class RemoteHostPanel extends VBox {
             statusConsumer.accept(validation);
             return;
         }
-        connection.setText("Conectando...");
-        service.connectAsync(config, password.getText()).whenComplete((ignored, error) -> Platform.runLater(() -> {
-            if (error != null) {
-                connection.setText("Erro: " + friendly(error));
-                statusConsumer.accept(connection.getText());
-                return;
-            }
+
+        runRemoteTask("Conectando...", () -> {
+            service.connect(config, password.getText());
+            return null;
+        }, ignored -> {
             currentPath = config.getDefaultPath();
             connection.setText("Conectado: " + config.displayName());
             statusConsumer.accept(connection.getText());
             browse(currentPath);
-        }));
+        }, error -> {
+            connection.setText("Erro: " + friendly(error));
+            statusConsumer.accept(connection.getText());
+        });
     }
 
     private void disconnect() {
@@ -241,35 +248,19 @@ public class RemoteHostPanel extends VBox {
     private void browse(String path) {
         currentPath = path == null || path.isBlank() ? "." : path;
         connection.setText(service.isConnected() ? "Listando " + currentPath : "Desconectado");
-        java.util.concurrent.CompletableFuture.supplyAsync(() -> {
-            try {
-                return service.list(currentPath);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        }).whenComplete((entries, error) -> Platform.runLater(() -> {
-            if (error != null) {
-                statusConsumer.accept("Falha ao listar remoto: " + friendly(error));
-                connection.setText("Erro ao listar: " + currentPath);
-                return;
-            }
+        String requestedPath = currentPath;
+        runRemoteTask(null, () -> service.list(requestedPath), entries -> {
             files.getItems().setAll(entries);
-            connection.setText("Remoto: " + currentPath);
-        }));
+            currentPath = requestedPath;
+            connection.setText("Remoto: " + requestedPath);
+        }, error -> {
+            statusConsumer.accept("Falha ao listar remoto: " + friendly(error));
+            connection.setText("Erro ao listar: " + requestedPath);
+        });
     }
 
     private void openRemoteFile(String path) {
-        java.util.concurrent.CompletableFuture.supplyAsync(() -> {
-            try {
-                return service.readText(path);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        }).whenComplete((content, error) -> Platform.runLater(() -> {
-            if (error != null) {
-                statusConsumer.accept("Falha ao abrir remoto: " + friendly(error));
-                return;
-            }
+        runRemoteTask("Abrindo " + displayName(path) + "...", () -> service.readText(path), content -> {
             fileOpener.open(path.substring(path.lastIndexOf('/') + 1), "remote://" + path, content, updated -> {
                 try {
                     service.writeText(path, updated);
@@ -277,7 +268,8 @@ public class RemoteHostPanel extends VBox {
                     throw new IllegalStateException(e);
                 }
             });
-        }));
+            statusConsumer.accept("Arquivo remoto aberto: " + displayName(path));
+        }, error -> statusConsumer.accept("Falha ao abrir remoto: " + friendly(error)));
     }
 
     private void executeRemote() {
@@ -290,8 +282,9 @@ public class RemoteHostPanel extends VBox {
             return;
         }
         output.appendText(currentPath + " $ " + text + System.lineSeparator());
-        terminalService.executeAsync(text).whenComplete((result, error) -> Platform.runLater(() ->
-                output.appendText((error == null ? result : friendly(error)) + System.lineSeparator())));
+        runRemoteTask("Executando comando remoto...", () -> terminalService.execute(text), result ->
+                output.appendText((result == null || result.isBlank() ? "[remote] comando concluido" : result) + System.lineSeparator()),
+                error -> output.appendText("[remote] " + friendly(error) + System.lineSeparator()));
     }
 
     private void newFile() {
@@ -322,18 +315,48 @@ public class RemoteHostPanel extends VBox {
     }
 
     private void mutate(RemoteMutation mutation) {
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                mutation.run();
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
+        runRemoteTask("Aplicando operacao remota...", () -> {
+            mutation.run();
+            return null;
+        }, ignored -> {
+            browse(currentPath);
+            statusConsumer.accept("Operacao remota concluida");
+        }, error -> {
+            statusConsumer.accept("Operacao remota falhou: " + friendly(error));
+            browse(currentPath);
+        });
+    }
+
+    private <T> void runRemoteTask(String busyMessage, Callable<T> operation, Consumer<T> onSuccess, Consumer<Throwable> onError) {
+        if (busyMessage != null && !busyMessage.isBlank()) {
+            connection.setText(busyMessage);
+            statusConsumer.accept(busyMessage);
+        }
+
+        Task<T> task = new Task<>() {
+            @Override
+            protected T call() throws Exception {
+                return operation.call();
             }
-        }).whenComplete((ignored, error) -> Platform.runLater(() -> {
-            if (error != null) {
+        };
+
+        task.setOnSucceeded(event -> {
+            if (onSuccess != null) {
+                onSuccess.accept(task.getValue());
+            }
+        });
+        task.setOnFailed(event -> {
+            Throwable error = task.getException();
+            if (onError != null) {
+                onError.accept(error);
+            } else {
                 statusConsumer.accept("Operacao remota falhou: " + friendly(error));
             }
-            browse(currentPath);
-        }));
+        });
+
+        Thread thread = new Thread(task, "npsharp-remote-task");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private RemoteHostConfig readForm() {
@@ -422,7 +445,16 @@ public class RemoteHostPanel extends VBox {
     }
 
     private String join(String name) {
-        return currentPath.endsWith("/") ? currentPath + name : currentPath + "/" + name;
+        String cleanName = name == null ? "" : name.trim();
+        return currentPath.endsWith("/") ? currentPath + cleanName : currentPath + "/" + cleanName;
+    }
+
+    private String displayName(String path) {
+        if (path == null || path.isBlank()) {
+            return "";
+        }
+        int index = path.lastIndexOf('/');
+        return index >= 0 && index < path.length() - 1 ? path.substring(index + 1) : path;
     }
 
     private String parentPath(String path) {

@@ -66,7 +66,7 @@ public class UserPreferences {
      * 0.0 → totalmente transparente
      * 1.0 → totalmente opaco
      */
-    private double wallpaperOpacity = 0.18;
+    private double wallpaperOpacity = 0.38;
 
     /**
      * Define se o wallpaper está habilitado ou não.
@@ -132,4 +132,3 @@ public class UserPreferences {
         this.wallpaperEnabled = wallpaperEnabled;
     }
 }
-

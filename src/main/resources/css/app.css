@@ -19,6 +19,7 @@
 
 }
 
+
 .label {
     -fx-text-fill: -theme-fg;
 }
@@ -3045,3 +3046,49 @@
 .scroll-bar .thumb:hover {
     -fx-background-color: rgba(121,121,121,0.58);
 }
+
+/* =========================================================
+   WALLPAPER WORKBENCH OVERRIDES
+   ========================================================= */
+
+.workbench-wallpaper-host,
+.wallpaper-layer {
+    -fx-background-color: transparent;
+}
+
+.wallpaper-active .center-area,
+.wallpaper-active .root-pane,
+.wallpaper-active .main-horizontal-split,
+.wallpaper-active .workbench-wallpaper-host,
+.wallpaper-active .main-vertical-split,
+.wallpaper-active .split-pane,
+.wallpaper-active .editor-area,
+.wallpaper-active .editor-tabs,
+.wallpaper-active .editor-tabs > .tab-content-area,
+.wallpaper-active .tab-pane > .tab-content-area,
+.wallpaper-active .editor-scroll-pane,
+.wallpaper-active .editor-scroll-pane .viewport,
+.wallpaper-active .editor-scroll-pane .virtual-flow,
+.wallpaper-active .editor-scroll-pane .clipped-container,
+.wallpaper-active .editor-scroll-pane .sheet,
+.wallpaper-active .editor-textarea,
+.wallpaper-active .styled-text-area,
+.wallpaper-active .code-area,
+.wallpaper-active .code-area .content,
+.wallpaper-active .paragraph-box,
+.wallpaper-active .editor-textarea .paragraph-box {
+    -fx-background-color: transparent;
+}
+
+.wallpaper-active .editor-textarea .paragraph-box:has-caret {
+    -fx-background-color: rgba(255,255,255,0.06);
+}
+
+.wallpaper-active .lineno,
+.wallpaper-active .editor-textarea .scroll-bar,
+.wallpaper-active .editor-tabs .control-buttons-tab,
+.wallpaper-active .editor-tabs .tab-down-button {
+    -fx-background-color: transparent;
+}
+
+

@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -18,7 +17,6 @@ import java.util.function.UnaryOperator;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
@@ -42,10 +40,8 @@ public class IntegratedTerminalPane extends BorderPane {
     private final double maxHeight = 600;
 
     private double currentHeight = 220;
-    private boolean resizing = false;
     private DoubleConsumer heightChangeHandler;
     private Supplier<File> workingDirectorySupplier;
-    private java.util.function.Consumer<String> inputListener;
     private final BorderPane debugConsolePane = new BorderPane();
 private final TextArea debugOutputArea = new TextArea();
 private final TextField debugInputField = new TextField();
@@ -881,7 +877,7 @@ private static File findWindowsBash() {
                 host = java.net.InetAddress
                         .getLocalHost()
                         .getHostName();
-            } catch (Exception ignored) {
+            } catch (java.net.UnknownHostException | SecurityException ignored) {
             }
 
             String path = currentDirectory
@@ -1031,17 +1027,12 @@ private static File findWindowsBash() {
         }
 
         try {
-
             if (writer != null) {
-
                 writer.write("exit");
-
                 writer.newLine();
-
                 writer.flush();
             }
-
-        } catch (Exception ignored) {
+        } catch (IOException ignored) {
         }
 
         if (process != null
@@ -1088,11 +1079,8 @@ private static File findWindowsBash() {
             }
 
             try {
-
                 return Charset.forName("Cp850");
-
-            } catch (Exception ignored) {
-
+            } catch (java.nio.charset.IllegalCharsetNameException | java.nio.charset.UnsupportedCharsetException ignored) {
                 return StandardCharsets.UTF_8;
             }
         }
