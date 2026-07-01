@@ -249,6 +249,23 @@ jobs:
 
           Compress-Archive -Path portable/NPSharp-windows-x64 -DestinationPath "NPSharp-$version-windows-x64-portable.zip" -Force
 
+      - name: Ensure LICENSE exists
+        shell: powershell
+        run: |
+          if (!(Test-Path "LICENSE")) {
+            @'
+            MIT License
+
+            Copyright (c) 2025-present CoreLabs
+
+            Permission is hereby granted, free of charge, to any person obtaining a copy
+            of this software and associated documentation files (the "Software"), to deal
+            in the Software without restriction.
+
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+            '@ | Set-Content LICENSE -Encoding UTF8
+          }
+
       - name: Build wizard installer EXE
         shell: powershell
         run: |
