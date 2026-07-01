@@ -160,6 +160,11 @@ jobs:
           EOF
 
           dpkg-deb --build pkg "NPSharp-${VERSION}-linux-amd64.deb"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: NPSharp-*-linux-amd64.deb
+          
   windows-installer:
     needs: validate
     runs-on: windows-latest
