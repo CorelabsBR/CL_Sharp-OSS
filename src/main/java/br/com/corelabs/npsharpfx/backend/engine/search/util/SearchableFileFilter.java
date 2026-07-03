@@ -44,10 +44,19 @@ public class SearchableFileFilter {
 
         String fullPath = file.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
         return !fullPath.contains("/.git/") &&
+               !fullPath.contains("/.hg/") &&
+               !fullPath.contains("/.svn/") &&
+               !fullPath.contains("/.idea/") &&
+               !fullPath.contains("/.gradle/") &&
+               !fullPath.contains("/.settings/") &&
                !fullPath.contains("/target/") &&
                !fullPath.contains("/build/") &&
                !fullPath.contains("/node_modules/") &&
                !fullPath.contains("/dist/") &&
-               !fullPath.contains("/out/");
+               !fullPath.contains("/out/") &&
+               !fullPath.contains("/bin/") &&
+               !fullPath.contains("/obj/") &&
+               !fullPath.contains("/vendor/") &&
+               !fullPath.contains("/coverage/");
     }
 }

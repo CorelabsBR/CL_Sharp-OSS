@@ -7,13 +7,18 @@ package br.com.corelabs.npsharpfx.frontend.ui.window;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.prefs.Preferences;
 
 import javafx.animation.PauseTransition;
@@ -105,6 +110,11 @@ private static final double MIN_HEIGHT = 520;
     private final StatusBarManager statusBarManager;
     private final ShortcutManager shortcutManager;
     private final SearchHelper searchHelper;
+    private final ExecutorService workspaceIndexExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "npsharp-workspace-index");
+        thread.setDaemon(true);
+        return thread;
+    });
     @SuppressWarnings("unused")
     private final SettingsPanelBuilder settingsPanelBuilder;
 
@@ -115,6 +125,9 @@ private static final double MIN_HEIGHT = 520;
     private Popup appearancePopup;
     private TextField commandPaletteInput;
     private ListView<CommandAction> commandPaletteList;
+    private volatile Path quickOpenIndexedRoot;
+    private volatile List<File> quickOpenFileCache = List.of();
+    private volatile boolean quickOpenIndexing;
     private Popup colorThemePopup;
     private TextField colorThemeInput;
     private ListView<VSCodeThemeEntry> colorThemeList;
@@ -228,6 +241,7 @@ private void restoreSession() {
         if (workspace.exists() && workspace.isDirectory()) {
             explorerPane.openFolder(workspace);
             searchPane.setWorkspaceRoot(workspace);
+            scheduleWorkspaceFileIndex(workspace);
             statusBarManager.updateStatusLeft("Workspace restaurado: " + workspace.getName());
         }
     }
@@ -281,6 +295,7 @@ private void restoreSession() {
             titleBar.updateWorkspaceNameInCommandBar();
         }
         statusBarManager.updateStatusLeft("Workspace salvo: " + workspace.getName());
+        scheduleWorkspaceFileIndex(workspace);
         refreshSourceControlPanel();
     }
 }
@@ -1143,9 +1158,10 @@ appRoot.getChildren().add(root);
             return;
         }
 
-        editorManager.openFileInTab(file);
-        sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange);
-        explorerPane.revealFile(file);
+        editorManager.openFileInTab(file, tab -> {
+            sidePanelManager.showSidePanel("explorer", this::updateStatusOnPanelChange);
+            explorerPane.revealFile(file);
+        });
         statusBarManager.updateStatusLeft("Arquivo aberto: " + file.getName());
         statusBarManager.updateStatusRight("Explorer");
     }
@@ -1162,16 +1178,96 @@ appRoot.getChildren().add(root);
             return List.of();
         }
 
-        try (var stream = java.nio.file.Files.walk(workspace.toPath())) {
-            return stream
-                    .filter(java.nio.file.Files::isRegularFile)
-                    .filter(path -> isQuickOpenPathAllowed(workspace.toPath(), path))
-                    .map(java.nio.file.Path::toFile)
-                    .limit(5000)
-                    .toList();
+        Path workspacePath = workspace.toPath().toAbsolutePath().normalize();
+        if (!workspacePath.equals(quickOpenIndexedRoot) && !quickOpenIndexing) {
+            scheduleWorkspaceFileIndex(workspace);
+        }
+
+        return quickOpenFileCache;
+    }
+
+    private void scheduleWorkspaceFileIndex(File workspace) {
+        if (workspace == null || !workspace.isDirectory()) {
+            clearWorkspaceFileIndex();
+            return;
+        }
+
+        Path rootPath = workspace.toPath().toAbsolutePath().normalize();
+        quickOpenIndexedRoot = rootPath;
+        quickOpenIndexing = true;
+
+        workspaceIndexExecutor.submit(() -> {
+            List<File> files = indexWorkspaceFiles(rootPath);
+            if (rootPath.equals(quickOpenIndexedRoot)) {
+                quickOpenFileCache = files;
+                quickOpenIndexing = false;
+            }
+        });
+    }
+
+    private void clearWorkspaceFileIndex() {
+        quickOpenIndexedRoot = null;
+        quickOpenFileCache = List.of();
+        quickOpenIndexing = false;
+    }
+
+    private List<File> indexWorkspaceFiles(Path workspacePath) {
+        List<File> files = new ArrayList<>();
+
+        try {
+            Files.walkFileTree(workspacePath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (files.size() >= 5000) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (!dir.equals(workspacePath) && isIgnoredQuickOpenDirectory(dir)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (files.size() >= 5000) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (attrs != null && attrs.isRegularFile() && isQuickOpenPathAllowed(workspacePath, file)) {
+                        files.add(file.toFile());
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, java.io.IOException exc) {
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (Exception e) {
             return List.of();
         }
+
+        return List.copyOf(files);
+    }
+
+    private boolean isIgnoredQuickOpenDirectory(Path dir) {
+        Path fileName = dir == null ? null : dir.getFileName();
+        String name = fileName == null ? "" : fileName.toString().toLowerCase(java.util.Locale.ROOT);
+        return name.equals(".git")
+                || name.equals(".hg")
+                || name.equals(".svn")
+                || name.equals(".idea")
+                || name.equals(".gradle")
+                || name.equals(".settings")
+                || name.equals("node_modules")
+                || name.equals("target")
+                || name.equals("build")
+                || name.equals("dist")
+                || name.equals("out")
+                || name.equals("bin")
+                || name.equals("obj")
+                || name.equals("vendor")
+                || name.equals("coverage");
     }
 
     private boolean isQuickOpenPathAllowed(java.nio.file.Path workspace, java.nio.file.Path path) {
@@ -1226,6 +1322,8 @@ appRoot.getChildren().add(root);
                     public void saveCurrentFile() { editorManager.saveCurrentFile(); }
                     @Override
                     public void saveCurrentFileAs() { editorManager.saveCurrentFileAs(); }
+                    @Override
+                    public void saveAll() { editorManager.saveAll(); }
                     @Override
                     public void closeCurrentTab() { editorManager.closeCurrentTab(); }
                     @Override
@@ -1401,8 +1499,8 @@ appRoot.getChildren().add(root);
         commands.add(new CommandAction("File: Open File...", "Ctrl+O", "abrir arquivo", editorManager::openFileFromDialog));
         commands.add(new CommandAction("File: Open Folder...", "Ctrl+Shift+O", "abrir pasta workspace explorer", this::openFolderInExplorer));
         commands.add(new CommandAction("File: Save", "Ctrl+S", "salvar", editorManager::saveCurrentFile));
-        commands.add(new CommandAction("File: Save As...", "Ctrl+Shift+S", "salvar como", editorManager::saveCurrentFileAs));
-        commands.add(new CommandAction("File: Save All", "", "salvar todos", editorManager::saveAll));
+        commands.add(new CommandAction("File: Save As...", "", "salvar como", editorManager::saveCurrentFileAs));
+        commands.add(new CommandAction("File: Save All", "Ctrl+Shift+S", "salvar todos", editorManager::saveAll));
         commands.add(new CommandAction("File: Close Editor", "Ctrl+W", "fechar aba", editorManager::closeCurrentTab));
         commands.add(new CommandAction("File: Close Others", "", "fechar outras abas", editorManager::closeOtherTabs));
         commands.add(new CommandAction("File: Close All Editors", "Ctrl+Shift+W", "fechar todas abas", editorManager::closeAllTabs));
@@ -1923,6 +2021,7 @@ private void hideAppearancePopup() {
         java.io.File rootFolder = explorerPane.getCurrentRootFolder();
         if (rootFolder != null) {
             searchPane.setWorkspaceRoot(rootFolder);
+            scheduleWorkspaceFileIndex(rootFolder);
             titleBar.updateWorkspaceNameInCommandBar();
             refreshSourceControlPanel();
         }
@@ -1933,6 +2032,7 @@ private void hideAppearancePopup() {
 private void closeFolderFromExplorer() {
     explorerPane.clearFolder();
     searchPane.setWorkspaceRoot(null);
+    clearWorkspaceFileIndex();
     titleBar.updateWorkspaceNameInCommandBar();
 
     prefs.remove(PREF_WORKSPACE);
@@ -2196,19 +2296,11 @@ private void closeFolderFromExplorer() {
         return;
     }
 
-    editorManager.openFileInTab(file);
-
-    var selectedTab = editorManager.getTabPane()
-            .getSelectionModel()
-            .getSelectedItem();
-
-    if (selectedTab != null) {
-        editorManager.goToPosition(
-                selectedTab,
-                result.getLine(),
-                result.getColumn()
-        );
-    }
+    editorManager.openFileInTab(file, tab -> editorManager.goToPosition(
+            tab,
+            result.getLine(),
+            result.getColumn()
+    ));
 
     statusBarManager.updateStatusLeft(
             "Navegando para: " + file.getName() + " Ln " + result.getLine()

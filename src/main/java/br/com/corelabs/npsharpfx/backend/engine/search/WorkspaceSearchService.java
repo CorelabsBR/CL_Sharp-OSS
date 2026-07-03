@@ -8,17 +8,21 @@ package br.com.corelabs.npsharpfx.backend.engine.search;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import br.com.corelabs.npsharpfx.backend.engine.search.util.SearchTextAnalyzer;
 import br.com.corelabs.npsharpfx.backend.engine.search.util.SearchableFileFilter;
@@ -38,6 +42,28 @@ public class WorkspaceSearchService {
 
     private static final int MAX_RESULTS =
             5000;
+
+    private static final int MAX_SCANNED_FILES =
+            50000;
+
+    private static final List<String> IGNORED_DIRECTORY_NAMES =
+            List.of(
+                    ".git",
+                    ".hg",
+                    ".svn",
+                    ".idea",
+                    ".gradle",
+                    ".settings",
+                    "node_modules",
+                    "target",
+                    "build",
+                    "dist",
+                    "out",
+                    "bin",
+                    "obj",
+                    "vendor",
+                    "coverage"
+            );
 
     /*
     ========================================
@@ -66,6 +92,14 @@ public class WorkspaceSearchService {
             Path workspaceRoot,
             WorkspaceSearchQuery query
     ) {
+        return search(workspaceRoot, query, () -> false);
+    }
+
+    public List<WorkspaceSearchResult> search(
+            Path workspaceRoot,
+            WorkspaceSearchQuery query,
+            BooleanSupplier shouldCancel
+    ) {
 
         if (workspaceRoot == null
                 || query == null
@@ -83,30 +117,44 @@ public class WorkspaceSearchService {
 
         ConcurrentLinkedQueue<WorkspaceSearchResult> results =
                 new ConcurrentLinkedQueue<>();
+        AtomicInteger resultCount = new AtomicInteger();
+        AtomicInteger scannedFiles = new AtomicInteger();
 
-        try (Stream<Path> stream = Files.walk(workspaceRoot)) {
+        try {
+            Files.walkFileTree(workspaceRoot, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (isCancelled(shouldCancel) || resultCount.get() >= MAX_RESULTS) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (!dir.equals(workspaceRoot) && isIgnoredDirectory(dir)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
 
-            stream
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (isCancelled(shouldCancel) || resultCount.get() >= MAX_RESULTS) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (scannedFiles.incrementAndGet() > MAX_SCANNED_FILES) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (attrs != null
+                            && attrs.isRegularFile()
+                            && attrs.size() <= MAX_FILE_SIZE_BYTES
+                            && isSearchablePath(file)) {
+                        searchFile(file, query, results, resultCount, shouldCancel);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
 
-                    .parallel()
-
-                    .filter(Files::isRegularFile)
-
-                    .filter(this::isAllowedPath)
-
-                    .filter(fileFilter::isSearchableFile)
-
-                    .filter(this::isTextLikeFile)
-
-                    .forEach(path -> {
-
-                        if (results.size() >= MAX_RESULTS) {
-                            return;
-                        }
-
-                        searchFile(path, query, results);
-                    });
-
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
 
             throw new IllegalStateException(
@@ -145,97 +193,64 @@ public class WorkspaceSearchService {
     */
 
 public int replaceAll(
-        java.nio.file.Path workspace,
+        Path workspace,
         String search,
         String replace,
         boolean caseSensitive,
         boolean wholeWord
-) throws java.io.IOException {
+) throws IOException {
+    return replaceAll(workspace, search, replace, caseSensitive, wholeWord, () -> false);
+}
+
+public int replaceAll(
+        Path workspace,
+        String search,
+        String replace,
+        boolean caseSensitive,
+        boolean wholeWord,
+        BooleanSupplier shouldCancel
+) throws IOException {
 
     if (workspace == null || search == null || search.isBlank()) {
         return 0;
     }
 
-    if (replace == null) {
-        replace = "";
-    }
-
-    final String finalReplace = replace;
+    final String finalReplace = replace == null ? "" : replace;
     final int[] replacedCount = {0};
 
-    try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(workspace)) {
-        paths.filter(java.nio.file.Files::isRegularFile)
-                .filter(path -> {
-                    String name = path.getFileName().toString().toLowerCase();
+    Files.walkFileTree(workspace, new SimpleFileVisitor<>() {
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+            if (isCancelled(shouldCancel)) {
+                return FileVisitResult.TERMINATE;
+            }
+            if (!dir.equals(workspace) && isIgnoredDirectory(dir)) {
+                return FileVisitResult.SKIP_SUBTREE;
+            }
+            return FileVisitResult.CONTINUE;
+        }
 
-                    return name.endsWith(".java")
-                            || name.endsWith(".txt")
-                            || name.endsWith(".xml")
-                            || name.endsWith(".json")
-                            || name.endsWith(".css")
-                            || name.endsWith(".html")
-                            || name.endsWith(".js")
-                            || name.endsWith(".ts")
-                            || name.endsWith(".md")
-                            || name.endsWith(".gol")
-                            || name.endsWith(".por")
-                            || name.endsWith(".portugol");
-                })
-                .forEach(path -> {
-                    try {
-                        String content = java.nio.file.Files.readString(path);
-                        String newContent;
+        @Override
+        public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
+            if (isCancelled(shouldCancel)) {
+                return FileVisitResult.TERMINATE;
+            }
+            if (attrs == null
+                    || !attrs.isRegularFile()
+                    || attrs.size() > MAX_FILE_SIZE_BYTES
+                    || !isSearchablePath(path)) {
+                return FileVisitResult.CONTINUE;
+            }
 
-                        if (wholeWord) {
-                            String flags = caseSensitive ? "" : "(?i)";
-                            String regex = flags + "\\b" + java.util.regex.Pattern.quote(search) + "\\b";
+            replacedCount[0] += replaceInFile(path, search, finalReplace, caseSensitive, wholeWord);
+            return FileVisitResult.CONTINUE;
+        }
 
-                            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
-                            java.util.regex.Matcher matcher = pattern.matcher(content);
-
-                            int count = 0;
-                            while (matcher.find()) {
-                                count++;
-                            }
-
-                            newContent = matcher.replaceAll(
-                                    java.util.regex.Matcher.quoteReplacement(finalReplace)
-                            );
-
-                            replacedCount[0] += count;
-                        } else if (caseSensitive) {
-                            int count = countOccurrences(content, search);
-                            newContent = content.replace(search, finalReplace);
-                            replacedCount[0] += count;
-                        } else {
-                            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-                                    java.util.regex.Pattern.quote(search),
-                                    java.util.regex.Pattern.CASE_INSENSITIVE
-                            );
-
-                            java.util.regex.Matcher matcher = pattern.matcher(content);
-
-                            int count = 0;
-                            while (matcher.find()) {
-                                count++;
-                            }
-
-                            newContent = matcher.replaceAll(
-                                    java.util.regex.Matcher.quoteReplacement(finalReplace)
-                            );
-
-                            replacedCount[0] += count;
-                        }
-
-                        if (!content.equals(newContent)) {
-                            java.nio.file.Files.writeString(path, newContent);
-                        }
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
-    }
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
+            return FileVisitResult.CONTINUE;
+        }
+    });
 
     return replacedCount[0];
 }
@@ -252,10 +267,64 @@ private static int countOccurrences(String text, String search) {
     return count;
 }
 
+private int replaceInFile(
+        Path path,
+        String search,
+        String replace,
+        boolean caseSensitive,
+        boolean wholeWord
+) {
+    try {
+        String content = Files.readString(path, StandardCharsets.UTF_8);
+        if (content.indexOf('\0') >= 0 || content.isBlank()) {
+            return 0;
+        }
+
+        String newContent;
+        int count;
+
+        if (wholeWord) {
+            int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
+            Pattern pattern = Pattern.compile("\\b" + Pattern.quote(search) + "\\b", flags);
+            Matcher matcher = pattern.matcher(content);
+            count = countMatches(matcher);
+            matcher.reset();
+            newContent = matcher.replaceAll(Matcher.quoteReplacement(replace));
+        } else if (caseSensitive) {
+            count = countOccurrences(content, search);
+            newContent = content.replace(search, replace);
+        } else {
+            Pattern pattern = Pattern.compile(Pattern.quote(search), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Matcher matcher = pattern.matcher(content);
+            count = countMatches(matcher);
+            matcher.reset();
+            newContent = matcher.replaceAll(Matcher.quoteReplacement(replace));
+        }
+
+        if (count > 0 && !content.equals(newContent)) {
+            Files.writeString(path, newContent, StandardCharsets.UTF_8);
+        }
+
+        return count;
+    } catch (Exception ignored) {
+        return 0;
+    }
+}
+
+private static int countMatches(Matcher matcher) {
+    int count = 0;
+    while (matcher.find()) {
+        count++;
+    }
+    return count;
+}
+
     private void searchFile(
             Path file,
             WorkspaceSearchQuery query,
-            ConcurrentLinkedQueue<WorkspaceSearchResult> results
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results,
+            AtomicInteger resultCount,
+            BooleanSupplier shouldCancel
     ) {
 
         try {
@@ -295,7 +364,9 @@ private static int countOccurrences(String text, String search) {
                         needle,
                         file,
                         query.isCaseSensitive(),
-                        results
+                        results,
+                        resultCount,
+                        shouldCancel
                 );
 
                 return;
@@ -306,7 +377,9 @@ private static int countOccurrences(String text, String search) {
                     needle,
                     file,
                     query.isCaseSensitive(),
-                    results
+                    results,
+                    resultCount,
+                    shouldCancel
             );
 
         } catch (Exception ignored) {
@@ -334,7 +407,9 @@ private static int countOccurrences(String text, String search) {
             String needle,
             Path file,
             boolean caseSensitive,
-            ConcurrentLinkedQueue<WorkspaceSearchResult> results
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results,
+            AtomicInteger resultCount,
+            BooleanSupplier shouldCancel
     ) {
 
         String flags =
@@ -354,17 +429,15 @@ private static int countOccurrences(String text, String search) {
                 pattern.matcher(text);
 
         while (matcher.find()) {
+            if (isCancelled(shouldCancel) || resultCount.get() >= MAX_RESULTS) {
+                return;
+            }
 
             int start = matcher.start();
 
             int end = matcher.end();
 
-            results.add(buildResult(
-                    file,
-                    text,
-                    start,
-                    end
-            ));
+            addResult(results, resultCount, buildResult(file, text, start, end));
         }
     }
 
@@ -379,7 +452,9 @@ private static int countOccurrences(String text, String search) {
             String needle,
             Path file,
             boolean caseSensitive,
-            ConcurrentLinkedQueue<WorkspaceSearchResult> results
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results,
+            AtomicInteger resultCount,
+            BooleanSupplier shouldCancel
     ) {
 
         String haystack =
@@ -395,6 +470,9 @@ private static int countOccurrences(String text, String search) {
         int from = 0;
 
         while (true) {
+            if (isCancelled(shouldCancel) || resultCount.get() >= MAX_RESULTS) {
+                return;
+            }
 
             int index =
                     haystack.indexOf(
@@ -409,12 +487,7 @@ private static int countOccurrences(String text, String search) {
             int end =
                     index + needle.length();
 
-            results.add(buildResult(
-                    file,
-                    text,
-                    index,
-                    end
-            ));
+            addResult(results, resultCount, buildResult(file, text, index, end));
 
             /*
             ========================================
@@ -468,6 +541,19 @@ private static int countOccurrences(String text, String search) {
         );
     }
 
+    private void addResult(
+            ConcurrentLinkedQueue<WorkspaceSearchResult> results,
+            AtomicInteger resultCount,
+            WorkspaceSearchResult result
+    ) {
+        if (resultCount.get() >= MAX_RESULTS) {
+            return;
+        }
+
+        results.add(result);
+        resultCount.incrementAndGet();
+    }
+
     /*
     ========================================
     PATH FILTER
@@ -493,6 +579,23 @@ private static int countOccurrences(String text, String search) {
                 && !normalized.contains("/.settings/")
                 && !normalized.contains("/vendor/")
                 && !normalized.contains("/coverage/");
+    }
+
+    private boolean isSearchablePath(Path path) {
+        return isAllowedPath(path)
+                && fileFilter.isSearchableFile(path)
+                && isTextLikeFile(path);
+    }
+
+    private boolean isIgnoredDirectory(Path directory) {
+        Path fileName = directory == null ? null : directory.getFileName();
+        String name = fileName == null ? "" : fileName.toString().toLowerCase(Locale.ROOT);
+        return IGNORED_DIRECTORY_NAMES.contains(name);
+    }
+
+    private boolean isCancelled(BooleanSupplier shouldCancel) {
+        return Thread.currentThread().isInterrupted()
+                || (shouldCancel != null && shouldCancel.getAsBoolean());
     }
 
     /*

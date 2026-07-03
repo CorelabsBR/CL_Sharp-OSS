@@ -18,6 +18,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import org.fxmisc.flowless.VirtualizedScrollPane;
@@ -87,6 +89,9 @@ public class EditorManager {
 
     private static final int MAX_RECENT_FILES = 20;
     private static final String DIAGNOSTIC_FLASH_STYLE = "diagnostic-flash-line";
+    private static final long LARGE_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
+    private static final long MAX_OPEN_FILE_SIZE_BYTES = 25L * 1024L * 1024L;
+    private static final int MAX_HIGHLIGHT_CHARS = 300_000;
 
     /* =========================================
        REFERÃŠNCIAS PRINCIPAIS
@@ -95,6 +100,11 @@ public class EditorManager {
     private final Stage stage;
     private final Consumer<String> statusUpdater;
     private final DiagnosticsService diagnosticsService;
+    private final ExecutorService editorWorker = Executors.newFixedThreadPool(2, runnable -> {
+        Thread thread = new Thread(runnable, "npsharp-editor-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /* =========================================
        COMPONENTES VISUAIS PRINCIPAIS
@@ -132,6 +142,7 @@ public class EditorManager {
     private final Map<Tab, Consumer<String>> tabVirtualSaveHandlers = new HashMap<>();
     private final Map<Tab, String> tabVirtualUris = new HashMap<>();
     private final Map<Tab, ErrorLensRenderer> tabErrorLensRenderers = new HashMap<>();
+    private final Map<CodeArea, Long> highlightVersions = new HashMap<>();
 
     private boolean errorLensEnabled = true;
     private Consumer<File> fileSavedListener;
@@ -308,53 +319,91 @@ public File getCurrentFile() {
     ========================================= */
 
     public void openFileInTab(File file) {
+        openFileInTab(file, null);
+    }
+
+    public void openFileInTab(File file, Consumer<Tab> afterOpen) {
         if (file == null || !file.exists() || !file.isFile()) {
             updateStatus("Arquivo invÃ¡lido");
             return;
         }
 
-        try {
-            String path = file.getAbsolutePath();
+        File normalizedFile = normalizeFile(file);
+        String path = normalizedFile.getAbsolutePath();
 
-            // se jÃ¡ estiver aberto, sÃ³ foca na aba
-            if (openTabs.containsKey(path)) {
-                Tab existingTab = openTabs.get(path);
-                tabPane.getSelectionModel().select(existingTab);
-
-                updateWelcomeVisibility();
-                updateStatus("Arquivo jÃ¡ aberto: " + file.getName());
-                addRecentFile(file);
-                refreshStatusFromSelectedTab();
-                return;
-            }
-
-            // lÃª conteÃºdo do arquivo
-            String content = Files.readString(file.toPath());
-
-            // detecta tipo de quebra de linha
-            String lineEnding = detectLineEnding(content);
-
-            // cria aba com editor
-            Tab tab = createEditorTab(file.getName(), content, file, true, null, lineEnding);
-
-            tabPane.getTabs().add(tab);
-            tabPane.getSelectionModel().select(tab);
-
-            // registra estruturas de controle
-            openTabs.put(path, tab);
-            tabDirtyState.put(tab, false);
-            tabInitialContent.put(tab, content);
-            tabLineEndings.put(tab, lineEnding);
-
-            updateTabTitle(tab);
+        // se jÃ¡ estiver aberto, sÃ³ foca na aba
+        if (openTabs.containsKey(path)) {
+            Tab existingTab = openTabs.get(path);
+            tabPane.getSelectionModel().select(existingTab);
 
             updateWelcomeVisibility();
-            addRecentFile(file);
-            updateStatus("Arquivo aberto: " + file.getName());
+            updateStatus("Arquivo jÃ¡ aberto: " + normalizedFile.getName());
+            addRecentFile(normalizedFile);
             refreshStatusFromSelectedTab();
+            if (afterOpen != null) {
+                afterOpen.accept(existingTab);
+            }
+            return;
+        }
 
-        } catch (IOException e) {
-            updateStatus("Erro ao abrir arquivo");
+        updateStatus("Abrindo arquivo: " + normalizedFile.getName());
+
+        editorWorker.submit(() -> {
+            try {
+                long size = Files.size(normalizedFile.toPath());
+                if (size > MAX_OPEN_FILE_SIZE_BYTES) {
+                    Platform.runLater(() -> updateStatus("Arquivo muito grande para abrir: " + normalizedFile.getName()));
+                    return;
+                }
+
+                String content = Files.readString(normalizedFile.toPath());
+                String lineEnding = detectLineEnding(content);
+
+                Platform.runLater(() -> finishOpenFile(normalizedFile, path, content, lineEnding, size, afterOpen));
+            } catch (IOException | SecurityException e) {
+                Platform.runLater(() -> updateStatus("Erro ao abrir arquivo: " + firstLine(e.getMessage())));
+            }
+        });
+    }
+
+    private void finishOpenFile(
+            File file,
+            String path,
+            String content,
+            String lineEnding,
+            long size,
+            Consumer<Tab> afterOpen) {
+
+        if (openTabs.containsKey(path)) {
+            Tab existingTab = openTabs.get(path);
+            tabPane.getSelectionModel().select(existingTab);
+            if (afterOpen != null) {
+                afterOpen.accept(existingTab);
+            }
+            return;
+        }
+
+        Tab tab = createEditorTab(file.getName(), content, file, true, null, lineEnding);
+
+        tabPane.getTabs().add(tab);
+        tabPane.getSelectionModel().select(tab);
+
+        openTabs.put(path, tab);
+        tabDirtyState.put(tab, false);
+        tabInitialContent.put(tab, content);
+        tabLineEndings.put(tab, lineEnding);
+
+        updateTabTitle(tab);
+
+        updateWelcomeVisibility();
+        addRecentFile(file);
+        updateStatus(size > LARGE_FILE_SIZE_BYTES
+                ? "Arquivo grande aberto sem realce completo: " + file.getName()
+                : "Arquivo aberto: " + file.getName());
+        refreshStatusFromSelectedTab();
+
+        if (afterOpen != null) {
+            afterOpen.accept(tab);
         }
     }
 
@@ -444,11 +493,12 @@ public File getCurrentFile() {
             updateStatus("Salvar cancelado");
             return;
         }
+        file = normalizeFile(file);
 
         // remove associaÃ§Ã£o antiga, se havia
         File oldFile = tabFiles.get(selectedTab);
         if (oldFile != null) {
-            openTabs.remove(oldFile.getAbsolutePath());
+            openTabs.remove(normalizeFile(oldFile).getAbsolutePath());
         }
 
         // associa novo arquivo
@@ -964,15 +1014,15 @@ editor.getStylesheets().add(
 
         // aplica syntax highlighting inicial
         String lang = detectLanguage(tab, title);
-        applyHighlighting(editor, lang);
+        scheduleHighlighting(tab, editor, lang);
         renderErrorLensForTab(tab);
 
         // re-aplica highlighting com debounce ao editar
         editor.multiPlainChanges()
-                .successionEnds(Duration.ofMillis(100))
+                .successionEnds(Duration.ofMillis(180))
                 .subscribe(ignore -> {
                     String currentLang = detectLanguage(tab, buildSuggestedFileName(tab));
-                    applyHighlighting(editor, currentLang);
+                    scheduleHighlighting(tab, editor, currentLang);
                     renderErrorLensForTab(tab);
                 });
 
@@ -1006,16 +1056,38 @@ editor.getStylesheets().add(
        APLICA SYNTAX HIGHLIGHTING NO EDITOR
     ========================================= */
 
-    private void applyHighlighting(CodeArea editor, String language) {
-        try {
-            String text = editor.getText();
-            StyleSpans<Collection<String>> spans = SyntaxHighlighter.computeHighlighting(text, language);
-            if (spans != null) {
-                editor.setStyleSpans(0, spans);
-            }
-        } catch (Exception ignored) {
-            // ignora erros de highlighting para nÃ£o afetar ediÃ§Ã£o
+    private void scheduleHighlighting(Tab tab, CodeArea editor, String language) {
+        if (tab == null || editor == null) {
+            return;
         }
+
+        String text = editor.getText();
+        if (text == null || text.length() > MAX_HIGHLIGHT_CHARS) {
+            return;
+        }
+
+        long version = highlightVersions.merge(editor, 1L, Long::sum);
+
+        editorWorker.submit(() -> {
+            try {
+                StyleSpans<Collection<String>> spans = SyntaxHighlighter.computeHighlighting(text, language);
+                if (spans == null) {
+                    return;
+                }
+
+                Platform.runLater(() -> {
+                    if (!tabEditors.containsKey(tab)
+                            || !Objects.equals(highlightVersions.get(editor), version)
+                            || editor.getLength() != text.length()) {
+                        return;
+                    }
+
+                    editor.setStyleSpans(0, spans);
+                });
+            } catch (Exception ignored) {
+                // ignora erros de highlighting para nÃ£o afetar ediÃ§Ã£o
+            }
+        });
     }
     
     /* =========================================
@@ -1452,18 +1524,21 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
 
     private void cleanupTab(Tab tab) {
         File associatedFile = tabFiles.remove(tab);
+        CodeArea editor = tabEditors.remove(tab);
 
         tabDirtyState.remove(tab);
-        tabEditors.remove(tab);
         tabSuggestedExtensions.remove(tab);
         tabInitialContent.remove(tab);
         tabLineEndings.remove(tab);
         tabVirtualSaveHandlers.remove(tab);
         tabVirtualUris.remove(tab);
         tabErrorLensRenderers.remove(tab);
+        if (editor != null) {
+            highlightVersions.remove(editor);
+        }
 
         if (associatedFile != null) {
-            openTabs.remove(associatedFile.getAbsolutePath());
+            openTabs.remove(normalizeFile(associatedFile).getAbsolutePath());
         }
     }
 
@@ -1789,7 +1864,27 @@ public void openWorkspaceSearchResult(WorkspaceSearchResult result) {
             return false;
         }
 
-        return a.getAbsolutePath().equalsIgnoreCase(b.getAbsolutePath());
+        return normalizeFile(a).getAbsolutePath().equalsIgnoreCase(normalizeFile(b).getAbsolutePath());
+    }
+
+    private File normalizeFile(File file) {
+        if (file == null) {
+            return null;
+        }
+
+        try {
+            return file.getCanonicalFile();
+        } catch (IOException | SecurityException e) {
+            return file.getAbsoluteFile();
+        }
+    }
+
+    private String firstLine(String text) {
+        if (text == null || text.isBlank()) {
+            return "falha desconhecida";
+        }
+
+        return text.lines().findFirst().orElse(text);
     }
 
     /* =========================================

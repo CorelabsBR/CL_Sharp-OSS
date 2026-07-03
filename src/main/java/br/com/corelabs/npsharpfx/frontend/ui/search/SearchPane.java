@@ -10,6 +10,10 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -23,7 +27,10 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -45,16 +52,24 @@ public class SearchPane {
     private final Consumer<SearchResult> resultOpener;
     private final WorkspaceSearchService workspaceSearchService = new WorkspaceSearchService();
     private final AtomicLong searchVersion = new AtomicLong(0);
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "npsharp-search-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final VBox view;
     private final TextField queryField;
     private final TextField replaceField;
     private final CheckBox caseSensitiveCheck;
     private final CheckBox wholeWordCheck;
+    private final Button replaceAllButton;
     private final Label resultSummary;
     private final ListView<SearchResult> resultList;
 
     private File currentWorkspaceRoot;
+    private Future<?> currentSearch;
+    private Future<?> currentReplace;
 
     public SearchPane(
             Function<SearchQuery, List<SearchResult>> searchProvider,
@@ -77,7 +92,7 @@ public class SearchPane {
         wholeWordCheck = new CheckBox("Whole Word");
         wholeWordCheck.getStyleClass().add("search-check");
 
-        Button replaceAllButton = new Button("Replace All");
+        replaceAllButton = new Button("Replace All");
         replaceAllButton.getStyleClass().add("search-action-button");
         replaceAllButton.setMaxWidth(Double.MAX_VALUE);
         replaceAllButton.setOnAction(e -> replaceAllOccurrences());
@@ -168,7 +183,12 @@ public class SearchPane {
         long version = searchVersion.incrementAndGet();
         resultSummary.setText("Searching...");
 
-        Thread searchThread = new Thread(() -> {
+        Future<?> previous = currentSearch;
+        if (previous != null) {
+            previous.cancel(true);
+        }
+
+        currentSearch = searchExecutor.submit(() -> {
             List<SearchResult> results = doSearch(query, workspaceSnapshot);
 
             Platform.runLater(() -> {
@@ -182,9 +202,7 @@ public class SearchPane {
                     resultList.getSelectionModel().select(0);
                 }
             });
-        }, "npsharp-search-thread");
-        searchThread.setDaemon(true);
-        searchThread.start();
+        });
     }
 
     private List<SearchResult> doSearch(SearchQuery query, File workspaceRootSnapshot) {
@@ -205,7 +223,8 @@ public class SearchPane {
                                 query.getText(),
                                 query.isCaseSensitive(),
                                 query.isWholeWord()
-                        )
+                        ),
+                        () -> Thread.currentThread().isInterrupted()
                 );
 
                 workspaceResults.stream()
@@ -262,19 +281,59 @@ public class SearchPane {
             return;
         }
 
-        try {
-            int replaced = workspaceSearchService.replaceAll(
-                    currentWorkspaceRoot.toPath(),
-                    search,
-                    replaceField.getText(),
-                    caseSensitiveCheck.isSelected(),
-                    wholeWordCheck.isSelected()
-            );
-            resultSummary.setText(replaced + " occurrence(s) replaced");
-            runSearchAsync();
-        } catch (Exception e) {
-            resultSummary.setText("Replace failed: " + firstLine(e.getMessage()));
+        if (!confirmReplaceAll(search, currentWorkspaceRoot)) {
+            resultSummary.setText("Replace cancelled");
+            return;
         }
+
+        Future<?> previousReplace = currentReplace;
+        if (previousReplace != null) {
+            previousReplace.cancel(true);
+        }
+
+        File workspaceSnapshot = currentWorkspaceRoot;
+        String replacement = replaceField.getText();
+        boolean caseSensitive = caseSensitiveCheck.isSelected();
+        boolean wholeWord = wholeWordCheck.isSelected();
+
+        replaceAllButton.setDisable(true);
+        resultSummary.setText("Replacing...");
+
+        currentReplace = searchExecutor.submit(() -> {
+            try {
+                int replaced = workspaceSearchService.replaceAll(
+                        workspaceSnapshot.toPath(),
+                        search,
+                        replacement,
+                        caseSensitive,
+                        wholeWord,
+                        () -> Thread.currentThread().isInterrupted()
+                );
+                Platform.runLater(() -> {
+                    replaceAllButton.setDisable(false);
+                    resultSummary.setText(replaced + " occurrence(s) replaced");
+                    runSearchAsync();
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    replaceAllButton.setDisable(false);
+                    resultSummary.setText("Replace failed: " + firstLine(e.getMessage()));
+                });
+            }
+        });
+    }
+
+    private boolean confirmReplaceAll(String search, File workspace) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Replace All");
+        alert.setHeaderText("Replace across workspace?");
+        alert.setContentText("Replace \"" + search + "\" in " + workspace.getName() + ".");
+
+        ButtonType replace = new ButtonType("Replace All", ButtonBar.ButtonData.OK_DONE);
+        alert.getButtonTypes().setAll(ButtonType.CANCEL, replace);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == replace;
     }
 
     private void replaceSingleOccurrence(SearchResult result) {

@@ -17,6 +17,7 @@ public class ShortcutManager {
         void openFileFromDialog();
         void saveCurrentFile();
         void saveCurrentFileAs();
+        void saveAll();
         void closeCurrentTab();
         void closeAllTabs();
         void goToStartOfFile();
@@ -62,7 +63,7 @@ public class ShortcutManager {
 
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
-                editorActions::saveCurrentFileAs
+                editorActions::saveAll
         );
 
         scene.getAccelerators().put(

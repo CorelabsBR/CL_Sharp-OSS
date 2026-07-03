@@ -9,13 +9,19 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -23,6 +29,7 @@ import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
 import br.com.corelabs.npsharpfx.frontend.ui.icons.FileIconManager;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.event.EventTarget;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -53,13 +60,36 @@ import javafx.util.Duration;
 
 public class FileExplorerPane {
 
+    private static final Set<String> IGNORED_DIRECTORY_NAMES = Set.of(
+            ".git",
+            ".hg",
+            ".svn",
+            ".idea",
+            ".gradle",
+            ".settings",
+            "node_modules",
+            "target",
+            "build",
+            "dist",
+            "out",
+            "bin",
+            "obj",
+            "vendor",
+            "coverage"
+    );
+
     private final VBox view;
     private final TreeView<File> treeView;
     private final VBox emptyState;
     private final HBox toolbar;
     private final StackPane contentHost;
-    private final Map<TreeItem<File>, String> compactLabels = new IdentityHashMap<>();
     private final Map<TreeItem<File>, PendingCreate> pendingCreates = new IdentityHashMap<>();
+    private final Map<Path, DirectorySnapshot> directoryCache = new ConcurrentHashMap<>();
+    private final ExecutorService directoryLoader = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "npsharp-worktree-loader");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final Consumer<File> onFileOpen;
     private final Consumer<File> onFolderOpen;
     private final Stage stage;
@@ -67,6 +97,7 @@ public class FileExplorerPane {
 
     private File currentRootFolder;
     private Supplier<String> menuStyleSupplier;
+    private Set<Path> expandedPathsToRestore = Collections.emptySet();
 
     public FileExplorerPane(Stage stage, Consumer<File> onFileOpen, Consumer<File> onFolderOpen) {
         this.stage = stage;
@@ -153,16 +184,18 @@ public class FileExplorerPane {
             return;
         }
 
-        currentRootFolder = folder;
+        currentRootFolder = normalizeFile(folder);
         if (onFolderOpen != null) {
-            onFolderOpen.accept(folder);
+            onFolderOpen.accept(currentRootFolder);
         }
 
         pendingCreates.clear();
-        compactLabels.clear();
-        TreeItem<File> rootItem = createNode(folder);
-        rootItem.setExpanded(true);
+        directoryCache.clear();
+        expandedPathsToRestore = Collections.emptySet();
+        TreeItem<File> rootItem = createNode(currentRootFolder);
         treeView.setRoot(rootItem);
+        rootItem.setExpanded(true);
+        ensureChildrenLoaded(rootItem);
         treeView.getSelectionModel().clearSelection();
         refreshVisibility();
     }
@@ -170,7 +203,8 @@ public class FileExplorerPane {
     public void clearFolder() {
         currentRootFolder = null;
         pendingCreates.clear();
-        compactLabels.clear();
+        directoryCache.clear();
+        expandedPathsToRestore = Collections.emptySet();
         treeView.setRoot(null);
         refreshVisibility();
     }
@@ -186,10 +220,12 @@ public class FileExplorerPane {
         }
 
         pendingCreates.clear();
-        compactLabels.clear();
+        directoryCache.clear();
+        expandedPathsToRestore = expandedPaths;
         TreeItem<File> rootItem = createNode(currentRootFolder);
-        rootItem.setExpanded(true);
         treeView.setRoot(rootItem);
+        rootItem.setExpanded(true);
+        ensureChildrenLoaded(rootItem);
         restoreExpandedPaths(rootItem, expandedPaths);
 
         if (selectedFile != null) {
@@ -197,6 +233,32 @@ public class FileExplorerPane {
         }
 
         refreshVisibility();
+    }
+
+    private void refreshDirectory(File directory) {
+        if (directory == null || !directory.isDirectory()) {
+            refresh();
+            return;
+        }
+
+        TreeItem<File> item = findItem(treeView.getRoot(), directory);
+        if (!(item instanceof ExplorerTreeItem explorerItem)) {
+            refresh();
+            return;
+        }
+
+        Path key = normalizedPath(directory);
+        if (key != null) {
+            directoryCache.remove(key);
+        }
+
+        explorerItem.childrenLoaded = false;
+        explorerItem.loading = false;
+        explorerItem.getChildren().setAll(List.of(createLoadingPlaceholder()));
+
+        if (explorerItem.isExpanded()) {
+            ensureChildrenLoaded(explorerItem);
+        }
     }
 
     public void collapseAll() {
@@ -317,7 +379,7 @@ public class FileExplorerPane {
         copyRelativePath.setOnAction(event -> copyToClipboard(relativePath(file)));
 
         MenuItem refresh = new MenuItem("Atualizar");
-        refresh.setOnAction(event -> refresh());
+        refresh.setOnAction(event -> refreshDirectory(file.isDirectory() ? file : file.getParentFile()));
 
         menu.getItems().addAll(open, newFile, newFolder, rename, delete, copyPath, copyRelativePath, refresh);
         return menu;
@@ -374,6 +436,7 @@ public class FileExplorerPane {
             directory = currentRootFolder;
         }
 
+        loadChildrenNow(parent);
         parent.setExpanded(true);
 
         String defaultName = nextAvailableName(directory.toPath(), folder ? "New Folder" : "untitled");
@@ -666,80 +729,139 @@ public class FileExplorerPane {
     }
 
     private TreeItem<File> createNode(File file) {
-        return createNode(file, false);
-    }
-
-    private TreeItem<File> createNode(File file, boolean allowCompactFolders) {
-        File displayFile = file;
-        String compactLabel = null;
-
-        if (allowCompactFolders && file.isDirectory()) {
-            CompactFolder compactFolder = compactFolder(file);
-            displayFile = compactFolder.file();
-            compactLabel = compactFolder.label();
-        }
-
-        TreeItem<File> item = new TreeItem<>(displayFile);
+        File nodeFile = normalizeFile(file);
+        ExplorerTreeItem item = new ExplorerTreeItem(nodeFile);
         item.setExpanded(false);
-        item.setGraphic(FileIconManager.getIcon(displayFile, false));
+        item.setGraphic(FileIconManager.getIcon(nodeFile, false));
 
-        if (compactLabel != null) {
-            compactLabels.put(item, compactLabel);
-        }
-
-        if (displayFile.isDirectory()) {
-            File directory = displayFile;
+        if (nodeFile.isDirectory()) {
+            File directory = nodeFile;
             item.expandedProperty().addListener((obs, oldVal, expanded) ->
                     item.setGraphic(FileIconManager.getIcon(directory, expanded)));
-            item.getChildren().setAll(buildChildren(directory));
+            item.getChildren().setAll(List.of(createLoadingPlaceholder()));
+            item.expandedProperty().addListener((obs, oldVal, expanded) -> {
+                if (expanded) {
+                    ensureChildrenLoaded(item);
+                }
+            });
         }
 
         return item;
     }
 
-    @SuppressWarnings("unchecked")
-    private TreeItem<File>[] buildChildren(File directory) {
-        File[] files = visibleChildren(directory);
-        if (files == null) {
-            return new TreeItem[0];
+    private TreeItem<File> createLoadingPlaceholder() {
+        return new TreeItem<>((File) null);
+    }
+
+    private void ensureChildrenLoaded(TreeItem<File> item) {
+        if (!(item instanceof ExplorerTreeItem explorerItem)
+                || explorerItem.childrenLoaded
+                || explorerItem.loading) {
+            return;
         }
 
-        Arrays.sort(files, Comparator
+        File directory = explorerItem.getValue();
+        if (directory == null || !directory.isDirectory()) {
+            return;
+        }
+
+        explorerItem.loading = true;
+
+        directoryLoader.submit(() -> {
+            List<File> children = loadVisibleChildren(directory);
+
+            Platform.runLater(() -> {
+                if (!explorerItem.loading) {
+                    return;
+                }
+                explorerItem.loading = false;
+                populateChildren(explorerItem, children);
+                restoreExpandedPaths(explorerItem, expandedPathsToRestore);
+            });
+        });
+    }
+
+    private void loadChildrenNow(TreeItem<File> item) {
+        if (!(item instanceof ExplorerTreeItem explorerItem) || explorerItem.childrenLoaded) {
+            return;
+        }
+
+        File directory = explorerItem.getValue();
+        if (directory == null || !directory.isDirectory()) {
+            return;
+        }
+
+        explorerItem.loading = false;
+        populateChildren(explorerItem, loadVisibleChildren(directory));
+    }
+
+    private void populateChildren(ExplorerTreeItem item, List<File> children) {
+        List<TreeItem<File>> childItems = new ArrayList<>(children.size());
+        for (File child : children) {
+            childItems.add(createNode(child));
+        }
+
+        item.getChildren().setAll(childItems);
+        item.childrenLoaded = true;
+    }
+
+    private List<File> loadVisibleChildren(File directory) {
+        Path key = normalizedPath(directory);
+        long lastModified = lastModifiedMillis(directory);
+        DirectorySnapshot cached = directoryCache.get(key);
+
+        if (cached != null && cached.lastModifiedMillis() == lastModified) {
+            return cached.children();
+        }
+
+        List<File> children = new ArrayList<>();
+        try (var stream = Files.list(directory.toPath())) {
+            stream
+                    .filter(this::isVisibleExplorerPath)
+                    .map(Path::toFile)
+                    .map(this::normalizeFile)
+                    .forEach(children::add);
+        } catch (IOException | SecurityException e) {
+            return List.of();
+        }
+
+        children.sort(Comparator
                 .comparing(File::isFile)
                 .thenComparing(File::getName, String.CASE_INSENSITIVE_ORDER));
 
-        TreeItem<File>[] items = new TreeItem[files.length];
-        for (int i = 0; i < files.length; i++) {
-            items[i] = createNode(files[i], true);
-        }
-        return items;
+        List<File> snapshotChildren = List.copyOf(children);
+        directoryCache.put(key, new DirectorySnapshot(lastModified, snapshotChildren));
+        return snapshotChildren;
     }
 
-    private CompactFolder compactFolder(File start) {
-        StringBuilder label = new StringBuilder(nameOrPath(start));
-        File current = start;
-
-        while (true) {
-            File[] children = visibleChildren(current);
-
-            if (children == null || children.length != 1 || !children[0].isDirectory()) {
-                break;
+    private boolean isVisibleExplorerPath(Path path) {
+        try {
+            if (Files.isHidden(path)) {
+                return false;
             }
-
-            current = children[0];
-            label.append('/').append(nameOrPath(current));
+        } catch (IOException | SecurityException e) {
+            return false;
         }
 
-        return new CompactFolder(current, label.toString());
+        if (Files.isDirectory(path)) {
+            Path fileName = path.getFileName();
+            String name = fileName == null ? "" : fileName.toString();
+            return !isIgnoredDirectoryName(name);
+        }
+
+        return true;
     }
 
-    private File[] visibleChildren(File directory) {
-        return directory.listFiles(file -> !file.isHidden());
+    private boolean isIgnoredDirectoryName(String name) {
+        return name != null && IGNORED_DIRECTORY_NAMES.contains(name.toLowerCase(Locale.ROOT));
     }
 
-    private String nameOrPath(File file) {
-        String name = file.getName();
-        return name == null || name.isBlank() ? file.getAbsolutePath() : name;
+    private long lastModifiedMillis(File file) {
+        try {
+            return Files.getLastModifiedTime(file.toPath()).toMillis();
+        } catch (IOException | SecurityException e) {
+            return -1;
+        }
     }
 
     private final class ExplorerTreeCell extends TreeCell<File> {
@@ -748,22 +870,23 @@ public class FileExplorerPane {
         private TextField editor;
 
         private ExplorerTreeCell() {
-    setOnMouseClicked(event -> {
-        if (event.getButton() != MouseButton.PRIMARY
-                || isEmpty()
-                || getTreeItem() == null) {
-            return;
-        }
+            setOnMouseClicked(event -> {
+                if (event.getButton() != MouseButton.PRIMARY
+                        || isEmpty()
+                        || getTreeItem() == null
+                        || isDisclosureClick(event.getTarget())) {
+                    return;
+                }
 
-        TreeItem<File> item = getTreeItem();
-        treeView.getSelectionModel().select(item);
+                TreeItem<File> item = getTreeItem();
+                treeView.getSelectionModel().select(item);
 
-        if (event.getClickCount() >= 1) {
-            openTreeItem(item);
-            event.consume();
+                if (event.getClickCount() >= 1) {
+                    openTreeItem(item);
+                    event.consume();
+                }
+            });
         }
-    });
-}
 
         @Override
         public void startEdit() {
@@ -844,7 +967,7 @@ public class FileExplorerPane {
 
             TreeItem<File> currentItem = getTreeItem();
             boolean expanded = currentItem != null && currentItem.isExpanded();
-            String name = displayName(currentItem, file);
+            String name = displayName(file);
             setText(name);
 
             try {
@@ -868,18 +991,24 @@ public class FileExplorerPane {
         }
     }
 
-    private String displayName(TreeItem<File> item, File file) {
-        String name = item == null ? null : compactLabels.get(item);
-        if (name == null || name.isBlank()) {
-            name = file.getName();
-        }
+    private String displayName(File file) {
+        String name = file.getName();
         return name == null || name.isBlank() ? file.getAbsolutePath() : name;
     }
 
     private record PendingCreate(File baseDir, boolean folder) {
     }
 
-    private record CompactFolder(File file, String label) {
+    private static final class ExplorerTreeItem extends TreeItem<File> {
+        private boolean childrenLoaded;
+        private boolean loading;
+
+        private ExplorerTreeItem(File file) {
+            super(file);
+        }
+    }
+
+    private record DirectorySnapshot(long lastModifiedMillis, List<File> children) {
     }
 
     private void collapseChildren(TreeItem<File> item) {
@@ -896,6 +1025,10 @@ public class FileExplorerPane {
         }
 
         TreeItem<File> found = findItem(root, file);
+        if (found == null) {
+            found = loadPathToFile(root, file);
+        }
+
         if (found != null) {
             expandParents(found);
             treeView.getSelectionModel().select(found);
@@ -903,12 +1036,61 @@ public class FileExplorerPane {
         }
     }
 
+    private TreeItem<File> loadPathToFile(TreeItem<File> root, File file) {
+        File rootFile = root.getValue();
+        Path rootPath = normalizedPath(rootFile);
+        Path targetPath = normalizedPath(file);
+
+        if (rootPath == null || targetPath == null || !targetPath.startsWith(rootPath)) {
+            return null;
+        }
+
+        if (rootPath.equals(targetPath)) {
+            return root;
+        }
+
+        TreeItem<File> currentItem = root;
+        Path currentPath = rootPath;
+        Path relative = rootPath.relativize(targetPath);
+
+        for (Path part : relative) {
+            currentItem.setExpanded(true);
+            loadChildrenNow(currentItem);
+            currentPath = currentPath.resolve(part).normalize();
+
+            TreeItem<File> nextItem = findDirectChild(currentItem, currentPath);
+            if (nextItem == null) {
+                return null;
+            }
+
+            currentItem = nextItem;
+        }
+
+        return currentItem;
+    }
+
+    private TreeItem<File> findDirectChild(TreeItem<File> item, Path childPath) {
+        if (item == null || childPath == null) {
+            return null;
+        }
+
+        for (TreeItem<File> child : item.getChildren()) {
+            File value = child.getValue();
+            if (value != null && childPath.equals(normalizedPath(value))) {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
     private TreeItem<File> findItem(TreeItem<File> item, File file) {
         if (item == null || file == null) {
             return null;
         }
 
-        if (item.getValue().equals(file)) {
+        File itemFile = item.getValue();
+        if (itemFile != null && samePath(itemFile, file)) {
             return item;
         }
 
@@ -942,7 +1124,7 @@ public class FileExplorerPane {
     private void collectExpandedPaths(TreeItem<File> item, Set<Path> expanded) {
         File file = item.getValue();
         if (file != null && item.isExpanded()) {
-            expanded.add(file.toPath().toAbsolutePath().normalize());
+            expanded.add(normalizedPath(file));
         }
 
         for (TreeItem<File> child : item.getChildren()) {
@@ -952,12 +1134,60 @@ public class FileExplorerPane {
 
     private void restoreExpandedPaths(TreeItem<File> item, Set<Path> expanded) {
         File file = item.getValue();
-        if (file != null && expanded.contains(file.toPath().toAbsolutePath().normalize())) {
+        if (file != null && expanded.contains(normalizedPath(file))) {
             item.setExpanded(true);
         }
 
         for (TreeItem<File> child : item.getChildren()) {
             restoreExpandedPaths(child, expanded);
+        }
+    }
+
+    private boolean isDisclosureClick(EventTarget target) {
+        if (!(target instanceof Node node)) {
+            return false;
+        }
+
+        while (node != null) {
+            if (node.getStyleClass().contains("tree-disclosure-node")) {
+                return true;
+            }
+            if (node instanceof TreeCell<?>) {
+                return false;
+            }
+            node = node.getParent();
+        }
+
+        return false;
+    }
+
+    private boolean samePath(File left, File right) {
+        Path leftPath = normalizedPath(left);
+        Path rightPath = normalizedPath(right);
+        return leftPath != null && leftPath.equals(rightPath);
+    }
+
+    private Path normalizedPath(File file) {
+        if (file == null) {
+            return null;
+        }
+
+        try {
+            return file.toPath().toRealPath().normalize();
+        } catch (IOException | SecurityException e) {
+            return file.toPath().toAbsolutePath().normalize();
+        }
+    }
+
+    private File normalizeFile(File file) {
+        if (file == null) {
+            return null;
+        }
+
+        try {
+            return file.getCanonicalFile();
+        } catch (IOException | SecurityException e) {
+            return file.getAbsoluteFile();
         }
     }
 }
