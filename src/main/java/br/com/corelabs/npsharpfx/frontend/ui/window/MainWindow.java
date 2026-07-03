@@ -58,6 +58,7 @@ import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
 import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
 import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
+import br.com.corelabs.npsharpfx.backend.services.LiveServerService;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.JavaDiagnosticsRunner;
@@ -82,6 +83,7 @@ import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
 import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
+import br.com.corelabs.npsharpfx.backend.services.LiveServerService;
 
 
 public class MainWindow {
@@ -102,6 +104,7 @@ private static final double MIN_HEIGHT = 520;
     private StackPane appRoot;
     private StackPane wallpaperLayer;
     private Rectangle wallpaperOverlay;
+    private LiveServerService liveServerService;
 
     // Managers and components
     private final ThemeManager themeManager;
@@ -271,7 +274,12 @@ private void restoreSession() {
         restoreDefaultLayout();
         themeManager.applyTheme(wallpaperLayer, wallpaperOverlay, appRoot);
         restoreSession();
-        stage.setOnCloseRequest(event -> saveSession());
+        stage.setOnCloseRequest(event -> {
+    saveSession();
+    if (liveServerService != null) {
+        liveServerService.stopAll();
+    }
+});
     }
     private void flushPrefs() {
     try {
@@ -298,7 +306,7 @@ private void restoreSession() {
         scheduleWorkspaceFileIndex(workspace);
         refreshSourceControlPanel();
     }
-}
+    }
     private void prepareStage() {
         TitleBar.prepareStage(stage);
 
@@ -317,11 +325,13 @@ private void restoreSession() {
     private void createManagers() {
 
     gitService = new GitService(resolveGitExecutable());
-    gitService.setLogConsumer(line -> Platform.runLater(() -> {
-        if (terminalPane != null) {
-            terminalPane.appendOutput("[git] " + line);
-        }
-    }));
+        gitService.setLogConsumer(line -> {
+        Platform.runLater(() -> {
+            if (terminalPane != null) {
+              terminalPane.appendOutput("[git] " + line);
+            }
+     });
+});
 
     editorManager = new EditorManager(
             stage,
@@ -347,14 +357,18 @@ private void restoreSession() {
     EXPLORER DEPOIS
     ========================================
     */
-
-    explorerPane = new FileExplorerPane(
-            stage,
-            editorManager::openFileInTab,
-            this::setWorkspaceAndPersist
-    );
-}
-
+   liveServerService = new LiveServerService(
+        stage,
+        () -> explorerPane == null ? null : explorerPane.getCurrentRootFolder(),
+        statusBarManager::updateStatusLeft
+);
+explorerPane = new FileExplorerPane(
+        stage,
+        editorManager::openFileInTab,
+        this::setWorkspaceAndPersist,
+        liveServerService::openWithLiveServer
+);
+    }
     private void createPanels() {
         Button explorerBtn = activityBarManager.createActivityButton();
         Node explorerIcon = Codicon.icon("/icons/codicons/files.svg");

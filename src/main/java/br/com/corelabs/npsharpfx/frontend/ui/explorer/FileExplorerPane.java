@@ -94,12 +94,12 @@ public class FileExplorerPane {
     private final Consumer<File> onFolderOpen;
     private final Stage stage;
     private boolean renameRequestedFromMenu;
-
+    private final Consumer<File> onLiveServerOpen;
     private File currentRootFolder;
     private Supplier<String> menuStyleSupplier;
     private Set<Path> expandedPathsToRestore = Collections.emptySet();
 
-    public FileExplorerPane(Stage stage, Consumer<File> onFileOpen, Consumer<File> onFolderOpen) {
+public FileExplorerPane(Stage stage, Consumer<File> onFileOpen, Consumer<File> onFolderOpen, Consumer<File> onLiveServerOpen) {
         this.stage = stage;
         this.onFileOpen = onFileOpen;
         this.onFolderOpen = onFolderOpen;
@@ -109,6 +109,7 @@ public class FileExplorerPane {
         this.treeView.setShowRoot(true);
         this.treeView.setEditable(true);
         this.treeView.setMinWidth(0);
+        this.onLiveServerOpen = onLiveServerOpen;
         this.treeView.setContextMenu(createWorkspaceContextMenu());
         VBox.setVgrow(treeView, Priority.ALWAYS);
 
@@ -365,6 +366,15 @@ public class FileExplorerPane {
                 onFileOpen.accept(file);
             }
         });
+        MenuItem openWithLiveServer = new MenuItem("Open with Live Server");
+        openWithLiveServer.setOnAction(event -> {
+            if (onLiveServerOpen != null) {
+            onLiveServerOpen.accept(file);
+            }
+        });
+
+        boolean liveServerSupported = file.isFile() && isLiveServerSupported(file);
+        openWithLiveServer.setDisable(!liveServerSupported);
 
         MenuItem rename = new MenuItem("Renomear");
         rename.setOnAction(event -> startInlineRenameForFile(file));
@@ -381,7 +391,7 @@ public class FileExplorerPane {
         MenuItem refresh = new MenuItem("Atualizar");
         refresh.setOnAction(event -> refreshDirectory(file.isDirectory() ? file : file.getParentFile()));
 
-        menu.getItems().addAll(open, newFile, newFolder, rename, delete, copyPath, copyRelativePath, refresh);
+        menu.getItems().addAll(open, openWithLiveServer, newFile, newFolder, rename, delete, copyPath, copyRelativePath, refresh);
         return menu;
     }
 
@@ -995,6 +1005,17 @@ public class FileExplorerPane {
         String name = file.getName();
         return name == null || name.isBlank() ? file.getAbsolutePath() : name;
     }
+
+    private boolean isLiveServerSupported(File file) {
+    if (file == null || !file.isFile()) {
+        return false;
+    }
+
+    String name = file.getName().toLowerCase(Locale.ROOT);
+    return name.endsWith(".html")
+            || name.endsWith(".htm")
+            || name.endsWith(".php");
+}
 
     private record PendingCreate(File baseDir, boolean folder) {
     }

@@ -44,6 +44,8 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 /*
 ========================================================
@@ -89,10 +91,11 @@ public class EditorManager {
 
     private static final int MAX_RECENT_FILES = 20;
     private static final String DIAGNOSTIC_FLASH_STYLE = "diagnostic-flash-line";
-    private static final long LARGE_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
-    private static final long MAX_OPEN_FILE_SIZE_BYTES = 25L * 1024L * 1024L;
     private static final int MAX_HIGHLIGHT_CHARS = 300_000;
-
+private static final long LARGE_FILE_SIZE_BYTES = 2L * 1024L * 1024L;
+private static final long CONFIRM_FILE_SIZE_BYTES = 25L * 1024L * 1024L;
+private static final long MAX_OPEN_FILE_SIZE_BYTES = 100L * 1024L * 1024L;
+private static final int MAX_LARGE_FILE_PREVIEW_BYTES = 8 * 1024 * 1024;
     /* =========================================
        REFERÃŠNCIAS PRINCIPAIS
     ========================================= */
@@ -323,49 +326,150 @@ public File getCurrentFile() {
     }
 
     public void openFileInTab(File file, Consumer<Tab> afterOpen) {
-        if (file == null || !file.exists() || !file.isFile()) {
-            updateStatus("Arquivo invÃ¡lido");
-            return;
-        }
-
-        File normalizedFile = normalizeFile(file);
-        String path = normalizedFile.getAbsolutePath();
-
-        // se jÃ¡ estiver aberto, sÃ³ foca na aba
-        if (openTabs.containsKey(path)) {
-            Tab existingTab = openTabs.get(path);
-            tabPane.getSelectionModel().select(existingTab);
-
-            updateWelcomeVisibility();
-            updateStatus("Arquivo jÃ¡ aberto: " + normalizedFile.getName());
-            addRecentFile(normalizedFile);
-            refreshStatusFromSelectedTab();
-            if (afterOpen != null) {
-                afterOpen.accept(existingTab);
-            }
-            return;
-        }
-
-        updateStatus("Abrindo arquivo: " + normalizedFile.getName());
-
-        editorWorker.submit(() -> {
-            try {
-                long size = Files.size(normalizedFile.toPath());
-                if (size > MAX_OPEN_FILE_SIZE_BYTES) {
-                    Platform.runLater(() -> updateStatus("Arquivo muito grande para abrir: " + normalizedFile.getName()));
-                    return;
-                }
-
-                String content = Files.readString(normalizedFile.toPath());
-                String lineEnding = detectLineEnding(content);
-
-                Platform.runLater(() -> finishOpenFile(normalizedFile, path, content, lineEnding, size, afterOpen));
-            } catch (IOException | SecurityException e) {
-                Platform.runLater(() -> updateStatus("Erro ao abrir arquivo: " + firstLine(e.getMessage())));
-            }
-        });
+    if (file == null || !file.exists() || !file.isFile()) {
+        updateStatus("Arquivo inválido");
+        return;
     }
 
+    File normalizedFile = normalizeFile(file);
+    String path = normalizedFile.getAbsolutePath();
+
+    if (openTabs.containsKey(path)) {
+        Tab existingTab = openTabs.get(path);
+        tabPane.getSelectionModel().select(existingTab);
+
+        updateWelcomeVisibility();
+        updateStatus("Arquivo já aberto: " + normalizedFile.getName());
+        addRecentFile(normalizedFile);
+        refreshStatusFromSelectedTab();
+
+        if (afterOpen != null) {
+            afterOpen.accept(existingTab);
+        }
+        return;
+    }
+
+    updateStatus("Abrindo arquivo: " + normalizedFile.getName());
+
+    editorWorker.submit(() -> {
+        long t0 = System.nanoTime();
+
+        try {
+            Path filePath = normalizedFile.toPath();
+
+            long size = Files.size(filePath);
+            long tSize = System.nanoTime();
+
+            if (size > MAX_OPEN_FILE_SIZE_BYTES) {
+                Platform.runLater(() -> updateStatus(
+                        "Arquivo muito grande para abrir: " + normalizedFile.getName()
+                ));
+                return;
+            }
+
+            if (isProbablyBinary(filePath)) {
+                Platform.runLater(() -> updateStatus(
+                        "Arquivo binário não aberto como texto: " + normalizedFile.getName()
+                ));
+                return;
+            }
+
+            long tBinary = System.nanoTime();
+
+            boolean largeFile = size > LARGE_FILE_SIZE_BYTES;
+
+            String content = largeFile
+                    ? readPreview(filePath, MAX_LARGE_FILE_PREVIEW_BYTES, size)
+                    : Files.readString(filePath);
+
+            long tRead = System.nanoTime();
+
+            String lineEnding = detectLineEnding(content);
+            long tLine = System.nanoTime();
+
+            Platform.runLater(() -> {
+                long tUiStart = System.nanoTime();
+
+                finishOpenFile(normalizedFile, path, content, lineEnding, size, afterOpen);
+
+                long tUiEnd = System.nanoTime();
+
+                System.out.println("[OPEN-FILE] " + normalizedFile.getName()
+                        + " size=" + size
+                        + " sizeCheck=" + ms(t0, tSize)
+                        + " binaryCheck=" + ms(tSize, tBinary)
+                        + " read=" + ms(tBinary, tRead)
+                        + " lineEnding=" + ms(tRead, tLine)
+                        + " uiFinish=" + ms(tUiStart, tUiEnd)
+                        + " total=" + ms(t0, tUiEnd));
+            });
+        } catch (IOException | SecurityException e) {
+            Platform.runLater(() -> updateStatus(
+                    "Erro ao abrir arquivo: " + firstLine(e.getMessage())
+            ));
+        }
+    });
+}
+    private boolean isProbablyBinary(Path path) {
+    int maxBytes = 8192;
+    byte[] buffer = new byte[maxBytes];
+
+    try (InputStream input = Files.newInputStream(path)) {
+        int read = input.read(buffer);
+        if (read <= 0) {
+            return false;
+        }
+
+        for (int i = 0; i < read; i++) {
+            if (buffer[i] == 0) {
+                return true;
+            }
+        }
+
+        return false;
+    } catch (IOException | SecurityException e) {
+        return true;
+    }
+}
+
+private String readPreview(Path path, int maxBytes, long totalSize) throws IOException {
+    byte[] data;
+
+    try (InputStream input = Files.newInputStream(path)) {
+        data = input.readNBytes(maxBytes);
+    }
+
+    String preview = new String(data, StandardCharsets.UTF_8);
+
+    return preview
+            + "\n\n/* NPSharp Large File Mode\n"
+            + "   Arquivo original: " + humanSize(totalSize) + "\n"
+            + "   Preview carregado: " + humanSize(data.length) + "\n"
+            + "   O arquivo é grande demais para edição completa segura.\n"
+            + "*/\n";
+}
+
+private String humanSize(long bytes) {
+    if (bytes < 1024) {
+        return bytes + " B";
+    }
+
+    double kb = bytes / 1024.0;
+    if (kb < 1024) {
+        return String.format(Locale.ROOT, "%.1f KB", kb);
+    }
+
+    double mb = kb / 1024.0;
+    if (mb < 1024) {
+        return String.format(Locale.ROOT, "%.1f MB", mb);
+    }
+
+    double gb = mb / 1024.0;
+    return String.format(Locale.ROOT, "%.1f GB", gb);
+}
+private static String ms(long start, long end) {
+    return String.format(Locale.ROOT, "%.2fms", (end - start) / 1_000_000.0);
+}
     private void finishOpenFile(
             File file,
             String path,
@@ -406,6 +510,7 @@ public File getCurrentFile() {
             afterOpen.accept(tab);
         }
     }
+    
 
     public void openVirtualFile(String displayName, String uri, String content, Consumer<String> saveHandler) {
         if (uri == null || uri.isBlank()) {
@@ -1007,7 +1112,7 @@ editor.getStylesheets().add(
         editor.setOnMouseClicked(event -> refreshStatusFromSelectedTab());
 
         // define conteÃºdo inicial
-        editor.replaceText(content);
+        Platform.runLater(() -> editor.replaceText(content));
         tabInitialContent.put(tab, content);
         tabDirtyState.put(tab, false);
         updateTabTitle(tab);
@@ -1032,6 +1137,31 @@ editor.getStylesheets().add(
                 event.consume();
             }
         });
+
+long c0 = System.nanoTime();
+
+long cEditor = System.nanoTime();
+
+editor.getStyleClass().add("editor-textarea");
+editor.setWrapText(false);
+editor.getStylesheets().add(
+        Objects.requireNonNull(
+                getClass().getResource("/css/editor.css")
+        ).toExternalForm()
+);
+editor.setBackground(null);
+long cConfig = System.nanoTime();
+
+tab.setClosable(closable);
+
+long cScroll = System.nanoTime();
+
+scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+scrollPane.getStyleClass().add("editor-scroll-pane");
+tab.setContent(scrollPane);
+long cTabContent = System.nanoTime();
+
 
         // quando a aba fecha de fato, limpa todos os mapas
         tab.setOnClosed(event -> {
