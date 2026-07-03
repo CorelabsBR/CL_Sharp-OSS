@@ -7,6 +7,8 @@ package br.com.corelabs.npsharpfx.frontend.ui.editor;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -44,8 +46,6 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 /*
 ========================================================
@@ -1084,7 +1084,7 @@ editor.getStylesheets().add(
             }
         }
 
-        registerDiagnostics(tab, editor);
+        // registerDiagnostics(tab, editor);
 
         tabLineEndings.put(tab, lineEnding);
         tabDirtyState.put(tab, false);
@@ -1119,8 +1119,18 @@ editor.getStylesheets().add(
 
         // aplica syntax highlighting inicial
         String lang = detectLanguage(tab, title);
-        scheduleHighlighting(tab, editor, lang);
-        renderErrorLensForTab(tab);
+editor.replaceText(content);
+tabInitialContent.put(tab, content);
+tabDirtyState.put(tab, false);
+updateTabTitle(tab);
+
+Platform.runLater(() -> {
+    registerDiagnostics(tab, editor);
+
+    scheduleHighlighting(tab, editor, lang);
+
+    Platform.runLater(() -> renderErrorLensForTab(tab));
+});
 
         // re-aplica highlighting com debounce ao editar
         editor.multiPlainChanges()
@@ -1144,11 +1154,11 @@ long cEditor = System.nanoTime();
 
 editor.getStyleClass().add("editor-textarea");
 editor.setWrapText(false);
-editor.getStylesheets().add(
-        Objects.requireNonNull(
-                getClass().getResource("/css/editor.css")
-        ).toExternalForm()
-);
+// editor.getStylesheets().add(
+//         Objects.requireNonNull(
+//                 getClass().getResource("/css/editor.css")
+//         ).toExternalForm()
+// );
 editor.setBackground(null);
 long cConfig = System.nanoTime();
 

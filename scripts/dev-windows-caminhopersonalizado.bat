@@ -35,7 +35,7 @@ echo Maven:
 mvn -version
 
 echo Iniciando NPSharp em modo dev...
-call mvn clean javafx:run
+call & "C:\Program Files\Apache NetBeans\java\maven\bin\mvn.cmd" clean javafx:run    
 if errorlevel 1 (
     echo Erro: mvn clean javafx:run falhou.
     popd
