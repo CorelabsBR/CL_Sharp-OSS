@@ -5,9 +5,9 @@
  */
 package br.com.corelabs.npsharpfx.frontend.ui.editor;
 
+import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -45,66 +45,32 @@ public class WelcomePane extends VBox {
        CONSTRUTOR
        Monta toda a tela inicial
     ========================================= */
+    private final ThemeManager themeManager;
+    
+    public WelcomePane(Runnable onNewFile, Runnable onOpenFile, ThemeManager themeManager) {
+        this.themeManager = themeManager;
 
-    public WelcomePane(Runnable onNewFile, Runnable onOpenFile) {
-
-        // classe CSS principal da tela
         getStyleClass().add("welcome-pane");
-
-        // centraliza tudo no meio
         setAlignment(Pos.CENTER);
-
-        // espaÃ§amento vertical entre elementos
         setSpacing(18);
 
-        /* -----------------------------------------
-           LOGO DA TELA INICIAL
-        ----------------------------------------- */
-
-        ImageView logo = new ImageView(
-                new Image(getClass().getResourceAsStream("/icons/wlclogo.png"))
-        );
-
+        ImageView logo = new ImageView(this.themeManager.getWelcomeLogo());
         logo.setFitWidth(120);
         logo.setFitHeight(120);
         logo.setPreserveRatio(true);
         logo.getStyleClass().add("welcome-logo");
 
-        /* -----------------------------------------
-           TÃTULO PRINCIPAL
-        ----------------------------------------- */
-
         Label title = new Label("NPSharp");
         title.getStyleClass().add("welcome-title");
-
-        /* -----------------------------------------
-           SUBTÃTULO / SLOGAN
-        ----------------------------------------- */
 
         Label subtitle = new Label("Tecnologia sem limites.");
         subtitle.getStyleClass().add("welcome-subtitle");
 
-        /* -----------------------------------------
-           AÃ‡Ã•ES PRINCIPAIS CLICÃVEIS
-        ----------------------------------------- */
-
-        // botÃ£o visual para criar novo arquivo
         HBox actionNew = createActionButton("Novo Arquivo", "Ctrl+N", onNewFile);
-
-        // botÃ£o visual para abrir arquivo existente
         HBox actionOpen = createActionButton("Abrir Arquivo", "Ctrl+O", onOpenFile);
-
-        /* -----------------------------------------
-           DICA VISUAL ADICIONAL
-           NÃ£o Ã© clicÃ¡vel, sÃ³ informativa
-        ----------------------------------------- */
 
         Label actionSave = new Label("Salvar Arquivo    Ctrl+S");
         actionSave.getStyleClass().add("welcome-hint");
-
-        /* -----------------------------------------
-           MONTA A ORDEM DOS ELEMENTOS NA TELA
-        ----------------------------------------- */
 
         getChildren().addAll(
                 logo,
@@ -115,12 +81,6 @@ public class WelcomePane extends VBox {
                 actionSave
         );
     }
-
-    /* =========================================
-       CRIA UM BOTÃƒO VISUAL DE AÃ‡ÃƒO
-       Estrutura:
-       [ texto da aÃ§Ã£o ]   [ atalho ]
-    ========================================= */
 
     private HBox createActionButton(String text, String shortcut, Runnable action) {
 

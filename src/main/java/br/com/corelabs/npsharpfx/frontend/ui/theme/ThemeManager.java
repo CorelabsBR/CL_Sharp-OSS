@@ -256,14 +256,14 @@ public class ThemeManager {
 
         applyWallpaper(theme, wallpaperLayer, overlay);
     }
-public Image getWelcomeLogo() {
+ public Image getWelcomeLogo() {
     VSCodeThemeEntry entry = getCurrentThemeEntry();
 
     if (entry != null) {
-        String welcomeLogo = normalizeThemeResourcePath(entry.getWelcomeLogo());
+        String logoPath = normalizeThemeResourcePath(entry.getWelcomeLogo());
 
-        if (welcomeLogo != null) {
-            InputStream stream = getClass().getResourceAsStream(welcomeLogo);
+        if (logoPath != null) {
+            InputStream stream = getClass().getResourceAsStream(logoPath);
 
             if (stream != null) {
                 return new Image(stream);
@@ -274,7 +274,7 @@ public Image getWelcomeLogo() {
     return new Image(
             Objects.requireNonNull(
                     getClass().getResourceAsStream("/icons/wlclogo.png"),
-                    "Logo padrão da Welcome não encontrada: /icons/wlclogo.png"
+                    "Logo padrão não encontrada: /icons/wlclogo.png"
             )
     );
 }

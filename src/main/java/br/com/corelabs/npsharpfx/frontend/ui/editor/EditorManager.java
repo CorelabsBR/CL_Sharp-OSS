@@ -33,6 +33,7 @@ import br.com.corelabs.npsharpfx.backend.models.WorkspaceSearchResult;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.ErrorLensRenderer;
+import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -195,13 +196,13 @@ private static final int MAX_LARGE_FILE_PREVIEW_BYTES = 8 * 1024 * 1024;
         // tela inicial mostrada quando nÃ£o hÃ¡ abas
         this.welcomePane = new WelcomePane(
                 this::newTab,
-                this::openFileFromDialog
+                this::openFileFromDialog,
+                new ThemeManager()
         );
-
         // view final: abas + welcome pane em camadas
         this.view = new StackPane(tabPane, welcomePane);
         this.view.getStyleClass().add("editor-area");
-
+                
         updateWelcomeVisibility();
     }
 
