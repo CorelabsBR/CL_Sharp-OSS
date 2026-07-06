@@ -14,13 +14,50 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.prefs.Preferences;
 
+import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
+import br.com.corelabs.npsharpfx.backend.git.GitService;
+import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
+import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
+import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
+import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
+import br.com.corelabs.npsharpfx.backend.services.LiveServerService;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
+import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.JavaDiagnosticsRunner;
+import br.com.corelabs.npsharpfx.frontend.settings.SettingsView;
+import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
+import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
+import br.com.corelabs.npsharpfx.frontend.ui.git.SourceControlPanel;
+import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
+import br.com.corelabs.npsharpfx.frontend.ui.remote.RemoteHostPanel;
+import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane;
+import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane.SearchQuery;
+import br.com.corelabs.npsharpfx.frontend.ui.search.SearchResult;
+import br.com.corelabs.npsharpfx.frontend.ui.terminal.IntegratedTerminalPane;
+import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
+import br.com.corelabs.npsharpfx.frontend.ui.theme.VSCodeThemeEntry;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager.ActivityItem;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.SidePanelManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.StatusBarManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.layout.VSCodeLayoutAnimator;
+import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SearchHelper;
+import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
+import br.com.corelabs.npsharpfx.frontend.ui.window.panels.ThemePickerPopup;
+import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
+import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
+import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
@@ -48,42 +85,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-
-//aqui vai imports de arquivos. seu mongo
-import br.com.corelabs.npsharpfx.frontend.settings.SettingsView;
-import br.com.corelabs.npsharpfx.backend.debugger.DebuggerService;
-import br.com.corelabs.npsharpfx.backend.git.GitService;
-import br.com.corelabs.npsharpfx.backend.portugol.runtime.PortugolInterpreter;
-import br.com.corelabs.npsharpfx.backend.remote.RemoteHostService;
-import br.com.corelabs.npsharpfx.backend.runtime.LanguageRuntime;
-import br.com.corelabs.npsharpfx.backend.runtime.RuntimePaths;
-import br.com.corelabs.npsharpfx.backend.runtime.RuntimeRegistry;
-import br.com.corelabs.npsharpfx.backend.services.LiveServerService;
-import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
-import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
-import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.JavaDiagnosticsRunner;
-import br.com.corelabs.npsharpfx.frontend.ui.editor.EditorManager;
-import br.com.corelabs.npsharpfx.frontend.ui.explorer.FileExplorerPane;
-import br.com.corelabs.npsharpfx.frontend.ui.git.SourceControlPanel;
-import br.com.corelabs.npsharpfx.frontend.ui.icons.Codicon;
-import br.com.corelabs.npsharpfx.frontend.ui.remote.RemoteHostPanel;
-import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane;
-import br.com.corelabs.npsharpfx.frontend.ui.search.SearchPane.SearchQuery;
-import br.com.corelabs.npsharpfx.frontend.ui.search.SearchResult;
-import br.com.corelabs.npsharpfx.frontend.ui.terminal.IntegratedTerminalPane;
-import br.com.corelabs.npsharpfx.frontend.ui.theme.ThemeManager;
-import br.com.corelabs.npsharpfx.frontend.ui.theme.VSCodeThemeEntry;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.ActivityBarManager.ActivityItem;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.SidePanelManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.StatusBarManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.layout.VSCodeLayoutAnimator;
-import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SearchHelper;
-import br.com.corelabs.npsharpfx.frontend.ui.window.panels.SettingsPanelBuilder;
-import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager;
-import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.EditorActions;
-import br.com.corelabs.npsharpfx.frontend.ui.window.shortcuts.ShortcutManager.WindowActions;
-import br.com.corelabs.npsharpfx.backend.services.LiveServerService;
 
 
 public class MainWindow {
@@ -131,9 +132,8 @@ private static final double MIN_HEIGHT = 520;
     private volatile Path quickOpenIndexedRoot;
     private volatile List<File> quickOpenFileCache = List.of();
     private volatile boolean quickOpenIndexing;
-    private Popup colorThemePopup;
-    private TextField colorThemeInput;
-    private ListView<VSCodeThemeEntry> colorThemeList;
+    private final ThemePickerPopup colorThemePicker;
+    private final ThemePickerPopup specialThemePicker;
 
     private EditorManager editorManager;
     private FileExplorerPane explorerPane;
@@ -173,9 +173,28 @@ private static final double MIN_HEIGHT = 520;
         this.shortcutManager = new ShortcutManager();
         this.searchHelper = new SearchHelper();
         this.settingsPanelBuilder = new SettingsPanelBuilder();
+        this.colorThemePicker = createThemePicker("Select Color Theme", () -> themeManager.getRegistry().getEntries());
+        this.specialThemePicker = createThemePicker("Temas Especiais", () -> themeManager.getRegistry().getSpecialEntries());
         this.diagnosticsDebounce.setOnFinished(event -> compileProject());
         this.diagnosticsService.addListener(() -> Platform.runLater(this::refreshDiagnosticsUi));
         configureStage();
+    }
+
+    private ThemePickerPopup createThemePicker(
+            String promptText,
+            Supplier<Collection<VSCodeThemeEntry>> themesSupplier) {
+
+        return new ThemePickerPopup(
+                stage,
+                themeManager,
+                promptText,
+                themesSupplier,
+                () -> appRoot == null ? "" : appRoot.getStyle(),
+                () -> wallpaperLayer,
+                () -> wallpaperOverlay,
+                () -> appRoot,
+                statusBarManager::updateStatusLeft
+        );
     }
     private void openSettingsView() {
     if (centerArea == null) {
@@ -1346,6 +1365,8 @@ appRoot.getChildren().add(root);
                     public void goToStartOfFile() { editorManager.goToStartOfFile(); }
                     @Override
                     public void goToEndOfFile() { editorManager.goToEndOfFile(); }
+                    @Override
+                    public void showFindBar() {editorManager.showFindBar();}
                 },
                 new WindowActions() {
                     @Override
@@ -1662,170 +1683,29 @@ public void runSelectedCode() {
 }
 
     private void openThemeChooser() {
-        if (colorThemePopup != null && colorThemePopup.isShowing()) {
-            colorThemePopup.hide();
+        openThemeChooser(false);
+    }
+
+    private void openThemeChooser(boolean specialThemeRequested) {
+        if (specialThemeRequested) {
+            openSpecialThemeChooser();
             return;
         }
 
+        specialThemePicker.hide();
+        hideSettingsPopupIfShowing();
+        colorThemePicker.show();
+    }
+
+    private void openSpecialThemeChooser() {
+        colorThemePicker.hide();
+        hideSettingsPopupIfShowing();
+        specialThemePicker.show();
+    }
+
+    private void hideSettingsPopupIfShowing() {
         if (settingsPopup != null && settingsPopup.isShowing()) {
             settingsPopup.hide();
-        }
-
-        colorThemeInput = new TextField();
-        colorThemeInput.getStyleClass().add("command-palette-input");
-        colorThemeInput.setPromptText("Select Color Theme");
-
-        colorThemeList = new ListView<>();
-        colorThemeList.getStyleClass().add("command-palette-list");
-        colorThemeList.setPrefHeight(340);
-        colorThemeList.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(VSCodeThemeEntry item, boolean empty) {
-                super.updateItem(item, empty);
-
-                if (empty || item == null) {
-                    setText(null);
-                    return;
-                }
-
-                String marker = themeManager.isThemeActive(item.getId()) ? "* " : "  ";
-                String type = item.isDark() ? "Dark" : "Light";
-                setText(marker + item.getLabel() + "    " + type);
-            }
-        });
-
-        colorThemeInput.textProperty().addListener((obs, oldValue, newValue) -> updateColorThemeResults(newValue));
-        colorThemeInput.setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.ENTER) {
-                applySelectedColorTheme();
-                event.consume();
-            } else if (event.getCode() == KeyCode.ESCAPE) {
-                hideColorThemePopup();
-                event.consume();
-            } else if (event.getCode() == KeyCode.DOWN) {
-                moveColorThemeSelection(1);
-                colorThemeList.requestFocus();
-                event.consume();
-            } else if (event.getCode() == KeyCode.UP) {
-                moveColorThemeSelection(-1);
-                colorThemeList.requestFocus();
-                event.consume();
-            }
-        });
-
-        colorThemeList.setOnMouseClicked(event -> {
-            if (colorThemeList.getSelectionModel().getSelectedItem() != null) {
-                applySelectedColorTheme();
-                event.consume();
-            }
-        });
-        colorThemeList.setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.ENTER) {
-                applySelectedColorTheme();
-                event.consume();
-            } else if (event.getCode() == KeyCode.ESCAPE) {
-                hideColorThemePopup();
-                event.consume();
-            } else if (event.getCode() == KeyCode.DOWN) {
-                moveColorThemeSelection(1);
-                event.consume();
-            } else if (event.getCode() == KeyCode.UP) {
-                moveColorThemeSelection(-1);
-                event.consume();
-            }
-        });
-
-        VBox content = new VBox(colorThemeInput, colorThemeList);
-        content.getStyleClass().add("command-palette");
-        content.setStyle(appRoot == null ? "" : appRoot.getStyle());
-        content.setPrefWidth(Math.min(720, Math.max(520, stage.getWidth() * 0.55)));
-
-        colorThemePopup = new Popup();
-        colorThemePopup.setAutoHide(true);
-        colorThemePopup.setHideOnEscape(true);
-        colorThemePopup.getContent().add(content);
-
-        updateColorThemeResults("");
-        colorThemePopup.show(
-                stage,
-                stage.getX() + (stage.getWidth() - content.getPrefWidth()) / 2,
-                stage.getY() + 58
-        );
-        VSCodeLayoutAnimator.fadeSlideIn(content, 0, -8);
-        colorThemeInput.requestFocus();
-    }
-
-    private void updateColorThemeResults(String query) {
-        if (colorThemeList == null) {
-            return;
-        }
-
-        String normalizedQuery = normalizeCommandText(query);
-        List<VSCodeThemeEntry> filtered = themeManager.getRegistry().getEntries().stream()
-                .filter(entry -> normalizedQuery.isBlank() || colorThemeMatches(entry, normalizedQuery))
-                .toList();
-
-        colorThemeList.getItems().setAll(filtered);
-        selectActiveOrFirstColorTheme();
-    }
-
-    private boolean colorThemeMatches(VSCodeThemeEntry entry, String query) {
-        String searchable = normalizeCommandText(entry.getLabel())
-                + " " + normalizeCommandText(entry.getId())
-                + " " + normalizeCommandText(entry.getUiTheme())
-                + (entry.isDark() ? " dark escuro" : " light claro");
-        return searchable.contains(query);
-    }
-
-    private void selectActiveOrFirstColorTheme() {
-        if (colorThemeList == null || colorThemeList.getItems().isEmpty()) {
-            return;
-        }
-
-        int activeIndex = -1;
-        for (int i = 0; i < colorThemeList.getItems().size(); i++) {
-            if (themeManager.isThemeActive(colorThemeList.getItems().get(i).getId())) {
-                activeIndex = i;
-                break;
-            }
-        }
-
-        int index = activeIndex >= 0 ? activeIndex : 0;
-        colorThemeList.getSelectionModel().select(index);
-        colorThemeList.scrollTo(index);
-    }
-
-    private void moveColorThemeSelection(int delta) {
-        if (colorThemeList == null || colorThemeList.getItems().isEmpty()) {
-            return;
-        }
-
-        int current = colorThemeList.getSelectionModel().getSelectedIndex();
-        int max = colorThemeList.getItems().size() - 1;
-        int next = current < 0 ? 0 : Math.max(0, Math.min(max, current + delta));
-
-        colorThemeList.getSelectionModel().select(next);
-        colorThemeList.getFocusModel().focus(next);
-        colorThemeList.scrollTo(next);
-    }
-
-    private void applySelectedColorTheme() {
-        VSCodeThemeEntry selected = colorThemeList == null
-                ? null
-                : colorThemeList.getSelectionModel().getSelectedItem();
-
-        if (selected == null) {
-            return;
-        }
-
-        themeManager.setTheme(selected.getId(), wallpaperLayer, wallpaperOverlay, appRoot);
-        hideColorThemePopup();
-        statusBarManager.updateStatusLeft("Tema aplicado: " + selected.getLabel());
-    }
-
-    private void hideColorThemePopup() {
-        if (colorThemePopup != null) {
-            colorThemePopup.hide();
         }
     }
 
@@ -1883,10 +1763,10 @@ private void showAppearancePopup(Node anchor) {
     menu.setStyle(appRoot == null ? "" : appRoot.getStyle());
 
     menu.getChildren().addAll(
-            createPopupMenuItem("Color Theme...", "Escolher", () -> {
+            createPopupMenuItem("Color Theme...", "Escolher", specialThemeRequested -> {
                 hideAppearancePopup();
                 if (settingsPopup != null) settingsPopup.hide();
-                openThemeChooser();
+                openThemeChooser(specialThemeRequested);
             }),
             createPopupMenuItem("Wallpaper...", "Escolher", () -> {
                 hideAppearancePopup();
@@ -1915,6 +1795,10 @@ private void hideAppearancePopup() {
     }
 }
     private HBox createPopupMenuItem(String text, String shortcut, Runnable action) {
+        return createPopupMenuItem(text, shortcut, action == null ? null : ignored -> action.run());
+    }
+
+    private HBox createPopupMenuItem(String text, String shortcut, Consumer<Boolean> action) {
         Label label = new Label(text);
         label.getStyleClass().add("context-menu-item");
 
@@ -1933,7 +1817,7 @@ private void hideAppearancePopup() {
         }
 
         if (action != null) {
-            row.setOnMouseClicked(e -> action.run());
+            row.setOnMouseClicked(e -> action.accept(e.isShiftDown()));
         }
 
         return row;

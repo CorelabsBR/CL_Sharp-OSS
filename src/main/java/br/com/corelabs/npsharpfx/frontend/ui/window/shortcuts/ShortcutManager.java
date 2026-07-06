@@ -22,6 +22,7 @@ public class ShortcutManager {
         void closeAllTabs();
         void goToStartOfFile();
         void goToEndOfFile();
+        void showFindBar();
     }
 
     public interface WindowActions {
@@ -39,7 +40,7 @@ public class ShortcutManager {
 
     public ShortcutManager() {
     }
-
+// lá vamos nós denovo, lutar por uma desenvolvedora. sem ilusão dessa vez
     public void configureShortcuts(
             Scene scene,
             EditorActions editorActions,
@@ -158,6 +159,10 @@ public class ShortcutManager {
         scene.getAccelerators().put(
                 new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
                 windowActions::compileProject
+        );
+        scene.getAccelerators().put(
+        new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
+         editorActions::showFindBar
         );
 
         // Tab focus

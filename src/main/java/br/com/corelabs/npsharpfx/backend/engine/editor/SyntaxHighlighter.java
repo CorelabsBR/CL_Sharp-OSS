@@ -188,7 +188,7 @@ public final class SyntaxHighlighter {
                         "exit", "extends", "final", "finally", "fn", "for", "foreach", "function", "global", "goto",
                         "if", "implements", "include", "instanceof", "interface", "isset", "list", "match", "namespace",
                         "new", "or", "print", "private", "protected", "public", "require", "return", "static",
-                        "switch", "throw", "trait", "try", "use", "var", "while", "xor", "yield"),
+                        "switch", "throw", "trait", "try", "use", "var", "while", "xor", "yield", "strong"),
                 "TYPE", words("bool", "float", "int", "string", "array", "object", "mixed", "void", "never"),
                 "VARIABLE", "\\$" + IDENT,
                 "CONSTANT", CONSTANT,

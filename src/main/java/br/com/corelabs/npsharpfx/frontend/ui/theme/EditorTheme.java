@@ -55,6 +55,15 @@ public class EditorTheme {
     public String getName() {
         return name;
     }
+    private String welcomeLogo;
+
+public String getWelcomeLogo() {
+    return welcomeLogo;
+}
+
+public void setWelcomeLogo(String welcomeLogo) {
+    this.welcomeLogo = welcomeLogo;
+}
 
     public void setName(String name) {
         this.name = name;

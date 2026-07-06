@@ -5,6 +5,9 @@
  */
 package br.com.corelabs.npsharpfx.frontend.ui.theme;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Representa uma entrada de tema definida no package.json.
  *
@@ -86,6 +89,17 @@ public class VSCodeThemeEntry {
     private String path;
 
     /**
+     * Metadados opcionais para agrupamento e previews visuais.
+     *
+     * Temas existentes continuam válidos mesmo sem esses campos.
+     */
+    private String category;
+    private final List<String> categories = new ArrayList<>();
+    private String image;
+    private String preview;
+    private final List<String> previews = new ArrayList<>();
+
+    /**
      * Retorna o ID do tema.
      */
     public String getId() {
@@ -113,6 +127,35 @@ public class VSCodeThemeEntry {
         return path;
     }
 
+    public String getCategory() {
+        return category;
+    }
+
+    public List<String> getCategories() {
+        return categories == null ? List.of() : categories;
+    }
+
+    public String getImage() {
+        return image;
+    }
+    private String welcomeLogo;
+
+public String getWelcomeLogo() {
+    return welcomeLogo;
+}
+
+public void setWelcomeLogo(String welcomeLogo) {
+    this.welcomeLogo = welcomeLogo;
+}
+
+    public String getPreview() {
+        return preview;
+    }
+
+    public List<String> getPreviews() {
+        return previews == null ? List.of() : previews;
+    }
+
     /**
      * Verifica se o tema é escuro.
      *
@@ -131,4 +174,3 @@ public class VSCodeThemeEntry {
         return "vs".equalsIgnoreCase(uiTheme);
     }
 }
-

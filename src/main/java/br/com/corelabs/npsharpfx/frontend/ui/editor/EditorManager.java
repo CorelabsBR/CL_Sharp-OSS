@@ -34,19 +34,26 @@ import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.DiagnosticsService;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.EditorDiagnostic;
 import br.com.corelabs.npsharpfx.frontend.editor.diagnostics.ErrorLensRenderer;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.IndexRange;
+import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-
 /*
 ========================================================
 EDITOR MANAGER
@@ -410,6 +417,10 @@ public File getCurrentFile() {
         }
     });
 }
+/* agora vem a pergunta, deveria eu tentar lutar novamente por uma guria? ainda mais sendo amiga dela? ou deveria simplesmente deixar tudo e focar nas 3 letrinhas amarelas?
+   veremos, Deus tá comigo nessa. ele faz a escolha, eu só sigo o caminho que ele me mostra. e se for pra ser, será. e se não for, também será. então, bora focar no que importa, que é o que tá na minha frente.
+   Só sei que meu cargo publico não vai ficar falando que tá confuso */
+int maxBytes = 8192;
     private boolean isProbablyBinary(Path path) {
     int maxBytes = 8192;
     byte[] buffer = new byte[maxBytes];
@@ -1111,30 +1122,21 @@ editor.getStylesheets().add(
         editor.addEventFilter(KeyEvent.KEY_RELEASED, event -> refreshStatusFromSelectedTab());
         editor.setOnMouseClicked(event -> refreshStatusFromSelectedTab());
 
-        // define conteÃºdo inicial
-        Platform.runLater(() -> editor.replaceText(content));
-        tabInitialContent.put(tab, content);
-        tabDirtyState.put(tab, false);
-        updateTabTitle(tab);
-
-        // aplica syntax highlighting inicial
-        String lang = detectLanguage(tab, title);
 editor.replaceText(content);
 tabInitialContent.put(tab, content);
 tabDirtyState.put(tab, false);
 updateTabTitle(tab);
+String lang = detectLanguage(tab, title);
+scheduleHighlighting(tab, editor, lang);
 
 Platform.runLater(() -> {
     registerDiagnostics(tab, editor);
-
-    scheduleHighlighting(tab, editor, lang);
-
-    Platform.runLater(() -> renderErrorLensForTab(tab));
+    renderErrorLensForTab(tab);
 });
 
         // re-aplica highlighting com debounce ao editar
         editor.multiPlainChanges()
-                .successionEnds(Duration.ofMillis(180))
+                .successionEnds(Duration.ofMillis(100))
                 .subscribe(ignore -> {
                     String currentLang = detectLanguage(tab, buildSuggestedFileName(tab));
                     scheduleHighlighting(tab, editor, currentLang);
@@ -1148,29 +1150,6 @@ Platform.runLater(() -> {
             }
         });
 
-long c0 = System.nanoTime();
-
-long cEditor = System.nanoTime();
-
-editor.getStyleClass().add("editor-textarea");
-editor.setWrapText(false);
-// editor.getStylesheets().add(
-//         Objects.requireNonNull(
-//                 getClass().getResource("/css/editor.css")
-//         ).toExternalForm()
-// );
-editor.setBackground(null);
-long cConfig = System.nanoTime();
-
-tab.setClosable(closable);
-
-long cScroll = System.nanoTime();
-
-scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-scrollPane.getStyleClass().add("editor-scroll-pane");
-tab.setContent(scrollPane);
-long cTabContent = System.nanoTime();
 
 
         // quando a aba fecha de fato, limpa todos os mapas
@@ -1195,6 +1174,190 @@ long cTabContent = System.nanoTime();
     /* =========================================
        APLICA SYNTAX HIGHLIGHTING NO EDITOR
     ========================================= */
+
+public void showFindBar() {
+    Tab tab = tabPane.getSelectionModel().getSelectedItem();
+
+    if (tab == null) {
+        updateStatus("Nenhum editor aberto para pesquisar");
+        return;
+    }
+
+    CodeArea editor = tabEditors.get(tab);
+
+    if (editor == null) {
+        updateStatus("Editor indisponível");
+        return;
+    }
+
+    Node currentContent = tab.getContent();
+
+    if (currentContent instanceof StackPane stackPane
+            && stackPane.lookup(".editor-find-bar") instanceof HBox existingFindBar) {
+        TextField existingInput = (TextField) existingFindBar.lookup(".search-input");
+        if (existingInput != null) {
+            existingInput.requestFocus();
+            existingInput.selectAll();
+        }
+        return;
+    }
+
+    TextField findInput = new TextField();
+    findInput.setPromptText("Pesquisar");
+    findInput.getStyleClass().add("search-input");
+    findInput.setPrefWidth(260);
+
+    Label counter = new Label("0/0");
+    counter.getStyleClass().add("settings-description");
+
+    Button previous = new Button("↑");
+    Button next = new Button("↓");
+    Button close = new Button("×");
+
+    previous.getStyleClass().add("terminal-control-button");
+    next.getStyleClass().add("terminal-control-button");
+    close.getStyleClass().add("terminal-control-button");
+
+    HBox findBar = new HBox(6, findInput, previous, next, counter, close);
+    findBar.setAlignment(Pos.CENTER_LEFT);
+    findBar.setPadding(new Insets(6));
+    findBar.getStyleClass().add("editor-find-bar");
+    findBar.setMaxWidth(430);
+    findBar.setMouseTransparent(false);
+    findBar.setFocusTraversable(false);
+
+    StackPane wrapper = new StackPane();
+    Node oldContent = tab.getContent();
+
+    wrapper.getChildren().add(oldContent);
+    wrapper.getChildren().add(findBar);
+
+    StackPane.setAlignment(findBar, Pos.TOP_RIGHT);
+    StackPane.setMargin(findBar, new Insets(8, 18, 0, 0));
+
+    tab.setContent(wrapper);
+
+    final int[] currentIndex = { -1 };
+    final List<int[]> matches = new ArrayList<>();
+
+    Runnable refreshMatches = () -> {
+        matches.clear();
+        currentIndex[0] = -1;
+
+        String query = findInput.getText();
+        String text = editor.getText();
+
+        if (query == null || query.isBlank()) {
+            counter.setText("0/0");
+            return;
+        }
+
+        String lowerText = text.toLowerCase(Locale.ROOT);
+        String lowerQuery = query.toLowerCase(Locale.ROOT);
+
+        int index = lowerText.indexOf(lowerQuery);
+
+        while (index >= 0) {
+            matches.add(new int[] { index, index + query.length() });
+            index = lowerText.indexOf(lowerQuery, index + query.length());
+        }
+
+        if (matches.isEmpty()) {
+            counter.setText("0/0");
+            return;
+        }
+
+        currentIndex[0] = 0;
+        int[] match = matches.get(0);
+
+        editor.selectRange(match[0], match[1]);
+        editor.requestFollowCaret();
+        counter.setText("1/" + matches.size());
+    };
+
+    Runnable goNext = () -> {
+        if (matches.isEmpty()) {
+            refreshMatches.run();
+            return;
+        }
+
+        currentIndex[0] = (currentIndex[0] + 1) % matches.size();
+
+        int[] match = matches.get(currentIndex[0]);
+        editor.selectRange(match[0], match[1]);
+        editor.requestFollowCaret();
+
+        counter.setText((currentIndex[0] + 1) + "/" + matches.size());
+    };
+
+    Runnable goPrevious = () -> {
+        if (matches.isEmpty()) {
+            refreshMatches.run();
+            return;
+        }
+
+        currentIndex[0] = currentIndex[0] <= 0
+                ? matches.size() - 1
+                : currentIndex[0] - 1;
+
+        int[] match = matches.get(currentIndex[0]);
+        editor.selectRange(match[0], match[1]);
+        editor.requestFollowCaret();
+
+        counter.setText((currentIndex[0] + 1) + "/" + matches.size());
+    };
+
+    findInput.textProperty().addListener((obs, oldValue, newValue) -> refreshMatches.run());
+
+    findInput.setOnAction(event -> {
+        goNext.run();
+        event.consume();
+    });
+
+    next.setOnAction(event -> {
+        goNext.run();
+        findInput.requestFocus();
+    });
+
+    previous.setOnAction(event -> {
+        goPrevious.run();
+        findInput.requestFocus();
+    });
+
+    close.setOnAction(event -> {
+        tab.setContent(oldContent);
+        editor.requestFocus();
+    });
+
+    findInput.setOnKeyPressed(event -> {
+        if (event.getCode() == KeyCode.ESCAPE) {
+            editor.requestFocus();
+            event.consume();
+            return;
+        }
+
+        if (event.getCode() == KeyCode.ENTER && event.isShiftDown()) {
+            goPrevious.run();
+            event.consume();
+        }
+    });
+
+    wrapper.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+        if (!findBar.localToScene(findBar.getBoundsInLocal()).contains(event.getSceneX(), event.getSceneY())) {
+            editor.requestFocus();
+        }
+    });
+
+    editor.setOnMouseClicked(event -> editor.requestFocus());
+
+    if (editor.getSelectedText() != null && !editor.getSelectedText().isBlank()) {
+        findInput.setText(editor.getSelectedText());
+        findInput.selectAll();
+    }
+
+    findInput.requestFocus();
+    updateStatus("Pesquisar no arquivo");
+}
 
     private void scheduleHighlighting(Tab tab, CodeArea editor, String language) {
         if (tab == null || editor == null) {

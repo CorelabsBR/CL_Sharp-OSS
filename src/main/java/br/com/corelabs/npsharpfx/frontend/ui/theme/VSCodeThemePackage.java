@@ -110,10 +110,14 @@ public class VSCodeThemePackage {
          * Lista de temas que a extensão adiciona.
          */
         private final List<VSCodeThemeEntry> themes = new ArrayList<>();
+        private final List<VSCodeThemeEntry> specialThemes = new ArrayList<>();
 
         public List<VSCodeThemeEntry> getThemes() {
-            return themes;
+            return themes == null ? List.of() : themes;
+        }
+
+        public List<VSCodeThemeEntry> getSpecialThemes() {
+            return specialThemes == null ? List.of() : specialThemes;
         }
     }
 }
-

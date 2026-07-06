@@ -56,6 +56,8 @@ public class ThemeRegistry {
      * - caminho do arquivo do tema
      */
     private final Map<String, VSCodeThemeEntry> entries = new LinkedHashMap<>();
+    private final Map<String, VSCodeThemeEntry> specialEntries = new LinkedHashMap<>();
+    private final Map<String, VSCodeThemeEntry> allEntries = new LinkedHashMap<>();
 
     /**
      * Cache de temas já carregados.
@@ -87,6 +89,12 @@ public class ThemeRegistry {
          */
         for (VSCodeThemeEntry entry : themePackage.getContributes().getThemes()) {
             entries.put(entry.getId(), entry);
+            allEntries.put(entry.getId(), entry);
+        }
+
+        for (VSCodeThemeEntry entry : themePackage.getContributes().getSpecialThemes()) {
+            specialEntries.put(entry.getId(), entry);
+            allEntries.put(entry.getId(), entry);
         }
     }
 
@@ -99,6 +107,14 @@ public class ThemeRegistry {
      */
     public Collection<VSCodeThemeEntry> getEntries() {
         return entries.values();
+    }
+
+    public Collection<VSCodeThemeEntry> getSpecialEntries() {
+        return specialEntries.values();
+    }
+
+    public Collection<VSCodeThemeEntry> getAllEntries() {
+        return allEntries.values();
     }
 
     /**
@@ -122,7 +138,7 @@ public class ThemeRegistry {
          */
         if (id == null || id.isBlank()) {
 
-            id = entries.keySet().stream()
+            id = allEntries.keySet().stream()
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Nenhum tema registrado"));
         }
@@ -139,7 +155,7 @@ public class ThemeRegistry {
         /**
          * Busca entrada correspondente ao ID.
          */
-        VSCodeThemeEntry entry = entries.get(id);
+        VSCodeThemeEntry entry = allEntries.get(id);
 
         /**
          * Caso ID não exista no registro, lança erro.
@@ -164,4 +180,3 @@ public class ThemeRegistry {
         return theme;
     }
 }
-

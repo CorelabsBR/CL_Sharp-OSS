@@ -1,6 +1,7 @@
 {
 	"$schema": "vscode://schemas/color-theme",
 	"name": "Nochnói Spektr",
+	"Comentario": "Esse tema costumava ser dela, tanto que se olhar nas releases antigas, ele era chamado de Thainá's Void Violeta, um dos unicos fora do padrão, mas já sabemos oq aconteceu durante esses 200 dias",
 	"colors": {
 		"contrastActiveBorder": "#00000000",
 		"contrastBorder": "#00000000",

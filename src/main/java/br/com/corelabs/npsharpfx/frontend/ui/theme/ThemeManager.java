@@ -8,10 +8,12 @@ package br.com.corelabs.npsharpfx.frontend.ui.theme;
 // Classe File do Java usada para representar arquivos do sistema.
 // Aqui ela é usada para lidar com o wallpaper personalizado escolhido pelo usuário.
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
+import java.util.Objects;
 
 import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
@@ -115,7 +117,7 @@ public class ThemeManager {
      */
     public VSCodeThemeEntry getCurrentThemeEntry() {
         String selectedThemeId = resolveSelectedThemeId();
-        for (VSCodeThemeEntry entry : registry.getEntries()) {
+        for (VSCodeThemeEntry entry : registry.getAllEntries()) {
             if (entry.getId().equals(selectedThemeId)) {
                 return entry;
             }
@@ -254,6 +256,46 @@ public class ThemeManager {
 
         applyWallpaper(theme, wallpaperLayer, overlay);
     }
+public Image getWelcomeLogo() {
+    VSCodeThemeEntry entry = getCurrentThemeEntry();
+
+    if (entry != null) {
+        String welcomeLogo = normalizeThemeResourcePath(entry.getWelcomeLogo());
+
+        if (welcomeLogo != null) {
+            InputStream stream = getClass().getResourceAsStream(welcomeLogo);
+
+            if (stream != null) {
+                return new Image(stream);
+            }
+        }
+    }
+
+    return new Image(
+            Objects.requireNonNull(
+                    getClass().getResourceAsStream("/icons/wlclogo.png"),
+                    "Logo padrão da Welcome não encontrada: /icons/wlclogo.png"
+            )
+    );
+}
+
+private String normalizeThemeResourcePath(String path) {
+    if (path == null || path.isBlank()) {
+        return null;
+    }
+
+    String normalized = path.trim().replace("\\", "/");
+
+    if (normalized.startsWith("./")) {
+        normalized = normalized.substring(2);
+    }
+
+    if (!normalized.startsWith("/themes/")) {
+        normalized = "/themes/" + normalized;
+    }
+
+    return normalized;
+}
 
     private void appendColor(StringBuilder sb, EditorTheme theme, String varName, String themeKey, String fallback) {
         String color = normalizeCssColor(theme.color(themeKey, fallback), fallback);

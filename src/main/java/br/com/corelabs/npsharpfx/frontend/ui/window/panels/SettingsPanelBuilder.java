@@ -5,12 +5,17 @@
  */
 package br.com.corelabs.npsharpfx.frontend.ui.window.panels;
 
+import java.util.function.Consumer;
+
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 
@@ -22,7 +27,7 @@ public Node buildSettingsPanel(
         Runnable openCommandPalette,
         Runnable onAppearanceClick,
         Runnable openSettingsView,
-        Runnable onThemesClick,
+        Consumer<Boolean> onThemesClick,
         Runnable onWallpaperClick,
         Runnable onRemoveWallpaperClick) {
 
@@ -37,7 +42,7 @@ public Node buildSettingsPanel(
     appearanceSubmenu.setManaged(false);
     Button commandPaletteButton = createSettingsMenuItem("Command Palette...", "Ctrl+Shift+P", openCommandPalette);
 
-    Button colorThemeButton = createSettingsMenuItem("Color Theme...", "Escolher", onThemesClick);
+    Button colorThemeButton = createShiftAwareSettingsMenuItem("Color Theme...", "Escolher", onThemesClick);
     Button wallpaperButton = createSettingsMenuItem("Wallpaper...", "Escolher", onWallpaperClick);
     Button clearWallpaperButton = createSettingsMenuItem("Clear Wallpaper", null, onRemoveWallpaperClick);
 
@@ -120,6 +125,31 @@ public Node buildSettingsPanel(
 
         if (action != null) {
             button.setOnAction(event -> action.run());
+        }
+
+        return button;
+    }
+
+    private Button createShiftAwareSettingsMenuItem(String text, String shortcut, Consumer<Boolean> action) {
+        Button button = createSettingsMenuItem(text, shortcut, (Runnable) null);
+
+        if (action != null) {
+            boolean[] mouseReleaseHandled = { false };
+            button.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+                if (event.getButton() != MouseButton.PRIMARY) {
+                    return;
+                }
+                mouseReleaseHandled[0] = true;
+                action.accept(event.isShiftDown());
+                Platform.runLater(() -> mouseReleaseHandled[0] = false);
+                event.consume();
+            });
+            button.setOnAction(event -> {
+                if (mouseReleaseHandled[0]) {
+                    return;
+                }
+                action.accept(false);
+            });
         }
 
         return button;
