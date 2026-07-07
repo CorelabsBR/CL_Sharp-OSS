@@ -67,6 +67,7 @@ export async function loadSession(): Promise<PersistedSession> {
     const parsed = JSON.parse(raw) as Partial<PersistedSession> & { recentFiles?: string[]; lastOpenedWorkspace?: string };
     return {
       workspace: parsed.workspace ?? parsed.lastOpenedWorkspace,
+      recentWorkspaces: normalizeRecentWorkspaces(parsed.recentWorkspaces, parsed.workspace ?? parsed.lastOpenedWorkspace),
       openFiles: parsed.openFiles ?? parsed.recentFiles ?? [],
       activeFile: parsed.activeFile,
       sidePanel: parsed.sidePanel ?? "explorer",
@@ -83,9 +84,16 @@ export async function saveSession(session: PersistedSession): Promise<void> {
     recentFilesPath(),
     JSON.stringify({
       ...session,
+      recentWorkspaces: normalizeRecentWorkspaces(session.recentWorkspaces, session.workspace),
       recentFiles: session.openFiles,
       lastOpenedWorkspace: session.workspace
     }, null, 2) + "\n",
     "utf8"
   );
+}
+
+function normalizeRecentWorkspaces(recentWorkspaces?: string[], currentWorkspace?: string): string[] {
+  const values = [currentWorkspace, ...(recentWorkspaces ?? [])]
+    .filter((value): value is string => Boolean(value?.trim()));
+  return [...new Set(values)].slice(0, 12);
 }

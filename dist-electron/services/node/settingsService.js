@@ -72,6 +72,7 @@ async function loadSession() {
         const parsed = JSON.parse(raw);
         return {
             workspace: parsed.workspace ?? parsed.lastOpenedWorkspace,
+            recentWorkspaces: normalizeRecentWorkspaces(parsed.recentWorkspaces, parsed.workspace ?? parsed.lastOpenedWorkspace),
             openFiles: parsed.openFiles ?? parsed.recentFiles ?? [],
             activeFile: parsed.activeFile,
             sidePanel: parsed.sidePanel ?? "explorer",
@@ -86,8 +87,14 @@ async function saveSession(session) {
     await promises_1.default.mkdir((0, paths_1.npsharpHome)(), { recursive: true });
     await promises_1.default.writeFile((0, paths_1.recentFilesPath)(), JSON.stringify({
         ...session,
+        recentWorkspaces: normalizeRecentWorkspaces(session.recentWorkspaces, session.workspace),
         recentFiles: session.openFiles,
         lastOpenedWorkspace: session.workspace
     }, null, 2) + "\n", "utf8");
+}
+function normalizeRecentWorkspaces(recentWorkspaces, currentWorkspace) {
+    const values = [currentWorkspace, ...(recentWorkspaces ?? [])]
+        .filter((value) => Boolean(value?.trim()));
+    return [...new Set(values)].slice(0, 12);
 }
 //# sourceMappingURL=settingsService.js.map

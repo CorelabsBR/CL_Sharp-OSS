@@ -507,11 +507,6 @@ export class EditorTabs {
     const title = el("h1", { text: "NPSharp" });
     const subtitle = el("p", { text: "Código, Controle, Dominio" });
     const actions = el("div", { className: "welcome-actions" });
-    const newFile = el("button", { className: "primary", text: "Novo" });
-    newFile.addEventListener("click", () => this.newTab());
-    const openFile = el("button", { text: "Abrir" });
-    openFile.addEventListener("click", () => void this.openFileFromDialog());
-    actions.append(newFile, openFile);
     this.welcome.append(this.welcomeLogo, title, subtitle, actions);
   }
 

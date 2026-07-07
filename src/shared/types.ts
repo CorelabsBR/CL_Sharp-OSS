@@ -71,6 +71,7 @@ export interface AppSettings {
 
 export interface PersistedSession {
   workspace?: string;
+  recentWorkspaces?: string[];
   openFiles: string[];
   activeFile?: string;
   sidePanel: string;

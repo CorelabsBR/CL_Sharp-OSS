@@ -1,4 +1,5 @@
 import type { AppSettings, EditorDiagnostic, PersistedSession } from "../../shared/types";
+import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
 import { CommandPalette, type CommandAction } from "../components/CommandPalette";
 import { EditorTabs } from "../components/EditorTabs";
 import { FileExplorer } from "../components/FileExplorer";
@@ -11,7 +12,7 @@ import { api } from "../services/api";
 import { applyTheme, listThemes } from "../services/themes";
 import { buttonIcon, el, icon } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
-import { basename, dirname, fileUri } from "../utils/path";
+import { basename, dirname, fileUri, joinPath } from "../utils/path";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench";
@@ -30,6 +31,7 @@ export class IdePage {
   private readonly statusRight = el("span", { text: "" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
   private readonly commandBar = el("input", { className: "command-bar", attrs: { readonly: "true" } });
+  private readonly commandCenter = new CommandCenter(workspace => void this.openRecentWorkspace(workspace));
   private readonly editor = new EditorTabs(text => this.updateStatus(text));
   private readonly explorer = new FileExplorer(file => void this.editor.openFile(file), text => this.updateStatus(text));
   private readonly search = new SearchPanel(result => void this.editor.openSearchResult(result), text => this.updateStatus(text));
@@ -49,6 +51,7 @@ export class IdePage {
   private settingsCategory: SettingsCategory = "Appearance";
   private settingsQuery = "";
   private appPlatform = "";
+  private appInfoPath = "";
 
   constructor() {
     void this.init().catch(error => this.renderFatalError(error));
@@ -56,7 +59,9 @@ export class IdePage {
 
   private async init(): Promise<void> {
     this.settings = await api.settings.load();
-    this.appPlatform = (await api.appInfo()).platform;
+    const appInfo = await api.appInfo();
+    this.appPlatform = appInfo.platform;
+    this.appInfoPath = appInfo.npsharpHome;
     this.terminal.setShell(this.terminalShell());
     this.session = await api.settings.loadSession();
     this.editor.applyTheme(await applyTheme(this.settings));
@@ -65,6 +70,7 @@ export class IdePage {
     this.wireEvents();
     this.build();
     this.applyLayoutSettings();
+    this.updateCommandCenter();
     this.registerCommands();
     await this.restoreSession();
   }
@@ -75,6 +81,7 @@ export class IdePage {
     this.buildSideBar();
     const center = el("section", { className: "center-area" });
     const editorStack = el("section", { className: "editor-stack" });
+    this.editor.element.append(this.commandCenter.element);
     editorStack.append(this.editor.element, this.terminal.element);
     this.terminal.element.hidden = !this.session.terminalVisible;
     center.append(this.activityBar, this.sideBar, editorStack);
@@ -218,17 +225,21 @@ export class IdePage {
       this.search.setWorkspace(workspace);
       void this.source.setWorkspace(workspace);
       this.palette.setWorkspace(workspace);
+      if (workspace) this.rememberWorkspace(workspace);
       this.commandBar.value = this.commandLabel();
+      this.updateCommandCenter();
       this.persist();
       void this.runDiagnostics();
     };
     this.editor.onTabsChanged = () => {
       this.palette.setQuickOpenFiles([...this.editor.getOpenFiles(), ...this.editor.getRecentFiles()]);
+      this.updateCommandCenter();
       this.persist();
     };
     this.editor.onFileActivated = file => {
       if (file) void this.explorer.revealFile(file);
       this.commandBar.value = this.commandLabel();
+      this.updateCommandCenter();
       this.persist();
       void this.runDiagnostics();
     };
@@ -285,6 +296,7 @@ export class IdePage {
       await this.editor.restoreFiles(this.session.openFiles, this.session.activeFile);
       this.showPanel((this.session.sidePanel as PanelId) || "explorer");
       this.terminal.element.hidden = !this.session.terminalVisible;
+      this.updateCommandCenter();
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Restore session failed");
     }
@@ -628,6 +640,61 @@ export class IdePage {
     }
   }
 
+  private async createProject(): Promise<void> {
+    const projectPath = prompt("Caminho completo do novo projeto");
+    const target = projectPath?.trim();
+    if (!target) return;
+    if (!isAbsolutePath(target)) {
+      this.updateStatus("Informe um caminho absoluto para criar o projeto.");
+      return;
+    }
+    try {
+      await api.fs.createFolder(target);
+      await this.explorer.openFolder(target);
+      this.showPanel("explorer");
+      this.updateStatus(`Projeto criado: ${target}`);
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Create project failed");
+    }
+  }
+
+  private async cloneRepository(): Promise<void> {
+    const url = prompt("URL do repositorio Git");
+    if (!url?.trim()) return;
+    const target = await api.dialog.openFolder();
+    if (target.canceled || !target.paths[0]) return;
+    const parent = target.paths[0];
+    this.showTerminal(true);
+    this.terminal.appendOutput(`[git] git clone ${url.trim()}`);
+    try {
+      const result = await api.git.run(parent, ["clone", url.trim()]);
+      this.terminal.appendOutput(result.output || (result.success ? "Clone concluido." : "Clone falhou."));
+      this.updateStatus(result.success ? "Clone completed" : "Clone failed");
+      const clonedPath = joinPath(parent, cloneFolderName(url.trim()));
+      if (result.success && await api.fs.exists(clonedPath)) {
+        await this.explorer.openFolder(clonedPath);
+        this.showPanel("explorer");
+      }
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Clone repository failed");
+    }
+  }
+
+  private async openNotes(): Promise<void> {
+    const base = this.explorer.workspace ? joinPath(this.explorer.workspace, ".npsharp") : this.appInfoPath;
+    const notesPath = joinPath(base, "notes.nps.md");
+    try {
+      await api.fs.createFolder(base);
+      if (!await api.fs.exists(notesPath)) {
+        await api.fs.writeFile(notesPath, "# NPSharp Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n");
+      }
+      await this.editor.openFile(notesPath);
+      this.updateStatus(`Notes aberto: ${notesPath}`);
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Open notes failed");
+    }
+  }
+
   private applyWallpaper(): void {
     if (!this.settings?.wallpaperPath) {
       this.wallpaper.style.backgroundImage = "";
@@ -671,6 +738,64 @@ export class IdePage {
     if (this.diagnostics.length && this.settings.problemsAutoOpen) {
       this.showPanel("problems");
     }
+  }
+
+  private async openRecentWorkspace(workspace: string): Promise<void> {
+    try {
+      if (!await api.fs.exists(workspace)) {
+        this.session.recentWorkspaces = (this.session.recentWorkspaces ?? []).filter(item => item !== workspace);
+        this.updateCommandCenter();
+        this.persist();
+        this.updateStatus(`Workspace nao encontrado: ${workspace}`);
+        return;
+      }
+      await this.explorer.openFolder(workspace);
+      this.showPanel("explorer");
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), `Open workspace failed (${workspace})`);
+    }
+  }
+
+  private rememberWorkspace(workspace: string): void {
+    this.session.recentWorkspaces = [workspace, ...(this.session.recentWorkspaces ?? []).filter(item => item !== workspace)].slice(0, 12);
+  }
+
+  private updateCommandCenter(): void {
+    const visible = !this.explorer.workspace && !this.editor.activeTab;
+    this.commandCenter.setState({
+      visible,
+      actions: this.commandCenterActions(),
+      recentWorkspaces: this.session.recentWorkspaces ?? [],
+      shortcuts: this.commandCenterShortcuts()
+    });
+  }
+
+  private commandCenterActions(): CommandCenterAction[] {
+    const hasProject = Boolean(this.explorer.workspace);
+    const hasRunnableTarget = Boolean(this.editor.getCurrentFile() || this.explorer.workspace);
+    return [
+      { id: "open-folder", label: "Abrir pasta", detail: "Escolher um workspace local.", iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
+      { id: "new-file", label: "Novo arquivo", detail: "Criar um arquivo sem sair do hub.", iconName: "new-file", run: () => this.editor.newTab() },
+      { id: "new-project", label: "Novo projeto", detail: "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
+      { id: "clone", label: "Clonar Git", detail: "Executar git clone em uma pasta escolhida.", iconName: "repo-clone", run: () => void this.cloneRepository() },
+      { id: "terminal", label: "Abrir terminal", detail: "Abrir o terminal integrado.", iconName: "terminal", run: () => this.showTerminal(true) },
+      { id: "notes", label: "Abrir Notes", detail: "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
+      { id: "theme-lab", label: "Abrir Theme Lab", detail: "Abrir o seletor de temas incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
+      { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
+      { id: "run", label: "Rodar projeto", detail: hasRunnableTarget ? "Executar o arquivo/projeto atual." : "Abra um arquivo ou workspace primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
+      { id: "git-status", label: "Git Status", detail: hasProject ? "Abrir Source Control do workspace." : "Abra um workspace primeiro.", iconName: "source-control", disabled: !hasProject, run: () => this.showPanel("source") }
+    ];
+  }
+
+  private commandCenterShortcuts(): CommandCenterShortcut[] {
+    return [
+      { label: "Command Palette", keys: "Ctrl+Shift+P" },
+      { label: "Abrir pasta", keys: "Ctrl+K Ctrl+O" },
+      { label: "Quick Open", keys: "Ctrl+P" },
+      { label: "Terminal", keys: "Ctrl+`" },
+      { label: "Configurações", keys: "Ctrl+," },
+      { label: "Rodar", keys: "F5" }
+    ];
   }
 
   private renderProblems(): void {
@@ -914,16 +1039,27 @@ export class IdePage {
 
   private persist(): void {
     this.session.workspace = this.explorer.workspace;
+    if (this.explorer.workspace) this.rememberWorkspace(this.explorer.workspace);
     this.session.openFiles = this.editor.getOpenFiles();
     this.session.activeFile = this.editor.getCurrentFile();
     this.session.sidePanel = this.activePanel;
     this.session.terminalVisible = !this.terminal.element.hidden;
     void api.settings.saveSession(this.session);
   }
+private about(): void {
+  alert(`NPSharp IDE
+Version 1.0.2
 
-  private about(): void {
-    alert("CoreLabs NPSHARP - A modern, fast and efficient IDE for Development of projects.");
-  }
+Developed by CoreLabs.
+
+Code without distractions.
+
+NPSharp is a fast, modern and developer-first IDE created to provide a clean and efficient coding experience. Combining the power of Monaco Editor with Electron, it delivers a familiar environment enhanced with custom themes, integrated tools, source control, terminal support and a workflow built for real-world software development.
+
+Designed by developers, for developers.
+
+© ${new Date().getFullYear()} CoreLabs. All rights reserved.`);
+}
 
   private renderFatalError(error: unknown): void {
     this.element.replaceChildren(
@@ -937,6 +1073,16 @@ export class IdePage {
       })
     );
   }
+}
+
+function isAbsolutePath(filePath: string): boolean {
+  return filePath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(filePath);
+}
+
+function cloneFolderName(url: string): string {
+  const clean = url.replace(/[?#].*$/, "").replace(/\/+$/, "").replace(/\.git$/i, "");
+  const match = clean.match(/([^/:]+)$/);
+  return match?.[1] || "repository";
 }
 
 function menuButton(label: string, items: Array<[string, string, MenuAction]>): HTMLButtonElement {

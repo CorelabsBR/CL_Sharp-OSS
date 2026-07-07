@@ -44,6 +44,11 @@ O NPSHARP existe para:
 - Atender devs que querem controle total da ferramenta
 - Criar uma base para futuras variações do editor
 
+## Command Center
+Quando nenhum workspace está aberto, o NPSharp Electron exibe o Command Center como hub inicial do editor.
+
+O hub permite abrir pasta, criar arquivo, criar projeto, clonar repositório Git, abrir terminal, abrir Notes, acessar temas/configurações, revisar atalhos e reabrir workspaces recentes. As ações usam as APIs reais do backend Electron/Node e os últimos workspaces ficam persistidos em `~/.npsharp/recent-files.json`.
+
 ## Licença
 O projeto utiliza uma **licença personalizada**, permitindo:
 
@@ -89,4 +94,3 @@ O projeto suporta:
 
 Instruções detalhadas estão em `BUILDING.md`.
 Pronto para colocar no GitHub.
-
