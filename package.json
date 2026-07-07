@@ -21,9 +21,15 @@
     "build": "node scripts/build.mjs",
     "package": "node scripts/build.mjs",
     "package:linux": "node scripts/build.mjs linux",
-    "package:win": "node scripts/build.mjs win"
+    "package:win": "node scripts/build.mjs win",
+    "mobile:init": "npm install @capacitor/core @capacitor/cli @capacitor/android && npx cap init NPSharp br.com.corelabs.npsharp --web-dir=dist && npx cap add android",
+    "mobile:sync": "npm run build && npx cap sync android",
+    "mobile:android": "npm run mobile:sync && npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "monaco-editor": "^0.52.2",
     "ssh2": "^1.16.0"
   },

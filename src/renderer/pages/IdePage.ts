@@ -283,10 +283,11 @@ export class IdePage {
       { label: "Preferences: Color Theme", run: () => this.showThemePicker() },
       { label: "Preferences: Wallpaper", run: () => this.chooseWallpaper() },
       { label: "Preferences: Clear Wallpaper", run: () => this.clearWallpaper() },
-      { label: "Preferences: ErrorLens Toggle", run: () => this.toggleErrorLens() }
+      { label: "Preferences: ErrorLens Toggle", run: () => this.toggleErrorLens() },
+      { label: "Notes: Show Notes", run: () => this.openNotes() }
     ];
     this.palette.setCommands(commands);
-  }
+    }
 
   private async restoreSession(): Promise<void> {
     try {
@@ -1023,7 +1024,8 @@ export class IdePage {
       "preferences:wallpaper": () => void this.chooseWallpaper(),
       "preferences:clearWallpaper": () => void this.clearWallpaper(),
       "preferences:errorLensToggle": () => this.toggleErrorLens(),
-      "help:about": () => this.about()
+      "help:about": () => this.about(),
+      "notes:open": () => void this.openNotes()
     };
     map[command]?.();
   }

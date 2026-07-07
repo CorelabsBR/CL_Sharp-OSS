@@ -1356,6 +1356,10 @@ button {
   .command-center-shell {
     padding: 22px 14px;
   }
+  .command-center {
+    width:100%;
+    height:100%;
+  }
 
   .command-center-content {
     grid-template-columns: 1fr;
