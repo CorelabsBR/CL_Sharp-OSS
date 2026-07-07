@@ -1,13 +1,64 @@
 {
-  "name": "npsharpfx",
+  "name": "npsharp-electron",
   "version": "1.0.0",
-  "private": true,
+  "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
+  "main": "dist-electron/main/main.js",
+  "type": "commonjs",
+  "author": "CoreLabs",
+  "homepage": "https://github.com/girellidev/npsharp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/girellidev/npsharp.git"
+  },
+  "license": "SEE LICENSE IN ../NPSharp/LICENSE.txt",
   "scripts": {
-    "dev:linux": "bash scripts/dev-linux.sh",
-    "dev:win": "scripts\\dev-windows.bat",
-    "dev:win2": "scripts\\dev-windows-caminhopersonalizado.bat",
-    "build:linux": "bash scripts/build-linux.sh",
-    "build:win": "scripts\\build-windows.bat",
-    "package": "scripts\\package-windows-innosetup.bat"
+    "clean": "node scripts/clean.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:renderer": "vite",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs",
+    "package:linux": "node scripts/build.mjs linux",
+    "package:win": "node scripts/build.mjs win"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.52.2",
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ssh2": "^1.15.4",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  },
+  "build": {
+    "appId": "br.com.corelabs.npsharp",
+    "productName": "NPSharp",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "resources/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "maintainer": "CoreLabs"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }

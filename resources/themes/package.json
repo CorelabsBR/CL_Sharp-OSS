@@ -1,0 +1,159 @@
+{
+  "name": "npsharp-themes",
+  "displayName": "NPSharp Themes",
+  "description": "Pacote de temas do NPSharp compatível com estrutura inspirada no VS Code.",
+  "categories": [
+    "Themes"
+  ],
+  "version": "1.0.0",
+  "publisher": "corelabs",
+  "license": "MIT",
+  "engines": {
+    "vscode": "*"
+  },
+  "contributes": {
+    "themes": [
+      {
+        "id": "dark_core",
+        "label": "Dark Core",
+        "uiTheme": "vs-dark",
+        "path": "./dark_core.json"
+      },
+      {
+        "id": "oled_black",
+        "label": "OLED Black",
+        "uiTheme": "vs-dark",
+        "path": "./oled_black.json"
+      },
+      {
+        "id": "light_core",
+        "label": "Light Core",
+        "uiTheme": "vs",
+        "path": "./light_core.json"
+      },
+      {
+        "id": "dark_plus",
+        "label": "Dark Plus",
+        "uiTheme": "vs-dark",
+        "path": "./dark_plus.json"
+      },
+      {
+        "id": "light_plus",
+        "label": "Light Plus",
+        "uiTheme": "vs",
+        "path": "./light_plus.json"
+      },
+      {
+        "id": "steel",
+        "label": "Steel",
+        "uiTheme": "vs-dark",
+        "path": "./steel.json"
+      },
+      {
+        "id": "frost",
+        "label": "Frost",
+        "uiTheme": "vs",
+        "path": "./frost.json"
+      },
+      {
+        "id": "neutral",
+        "label": "Neutral",
+        "uiTheme": "vs-dark",
+        "path": "./neutral.json"
+      },
+      {
+        "id": "spectrum",
+        "label": "Spectrum",
+        "uiTheme": "vs-dark",
+        "path": "./spectrum.json"
+      },
+      {
+        "id": "solar",
+        "label": "Solar",
+        "uiTheme": "vs",
+        "path": "./solar.json"
+      },
+      {
+        "id": "dawn",
+        "label": "Dawn",
+        "uiTheme": "vs",
+        "path": "./dawn.json"
+      },
+      {
+        "id": "coffee",
+        "label": "Coffee",
+        "uiTheme": "vs",
+        "path": "./coffee.json"
+      },
+      {
+        "id": "mint",
+        "label": "Mint",
+        "uiTheme": "vs",
+        "path": "./mint.json"
+      },
+      {
+        "id": "ocean",
+        "label": "Ocean",
+        "uiTheme": "vs-dark",
+        "path": "./ocean.json"
+      },
+      {
+        "id": "terminal",
+        "label": "Terminal",
+        "uiTheme": "vs-dark",
+        "path": "./terminal.json"
+      },
+      {
+        "id": "graphite",
+        "label": "Graphite",
+        "uiTheme": "vs-dark",
+        "path": "./graphite.json"
+      }
+    ],
+    "specialThemes": [
+      {
+        "id": "sakura",
+        "label": "Andrieli's Sakura (Pink Spectrum)",
+        "uiTheme": "vs-dark",
+        "path": "./sakura.json",
+        "categories": [
+          "Special Themes"
+        ],
+        "preview": "./previews/sakura.png",
+        "welcomeLogo": "./welcomelogos/sakura.png"
+      },
+      {
+        "id": "amethyst",
+        "label": "Andrieli's Amethyst (Purple Protocol)",
+        "uiTheme": "vs-dark",
+        "path": "./amethyst.json",
+        "categories": [
+          "Special Themes"
+        ],
+        "preview": "./previews/amethyst.png",
+        "welcomeLogo": "./welcomelogos/amethyst.png"
+      },
+      {
+        "id": "crimson_screen",
+        "label": "Crimson Screen",
+        "uiTheme": "vs-dark",
+        "path": "./crimson_screen.json",
+        "categories": [
+          "Special Themes"
+        ],
+        "preview": "./previews/crimson_screen.png"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "vs-minimal",
+        "label": "VS Minimal Icons",
+        "path": "./fileicons/vs_minimal-icon-theme.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/girellidev/npsharp.git"
+  }
+}
