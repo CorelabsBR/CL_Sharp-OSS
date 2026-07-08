@@ -85,9 +85,6 @@ node_modules/
 
 # Mobile build artifacts
 android/app/build/
-android/build/
-android/.gradle/
-ios/App/build/
 *.apk
 *.aab
 *.ipa
