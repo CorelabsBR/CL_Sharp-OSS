@@ -1,4 +1,5 @@
 import type { AppSettings, EditorDiagnostic, PersistedSession } from "../../shared/types";
+import { ArduinoPanel } from "../components/ArduinoPanel";
 import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
 import { CommandPalette, type CommandAction } from "../components/CommandPalette";
 import { EditorTabs } from "../components/EditorTabs";
@@ -14,7 +15,7 @@ import { buttonIcon, el, icon } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
 import { basename, dirname, extname, fileUri, joinPath } from "../utils/path";
 
-type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "settings" | "problems";
+type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "arduino" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench";
 type MenuAction = (event: MouseEvent) => void;
 
@@ -40,6 +41,7 @@ export class IdePage {
   private readonly terminal = new TerminalPanel(() => this.terminalCwd(), text => this.updateStatus(text), () => this.closeTerminalPanel());
   private readonly runtime = new RuntimePanel(() => this.runCurrentFile(), text => this.updateStatus(text));
   private readonly remote = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text));
+  private readonly arduino = new ArduinoPanel(() => this.explorer.workspace, file => this.editor.openFile(file), text => this.updateStatus(text));
   private readonly palette = new CommandPalette();
   private readonly problemsPanel = el("div", { className: "panel problems-panel" });
   private readonly panels = new Map<PanelId, HTMLElement>();
@@ -138,6 +140,7 @@ export class IdePage {
         ["Search", "Ctrl+Shift+F", () => this.showPanel("search")],
         ["Source Control", "Ctrl+Shift+G", () => this.showPanel("source")],
         ["Run and Debug", "Ctrl+Shift+D", () => this.showPanel("run")],
+        ["Arduino", "", () => this.showPanel("arduino")],
         ["Problems", "F8", () => this.showPanel("problems")],
         ["Debug Console", "", () => this.terminal.showDebugConsole()],
         ["Toggle Sidebar", "Ctrl+B", () => this.toggleSidebar()],
@@ -146,6 +149,7 @@ export class IdePage {
       menuButton("Run", [
         ["Run Current File", "F5", () => void this.runCurrentFile()],
         ["Build Project", "Ctrl+Shift+B", () => void this.buildProject()],
+        ["Arduino", "", () => this.showPanel("arduino")],
         ["Runtime Paths", "", () => this.showPanel("run")]
       ]),
       menuButton("Terminal", [
@@ -190,6 +194,7 @@ export class IdePage {
       this.activityButton("source", "source-control", "Source Control"),
       this.activityButton("run", "debug-alt", "Run and Debug"),
       this.activityButton("remote", "remote", "Remote Host"),
+      this.activityButton("arduino", "circuit-board", "Arduino"),
       this.activityButton("problems", "warning", "Problems"),
       el("div", { className: "activity-spacer" }),
       this.settingsActivityButton()
@@ -202,6 +207,7 @@ export class IdePage {
     this.panels.set("source", this.source.element);
     this.panels.set("run", this.runtime.element);
     this.panels.set("remote", this.remote.element);
+    this.panels.set("arduino", this.arduino.element);
     this.panels.set("settings", this.settingsPanel());
     this.panels.set("problems", this.problemsPanel);
     this.sideBar.append(this.sideTitle, this.sideContent);
@@ -276,6 +282,7 @@ export class IdePage {
       { label: "View: Search", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
       { label: "View: Source Control", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
       { label: "View: Run and Debug", shortcut: "Ctrl+Shift+D", run: () => this.showPanel("run") },
+      { label: "View: Arduino", run: () => this.showPanel("arduino") },
       { label: "View: Problems", shortcut: "F8", run: () => this.showPanel("problems") },
       { label: "Terminal: Toggle Terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
       { label: "Terminal: New Terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
@@ -319,6 +326,7 @@ export class IdePage {
     if (panelId === "source") void this.source.refresh();
     if (panelId === "run") void this.runtime.refresh();
     if (panelId === "remote") void this.remote.refresh();
+    if (panelId === "arduino") void this.arduino.refresh();
     this.persist();
   }
 
@@ -943,6 +951,7 @@ export class IdePage {
       { id: "new-project", label: "Novo projeto", detail: platform.isMobile ? "Criar workspace em Documents/NPSharp/workspaces." : "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
       { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? "Executar git clone em uma pasta escolhida." : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
       { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir Output", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponivel neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
+      { id: "arduino", label: "Arduino", detail: platform.canUseNodeBackend ? "Boards, portas, compile e upload via Arduino CLI." : "Modo limitado para sketches Arduino.", iconName: "circuit-board", run: () => this.showPanel("arduino") },
       { id: "notes", label: "Abrir Notes", detail: platform.isMobile ? "Abrir ou criar Documents/NPSharp/notes.nps.md." : "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
       { id: "theme-lab", label: "Abrir Theme Lab", detail: "Abrir o seletor de temas incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
@@ -1182,6 +1191,7 @@ export class IdePage {
       "view:search": () => this.showPanel("search"),
       "view:source": () => this.showPanel("source"),
       "view:run": () => this.showPanel("run"),
+      "view:arduino": () => this.showPanel("arduino"),
       "view:problems": () => this.showPanel("problems"),
       "view:debugConsole": () => this.terminal.showDebugConsole(),
       "view:commandPalette": () => this.palette.showCommands(),
@@ -1312,6 +1322,7 @@ function panelTitle(panel: PanelId): string {
     source: "SOURCE CONTROL",
     run: "RUN AND DEBUG",
     remote: "REMOTE HOST",
+    arduino: "ARDUINO",
     settings: "SETTINGS",
     problems: "PROBLEMS"
   };

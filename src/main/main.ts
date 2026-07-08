@@ -1,6 +1,17 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "node:path";
 import {
+  compileArduinoSketch,
+  createArduinoSketch,
+  detectArduinoCli,
+  listArduinoBoards,
+  listArduinoPorts,
+  loadArduinoConfig,
+  monitorArduinoSerial,
+  saveArduinoConfig,
+  uploadArduinoSketch
+} from "../services/node/arduinoService";
+import {
   createFile,
   createFolder,
   deletePath,
@@ -45,6 +56,13 @@ import {
   writeRemoteFile
 } from "../services/node/remoteService";
 import type {
+  ArduinoCliRequest,
+  ArduinoCompileRequest,
+  ArduinoConfigRequest,
+  ArduinoCreateSketchRequest,
+  ArduinoMonitorRequest,
+  ArduinoSaveConfigRequest,
+  ArduinoUploadRequest,
   GitFileStatus,
   LiveServerRequest,
   RemoteCommandRequest,
@@ -202,6 +220,7 @@ function createApplicationMenu(): void {
         { label: "Search", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
         { label: "Source Control", accelerator: "CmdOrCtrl+Shift+G", click: () => sendCommand("view:source") },
         { label: "Run and Debug", accelerator: "CmdOrCtrl+Shift+D", click: () => sendCommand("view:run") },
+        { label: "Arduino", click: () => sendCommand("view:arduino") },
         { label: "Terminal", accelerator: "CmdOrCtrl+`", click: () => sendCommand("view:terminal") },
         { label: "Problems", accelerator: "F8", click: () => sendCommand("view:problems") },
         { label: "Debug Console", click: () => sendCommand("view:debugConsole") },
@@ -219,6 +238,7 @@ function createApplicationMenu(): void {
         { label: "Build Project", accelerator: "CmdOrCtrl+Shift+B", click: () => sendCommand("tools:build") },
         { label: "Run", accelerator: "CmdOrCtrl+Alt+N", click: () => sendCommand("tools:run") },
         { label: "Debug Program", accelerator: "F5", click: () => sendCommand("tools:run") },
+        { label: "Arduino", click: () => sendCommand("view:arduino") },
         { type: "separator" },
         { label: "New Terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendCommand("terminal:new") },
         { label: "Output", click: () => sendCommand("terminal:output") },
@@ -338,6 +358,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle("runtime:discover", () => discoverRuntimes(true));
   ipcMain.handle("runtime:configure", (_event, languageId: string, executablePath: string) => configureRuntime(languageId, executablePath));
   ipcMain.handle("runtime:runFile", (_event, request: RuntimeRunRequest) => runFile(request));
+
+  ipcMain.handle("arduino:detect", (_event, request?: ArduinoCliRequest) => detectArduinoCli(request));
+  ipcMain.handle("arduino:loadConfig", (_event, request: ArduinoConfigRequest) => loadArduinoConfig(request));
+  ipcMain.handle("arduino:saveConfig", (_event, request: ArduinoSaveConfigRequest) => saveArduinoConfig(request));
+  ipcMain.handle("arduino:listPorts", (_event, request?: ArduinoCliRequest) => listArduinoPorts(request));
+  ipcMain.handle("arduino:listBoards", (_event, request?: ArduinoCliRequest) => listArduinoBoards(request));
+  ipcMain.handle("arduino:createSketch", (_event, request: ArduinoCreateSketchRequest) => createArduinoSketch(request));
+  ipcMain.handle("arduino:compile", (_event, request: ArduinoCompileRequest) => compileArduinoSketch(request));
+  ipcMain.handle("arduino:upload", (_event, request: ArduinoUploadRequest) => uploadArduinoSketch(request));
+  ipcMain.handle("arduino:monitor", (_event, request: ArduinoMonitorRequest) => monitorArduinoSerial(request));
+
   ipcMain.handle("liveServer:open", (_event, request: LiveServerRequest) => openLiveServer(request));
   ipcMain.handle("liveServer:stopAll", () => stopAllLiveServers());
   ipcMain.handle("templates:apply", (_event, request: TemplateApplyRequest) => applyTemplate(app.getAppPath(), request));

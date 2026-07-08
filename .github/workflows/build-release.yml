@@ -26,6 +26,8 @@ concurrency:
 env:
   NODE_VERSION: "22"
   JAVA_VERSION: "17"
+  ANDROID_PLATFORM: "android-35"
+  ANDROID_BUILD_TOOLS: "35.0.0"
 
 jobs:
   test:
@@ -98,7 +100,7 @@ jobs:
             release/latest*.yml
 
   package-linux:
-    name: Package Linux deb and portable
+    name: Package Linux deb and AppImage
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name != 'pull_request'
@@ -157,19 +159,27 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${ANDROID_BUILD_TOOLS}"
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build renderer
+        run: npm run build:renderer
 
       - name: Sync Capacitor Android project
         run: npm run cap:sync
 
       - name: Build APKs
         working-directory: android
+        shell: bash
         run: |
           chmod +x ./gradlew
           ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
@@ -218,6 +228,7 @@ jobs:
           tag_name="${{ steps.release_tag.outputs.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           if git rev-parse "refs/tags/$tag_name" >/dev/null 2>&1; then
             echo "Tag $tag_name already exists."
           else
@@ -237,6 +248,7 @@ jobs:
         run: |
           tag_name="${{ steps.release_tag.outputs.tag_name }}"
           mapfile -t assets < <(find release-assets -type f | sort)
+
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No release assets found."
             exit 1

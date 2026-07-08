@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AppSettings,
+  ArduinoCliRequest,
+  ArduinoCompileRequest,
+  ArduinoConfigRequest,
+  ArduinoCreateSketchRequest,
+  ArduinoMonitorRequest,
+  ArduinoSaveConfigRequest,
+  ArduinoUploadRequest,
   GitFileStatus,
   LiveServerRequest,
   NpsharpApi,
@@ -85,6 +92,17 @@ const api: NpsharpApi = {
     discover: () => invoke("runtime:discover"),
     configure: (languageId: string, executablePath: string) => invoke("runtime:configure", languageId, executablePath),
     runFile: (request: RuntimeRunRequest) => invoke("runtime:runFile", request)
+  },
+  arduino: {
+    detect: (request?: ArduinoCliRequest) => invoke("arduino:detect", request),
+    loadConfig: (request: ArduinoConfigRequest) => invoke("arduino:loadConfig", request),
+    saveConfig: (request: ArduinoSaveConfigRequest) => invoke("arduino:saveConfig", request),
+    listPorts: (request?: ArduinoCliRequest) => invoke("arduino:listPorts", request),
+    listBoards: (request?: ArduinoCliRequest) => invoke("arduino:listBoards", request),
+    createSketch: (request: ArduinoCreateSketchRequest) => invoke("arduino:createSketch", request),
+    compile: (request: ArduinoCompileRequest) => invoke("arduino:compile", request),
+    upload: (request: ArduinoUploadRequest) => invoke("arduino:upload", request),
+    monitor: (request: ArduinoMonitorRequest) => invoke("arduino:monitor", request)
   },
   liveServer: {
     open: (request: LiveServerRequest) => invoke("liveServer:open", request),

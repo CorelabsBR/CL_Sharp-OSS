@@ -2,6 +2,15 @@ import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import type {
   AppInfo,
   AppSettings,
+  ArduinoCliRequest,
+  ArduinoCompileRequest,
+  ArduinoConfig,
+  ArduinoConfigRequest,
+  ArduinoCreateSketchRequest,
+  ArduinoMonitorRequest,
+  ArduinoOperationResult,
+  ArduinoSaveConfigRequest,
+  ArduinoUploadRequest,
   DialogFileResult,
   EditorDiagnostic,
   FileReadResult,
@@ -67,6 +76,7 @@ export interface RendererApi extends NpsharpApi {
 const SETTINGS_PATH = `${MOBILE_ROOT}/settings.json`;
 const SESSION_PATH = `${MOBILE_ROOT}/session.json`;
 const REMOTE_HOSTS_PATH = `${MOBILE_ROOT}/remote-hosts.json`;
+const ARDUINO_CONFIG_PATH = `${MOBILE_ROOT}/.npsharp/arduino.json`;
 const NOTES_PATH = `${MOBILE_ROOT}/notes.nps.md`;
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -109,6 +119,8 @@ const MOBILE_GIT_MESSAGE = "Git nativo ainda nao esta disponivel no mobile.";
 const WEB_GIT_MESSAGE = "Git local nao esta disponivel neste modo web.";
 const MOBILE_TERMINAL_MESSAGE = "Terminal real Node nao esta disponivel no mobile. Use este painel como Output/Command Log.";
 const WEB_TERMINAL_MESSAGE = "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
+const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use este painel para manter configuracao e sketches; compile/upload dependem do desktop.";
+const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
 
 class CapacitorSandboxFs implements FsApi {
   async listDir(path: string): Promise<WorkspaceEntry[]> {
@@ -400,6 +412,7 @@ function createBrowserApi(): NpsharpApi {
       configure: async () => [],
       runFile: async request => runInBrowserSandbox(request)
     },
+    arduino: createArduinoFallbackApi(fs),
     liveServer: {
       open: request => openHtmlPreviewUrl(fs, request),
       stopAll: async () => ({ success: true, output: "Nenhum Live Server Node ativo neste ambiente." })
@@ -517,6 +530,53 @@ function createRemoteFallbackApi(fs: FsApi): RemoteApi {
     rename: async (_request: RemoteFileRequest & { newPath: string }) => undefined,
     delete: async (_request: RemoteFileRequest) => undefined,
     execute: async (_request: RemoteCommandRequest) => unavailable()
+  };
+}
+
+function createArduinoFallbackApi(fs: FsApi): NpsharpApi["arduino"] {
+  const unavailable = (): ArduinoOperationResult => ({
+    success: false,
+    output: platform.isMobile ? MOBILE_ARDUINO_MESSAGE : WEB_ARDUINO_MESSAGE,
+    code: 1
+  });
+  const loadConfig = async (_request: ArduinoConfigRequest): Promise<ArduinoConfig> => {
+    const saved = await readJsonFile<Partial<ArduinoConfig>>(fs, ARDUINO_CONFIG_PATH, {});
+    return {
+      cliPath: saved.cliPath,
+      selectedBoardFqbn: saved.selectedBoardFqbn,
+      selectedPort: saved.selectedPort,
+      baudRate: Number(saved.baudRate) || 9600,
+      sketchPath: saved.sketchPath
+    };
+  };
+  const saveConfig = async (request: ArduinoSaveConfigRequest): Promise<ArduinoConfig> => {
+    const next = { ...await loadConfig(request), ...request.config };
+    await writeJsonFile(fs, ARDUINO_CONFIG_PATH, next);
+    return next;
+  };
+  return {
+    detect: async (_request?: ArduinoCliRequest) => ({
+      available: false,
+      message: platform.isMobile ? MOBILE_ARDUINO_MESSAGE : WEB_ARDUINO_MESSAGE
+    }),
+    loadConfig,
+    saveConfig,
+    listPorts: async (_request?: ArduinoCliRequest) => [],
+    listBoards: async (_request?: ArduinoCliRequest) => [],
+    createSketch: async (request: ArduinoCreateSketchRequest) => {
+      const name = sanitizeName(request.name || "Blink").replace(/\s+/g, "_");
+      const sketchPath = joinPath(DEFAULT_MOBILE_WORKSPACE, name);
+      const filePath = joinPath(sketchPath, `${name}.ino`);
+      await fs.createFolder(sketchPath);
+      if (!await fs.exists(filePath)) {
+        await fs.writeFile(filePath, "void setup() {\n}\n\nvoid loop() {\n}\n");
+      }
+      const config = await saveConfig({ workspace: request.workspace, config: { sketchPath } });
+      return { sketchPath, filePath, config };
+    },
+    compile: async (_request: ArduinoCompileRequest) => unavailable(),
+    upload: async (_request: ArduinoUploadRequest) => unavailable(),
+    monitor: async (_request: ArduinoMonitorRequest) => unavailable()
   };
 }
 

@@ -207,6 +207,81 @@ export interface RuntimeRunResult {
   code: number;
 }
 
+export interface ArduinoCliInfo {
+  available: boolean;
+  path?: string;
+  version?: string;
+  message: string;
+}
+
+export interface ArduinoBoardPort {
+  port: string;
+  protocol?: string;
+  type?: string;
+  boardName?: string;
+  fqbn?: string;
+  core?: string;
+  raw: string;
+}
+
+export interface ArduinoBoard {
+  name: string;
+  fqbn: string;
+  raw: string;
+}
+
+export interface ArduinoConfig {
+  cliPath?: string;
+  selectedBoardFqbn?: string;
+  selectedPort?: string;
+  baudRate: number;
+  sketchPath?: string;
+}
+
+export interface ArduinoConfigRequest {
+  workspace?: string;
+}
+
+export interface ArduinoSaveConfigRequest extends ArduinoConfigRequest {
+  config: Partial<ArduinoConfig>;
+}
+
+export interface ArduinoCreateSketchRequest extends ArduinoConfigRequest {
+  name: string;
+}
+
+export interface ArduinoSketchResult {
+  sketchPath: string;
+  filePath: string;
+  config: ArduinoConfig;
+}
+
+export interface ArduinoCliRequest extends ArduinoConfigRequest {
+  cliPath?: string;
+}
+
+export interface ArduinoCompileRequest extends ArduinoCliRequest {
+  sketchPath: string;
+  fqbn: string;
+}
+
+export interface ArduinoUploadRequest extends ArduinoCompileRequest {
+  port: string;
+}
+
+export interface ArduinoMonitorRequest extends ArduinoCliRequest {
+  port: string;
+  fqbn?: string;
+  baudRate: number;
+  durationMs?: number;
+}
+
+export interface ArduinoOperationResult {
+  success: boolean;
+  output: string;
+  code: number | null;
+}
+
 export interface LiveServerRequest {
   workspace: string;
   filePath: string;
@@ -314,6 +389,17 @@ export interface NpsharpApi {
     discover(): Promise<InstalledRuntime[]>;
     configure(languageId: string, executablePath: string): Promise<InstalledRuntime[]>;
     runFile(request: RuntimeRunRequest): Promise<RuntimeRunResult>;
+  };
+  arduino: {
+    detect(request?: ArduinoCliRequest): Promise<ArduinoCliInfo>;
+    loadConfig(request: ArduinoConfigRequest): Promise<ArduinoConfig>;
+    saveConfig(request: ArduinoSaveConfigRequest): Promise<ArduinoConfig>;
+    listPorts(request?: ArduinoCliRequest): Promise<ArduinoBoardPort[]>;
+    listBoards(request?: ArduinoCliRequest): Promise<ArduinoBoard[]>;
+    createSketch(request: ArduinoCreateSketchRequest): Promise<ArduinoSketchResult>;
+    compile(request: ArduinoCompileRequest): Promise<ArduinoOperationResult>;
+    upload(request: ArduinoUploadRequest): Promise<ArduinoOperationResult>;
+    monitor(request: ArduinoMonitorRequest): Promise<ArduinoOperationResult>;
   };
   liveServer: {
     open(request: LiveServerRequest): Promise<LiveServerResult>;
