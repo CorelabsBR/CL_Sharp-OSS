@@ -198,7 +198,6 @@ jobs:
       - package-windows
       - package-linux
       - package-android
-    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
