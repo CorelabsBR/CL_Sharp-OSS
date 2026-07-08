@@ -52,6 +52,7 @@ export class EditorTabs {
   onFileActivated: (filePath?: string) => void = () => undefined;
   onFileSaved: (filePath?: string) => void = () => undefined;
   onStatus: (text: string) => void;
+  action: any;
 
   constructor(updateStatus: (text: string) => void) {
     this.onStatus = updateStatus;
@@ -308,14 +309,81 @@ export class EditorTabs {
     this.editor.trigger("keyboard", "editor.action.moveLinesDownAction", null);
   }
 
-  toggleLineComment(): void {
-    this.editor.trigger("keyboard", "editor.action.commentLine", null);
+addLineComment(): void {
+  this.editor.focus();
+  this.commentSelectedLines(true);
+}
+
+removeLineComment(): void {
+  this.editor.focus();
+  this.commentSelectedLines(false);
+}
+
+toggleLineComment(): void {
+  this.editor.focus();
+  this.editor.trigger("keyboard", "editor.action.commentLine", null);
+}
+
+private commentSelectedLines(add: boolean): void {
+  const model = this.editor.getModel();
+  const selection = this.editor.getSelection();
+  if (!model || !selection) return;
+
+  const language = model.getLanguageId();
+  const token = lineCommentToken(language);
+  if (!token) {
+    this.onStatus(`Comentario de linha nao configurado para ${language}`);
+    return;
   }
 
-  toggleBlockComment(): void {
-    this.editor.trigger("keyboard", "editor.action.blockComment", null);
+  const startLine = selection.startLineNumber;
+  const endLine =
+    selection.endColumn === 1 && selection.endLineNumber > startLine
+      ? selection.endLineNumber - 1
+      : selection.endLineNumber;
+
+  const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
+
+  for (let line = startLine; line <= endLine; line += 1) {
+    const text = model.getLineContent(line);
+    const firstNonWhitespace = text.search(/\S/);
+    const column = firstNonWhitespace === -1 ? 1 : firstNonWhitespace + 1;
+
+    if (add) {
+      edits.push({
+        range: new monaco.Range(line, column, line, column),
+        text: `${token} `
+      });
+      continue;
+    }
+
+    const trimmedStart = firstNonWhitespace === -1 ? 0 : firstNonWhitespace;
+    const afterIndent = text.slice(trimmedStart);
+
+    if (afterIndent.startsWith(`${token} `)) {
+      edits.push({
+        range: new monaco.Range(line, trimmedStart + 1, line, trimmedStart + token.length + 2),
+        text: ""
+      });
+    } else if (afterIndent.startsWith(token)) {
+      edits.push({
+        range: new monaco.Range(line, trimmedStart + 1, line, trimmedStart + token.length + 1),
+        text: ""
+      });
+    }
   }
 
+  if (!edits.length) return;
+
+  this.editor.executeEdits("npsharp-comment-lines", edits);
+  this.editor.pushUndoStop();
+}
+
+
+toggleBlockComment(): void {
+  this.editor.focus();
+  this.editor.trigger("keyboard", "editor.action.blockComment", null);
+}
   formatDocument(): void {
     this.editor.trigger("keyboard", "editor.action.formatDocument", null);
   }
@@ -729,4 +797,38 @@ function findBrandRanges(model: monaco.editor.ITextModel, terms: string[]): mona
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function lineCommentToken(language: string): string | undefined {
+  const tokens: Record<string, string> = {
+    javascript: "//",
+    typescript: "//",
+    json: "//",
+    jsonc: "//",
+    java: "//",
+    c: "//",
+    cpp: "//",
+    csharp: "//",
+    go: "//",
+    rust: "//",
+    php: "//",
+    kotlin: "//",
+    swift: "//",
+    scala: "//",
+    css: "//",
+    scss: "//",
+    less: "//",
+    html: undefined as never,
+    sql: undefined as never,
+    xml: "<!--",
+    python: "#",
+    shell: "#",
+    powershell: "#",
+    ruby: "#",
+    perl: "#",
+    yaml: "#",
+    markdown: undefined as never,
+    plaintext: "//"
+  };
+
+  return tokens[language];
 }

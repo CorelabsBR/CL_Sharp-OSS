@@ -58,6 +58,7 @@ export class IdePage {
 
   constructor() {
     void this.init().catch(error => this.renderFatalError(error));
+    this.handleShortcut = this.handleShortcut.bind(this);
   }
 
   private async init(): Promise<void> {
@@ -119,7 +120,8 @@ export class IdePage {
         ["Paste", "Ctrl+V", () => this.editor.paste()],
         ["Find", "Ctrl+F", () => this.editor.find()],
         ["Replace", "Ctrl+H", () => this.editor.replace()],
-        ["Comment Line", "Ctrl+/", () => this.editor.toggleLineComment()],
+        ["Comment Line", "Ctrl+/", () => this.editor.addLineComment()],
+        ["Uncomment Line", "Ctrl+Shift+/", () => this.editor.removeLineComment()],
         ["Comment Block", "Ctrl+Shift+/", () => this.editor.toggleBlockComment()],
         ["Go to Line", "Ctrl+G", () => this.editor.goToLine()],
         ["Go to Start", "Ctrl+Home", () => this.editor.goToStartOfFile()],
@@ -257,7 +259,7 @@ export class IdePage {
       if (this.settings.compileOnSave) void this.runDiagnostics();
     };
     this.palette.setFileOpener(file => void this.editor.openFile(file));
-    window.addEventListener("keydown", event => this.handleShortcut(event));
+    window.addEventListener("keydown", this.handleShortcut, true);
     window.addEventListener("error", event => this.updateStatus(`Error: ${errorMessage(event.error ?? event.message)}`));
     window.addEventListener("unhandledrejection", event => this.updateStatus(`Error: ${errorMessage(event.reason)}`));
     const events = window as typeof window & { npsharpEvents?: { onCommand(callback: (command: string) => void): () => void } };
@@ -275,7 +277,8 @@ export class IdePage {
       { label: "File: Close Editor", shortcut: "Ctrl+W", run: () => this.editor.closeCurrentTab() },
       { label: "File: Close All Editors", shortcut: "Ctrl+Shift+W", run: () => this.editor.closeAllTabs() },
       { label: "Editor: Go to Line", shortcut: "Ctrl+G", run: () => this.editor.goToLine() },
-      { label: "Editor: Toggle Line Comment", shortcut: "Ctrl+/", run: () => this.editor.toggleLineComment() },
+      { label: "Editor: Add Line Comment", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
+      { label: "Editor: Remove Line Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.removeLineComment() },
       { label: "Editor: Toggle Block Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.toggleBlockComment() },
       { label: "Editor: Format Document", shortcut: "Shift+Alt+F", run: () => this.editor.formatDocument() },
       { label: "View: Explorer", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
@@ -295,7 +298,29 @@ export class IdePage {
       { label: "Preferences: Wallpaper", run: () => this.chooseWallpaper() },
       { label: "Preferences: Clear Wallpaper", run: () => this.clearWallpaper() },
       { label: "Preferences: ErrorLens Toggle", run: () => this.toggleErrorLens() },
-      { label: "Notes: Show Notes", run: () => this.openNotes() }
+      { label: "Notes: Show Notes", run: () => this.openNotes() },
+      { label: "Search: Find", shortcut: "Ctrl+F", run: () => this.editor.find() },
+      { label: "Search: Replace", shortcut: "Ctrl+H", run: () => this.editor.replace() },
+      { label: "Search: Find in Workspace", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
+      { label: "Editor: Comment Line", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
+      { label: "Editor: Add Line Comment", shortcut: "Ctrl+K Ctrl+C", run: () => this.editor.addLineComment() },
+      { label: "Editor: Remove Line Comment", shortcut: "Ctrl+K Ctrl+U", run: () => this.editor.removeLineComment() },
+      { label: "Editor: Toggle Block Comment", shortcut: "Shift+Alt+A", run: () => this.editor.toggleBlockComment() },
+
+      { label: "View: Command Palette", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
+      { label: "View: Quick Open", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
+      { label: "View: Explorer", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
+      { label: "View: Source Control", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
+      { label: "View: Problems", shortcut: "Ctrl+Shift+M", run: () => this.showPanel("problems") },
+      { label: "View: Toggle Sidebar", shortcut: "Ctrl+B", run: () => this.toggleSidebar() },
+      { label: "Terminal: Toggle Terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
+      { label: "Terminal: New Terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Clear", shortcut: "Ctrl+Alt+K", run: () => this.terminal.clearCurrentTerminal() },
+      { label: "Run: Run Current File", shortcut: "F5", run: () => this.runCurrentFile() },
+      { label: "Run: Build Project", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
+      { label: "NPSharp: Notes", shortcut: "Ctrl+Alt+N", run: () => this.openNotes() },
+      { label: "NPSharp: Command Center", shortcut: "Ctrl+Alt+C", run: () => this.updateStatus("Command Center") },
+      { label: "NPSharp: Theme Picker", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
     ];
     this.palette.setCommands(commands);
     }
@@ -725,6 +750,8 @@ export class IdePage {
     }
   }
 
+  
+
   private async saveFutureRemote(url: string): Promise<void> {
     const path = joinPath(MOBILE_ROOT, "remote-projects.json");
     let entries: Array<{ url: string; savedAt: string }> = [];
@@ -1035,129 +1062,160 @@ export class IdePage {
   }
 
   private handleShortcut(event: KeyboardEvent): void {
-    const ctrl = event.ctrlKey || event.metaKey;
-    const shift = event.shiftKey;
-    const alt = event.altKey;
-    const key = event.key.toLowerCase();
+  const key = shortcutFromEvent(event);
+  if (!key) return;
 
-    if (this.handleChord(event)) return;
+const active = document.activeElement;
+const tag = active?.tagName?.toLowerCase();
+const isMonaco = Boolean(active?.closest?.(".monaco-editor"));
 
-    if (ctrl && !shift && key === "k") {
-      event.preventDefault();
-      this.pendingChord = "ctrl+k";
-      this.updateStatus("Ctrl+K");
-      window.setTimeout(() => {
-        this.pendingChord = undefined;
-      }, 2500);
-      return;
-    }
+const isTyping =
+  !isMonaco &&
+  (
+    tag === "input" ||
+    tag === "textarea" ||
+    (active instanceof HTMLElement && active.isContentEditable)
+  );
 
-    if (event.key === "F8") {
-      event.preventDefault();
-      this.goToDiagnosticByOffset(shift ? -1 : 1);
-    } else if (event.key === "F5" && shift) {
-      event.preventDefault();
-      this.terminal.appendOutput("[DEBUG] Nenhum processo de debug ativo para parar.");
-    } else if (event.key === "F5") {
-      event.preventDefault();
-      void this.runCurrentFile();
-    } else if (ctrl && shift && event.key.toLowerCase() === "p") {
-      event.preventDefault();
-      this.palette.showCommands();
-    } else if (ctrl && !shift && event.key.toLowerCase() === "p") {
-      event.preventDefault();
-      this.palette.showQuickOpen();
-    } else if (ctrl && event.key === ",") {
-      event.preventDefault();
-      this.showSettings();
-    } else if (ctrl && alt && event.key.toLowerCase() === "n") {
-      event.preventDefault();
-      void this.runCurrentFile();
-    } else if (ctrl && event.key.toLowerCase() === "n") {
-      event.preventDefault();
-      this.editor.newTab();
-    } else if (ctrl && event.key.toLowerCase() === "o") {
-      event.preventDefault();
-      void this.editor.openFileFromDialog();
-    } else if (ctrl && shift && event.key.toLowerCase() === "s") {
-      event.preventDefault();
-      void this.editor.saveCurrentFileAs();
-    } else if (ctrl && event.key.toLowerCase() === "s") {
-      event.preventDefault();
-      void this.editor.saveCurrentFile();
-    } else if (ctrl && shift && event.key.toLowerCase() === "w") {
-      event.preventDefault();
-      this.editor.closeAllTabs();
-    } else if (ctrl && event.key.toLowerCase() === "w") {
-      event.preventDefault();
-      this.editor.closeCurrentTab();
-    } else if (ctrl && shift && event.key.toLowerCase() === "b") {
-      event.preventDefault();
-      void this.buildProject();
-    } else if (ctrl && event.key.toLowerCase() === "b") {
-      event.preventDefault();
-      this.toggleSidebar();
-    } else if (ctrl && event.key.toLowerCase() === "g") {
-      event.preventDefault();
-      this.editor.goToLine();
-    } else if (ctrl && event.key === "Home") {
-      event.preventDefault();
-      this.editor.goToStartOfFile();
-    } else if (ctrl && event.key === "End") {
-      event.preventDefault();
-      this.editor.goToEndOfFile();
-    } else if (ctrl && shift && event.code === "Slash") {
-      event.preventDefault();
-      this.editor.toggleBlockComment();
-    } else if (ctrl && shift && event.key.toLowerCase() === "f") {
-      event.preventDefault();
-      this.showPanel("search");
-    } else if (ctrl && shift && event.key.toLowerCase() === "g") {
-      event.preventDefault();
-      this.showPanel("source");
-    } else if (ctrl && shift && event.key.toLowerCase() === "e") {
-      event.preventDefault();
-      this.showPanel("explorer");
-    } else if (ctrl && shift && event.key.toLowerCase() === "d") {
-      event.preventDefault();
-      this.showPanel("run");
-    } else if (ctrl && event.key.toLowerCase() === "j") {
-      event.preventDefault();
-      this.toggleTerminal();
-    } else if (ctrl && event.key === "`") {
-      event.preventDefault();
-      this.toggleTerminal();
-    }
-  }
+if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includes(key)) {
+  return;
+}
 
-  private handleChord(event: KeyboardEvent): boolean {
-    if (!this.pendingChord) return false;
-    const ctrl = event.ctrlKey || event.metaKey;
-    if (!ctrl) {
-      this.pendingChord = undefined;
-      return false;
-    }
+  const chord = this.pendingChord ? `${this.pendingChord} ${key}` : key;
+
+  const run = (action: () => void): void => {
     event.preventDefault();
-    const key = event.key.toLowerCase();
+    event.stopPropagation();
     this.pendingChord = undefined;
+    action();
+  };
 
-    if (key === "o") {
-      void this.explorer.openFolderFromDialog();
-    } else if (key === "c") {
-      void this.source.commit();
-    } else if (key === "p") {
-      void this.source.runOnFirstRepo(["push"]);
-    } else if (key === "u") {
-      void this.source.runOnFirstRepo(["pull"]);
-    } else if (key === "f") {
-      this.editor.formatDocument();
-    } else if (key === "s") {
-      this.showSettings();
-    } else {
-      this.updateStatus(`No command bound to Ctrl+K Ctrl+${event.key.toUpperCase()}`);
-    }
-    return true;
+  switch (chord) {
+    case "Ctrl+K Ctrl+C":
+      run(() => this.editor.addLineComment());
+      return;
+
+    case "Ctrl+K Ctrl+U":
+      run(() => this.editor.removeLineComment());
+      return;
+
+    case "Ctrl+K Ctrl+O":
+      run(() => this.explorer.openFolderFromDialog());
+      return;
+      case "Ctrl+K Ctrl+S":
+  run(() => this.updateStatus("Keyboard Shortcuts"));
+  return;
   }
+
+  if (key === "Ctrl+K") {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.pendingChord = "Ctrl+K";
+    this.updateStatus("Ctrl+K...");
+
+    window.setTimeout(() => {
+      if (this.pendingChord === "Ctrl+K") {
+        this.pendingChord = undefined;
+        this.updateStatus("Atalho cancelado");
+      }
+    }, 1600);
+
+    return;
+  }
+
+  switch (key) {
+    case "Ctrl+F":
+      run(() => this.editor.find());
+      return;
+
+    case "Ctrl+H":
+      run(() => this.editor.replace());
+      return;
+
+    case "Ctrl+Shift+F":
+      run(() => this.showPanel("search"));
+      return;
+
+    case "Ctrl+/":
+      run(() => this.editor.addLineComment());
+      return;
+
+    case "Ctrl+Shift+/":
+      run(() => this.editor.removeLineComment());
+      return;
+
+    case "Shift+Alt+A":
+      run(() => this.editor.toggleBlockComment());
+      return;
+
+    case "Ctrl+S":
+      run(() => this.editor.saveCurrentFile());
+      return;
+
+    case "Ctrl+Shift+S":
+      run(() => this.editor.saveCurrentFileAs());
+      return;
+
+    case "Ctrl+O":
+      run(() => this.editor.openFileFromDialog());
+      return;
+
+    case "Ctrl+N":
+      run(() => this.editor.newTab());
+      return;
+
+    case "Ctrl+W":
+      run(() => this.editor.closeCurrentTab());
+      return;
+
+    case "Ctrl+Shift+P":
+      run(() => this.palette.showCommands());
+      return;
+
+    case "Ctrl+P":
+      run(() => this.palette.showQuickOpen());
+      return;
+
+    case "Ctrl+Shift+E":
+      run(() => this.showPanel("explorer"));
+      return;
+
+    case "Ctrl+Shift+G":
+      run(() => this.showPanel("source"));
+      return;
+
+    case "Ctrl+Shift+M":
+      run(() => this.showPanel("problems"));
+      return;
+
+    case "Ctrl+B":
+      run(() => this.toggleSidebar());
+      return;
+
+    case "Ctrl+`":
+      run(() => this.toggleTerminal());
+      return;
+
+    case "F5":
+      run(() => this.runCurrentFile());
+      return;
+
+    case "Ctrl+Alt+N":
+      run(() => this.openNotes());
+      return;
+
+    case "Ctrl+Alt+C":
+      run(() => this.updateStatus("Command Center"));
+      return;
+
+    case "Ctrl+Alt+T":
+      run(() => this.showThemePicker());
+      return;
+  }
+
+  this.pendingChord = undefined;
+}
 
   private goToDiagnosticByOffset(offset: number): void {
     if (this.diagnostics.length === 0) {
@@ -1181,7 +1239,8 @@ export class IdePage {
       "workspace:openFolder": () => void this.explorer.openFolderFromDialog(),
       "editor:find": () => this.editor.find(),
       "editor:replace": () => this.editor.replace(),
-      "editor:commentLine": () => this.editor.toggleLineComment(),
+      "editor:commentLine": () => this.editor.addLineComment(),
+      "editor:uncommentLine": () => this.editor.removeLineComment(),
       "editor:commentBlock": () => this.editor.toggleBlockComment(),
       "editor:goToLine": () => this.editor.goToLine(),
       "editor:start": () => this.editor.goToStartOfFile(),
@@ -1384,4 +1443,21 @@ function settingRow(label: string, description: string, control: HTMLElement): H
 function clampNumber(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
+}
+function shortcutFromEvent(event: KeyboardEvent): string {
+  const parts: string[] = [];
+
+  if (event.ctrlKey || event.metaKey) parts.push("Ctrl");
+  if (event.shiftKey) parts.push("Shift");
+  if (event.altKey) parts.push("Alt");
+
+  let key = event.key;
+
+  if (key === " ") key = "Space";
+  if (key.length === 1) key = key.toUpperCase();
+
+  if (["Control", "Shift", "Alt", "Meta"].includes(key)) return "";
+
+  parts.push(key);
+  return parts.join("+");
 }
