@@ -176,16 +176,9 @@ function createApplicationMenu() {
             ]
         },
         {
-            label: "Preferences",
+            label: "more",
             submenu: [
                 { label: "Command Palette", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
-                { label: "Settings", accelerator: "CmdOrCtrl+,", click: () => sendCommand("view:settings") },
-                { label: "Color Theme", click: () => sendCommand("preferences:theme") },
-                { label: "Wallpaper...", click: () => sendCommand("preferences:wallpaper") },
-                { label: "Clear Wallpaper", click: () => sendCommand("preferences:clearWallpaper") },
-                { type: "separator" },
-                { label: "Toggle ErrorLens", click: () => sendCommand("preferences:errorLensToggle") },
-                { type: "separator" },
                 { label: "About NPSharp", click: () => sendCommand("help:about") }
             ]
         }

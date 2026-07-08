@@ -14,7 +14,7 @@ const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
   { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
   { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
   { terms: ["corelabs","Npsharp","NPSharp"], className: "brand-highlight-red" },
-  { terms: ["andrieli","andy"], className: "brand-highlight-special" }
+  // { terms: ["andrieli","andy"], className: "brand-highlight-special" }
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;

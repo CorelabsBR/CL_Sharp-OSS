@@ -113,7 +113,7 @@
     "specialThemes": [
       {
         "id": "sakura",
-        "label": "Andrieli's Sakura (Pink Spectrum)",
+        "label": "Sakura (Pink Spectrum)",
         "uiTheme": "vs-dark",
         "path": "./sakura.json",
         "categories": [
@@ -124,7 +124,7 @@
       },
       {
         "id": "amethyst",
-        "label": "Andrieli's Amethyst (Purple Protocol)",
+        "label": "Amethyst (Purple Protocol)",
         "uiTheme": "vs-dark",
         "path": "./amethyst.json",
         "categories": [
