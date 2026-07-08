@@ -339,6 +339,7 @@ export interface NpsharpApi {
 
 declare global {
   interface Window {
-    npsharp: NpsharpApi;
+    npsharp?: NpsharpApi;
+    npsharpApi?: NpsharpApi;
   }
 }

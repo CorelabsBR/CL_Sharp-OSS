@@ -1,5 +1,5 @@
 import type { GitCommit, GitFileStatus, GitRepositoryStatus } from "../../shared/types";
-import { api } from "../services/api";
+import { api, platform } from "../services/api";
 import { buttonIcon, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
 
@@ -9,6 +9,7 @@ export class SourceControlPanel {
   private readonly commitInput = el("input", { className: "panel-input", attrs: { placeholder: "Commit message" } });
   private readonly allowEmpty = el("input", { attrs: { type: "checkbox" } });
   private readonly list = el("div", { className: "scm-list" });
+  private readonly gitActions: HTMLButtonElement[] = [];
   private workspace?: string;
   private repos: GitRepositoryStatus[] = [];
 
@@ -26,6 +27,10 @@ export class SourceControlPanel {
 
   async refresh(): Promise<void> {
     this.list.replaceChildren();
+    if (!platform.canUseGit) {
+      this.renderLimitedMode();
+      return;
+    }
     if (!this.workspace) {
       this.summary.textContent = "Open a folder to use source control";
       return;
@@ -40,6 +45,10 @@ export class SourceControlPanel {
   }
 
   async runOnFirstRepo(args: string[]): Promise<void> {
+    if (!platform.canUseGit) {
+      this.updateStatus(platform.isMobile ? "Git nativo ainda nao esta disponivel no mobile." : "Git local nao esta disponivel neste modo.");
+      return;
+    }
     const repo = this.repos[0];
     if (!repo) return;
     const result = await api.git.run(repo.repo, args);
@@ -53,24 +62,26 @@ export class SourceControlPanel {
 
   private build(): void {
     const toolbar = el("div", { className: "panel-toolbar" });
-    toolbar.append(
-      buttonIcon("refresh", "Refresh", () => void this.refresh()),
-      buttonIcon("add", "Stage All", () => void this.stageAll()),
-      buttonIcon("remove", "Unstage All", () => void this.unstageAll()),
-      buttonIcon("check", "Commit", () => void this.commitAll()),
-      buttonIcon("repo-pull", "Pull", () => void this.runOnFirstRepo(["pull"])),
-      buttonIcon("repo-push", "Push", () => void this.runOnFirstRepo(["push"])),
-      buttonIcon("repo-fetch", "Fetch", () => void this.runOnFirstRepo(["fetch"]))
-    );
+    const refresh = buttonIcon("refresh", "Refresh", () => void this.refresh());
+    const stageAll = buttonIcon("add", "Stage All", () => void this.stageAll());
+    const unstageAll = buttonIcon("remove", "Unstage All", () => void this.unstageAll());
+    const commit = buttonIcon("check", "Commit", () => void this.commitAll());
+    const pull = buttonIcon("repo-pull", "Pull", () => void this.runOnFirstRepo(["pull"]));
+    const push = buttonIcon("repo-push", "Push", () => void this.runOnFirstRepo(["push"]));
+    const fetch = buttonIcon("repo-fetch", "Fetch", () => void this.runOnFirstRepo(["fetch"]));
+    this.gitActions.push(stageAll, unstageAll, commit, pull, push, fetch);
+    toolbar.append(refresh, stageAll, unstageAll, commit, pull, push, fetch);
     this.commitInput.addEventListener("keydown", event => {
       if (event.key === "Enter") void this.commitAll();
     });
     const allowEmptyRow = el("label", { className: "check-row" });
     allowEmptyRow.append(this.allowEmpty, el("span", { text: "Allow empty commit" }));
     this.element.append(toolbar, this.summary, this.commitInput, allowEmptyRow, this.list);
+    this.applyCapabilityState();
   }
 
   private render(): void {
+    this.applyCapabilityState();
     const changes = this.repos.reduce((sum, repo) => sum + repo.files.length, 0);
     this.summary.textContent = this.repos.length === 0 ? "No Git repositories found" : `${this.repos.length} repo(s), ${changes} change(s)`;
     this.list.replaceChildren();
@@ -89,6 +100,32 @@ export class SourceControlPanel {
       for (const file of repo.files) repoBlock.append(this.fileRow(repo, file));
       this.list.append(repoBlock);
     }
+  }
+
+  private renderLimitedMode(): void {
+    this.repos = [];
+    this.applyCapabilityState();
+    this.summary.textContent = platform.isMobile
+      ? "Source Control mobile em modo limitado."
+      : "Source Control limitado no modo web.";
+    this.list.replaceChildren(
+      el("div", {
+        className: "muted-row",
+        text: platform.isMobile
+          ? "Git completo depende de um backend nativo futuro. Commit, push, pull, stage e discard ficam desabilitados."
+          : "Git completo depende do backend Electron/Node."
+      })
+    );
+    if (this.workspace) {
+      this.list.append(el("div", { className: "muted-row", text: `Workspace local: ${this.workspace}` }));
+    }
+  }
+
+  private applyCapabilityState(): void {
+    const disabled = !platform.canUseGit;
+    for (const button of this.gitActions) button.disabled = disabled;
+    this.commitInput.disabled = disabled;
+    this.allowEmpty.disabled = disabled;
   }
 
   private fileRow(repo: GitRepositoryStatus, file: GitFileStatus): HTMLElement {
@@ -132,20 +169,24 @@ export class SourceControlPanel {
 
 
   private async stageAll(): Promise<void> {
+    if (!platform.canUseGit) return this.renderLimitedMode();
     await this.runOnFirstRepo(["add", "-A"]);
   }
 
   private async unstageAll(): Promise<void> {
+    if (!platform.canUseGit) return this.renderLimitedMode();
     await this.runOnFirstRepo(["restore", "--staged", "."]);
   }
 
   private async stageToggle(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
+    if (!platform.canUseGit) return this.renderLimitedMode();
     const result = file.staged ? await api.git.unstage(repo.repo, file) : await api.git.stage(repo.repo, file);
     this.updateStatus(result.output || (result.success ? "Git operation complete" : "Git operation failed"));
     await this.refresh();
   }
 
   private async discard(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
+    if (!platform.canUseGit) return this.renderLimitedMode();
     if (!confirm(`Discard changes in ${file.path}?`)) return;
     const result = await api.git.discard(repo.repo, file);
     this.updateStatus(result.output || (result.success ? "Changes discarded" : "Discard failed"));
@@ -153,6 +194,7 @@ export class SourceControlPanel {
   }
 
   private async commitAll(): Promise<void> {
+    if (!platform.canUseGit) return this.renderLimitedMode();
     const message = this.commitInput.value.trim();
     const repo = this.repos[0];
     if (!repo || !message) return;

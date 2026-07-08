@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import type { InstalledRuntime, RuntimeRunRequest, RuntimeRunResult } from "../../shared/types";
 import { PortugolInterpreter } from "../../core/portugol/interpreter";
@@ -82,6 +84,19 @@ export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunRes
 
   const runtimes = await discoverRuntimes(true);
   const runtime = runtimes.find(item => item.language.id === language.id);
+
+  if (language.id === "node") {
+    return runNodeLikeFile(language.displayName, request.filePath, runtime);
+  }
+
+  if (language.id === "java") {
+    return runJavaSource(language.displayName, request.filePath, source);
+  }
+
+  if (language.id === "rust") {
+    return runRustFile(language.displayName, request.filePath);
+  }
+
   if (!runtime) {
     return {
       language: language.displayName,
@@ -99,7 +114,125 @@ export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunRes
 
   return {
     language: language.displayName,
-    output: `[DEBUG] Runtime selecionado: ${language.displayName}\n${result.output}\n[DEBUG] Processo finalizado com codigo ${result.code ?? 1}`.trim(),
+    output: formatRunOutput(language.displayName, command, result.output, result.code),
+    code: result.code ?? 1
+  };
+}
+
+async function runNodeLikeFile(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
+  const extension = path.extname(filePath).toLowerCase();
+  let command: string[] | undefined;
+
+  if (extension === ".ts" || extension === ".tsx") {
+    const tsx = await commandExists("tsx");
+    const tsNode = await commandExists("ts-node");
+    if (tsx) command = [tsx, filePath];
+    else if (tsNode) command = [tsNode, filePath];
+  } else if (runtime) {
+    command = [runtime.executablePath, filePath];
+  }
+
+  if (!command) {
+    return {
+      language: displayName,
+      output: extension === ".ts" || extension === ".tsx"
+        ? "[ERRO] Runtime TypeScript nao encontrado. Instale/configure tsx ou ts-node em Run and Debug."
+        : "[ERRO] Runtime Node.js nao encontrado. Configure o caminho em Run and Debug.",
+      code: 127
+    };
+  }
+
+  const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  return {
+    language: displayName,
+    output: formatRunOutput(displayName, command, result.output, result.code),
+    code: result.code ?? 1
+  };
+}
+
+async function runJavaSource(displayName: string, filePath: string, source: string): Promise<RuntimeRunResult> {
+  const java = await commandExists("java");
+  if (!java) {
+    return { language: displayName, output: "[ERRO] Runtime Java nao encontrado. Configure java em Run and Debug.", code: 127 };
+  }
+
+  const javac = await commandExists("javac");
+  if (!javac) {
+    const command = [java, filePath];
+    const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+    return {
+      language: displayName,
+      output: formatRunOutput(displayName, command, result.output, result.code),
+      code: result.code ?? 1
+    };
+  }
+
+  const buildDir = path.join(os.tmpdir(), "npsharp-java", createHash("sha1").update(filePath).digest("hex"));
+  await fs.rm(buildDir, { recursive: true, force: true });
+  await fs.mkdir(buildDir, { recursive: true });
+
+  const compileCommand = [javac, "-d", buildDir, filePath];
+  const compile = await runProcess(compileCommand[0], compileCommand.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  if ((compile.code ?? 1) !== 0) {
+    return {
+      language: displayName,
+      output: formatRunOutput(`${displayName} compile`, compileCommand, compile.output, compile.code),
+      code: compile.code ?? 1
+    };
+  }
+
+  const className = mainClassName(filePath, source);
+  const runCommand = [java, "-cp", buildDir, className];
+  const result = await runProcess(runCommand[0], runCommand.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  const compileOutput = formatRunOutput(`${displayName} compile`, compileCommand, compile.output || "Compilacao concluida.", compile.code);
+  const runOutput = formatRunOutput(displayName, runCommand, result.output, result.code);
+  return {
+    language: displayName,
+    output: `${compileOutput}\n\n${runOutput}`.trim(),
+    code: result.code ?? 1
+  };
+}
+
+async function runRustFile(displayName: string, filePath: string): Promise<RuntimeRunResult> {
+  const cargoRoot = await findUp(path.dirname(filePath), "Cargo.toml");
+  if (cargoRoot) {
+    const cargo = await commandExists("cargo");
+    if (!cargo) {
+      return { language: displayName, output: "[ERRO] Cargo nao encontrado para executar este projeto Rust.", code: 127 };
+    }
+    const command = [cargo, "run"];
+    const result = await runProcess(command[0], command.slice(1), { cwd: cargoRoot, timeoutMs: 120000 });
+    return {
+      language: displayName,
+      output: formatRunOutput(displayName, command, result.output, result.code),
+      code: result.code ?? 1
+    };
+  }
+
+  const rustc = await commandExists("rustc");
+  if (!rustc) {
+    return { language: displayName, output: "[ERRO] rustc nao encontrado para executar este arquivo Rust.", code: 127 };
+  }
+
+  const buildDir = path.join(os.tmpdir(), "npsharp-rust", createHash("sha1").update(filePath).digest("hex"));
+  await fs.rm(buildDir, { recursive: true, force: true });
+  await fs.mkdir(buildDir, { recursive: true });
+  const binary = path.join(buildDir, process.platform === "win32" ? "main.exe" : "main");
+  const compileCommand = [rustc, filePath, "-o", binary];
+  const compile = await runProcess(compileCommand[0], compileCommand.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  if ((compile.code ?? 1) !== 0) {
+    return {
+      language: displayName,
+      output: formatRunOutput(`${displayName} compile`, compileCommand, compile.output, compile.code),
+      code: compile.code ?? 1
+    };
+  }
+
+  const command = [binary];
+  const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  return {
+    language: displayName,
+    output: `${formatRunOutput(`${displayName} compile`, compileCommand, compile.output || "Compilacao concluida.", compile.code)}\n\n${formatRunOutput(displayName, command, result.output, result.code)}`.trim(),
     code: result.code ?? 1
   };
 }
@@ -117,6 +250,39 @@ function buildRunCommand(languageId: string, executable: string, filePath: strin
     default:
       return [executable, filePath];
   }
+}
+
+function mainClassName(filePath: string, source: string): string {
+  const packageMatch = source.match(/^\s*package\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*;/m);
+  const className = path.basename(filePath, ".java");
+  return packageMatch ? `${packageMatch[1]}.${className}` : className;
+}
+
+async function findUp(startDir: string, fileName: string): Promise<string | undefined> {
+  let current = path.resolve(startDir);
+  while (true) {
+    try {
+      await fs.access(path.join(current, fileName));
+      return current;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return undefined;
+      current = parent;
+    }
+  }
+}
+
+function formatRunOutput(displayName: string, command: string[], output: string, code: number | null): string {
+  return [
+    `[DEBUG] Runtime selecionado: ${displayName}`,
+    `[DEBUG] Comando: ${formatCommand(command)}`,
+    output,
+    `[DEBUG] Processo finalizado com codigo ${code ?? 1}`
+  ].filter(Boolean).join("\n").trim();
+}
+
+function formatCommand(command: string[]): string {
+  return command.map(part => /\s/.test(part) ? `"${part.replace(/"/g, "\\\"")}"` : part).join(" ");
 }
 
 async function readVersion(executable: string): Promise<string> {

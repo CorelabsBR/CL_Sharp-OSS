@@ -1,4 +1,4 @@
-import { api } from "../services/api";
+import { api, platform } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { dirname, joinPath } from "../utils/path";
@@ -51,7 +51,9 @@ export class TerminalPanel {
       history: [],
       historyIndex: -1
     };
-    session.output = this.prompt(session);
+    session.output = platform.canUseTerminal
+      ? this.prompt(session)
+      : `${terminalUnavailableMessage()}\n${this.prompt(session)}`;
     this.sessions.push(session);
     this.activeId = session.id;
     this.mode = "terminal";
@@ -118,7 +120,9 @@ export class TerminalPanel {
 
   showGitPanel(): void {
     this.mode = "git";
-    this.auxOutput.textContent = "[Git] Use o painel Source Control para branch, stage e commit.";
+    this.auxOutput.textContent = platform.canUseGit
+      ? "[Git] Use o painel Source Control para branch, stage e commit."
+      : "[Git] Git nativo ainda nao esta disponivel neste ambiente.";
     this.render();
   }
 
@@ -157,6 +161,13 @@ export class TerminalPanel {
     if (cdTarget !== undefined) {
       session.cwd = resolveCwd(session.cwd, cdTarget);
       session.output += this.prompt(session);
+      this.render();
+      return;
+    }
+
+    if (!platform.canUseTerminal) {
+      session.output += `${terminalUnavailableMessage()}\n${this.prompt(session)}`;
+      this.updateStatus("Terminal indisponivel neste ambiente");
       this.render();
       return;
     }
@@ -272,4 +283,10 @@ function resolveCwd(current: string, target: string): string {
   if (target === "..") return dirname(current);
   if (target.startsWith("/") || /^[A-Za-z]:[\\/]/.test(target)) return target;
   return joinPath(current, target);
+}
+
+function terminalUnavailableMessage(): string {
+  return platform.isMobile
+    ? "Terminal real Node nao esta disponivel no mobile. Use este painel como Output/Command Log."
+    : "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
 }

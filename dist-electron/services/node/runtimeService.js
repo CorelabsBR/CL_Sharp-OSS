@@ -8,6 +8,8 @@ exports.discoverRuntimes = discoverRuntimes;
 exports.configureRuntime = configureRuntime;
 exports.runFile = runFile;
 const promises_1 = __importDefault(require("node:fs/promises"));
+const node_crypto_1 = require("node:crypto");
+const node_os_1 = __importDefault(require("node:os"));
 const node_path_1 = __importDefault(require("node:path"));
 const interpreter_1 = require("../../core/portugol/interpreter");
 const languages_1 = require("../../core/runtime/languages");
@@ -81,6 +83,15 @@ async function runFile(request) {
     }
     const runtimes = await discoverRuntimes(true);
     const runtime = runtimes.find(item => item.language.id === language.id);
+    if (language.id === "node") {
+        return runNodeLikeFile(language.displayName, request.filePath, runtime);
+    }
+    if (language.id === "java") {
+        return runJavaSource(language.displayName, request.filePath, source);
+    }
+    if (language.id === "rust") {
+        return runRustFile(language.displayName, request.filePath);
+    }
     if (!runtime) {
         return {
             language: language.displayName,
@@ -96,7 +107,115 @@ async function runFile(request) {
     });
     return {
         language: language.displayName,
-        output: `[DEBUG] Runtime selecionado: ${language.displayName}\n${result.output}\n[DEBUG] Processo finalizado com codigo ${result.code ?? 1}`.trim(),
+        output: formatRunOutput(language.displayName, command, result.output, result.code),
+        code: result.code ?? 1
+    };
+}
+async function runNodeLikeFile(displayName, filePath, runtime) {
+    const extension = node_path_1.default.extname(filePath).toLowerCase();
+    let command;
+    if (extension === ".ts" || extension === ".tsx") {
+        const tsx = await (0, processService_1.commandExists)("tsx");
+        const tsNode = await (0, processService_1.commandExists)("ts-node");
+        if (tsx)
+            command = [tsx, filePath];
+        else if (tsNode)
+            command = [tsNode, filePath];
+    }
+    else if (runtime) {
+        command = [runtime.executablePath, filePath];
+    }
+    if (!command) {
+        return {
+            language: displayName,
+            output: extension === ".ts" || extension === ".tsx"
+                ? "[ERRO] Runtime TypeScript nao encontrado. Instale/configure tsx ou ts-node em Run and Debug."
+                : "[ERRO] Runtime Node.js nao encontrado. Configure o caminho em Run and Debug.",
+            code: 127
+        };
+    }
+    const result = await (0, processService_1.runProcess)(command[0], command.slice(1), { cwd: node_path_1.default.dirname(filePath), timeoutMs: 120000 });
+    return {
+        language: displayName,
+        output: formatRunOutput(displayName, command, result.output, result.code),
+        code: result.code ?? 1
+    };
+}
+async function runJavaSource(displayName, filePath, source) {
+    const java = await (0, processService_1.commandExists)("java");
+    if (!java) {
+        return { language: displayName, output: "[ERRO] Runtime Java nao encontrado. Configure java em Run and Debug.", code: 127 };
+    }
+    const javac = await (0, processService_1.commandExists)("javac");
+    if (!javac) {
+        const command = [java, filePath];
+        const result = await (0, processService_1.runProcess)(command[0], command.slice(1), { cwd: node_path_1.default.dirname(filePath), timeoutMs: 120000 });
+        return {
+            language: displayName,
+            output: formatRunOutput(displayName, command, result.output, result.code),
+            code: result.code ?? 1
+        };
+    }
+    const buildDir = node_path_1.default.join(node_os_1.default.tmpdir(), "npsharp-java", (0, node_crypto_1.createHash)("sha1").update(filePath).digest("hex"));
+    await promises_1.default.rm(buildDir, { recursive: true, force: true });
+    await promises_1.default.mkdir(buildDir, { recursive: true });
+    const compileCommand = [javac, "-d", buildDir, filePath];
+    const compile = await (0, processService_1.runProcess)(compileCommand[0], compileCommand.slice(1), { cwd: node_path_1.default.dirname(filePath), timeoutMs: 120000 });
+    if ((compile.code ?? 1) !== 0) {
+        return {
+            language: displayName,
+            output: formatRunOutput(`${displayName} compile`, compileCommand, compile.output, compile.code),
+            code: compile.code ?? 1
+        };
+    }
+    const className = mainClassName(filePath, source);
+    const runCommand = [java, "-cp", buildDir, className];
+    const result = await (0, processService_1.runProcess)(runCommand[0], runCommand.slice(1), { cwd: node_path_1.default.dirname(filePath), timeoutMs: 120000 });
+    const compileOutput = formatRunOutput(`${displayName} compile`, compileCommand, compile.output || "Compilacao concluida.", compile.code);
+    const runOutput = formatRunOutput(displayName, runCommand, result.output, result.code);
+    return {
+        language: displayName,
+        output: `${compileOutput}\n\n${runOutput}`.trim(),
+        code: result.code ?? 1
+    };
+}
+async function runRustFile(displayName, filePath) {
+    const cargoRoot = await findUp(node_path_1.default.dirname(filePath), "Cargo.toml");
+    if (cargoRoot) {
+        const cargo = await (0, processService_1.commandExists)("cargo");
+        if (!cargo) {
+            return { language: displayName, output: "[ERRO] Cargo nao encontrado para executar este projeto Rust.", code: 127 };
+        }
+        const command = [cargo, "run"];
+        const result = await (0, processService_1.runProcess)(command[0], command.slice(1), { cwd: cargoRoot, timeoutMs: 120000 });
+        return {
+            language: displayName,
+            output: formatRunOutput(displayName, command, result.output, result.code),
+            code: result.code ?? 1
+        };
+    }
+    const rustc = await (0, processService_1.commandExists)("rustc");
+    if (!rustc) {
+        return { language: displayName, output: "[ERRO] rustc nao encontrado para executar este arquivo Rust.", code: 127 };
+    }
+    const buildDir = node_path_1.default.join(node_os_1.default.tmpdir(), "npsharp-rust", (0, node_crypto_1.createHash)("sha1").update(filePath).digest("hex"));
+    await promises_1.default.rm(buildDir, { recursive: true, force: true });
+    await promises_1.default.mkdir(buildDir, { recursive: true });
+    const binary = node_path_1.default.join(buildDir, process.platform === "win32" ? "main.exe" : "main");
+    const compileCommand = [rustc, filePath, "-o", binary];
+    const compile = await (0, processService_1.runProcess)(compileCommand[0], compileCommand.slice(1), { cwd: node_path_1.default.dirname(filePath), timeoutMs: 120000 });
+    if ((compile.code ?? 1) !== 0) {
+        return {
+            language: displayName,
+            output: formatRunOutput(`${displayName} compile`, compileCommand, compile.output, compile.code),
+            code: compile.code ?? 1
+        };
+    }
+    const command = [binary];
+    const result = await (0, processService_1.runProcess)(command[0], command.slice(1), { cwd: node_path_1.default.dirname(filePath), timeoutMs: 120000 });
+    return {
+        language: displayName,
+        output: `${formatRunOutput(`${displayName} compile`, compileCommand, compile.output || "Compilacao concluida.", compile.code)}\n\n${formatRunOutput(displayName, command, result.output, result.code)}`.trim(),
         code: result.code ?? 1
     };
 }
@@ -113,6 +232,37 @@ function buildRunCommand(languageId, executable, filePath) {
         default:
             return [executable, filePath];
     }
+}
+function mainClassName(filePath, source) {
+    const packageMatch = source.match(/^\s*package\s+([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*;/m);
+    const className = node_path_1.default.basename(filePath, ".java");
+    return packageMatch ? `${packageMatch[1]}.${className}` : className;
+}
+async function findUp(startDir, fileName) {
+    let current = node_path_1.default.resolve(startDir);
+    while (true) {
+        try {
+            await promises_1.default.access(node_path_1.default.join(current, fileName));
+            return current;
+        }
+        catch {
+            const parent = node_path_1.default.dirname(current);
+            if (parent === current)
+                return undefined;
+            current = parent;
+        }
+    }
+}
+function formatRunOutput(displayName, command, output, code) {
+    return [
+        `[DEBUG] Runtime selecionado: ${displayName}`,
+        `[DEBUG] Comando: ${formatCommand(command)}`,
+        output,
+        `[DEBUG] Processo finalizado com codigo ${code ?? 1}`
+    ].filter(Boolean).join("\n").trim();
+}
+function formatCommand(command) {
+    return command.map(part => /\s/.test(part) ? `"${part.replace(/"/g, "\\\"")}"` : part).join(" ");
 }
 async function readVersion(executable) {
     const result = await (0, processService_1.runProcess)(executable, ["--version"], { timeoutMs: 5000 });

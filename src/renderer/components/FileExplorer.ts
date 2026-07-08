@@ -1,5 +1,5 @@
 import type { WorkspaceEntry } from "../../shared/types";
-import { api } from "../services/api";
+import { api, platform } from "../services/api";
 import { buttonIcon, contextMenu, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { basename, dirname, isSubPath, joinPath, relativePath } from "../utils/path";
@@ -106,9 +106,12 @@ export class FileExplorer {
       buttonIcon("collapse-all", "Recolher tudo", () => this.collapseAll())
     );
 
-    const title = el("div", { className: "empty-title", text: "Nenhuma pasta aberta" });
-    const subtitle = el("div", { className: "empty-subtitle", text: "Abra uma pasta para exibir os arquivos no Explorer." });
-    const open = el("button", { className: "primary", text: "Open Folder" });
+    const title = el("div", { className: "empty-title", text: platform.isMobile ? "Nenhum workspace mobile aberto" : "Nenhuma pasta aberta" });
+    const subtitle = el("div", {
+      className: "empty-subtitle",
+      text: platform.isMobile ? "Abra um workspace mobile no sandbox do app." : "Abra uma pasta para exibir os arquivos no Explorer."
+    });
+    const open = el("button", { className: "primary", text: platform.isMobile ? "Open Mobile Workspace" : "Open Folder" });
     open.addEventListener("click", () => void this.openFolderFromDialog());
     this.empty.append(title, subtitle, open);
     this.element.append(this.toolbar, this.tree, this.empty);
@@ -237,6 +240,9 @@ export class FileExplorer {
   private async openLiveServer(filePath: string): Promise<void> {
     if (!this.root) return;
     const result = await api.liveServer.open({ workspace: this.root, filePath });
+    if (result.url) {
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    }
     this.updateStatus(result.output);
   }
 }

@@ -19,17 +19,22 @@
     "build:electron": "tsc -p tsconfig.electron.json",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "build": "node scripts/build.mjs",
+    "build:mobile": "npm run typecheck && npm run build:renderer",
     "package": "node scripts/build.mjs",
     "package:linux": "node scripts/build.mjs linux",
     "package:win": "node scripts/build.mjs win",
-    "mobile:init": "npm install @capacitor/core @capacitor/cli @capacitor/android && npx cap init NPSharp br.com.corelabs.npsharp --web-dir=dist && npx cap add android",
-    "mobile:sync": "npm run build && npx cap sync android",
-    "mobile:android": "npm run mobile:sync && npx cap open android"
+    "mobile:init": "npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem && npx cap init NPSharp br.com.corelabs.npsharp --web-dir=dist && npx cap add android",
+    "cap:sync": "npm run build:mobile && npx cap sync android",
+    "android": "npm run cap:sync && npx cap run android",
+    "android:open": "npm run cap:sync && npx cap open android",
+    "mobile:sync": "npm run cap:sync",
+    "mobile:android": "npm run android:open"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.2",
     "monaco-editor": "^0.52.2",
     "ssh2": "^1.16.0"
   },
@@ -46,7 +51,7 @@
     "productName": "NPSharp",
     "directories": {
       "output": "release",
-      "buildResources": "build"
+      "buildResources": "resources"
     },
     "files": [
       "dist/**/*",
@@ -60,11 +65,42 @@
         "AppImage",
         "deb"
       ],
+      "icon": "resources/icon.png",
       "category": "Development",
-      "maintainer": "CoreLabs"
+      "maintainer": "CoreLabs",
+      "synopsis": "NPSharp IDE",
+      "description": "NPSharp is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor.",
+      "desktop": {
+        "Name": "NPSharp",
+        "Comment": "Code, run and manage projects with NPSharp",
+        "Categories": "Development;IDE;",
+        "StartupWMClass": "NPSharp"
+      }
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "mac": {
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "deb": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0"
+      ]
     }
   }
 }

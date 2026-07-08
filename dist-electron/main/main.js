@@ -52,7 +52,6 @@ electron_1.app.on("before-quit", () => {
     void (0, liveServerService_1.stopAllLiveServers)();
 });
 async function createMainWindow() {
-    const iconPath = node_path_1.default.join(electron_1.app.getAppPath(), "build", "icon.png");
     mainWindow = new electron_1.BrowserWindow({
         width: 1280,
         height: 760,
@@ -60,7 +59,7 @@ async function createMainWindow() {
         minHeight: 520,
         frame: false,
         title: "NPSharp",
-        icon: iconPath,
+        icon: resolveWindowIcon(),
         show: false,
         webPreferences: {
             preload: node_path_1.default.join(__dirname, "..", "preload", "preload.js"),
@@ -79,6 +78,14 @@ async function createMainWindow() {
     else {
         await mainWindow.loadFile(node_path_1.default.join(electron_1.app.getAppPath(), "dist", "index.html"));
     }
+}
+function resolveWindowIcon() {
+    const iconFile = process.platform === "win32"
+        ? "icon.ico"
+        : process.platform === "darwin"
+            ? "icon.icns"
+            : "icon.png";
+    return node_path_1.default.join(electron_1.app.getAppPath(), "resources", iconFile);
 }
 async function loadDevServer(window, url) {
     let lastError;

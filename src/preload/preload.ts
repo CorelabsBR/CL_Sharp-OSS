@@ -109,6 +109,7 @@ const api: NpsharpApi = {
 };
 
 contextBridge.exposeInMainWorld("npsharp", api);
+contextBridge.exposeInMainWorld("npsharpApi", api);
 contextBridge.exposeInMainWorld("npsharpEvents", {
   onCommand(callback: (command: string) => void): () => void {
     const listener = (_event: Electron.IpcRendererEvent, command: string) => callback(command);

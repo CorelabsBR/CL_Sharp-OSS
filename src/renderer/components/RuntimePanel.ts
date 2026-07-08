@@ -1,5 +1,5 @@
 import type { InstalledRuntime } from "../../shared/types";
-import { api } from "../services/api";
+import { api, platform } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
 
@@ -21,6 +21,10 @@ export class RuntimePanel {
   }
 
   async refresh(rescan = false): Promise<void> {
+    if (!platform.canUseNodeBackend) {
+      this.renderLimitedMode();
+      return;
+    }
     try {
       const runtimes = rescan ? await api.runtime.discover() : await api.runtime.list();
       this.render(runtimes);
@@ -44,6 +48,16 @@ export class RuntimePanel {
       row.append(configure);
       this.list.append(row);
     }
+  }
+
+  private renderLimitedMode(): void {
+    this.summary.textContent = platform.isMobile
+      ? "Runtimes locais indisponiveis no mobile"
+      : "Runtimes locais indisponiveis no modo web";
+    this.list.replaceChildren(el("div", {
+      className: "muted-row",
+      text: "Arquivos HTML podem usar preview interno. Outras linguagens dependem de backend nativo futuro."
+    }));
   }
 
   private async configure(runtime: InstalledRuntime): Promise<void> {

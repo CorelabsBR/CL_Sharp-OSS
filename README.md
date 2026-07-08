@@ -49,6 +49,14 @@ Quando nenhum workspace está aberto, o NPSharp Electron exibe o Command Center 
 
 O hub permite abrir pasta, criar arquivo, criar projeto, clonar repositório Git, abrir terminal, abrir Notes, acessar temas/configurações, revisar atalhos e reabrir workspaces recentes. As ações usam as APIs reais do backend Electron/Node e os últimos workspaces ficam persistidos em `~/.npsharp/recent-files.json`.
 
+## Desktop e Mobile
+
+O renderer do NPSharp roda em Electron Desktop, Capacitor Mobile e fallback web/dev por meio de uma camada unica em `src/renderer/services/platform.ts` e `src/renderer/services/api.ts`.
+
+No desktop, Git, terminal, runtimes locais, filesystem nativo e Live Server continuam usando o preload Electron/Node. No mobile, o app usa `@capacitor/filesystem`, cria um Mobile Workspace em `Documents/NPSharp/`, mantem Notes/settings/temas e mostra fallbacks claros para Git, terminal, runtimes locais e Live Server Node.
+
+Veja os comandos e limitacoes em [`docs/MOBILE.md`](docs/MOBILE.md).
+
 ## Licença
 O projeto utiliza uma **licença personalizada**, permitindo:
 

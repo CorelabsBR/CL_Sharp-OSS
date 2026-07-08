@@ -379,6 +379,10 @@ export class EditorTabs {
     this.editor.focus();
   }
 
+  layout(): void {
+    this.editor.layout();
+  }
+
   private async saveTab(tab: EditorTab, forceSaveAs: boolean): Promise<void> {
     const content = tab.model.getValue();
     if (tab.saveHandler && !forceSaveAs) {

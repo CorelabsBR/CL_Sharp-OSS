@@ -83,6 +83,15 @@ node_modules/
 *.snap
 *.asar
 
+# Mobile build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+ios/App/build/
+*.apk
+*.aab
+*.ipa
+
 # Build/release artifacts
 release/
 dist/

@@ -1,13 +1,28 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import type { TerminalRunResult } from "../../shared/types";
+
+const optionalRequire = createRequire(__filename);
 
 export interface ProcessResult {
   output: string;
   code: number | null;
 }
+
+interface PtyProcess {
+  onData(callback: (data: string) => void): void;
+  onExit(callback: (event: { exitCode: number; signal?: number }) => void): void;
+  kill(signal?: string): void;
+}
+
+interface NodePtyModule {
+  spawn(file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; name: string; cols: number; rows: number }): PtyProcess;
+}
+
+let cachedPty: NodePtyModule | null | undefined;
 
 export function normalizeCwd(cwd?: string): string {
   if (!cwd || cwd.trim() === "") {
@@ -16,15 +31,68 @@ export function normalizeCwd(cwd?: string): string {
   return path.resolve(cwd);
 }
 
-export function runShell(command: string, cwd?: string, configuredShell?: string): Promise<TerminalRunResult> {
+export async function runShell(command: string, cwd?: string, configuredShell?: string): Promise<TerminalRunResult> {
   const shell = configuredShell?.trim() || defaultShell();
   const normalizedCwd = normalizeCwd(cwd);
   const args = process.platform === "win32" ? windowsShellArgs(shell, command) : ["-lc", command];
+
+  const ptyResult = await runShellWithPty(shell, args, normalizedCwd);
+  if (ptyResult) return ptyResult;
+
   return runProcess(shell, args, { cwd: normalizedCwd, timeoutMs: 120000 }).then(result => ({
     cwd: normalizedCwd,
     output: result.output,
     code: result.code
   }));
+}
+
+function runShellWithPty(shell: string, args: string[], cwd: string): Promise<TerminalRunResult | undefined> {
+  const pty = loadNodePty();
+  if (!pty) return Promise.resolve(undefined);
+
+  return new Promise(resolve => {
+    let output = "";
+    let settled = false;
+    const finish = (result: TerminalRunResult | undefined) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    try {
+      const terminal = pty.spawn(shell, args, {
+        cwd,
+        env: { ...process.env, TERM: process.env.TERM || "xterm-256color" },
+        name: "xterm-256color",
+        cols: 120,
+        rows: 30
+      });
+      const timeout = setTimeout(() => {
+        output += "\n[ERRO] Processo excedeu o tempo limite.";
+        terminal.kill("SIGKILL");
+      }, 120000);
+
+      terminal.onData(data => {
+        output += data;
+      });
+      terminal.onExit(event => {
+        clearTimeout(timeout);
+        finish({ cwd, output: output.trimEnd(), code: event.exitCode });
+      });
+    } catch {
+      finish(undefined);
+    }
+  });
+}
+
+function loadNodePty(): NodePtyModule | undefined {
+  if (cachedPty !== undefined) return cachedPty ?? undefined;
+  try {
+    cachedPty = optionalRequire("node-pty") as NodePtyModule;
+  } catch {
+    cachedPty = null;
+  }
+  return cachedPty ?? undefined;
 }
 
 export function runProcess(

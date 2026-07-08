@@ -100,7 +100,6 @@ app.on("before-quit", () => {
 });
 
 async function createMainWindow(): Promise<void> {
-  const iconPath = path.join(app.getAppPath(), "build", "icon.png");
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 760,
@@ -108,7 +107,7 @@ async function createMainWindow(): Promise<void> {
     minHeight: 520,
     frame: false,
     title: "NPSharp",
-    icon: iconPath,
+    icon: resolveWindowIcon(),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "preload.js"),
@@ -128,6 +127,15 @@ async function createMainWindow(): Promise<void> {
   } else {
     await mainWindow.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
   }
+}
+
+function resolveWindowIcon(): string {
+  const iconFile = process.platform === "win32"
+    ? "icon.ico"
+    : process.platform === "darwin"
+      ? "icon.icns"
+      : "icon.png";
+  return path.join(app.getAppPath(), "resources", iconFile);
 }
 
 async function loadDevServer(window: BrowserWindow, url: string): Promise<void> {

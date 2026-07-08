@@ -9,23 +9,78 @@ exports.runProcess = runProcess;
 exports.commandExists = commandExists;
 const node_child_process_1 = require("node:child_process");
 const promises_1 = __importDefault(require("node:fs/promises"));
+const node_module_1 = require("node:module");
 const node_os_1 = __importDefault(require("node:os"));
 const node_path_1 = __importDefault(require("node:path"));
+const optionalRequire = (0, node_module_1.createRequire)(__filename);
+let cachedPty;
 function normalizeCwd(cwd) {
     if (!cwd || cwd.trim() === "") {
         return node_os_1.default.homedir();
     }
     return node_path_1.default.resolve(cwd);
 }
-function runShell(command, cwd, configuredShell) {
+async function runShell(command, cwd, configuredShell) {
     const shell = configuredShell?.trim() || defaultShell();
     const normalizedCwd = normalizeCwd(cwd);
     const args = process.platform === "win32" ? windowsShellArgs(shell, command) : ["-lc", command];
+    const ptyResult = await runShellWithPty(shell, args, normalizedCwd);
+    if (ptyResult)
+        return ptyResult;
     return runProcess(shell, args, { cwd: normalizedCwd, timeoutMs: 120000 }).then(result => ({
         cwd: normalizedCwd,
         output: result.output,
         code: result.code
     }));
+}
+function runShellWithPty(shell, args, cwd) {
+    const pty = loadNodePty();
+    if (!pty)
+        return Promise.resolve(undefined);
+    return new Promise(resolve => {
+        let output = "";
+        let settled = false;
+        const finish = (result) => {
+            if (settled)
+                return;
+            settled = true;
+            resolve(result);
+        };
+        try {
+            const terminal = pty.spawn(shell, args, {
+                cwd,
+                env: { ...process.env, TERM: process.env.TERM || "xterm-256color" },
+                name: "xterm-256color",
+                cols: 120,
+                rows: 30
+            });
+            const timeout = setTimeout(() => {
+                output += "\n[ERRO] Processo excedeu o tempo limite.";
+                terminal.kill("SIGKILL");
+            }, 120000);
+            terminal.onData(data => {
+                output += data;
+            });
+            terminal.onExit(event => {
+                clearTimeout(timeout);
+                finish({ cwd, output: output.trimEnd(), code: event.exitCode });
+            });
+        }
+        catch {
+            finish(undefined);
+        }
+    });
+}
+function loadNodePty() {
+    if (cachedPty !== undefined)
+        return cachedPty ?? undefined;
+    try {
+        cachedPty = optionalRequire("node-pty");
+    }
+    catch {
+        cachedPty = null;
+    }
+    return cachedPty ?? undefined;
 }
 function runProcess(executable, args, options = {}) {
     return new Promise(resolve => {

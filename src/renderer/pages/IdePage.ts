@@ -8,11 +8,11 @@ import { RuntimePanel } from "../components/RuntimePanel";
 import { SearchPanel } from "../components/SearchPanel";
 import { SourceControlPanel } from "../components/SourceControlPanel";
 import { TerminalPanel } from "../components/TerminalPanel";
-import { api } from "../services/api";
+import { api, DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform } from "../services/api";
 import { applyTheme, listThemes } from "../services/themes";
 import { buttonIcon, el, icon } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
-import { basename, dirname, fileUri, joinPath } from "../utils/path";
+import { basename, dirname, extname, fileUri, joinPath } from "../utils/path";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench";
@@ -27,6 +27,7 @@ export class IdePage {
   private readonly sideTitle = el("div", { className: "side-title", text: "EXPLORER" });
   private readonly sideContent = el("div", { className: "side-content" });
   private readonly workbench = el("section", { className: "workbench" });
+  private readonly editorStack = el("section", { className: "editor-stack" });
   private readonly statusLeft = el("span", { text: "Ready" });
   private readonly statusRight = el("span", { text: "" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
@@ -58,6 +59,7 @@ export class IdePage {
   }
 
   private async init(): Promise<void> {
+    this.element.dataset.platform = platform.kind;
     this.settings = await api.settings.load();
     const appInfo = await api.appInfo();
     this.appPlatform = appInfo.platform;
@@ -80,11 +82,10 @@ export class IdePage {
     this.buildActivityBar();
     this.buildSideBar();
     const center = el("section", { className: "center-area" });
-    const editorStack = el("section", { className: "editor-stack" });
     this.editor.element.append(this.commandCenter.element);
-    editorStack.append(this.editor.element, this.terminal.element);
-    this.terminal.element.hidden = !this.session.terminalVisible;
-    center.append(this.activityBar, this.sideBar, editorStack);
+    this.editorStack.append(this.editor.element, this.terminal.element);
+    this.setTerminalVisible(this.session.terminalVisible, false);
+    center.append(this.activityBar, this.sideBar, this.editorStack);
     this.workbench.append(center);
     this.element.append(this.wallpaper, this.titleBar, this.workbench, this.statusBar());
     this.showPanel((this.session.sidePanel as PanelId) || "explorer");
@@ -94,11 +95,12 @@ export class IdePage {
     const logo = el("div", { className: "title-logo" });
     logo.append(el("img", { attrs: { src: "/logos/app.png", alt: "NPSharp" } }), el("span", { text: "NPSharp" }));
     const menus = el("div", { className: "title-menus" });
+    const openWorkspaceLabel = platform.isMobile ? "Open Mobile Workspace" : "Open Folder";
     menus.append(
       menuButton("File", [
         ["New File", "Ctrl+N", () => this.editor.newTab()],
         ["Open File", "Ctrl+O", () => void this.editor.openFileFromDialog()],
-        ["Open Folder", "Ctrl+K Ctrl+O", () => void this.explorer.openFolderFromDialog()],
+        [openWorkspaceLabel, "Ctrl+K Ctrl+O", () => void this.explorer.openFolderFromDialog()],
         ["Close Folder", "", () => this.explorer.clearFolder()],
         ["Save", "Ctrl+S", () => void this.editor.saveCurrentFile()],
         ["Save As", "Ctrl+Shift+S", () => void this.editor.saveCurrentFileAs()],
@@ -171,11 +173,13 @@ export class IdePage {
     const nav = el("div", { className: "title-nav" });
     nav.append(buttonIcon("arrow-left", "Back", () => this.updateStatus("Back")), buttonIcon("arrow-right", "Forward", () => this.updateStatus("Forward")));
     const windowButtons = el("div", { className: "window-buttons" });
-    windowButtons.append(
-      titleIcon("chrome-minimize", "Minimize", () => void api.window.minimize()),
-      titleIcon("chrome-maximize", "Maximize", () => void api.window.maximize()),
-      titleIcon("chrome-close", "Close", () => void api.window.close(), "close")
-    );
+    if (platform.isDesktop) {
+      windowButtons.append(
+        titleIcon("chrome-minimize", "Minimize", () => void api.window.minimize()),
+        titleIcon("chrome-maximize", "Maximize", () => void api.window.maximize()),
+        titleIcon("chrome-close", "Close", () => void api.window.close(), "close")
+      );
+    }
     this.titleBar.append(logo, menus, nav, this.commandBar, windowButtons);
   }
 
@@ -296,7 +300,7 @@ export class IdePage {
       }
       await this.editor.restoreFiles(this.session.openFiles, this.session.activeFile);
       this.showPanel((this.session.sidePanel as PanelId) || "explorer");
-      this.terminal.element.hidden = !this.session.terminalVisible;
+      this.setTerminalVisible(this.session.terminalVisible, false);
       this.updateCommandCenter();
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Restore session failed");
@@ -635,6 +639,10 @@ export class IdePage {
   }
 
   private async chooseWallpaper(): Promise<void> {
+    if (!platform.isDesktop) {
+      this.updateStatus("Seletor nativo de wallpaper disponivel apenas no desktop.");
+      return;
+    }
     const result = await api.dialog.chooseWallpaper();
     if (!result.canceled && result.paths[0]) {
       await this.updateSettings({ ...this.settings, wallpaperPath: result.paths[0] });
@@ -642,6 +650,21 @@ export class IdePage {
   }
 
   private async createProject(): Promise<void> {
+    if (!platform.isDesktop) {
+      const name = prompt("Nome do workspace mobile", "Main");
+      if (!name?.trim()) return;
+      const target = joinPath(MOBILE_WORKSPACES_ROOT, sanitizeWorkspaceName(name));
+      try {
+        await api.fs.createFolder(target);
+        await this.explorer.openFolder(target);
+        this.showPanel("explorer");
+        this.updateStatus(`Workspace mobile criado: ${target}`);
+      } catch (error) {
+        reportError(error, text => this.updateStatus(text), "Create mobile workspace failed");
+      }
+      return;
+    }
+
     const projectPath = prompt("Caminho completo do novo projeto");
     const target = projectPath?.trim();
     if (!target) return;
@@ -662,6 +685,19 @@ export class IdePage {
   private async cloneRepository(): Promise<void> {
     const url = prompt("URL do repositorio Git");
     if (!url?.trim()) return;
+    if (!platform.canUseGit) {
+      this.showTerminal(false);
+      this.terminal.appendOutput(`[git] ${url.trim()}`);
+      this.terminal.appendOutput("Git nativo ainda nao esta disponivel no mobile.");
+      try {
+        await this.saveFutureRemote(url.trim());
+        this.terminal.appendOutput("URL salva como projeto remoto futuro.");
+        this.updateStatus("Git mobile limitado: URL salva para backend futuro");
+      } catch (error) {
+        reportError(error, text => this.updateStatus(text), "Save remote URL failed");
+      }
+      return;
+    }
     const target = await api.dialog.openFolder();
     if (target.canceled || !target.paths[0]) return;
     const parent = target.paths[0];
@@ -681,7 +717,32 @@ export class IdePage {
     }
   }
 
+  private async saveFutureRemote(url: string): Promise<void> {
+    const path = joinPath(MOBILE_ROOT, "remote-projects.json");
+    let entries: Array<{ url: string; savedAt: string }> = [];
+    if (await api.fs.exists(path)) {
+      try {
+        entries = JSON.parse((await api.fs.readFile(path)).content) as Array<{ url: string; savedAt: string }>;
+      } catch {
+        entries = [];
+      }
+    }
+    const next = [{ url, savedAt: new Date().toISOString() }, ...entries.filter(item => item.url !== url)].slice(0, 50);
+    await api.fs.writeFile(path, `${JSON.stringify(next, null, 2)}\n`);
+  }
+
   private async openNotes(): Promise<void> {
+    if (!platform.isDesktop) {
+      try {
+        const notes = await api.notes.read();
+        await this.editor.openFile(notes.path);
+        this.updateStatus(`Notes aberto: ${notes.path}`);
+      } catch (error) {
+        reportError(error, text => this.updateStatus(text), "Open notes failed");
+      }
+      return;
+    }
+
     const base = this.explorer.workspace ? joinPath(this.explorer.workspace, ".npsharp") : this.appInfoPath;
     const notesPath = joinPath(base, "notes.nps.md");
     try {
@@ -701,19 +762,53 @@ export class IdePage {
       this.wallpaper.style.backgroundImage = "";
       return;
     }
-    this.wallpaper.style.backgroundImage = `url("${fileUri(this.settings.wallpaperPath)}")`;
+    if (!platform.isDesktop && !/^(blob:|data:|https?:)/i.test(this.settings.wallpaperPath)) {
+      this.wallpaper.style.backgroundImage = "";
+      return;
+    }
+    const wallpaper = platform.isDesktop ? fileUri(this.settings.wallpaperPath) : this.settings.wallpaperPath;
+    this.wallpaper.style.backgroundImage = `url("${wallpaper}")`;
     this.wallpaper.style.opacity = String(this.settings.wallpaperOpacity);
   }
 
   private async runCurrentFile(): Promise<void> {
     try {
-      if (!this.editor.getCurrentFile()) await this.editor.saveCurrentFileAs();
+      const activeFile = this.editor.getCurrentFile();
+      if (!activeFile && this.explorer.workspace && await this.runWorkspace()) return;
+      if (!activeFile) await this.editor.saveCurrentFileAs();
       else await this.editor.saveCurrentFile();
       const filePath = this.editor.getCurrentFile();
       if (!filePath) return;
+
+      if (this.explorer.workspace && isProjectRunFile(filePath)) {
+        if (await this.runWorkspace()) return;
+      }
+
       this.showTerminal(true);
       this.terminal.showDebugConsole();
       this.terminal.appendDebugOutput(`[DEBUG] Arquivo detectado: ${basename(filePath)}`);
+
+      if (/\.html?$/i.test(filePath)) {
+        if (platform.canUseLiveServer && this.explorer.workspace) {
+          const result = await api.liveServer.open({ workspace: this.explorer.workspace, filePath });
+          this.terminal.appendDebugOutput(result.output);
+          if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");
+          this.updateStatus(result.success ? "Live Server aberto" : "Live Server falhou");
+        } else {
+          this.showHtmlPreview(basename(filePath), this.editor.getCurrentText());
+          this.terminal.appendDebugOutput("Preview HTML aberto sem iniciar servidor Node.");
+          this.updateStatus("Preview HTML aberto");
+        }
+        return;
+      }
+
+      if (!platform.canUseNodeBackend) {
+        const result = await api.runtime.runFile({ filePath, content: this.editor.getCurrentText() });
+        this.terminal.appendDebugOutput(result.output);
+        this.updateStatus("Runtime local indisponivel neste ambiente");
+        return;
+      }
+
       const result = await api.runtime.runFile({ filePath, content: this.editor.getCurrentText() });
       this.terminal.appendDebugOutput(result.output);
       this.updateStatus(result.code === 0 ? "Run completed" : "Run failed");
@@ -722,13 +817,77 @@ export class IdePage {
     }
   }
 
+  private async runWorkspace(): Promise<boolean> {
+    const workspace = this.explorer.workspace;
+    if (!workspace) return false;
+    const command = await this.detectWorkspaceRunCommand(workspace);
+    if (!command) {
+      this.updateStatus("Nenhum comando Run detectado no workspace");
+      return false;
+    }
+    this.showTerminal(true);
+    this.terminal.showTerminal();
+    await this.terminal.runCommand(command);
+    return true;
+  }
+
+  private async detectWorkspaceRunCommand(workspace: string): Promise<string | undefined> {
+    const packageJson = joinPath(workspace, "package.json");
+    if (await api.fs.exists(packageJson)) {
+      try {
+        const pkg = JSON.parse((await api.fs.readFile(packageJson)).content) as { scripts?: Record<string, string> };
+        if (pkg.scripts?.dev) return "npm run dev";
+        if (pkg.scripts?.start) return "npm start";
+        if (pkg.scripts?.test) return "npm test";
+      } catch {
+        this.updateStatus("package.json invalido para Run");
+      }
+    }
+
+    if (await api.fs.exists(joinPath(workspace, "pom.xml"))) return "mvn javafx:run";
+    if (await api.fs.exists(joinPath(workspace, "gradlew"))) return this.appPlatform === "win32" ? "gradlew.bat run" : "./gradlew run";
+    if (await api.fs.exists(joinPath(workspace, "gradlew.bat"))) return this.appPlatform === "win32" ? "gradlew.bat run" : "./gradlew run";
+    if (await api.fs.exists(joinPath(workspace, "Cargo.toml"))) return "cargo run";
+    if (await api.fs.exists(joinPath(workspace, "go.mod"))) return "go run .";
+    return undefined;
+  }
+
+  private showHtmlPreview(title: string, content: string): void {
+    document.querySelector(".html-preview-overlay")?.remove();
+    const overlay = el("div", { className: "html-preview-overlay" });
+    const panel = el("section", { className: "html-preview-panel" });
+    const header = el("header", { className: "html-preview-header" });
+    const close = buttonIcon("close", "Close Preview", () => overlay.remove());
+    header.append(el("strong", { text: title }), close);
+    const frame = el("iframe", {
+      className: "html-preview-frame",
+      attrs: { sandbox: "allow-scripts allow-forms allow-modals allow-popups" }
+    });
+    frame.srcdoc = content;
+    panel.append(header, frame);
+    overlay.append(panel);
+    overlay.addEventListener("click", event => {
+      if (event.target === overlay) overlay.remove();
+    });
+    document.body.append(overlay);
+  }
+
   private async buildProject(): Promise<void> {
+    if (!platform.canUseTerminal) {
+      this.showTerminal(false);
+      this.terminal.appendOutput(platform.isMobile
+        ? "Build local depende de backend nativo futuro no mobile."
+        : "Build local depende do backend Electron/Node.");
+      this.updateStatus("Build local indisponivel neste ambiente");
+      return;
+    }
     this.showTerminal(true);
     await this.terminal.runCommand(this.settings.buildCommand);
     await this.runDiagnostics();
   }
 
   private async runDiagnostics(): Promise<void> {
+    if (!platform.canUseNodeBackend) return;
     if (!this.settings?.diagnosticsEnabled || !this.explorer.workspace) return;
     const current = this.editor.getCurrentFile();
     if (current && !current.endsWith(".java")) return;
@@ -773,27 +932,31 @@ export class IdePage {
 
   private commandCenterActions(): CommandCenterAction[] {
     const hasProject = Boolean(this.explorer.workspace);
-    const hasRunnableTarget = Boolean(this.editor.getCurrentFile() || this.explorer.workspace);
+    const hasRunnableTarget = platform.canUseNodeBackend
+      ? Boolean(this.editor.getCurrentFile() || this.explorer.workspace)
+      : Boolean(this.editor.getCurrentFile());
+    const openWorkspaceLabel = platform.isMobile ? "Abrir workspace mobile" : "Abrir pasta";
+    const openWorkspaceDetail = platform.isMobile ? "Usar o sandbox Documents/NPSharp." : "Escolher um workspace local.";
     return [
-      { id: "open-folder", label: "Abrir pasta", detail: "Escolher um workspace local.", iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
+      { id: "open-folder", label: openWorkspaceLabel, detail: openWorkspaceDetail, iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
       { id: "new-file", label: "Novo arquivo", detail: "Criar um arquivo sem sair do hub.", iconName: "new-file", run: () => this.editor.newTab() },
-      { id: "new-project", label: "Novo projeto", detail: "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
-      { id: "clone", label: "Clonar Git", detail: "Executar git clone em uma pasta escolhida.", iconName: "repo-clone", run: () => void this.cloneRepository() },
-      { id: "terminal", label: "Abrir terminal", detail: "Abrir o terminal integrado.", iconName: "terminal", run: () => this.showTerminal(true) },
-      { id: "notes", label: "Abrir Notes", detail: "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
+      { id: "new-project", label: "Novo projeto", detail: platform.isMobile ? "Criar workspace em Documents/NPSharp/workspaces." : "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
+      { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? "Executar git clone em uma pasta escolhida." : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
+      { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir Output", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponivel neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
+      { id: "notes", label: "Abrir Notes", detail: platform.isMobile ? "Abrir ou criar Documents/NPSharp/notes.nps.md." : "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
       { id: "theme-lab", label: "Abrir Theme Lab", detail: "Abrir o seletor de temas incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
-      { id: "run", label: "Rodar projeto", detail: hasRunnableTarget ? "Executar o arquivo/projeto atual." : "Abra um arquivo ou workspace primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
-      { id: "git-status", label: "Git Status", detail: hasProject ? "Abrir Source Control do workspace." : "Abra um workspace primeiro.", iconName: "source-control", disabled: !hasProject, run: () => this.showPanel("source") }
+      { id: "run", label: "Rodar projeto", detail: hasRunnableTarget ? (platform.canUseNodeBackend ? "Executar o arquivo/projeto atual." : "Preview HTML ou fallback de runtime.") : "Abra um arquivo primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
+      { id: "git-status", label: "Source Control", detail: platform.canUseGit ? (hasProject ? "Abrir Source Control do workspace." : "Abra um workspace primeiro.") : "Abrir Source Control em modo limitado.", iconName: "source-control", disabled: platform.canUseGit && !hasProject, run: () => this.showPanel("source") }
     ];
   }
 
   private commandCenterShortcuts(): CommandCenterShortcut[] {
     return [
       { label: "Command Palette", keys: "Ctrl+Shift+P" },
-      { label: "Abrir pasta", keys: "Ctrl+K Ctrl+O" },
+      { label: platform.isMobile ? "Workspace mobile" : "Abrir pasta", keys: "Ctrl+K Ctrl+O" },
       { label: "Quick Open", keys: "Ctrl+P" },
-      { label: "Terminal", keys: "Ctrl+`" },
+      { label: platform.canUseTerminal ? "Terminal" : "Output", keys: "Ctrl+`" },
       { label: "Configurações", keys: "Ctrl+," },
       { label: "Rodar", keys: "F5" }
     ];
@@ -810,25 +973,36 @@ export class IdePage {
   }
 
   private showTerminal(focus = false): void {
-    this.terminal.element.hidden = false;
+    this.setTerminalVisible(true);
     if (!this.terminal.hasTerminal()) this.terminal.newTerminal();
-    if (focus) this.terminal.focusCurrentTerminal();
-    this.session.terminalVisible = true;
-    this.persist();
+    if (!platform.canUseTerminal) {
+      this.terminal.showOutputPanel();
+      this.terminal.appendOutput(platform.isMobile
+        ? "Terminal real Node nao esta disponivel no mobile. Output/Command Log ativo."
+        : "Terminal real nao esta disponivel no modo web. Output/Command Log ativo.");
+    } else if (focus) {
+      this.terminal.focusCurrentTerminal();
+    }
   }
 
   private toggleTerminal(): void {
-    this.terminal.element.hidden = !this.terminal.element.hidden;
-    if (!this.terminal.element.hidden && !this.terminal.hasTerminal()) this.terminal.newTerminal();
-    this.session.terminalVisible = !this.terminal.element.hidden;
-    this.persist();
+    const visible = this.terminal.element.hidden;
+    this.setTerminalVisible(visible);
+    if (visible && !this.terminal.hasTerminal()) this.terminal.newTerminal();
+    if (visible && !platform.canUseTerminal) this.terminal.showOutputPanel();
   }
 
   private closeTerminalPanel(): void {
-    this.terminal.element.hidden = true;
-    this.session.terminalVisible = false;
+    this.setTerminalVisible(false);
     this.updateStatus("Terminal hidden");
-    this.persist();
+  }
+
+  private setTerminalVisible(visible: boolean, persist = true): void {
+    this.terminal.element.hidden = !visible;
+    this.editorStack.classList.toggle("terminal-visible", visible);
+    this.session.terminalVisible = visible;
+    requestAnimationFrame(() => this.editor.layout());
+    if (persist) this.persist();
   }
 
   private toggleSidebar(): void {
@@ -837,6 +1011,11 @@ export class IdePage {
   }
 
   private terminalCwd(): string {
+    if (!platform.isDesktop) {
+      return this.editor.getCurrentFile()
+        ? dirname(this.editor.getCurrentFile()!)
+        : this.explorer.workspace ?? DEFAULT_MOBILE_WORKSPACE;
+    }
     return this.editor.getCurrentFile()
       ? dirname(this.editor.getCurrentFile()!)
       : this.explorer.workspace ?? this.settings?.terminalInitialDirectory ?? "";
@@ -1087,6 +1266,15 @@ function cloneFolderName(url: string): string {
   return match?.[1] || "repository";
 }
 
+function sanitizeWorkspaceName(name: string): string {
+  return name.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ") || "Main";
+}
+
+function isProjectRunFile(filePath: string): boolean {
+  const name = basename(filePath).toLowerCase();
+  return ["package.json", "pom.xml", "gradlew", "gradlew.bat", "cargo.toml", "go.mod"].includes(name);
+}
+
 function menuButton(label: string, items: Array<[string, string, MenuAction]>): HTMLButtonElement {
   const button = el("button", { className: "title-menu", text: label });
   button.addEventListener("click", event => {
@@ -1132,7 +1320,7 @@ function panelTitle(panel: PanelId): string {
 
 function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
-  const path = el("span", { className: "settings-path", text: "~/.npsharp/settings.json" });
+  const path = el("span", { className: "settings-path", text: platform.isMobile ? "Documents/NPSharp/settings.json" : "~/.npsharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
   const save = el("button", { className: "wide-action", text: "Save" });
   save.addEventListener("click", onSave);
