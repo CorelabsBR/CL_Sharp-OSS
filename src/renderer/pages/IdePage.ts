@@ -18,6 +18,7 @@ import { applyTheme, listThemes } from "../services/themes";
 import { buttonIcon, el, icon } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
 import { basename, dirname, extname, fileUri, joinPath } from "../utils/path";
+import type { CommandAction } from "../components/CommandPalette";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "arduino" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench";
@@ -67,6 +68,7 @@ export class IdePage {
   private sidebarHiddenBeforeFocus = false;
   private compactPreview = false;
   private liveServerActive = false;
+  private pendingChord: string | undefined;
 
   constructor() {
     void this.init().catch(error => this.renderFatalError(error));
@@ -134,8 +136,8 @@ export class IdePage {
         ["Find", "Ctrl+F", () => this.editor.find()],
         ["Replace", "Ctrl+H", () => this.editor.replace()],
         ["Comment Line", "Ctrl+/", () => this.editor.addLineComment()],
-        ["Uncomment Line", "Ctrl+Shift+/", () => this.editor.removeLineComment()],
-        ["Comment Block", "Ctrl+Shift+/", () => this.editor.toggleBlockComment()],
+        // ["Uncomment Line", "Ctrl+Shift+/", () => this.editor.removeLineComment()],
+        // ["Comment Block", "Ctrl+Shift+/", () => this.editor.toggleBlockComment()],
         ["Go to Line", "Ctrl+G", () => this.editor.goToLine()],
         ["Go to Start", "Ctrl+Home", () => this.editor.goToStartOfFile()],
         ["Go to End", "Ctrl+End", () => this.editor.goToEndOfFile()],
@@ -305,7 +307,7 @@ export class IdePage {
       { label: "Editor: Go to Line", shortcut: "Ctrl+G", run: () => this.editor.goToLine() },
       { label: "Editor: Add Line Comment", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
       { label: "Editor: Remove Line Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.removeLineComment() },
-      { label: "Editor: Toggle Block Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.toggleBlockComment() },
+      // { label: "Editor: Toggle Block Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.toggleBlockComment() },
       { label: "Editor: Format Document", shortcut: "Shift+Alt+F", run: () => this.editor.formatDocument() },
       { label: "View: Explorer", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
       { label: "View: Search", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
@@ -330,8 +332,8 @@ export class IdePage {
       { label: "Search: Find in Workspace", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
       { label: "Editor: Comment Line", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
       { label: "Editor: Add Line Comment", shortcut: "Ctrl+K Ctrl+C", run: () => this.editor.addLineComment() },
-      { label: "Editor: Remove Line Comment", shortcut: "Ctrl+K Ctrl+U", run: () => this.editor.removeLineComment() },
-      { label: "Editor: Toggle Block Comment", shortcut: "Shift+Alt+A", run: () => this.editor.toggleBlockComment() },
+      // { label: "Editor: Remove Line Comment", shortcut: "Ctrl+K Ctrl+U", run: () => this.editor.removeLineComment() },
+      // { label: "Editor: Toggle Block Comment", shortcut: "Shift+Alt+A", run: () => this.editor.toggleBlockComment() },
 
       { label: "View: Command Palette", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
       { label: "View: Quick Open", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
@@ -1389,9 +1391,9 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
       run(() => this.editor.removeLineComment());
       return;
 
-    case "Shift+Alt+A":
-      run(() => this.editor.toggleBlockComment());
-      return;
+    // case "Shift+Alt+A":
+    //   run(() => this.editor.toggleBlockComment());
+    //   return;
 
     case "Ctrl+S":
       run(() => this.editor.saveCurrentFile());
@@ -1486,7 +1488,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
       "editor:replace": () => this.editor.replace(),
       "editor:commentLine": () => this.editor.addLineComment(),
       "editor:uncommentLine": () => this.editor.removeLineComment(),
-      "editor:commentBlock": () => this.editor.toggleBlockComment(),
+      // "editor:commentBlock": () => this.editor.toggleBlockComment(),
       "editor:goToLine": () => this.editor.goToLine(),
       "editor:start": () => this.editor.goToStartOfFile(),
       "editor:end": () => this.editor.goToEndOfFile(),
