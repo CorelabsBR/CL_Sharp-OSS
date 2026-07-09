@@ -377,14 +377,6 @@ export class EditorTabs {
     this.runEditorAction("editor.action.copyLinesDownAction", "Linha copiada");
   }
 
-  insertLineBelow(): void {
-    this.runEditorAction("editor.action.insertLineAfter", "Linha inserida");
-  }
-
-  insertLineAbove(): void {
-    this.runEditorAction("editor.action.insertLineBefore", "Linha inserida");
-  }
-
   selectNextOccurrence(): void {
     this.runEditorAction("editor.action.addSelectionToNextFindMatch", "Ocorrencia selecionada");
   }
@@ -401,16 +393,7 @@ export class EditorTabs {
     this.runEditorAction("editor.action.removeCommentLine", "Comentario removido", () => this.commentSelectedLines(false));
   }
 
-toggleLineComment(): void {
-  this.editor.focus();
-  this.editor.trigger("keyboard", "editor.action.commentLine", null);
-}
-
-
-toggleBlockComment(): void {
-  this.editor.focus();
-  this.editor.trigger("keyboard", "editor.action.blockComment", null);
-}
+ 
   formatDocument(): void {
     this.runEditorAction("editor.action.formatDocument", "Formatacao solicitada");
   }
@@ -931,40 +914,41 @@ function findBrandRanges(model: monaco.editor.ITextModel, terms: string[]): mona
   return ranges;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 function lineCommentToken(language: string): string | undefined {
   const tokens: Record<string, string> = {
     javascript: "//",
     typescript: "//",
     json: "//",
-    jsonc: "//",
     java: "//",
-    c: "//",
-    cpp: "//",
     csharp: "//",
+    cpp: "//",
+    c: "//",
     go: "//",
     rust: "//",
     php: "//",
     kotlin: "//",
-    swift: "//",
     scala: "//",
+    swift: "//",
+    dart: "//",
+    plaintext: "//",
     css: "//",
     scss: "//",
     less: "//",
-    html: undefined as never,
-    sql: undefined as never,
-    xml: "<!--",
-    python: "#",
     shell: "#",
-    powershell: "#",
+    bash: "#",
+    sh: "#",
+    python: "#",
     ruby: "#",
     perl: "#",
+    powershell: "#",
     yaml: "#",
-    markdown: undefined as never,
-    plaintext: "//"
+    markdown: "<!--",
+    html: "<!--",
+    xml: "<!--"
   };
-
   return tokens[language];
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
