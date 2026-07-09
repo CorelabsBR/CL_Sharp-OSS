@@ -10,6 +10,7 @@ export interface CommandAction {
 export interface PaletteItem {
   label: string;
   hint?: string;
+  keywords?: string;
   active?: boolean;
   swatch?: string;
   run: () => void | Promise<void>;
@@ -37,7 +38,12 @@ export class CommandPalette {
   }
 
   showCommands(): void {
-    this.show(">", this.commands.map(command => ({ label: command.label, hint: command.shortcut ?? "", run: command.run })));
+    this.show(">", this.commands.map(command => ({
+      label: command.label,
+      hint: command.shortcut ?? "",
+      keywords: command.keywords,
+      run: command.run
+    })));
   }
 
   showQuickOpen(): void {
@@ -46,6 +52,10 @@ export class CommandPalette {
 
   showPicker(placeholder: string, items: PaletteItem[]): void {
     this.show("", items, placeholder);
+  }
+
+  close(): void {
+    document.querySelector(".palette-overlay")?.remove();
   }
 
   private show(prefix: string, items: PaletteItem[], placeholder = "Type a command or file"): void {
@@ -62,7 +72,7 @@ export class CommandPalette {
       const query = input.value.replace(/^>/, "").trim().toLowerCase();
       list.replaceChildren();
       items
-        .filter(item => item.label.toLowerCase().includes(query))
+        .filter(item => [item.label, item.hint ?? "", item.keywords ?? ""].join(" ").toLowerCase().includes(query))
         .slice(0, 50)
         .forEach((item, index) => {
           const row = el("button", { className: `palette-row ${index === 0 ? "active" : ""} ${item.active ? "selected" : ""}`.trim() });

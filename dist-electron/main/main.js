@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const node_path_1 = __importDefault(require("node:path"));
+const arduinoService_1 = require("../services/node/arduinoService");
 const fileSystemService_1 = require("../services/node/fileSystemService");
 const gitService_1 = require("../services/node/gitService");
 const liveServerService_1 = require("../services/node/liveServerService");
@@ -15,6 +16,7 @@ const searchService_1 = require("../services/node/searchService");
 const settingsService_1 = require("../services/node/settingsService");
 const templateService_1 = require("../services/node/templateService");
 const diagnosticsService_1 = require("../services/node/diagnosticsService");
+const terminalService_1 = require("../services/node/terminalService");
 const remoteService_1 = require("../services/node/remoteService");
 let mainWindow;
 const gotLock = process.env.VITE_DEV_SERVER_URL ? true : electron_1.app.requestSingleInstanceLock();
@@ -50,6 +52,7 @@ electron_1.app.on("window-all-closed", () => {
 });
 electron_1.app.on("before-quit", () => {
     void (0, liveServerService_1.stopAllLiveServers)();
+    (0, terminalService_1.closeAllTerminals)();
 });
 async function createMainWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -114,6 +117,7 @@ function createApplicationMenu() {
                 { label: "Salvar Tudo", click: () => sendCommand("file:saveAll") },
                 { type: "separator" },
                 { label: "Fechar Editor", accelerator: "CmdOrCtrl+W", click: () => sendCommand("file:close") },
+                { label: "Reabrir Editor Fechado", accelerator: "CmdOrCtrl+Shift+T", click: () => sendCommand("file:reopenClosed") },
                 { label: "Fechar Todos os Editores", accelerator: "CmdOrCtrl+Shift+W", click: () => sendCommand("file:closeAll") },
                 { type: "separator" },
                 { label: "Abrir pasta...", accelerator: "CmdOrCtrl+K CmdOrCtrl+O", click: () => sendCommand("workspace:openFolder") },
@@ -134,9 +138,12 @@ function createApplicationMenu() {
                 { label: "Find", accelerator: "CmdOrCtrl+F", click: () => sendCommand("editor:find") },
                 { label: "Replace", accelerator: "CmdOrCtrl+H", click: () => sendCommand("editor:replace") },
                 { label: "Find in Files", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
+                { label: "Replace in Files", accelerator: "CmdOrCtrl+Shift+H", click: () => sendCommand("view:replaceInFiles") },
                 { type: "separator" },
-                { label: "Comment Line", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:commentLine") },
-                { label: "Comment Block", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:commentBlock") },
+                { label: "Toggle Line Comment", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:toggleLineComment") },
+                { label: "Comment Line", accelerator: "CmdOrCtrl+K CmdOrCtrl+C", click: () => sendCommand("editor:commentLine") },
+                { label: "Uncomment Line", accelerator: "CmdOrCtrl+K CmdOrCtrl+U", click: () => sendCommand("editor:uncommentLine") },
+                { label: "Comment Block", accelerator: "Shift+Alt+A", click: () => sendCommand("editor:commentBlock") },
                 { type: "separator" },
                 { label: "Go to Line", accelerator: "CmdOrCtrl+G", click: () => sendCommand("editor:goToLine") },
                 { label: "Go to Start", accelerator: "CmdOrCtrl+Home", click: () => sendCommand("editor:start") },
@@ -151,9 +158,13 @@ function createApplicationMenu() {
                 { label: "Search", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
                 { label: "Source Control", accelerator: "CmdOrCtrl+Shift+G", click: () => sendCommand("view:source") },
                 { label: "Run and Debug", accelerator: "CmdOrCtrl+Shift+D", click: () => sendCommand("view:run") },
+                { label: "Arduino", click: () => sendCommand("view:arduino") },
                 { label: "Terminal", accelerator: "CmdOrCtrl+`", click: () => sendCommand("view:terminal") },
-                { label: "Problems", accelerator: "F8", click: () => sendCommand("view:problems") },
-                { label: "Debug Console", click: () => sendCommand("view:debugConsole") },
+                { label: "Toggle Panel", accelerator: "CmdOrCtrl+J", click: () => sendCommand("view:terminal") },
+                { label: "Problems", accelerator: "CmdOrCtrl+Shift+M", click: () => sendCommand("view:problems") },
+                { label: "Output", accelerator: "CmdOrCtrl+Shift+U", click: () => sendCommand("view:output") },
+                { label: "Keyboard Shortcuts", accelerator: "CmdOrCtrl+K CmdOrCtrl+S", click: () => sendCommand("view:keyboardShortcuts") },
+                { label: "Extensions", accelerator: "CmdOrCtrl+Shift+X", click: () => sendCommand("view:extensions") },
                 { type: "separator" },
                 { role: "zoomIn", label: "Zoom In" },
                 { role: "zoomOut", label: "Zoom Out" },
@@ -166,8 +177,10 @@ function createApplicationMenu() {
             label: "Tools",
             submenu: [
                 { label: "Build Project", accelerator: "CmdOrCtrl+Shift+B", click: () => sendCommand("tools:build") },
-                { label: "Run", accelerator: "CmdOrCtrl+Alt+N", click: () => sendCommand("tools:run") },
+                { label: "Run Current File", accelerator: "CmdOrCtrl+Alt+R", click: () => sendCommand("tools:run") },
+                { label: "Run Without Debugging", accelerator: "CmdOrCtrl+F5", click: () => sendCommand("tools:runWithoutDebug") },
                 { label: "Debug Program", accelerator: "F5", click: () => sendCommand("tools:run") },
+                { label: "Arduino", click: () => sendCommand("view:arduino") },
                 { type: "separator" },
                 { label: "New Terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendCommand("terminal:new") },
                 { label: "Output", click: () => sendCommand("terminal:output") },
@@ -186,6 +199,7 @@ function createApplicationMenu() {
             label: "more",
             submenu: [
                 { label: "Command Palette", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
+                { label: "Command Center", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
                 { label: "About NPSharp", click: () => sendCommand("help:about") }
             ]
         }
@@ -276,10 +290,28 @@ function registerIpcHandlers() {
         const result = await (0, processService_1.runShell)(request.command, cwd, request.shell);
         return { cwd, output: result.output, code: result.code };
     });
+    electron_1.ipcMain.handle("terminal:shells", () => (0, terminalService_1.listTerminalShells)());
+    electron_1.ipcMain.handle("terminal:create", (event, request) => (0, terminalService_1.createTerminalSession)(request, {
+        onData: data => event.sender.send("terminal:data", data),
+        onExit: exit => event.sender.send("terminal:exit", exit)
+    }));
+    electron_1.ipcMain.handle("terminal:write", (_event, id, data) => (0, terminalService_1.writeTerminal)(id, data));
+    electron_1.ipcMain.handle("terminal:resize", (_event, id, cols, rows) => (0, terminalService_1.resizeTerminal)(id, cols, rows));
+    electron_1.ipcMain.handle("terminal:kill", (_event, id) => (0, terminalService_1.killTerminal)(id));
+    electron_1.ipcMain.handle("terminal:close", (_event, id) => (0, terminalService_1.closeTerminal)(id));
     electron_1.ipcMain.handle("runtime:list", () => (0, runtimeService_1.listRuntimes)());
     electron_1.ipcMain.handle("runtime:discover", () => (0, runtimeService_1.discoverRuntimes)(true));
     electron_1.ipcMain.handle("runtime:configure", (_event, languageId, executablePath) => (0, runtimeService_1.configureRuntime)(languageId, executablePath));
     electron_1.ipcMain.handle("runtime:runFile", (_event, request) => (0, runtimeService_1.runFile)(request));
+    electron_1.ipcMain.handle("arduino:detect", (_event, request) => (0, arduinoService_1.detectArduinoCli)(request));
+    electron_1.ipcMain.handle("arduino:loadConfig", (_event, request) => (0, arduinoService_1.loadArduinoConfig)(request));
+    electron_1.ipcMain.handle("arduino:saveConfig", (_event, request) => (0, arduinoService_1.saveArduinoConfig)(request));
+    electron_1.ipcMain.handle("arduino:listPorts", (_event, request) => (0, arduinoService_1.listArduinoPorts)(request));
+    electron_1.ipcMain.handle("arduino:listBoards", (_event, request) => (0, arduinoService_1.listArduinoBoards)(request));
+    electron_1.ipcMain.handle("arduino:createSketch", (_event, request) => (0, arduinoService_1.createArduinoSketch)(request));
+    electron_1.ipcMain.handle("arduino:compile", (_event, request) => (0, arduinoService_1.compileArduinoSketch)(request));
+    electron_1.ipcMain.handle("arduino:upload", (_event, request) => (0, arduinoService_1.uploadArduinoSketch)(request));
+    electron_1.ipcMain.handle("arduino:monitor", (_event, request) => (0, arduinoService_1.monitorArduinoSerial)(request));
     electron_1.ipcMain.handle("liveServer:open", (_event, request) => (0, liveServerService_1.openLiveServer)(request));
     electron_1.ipcMain.handle("liveServer:stopAll", () => (0, liveServerService_1.stopAllLiveServers)());
     electron_1.ipcMain.handle("templates:apply", (_event, request) => (0, templateService_1.applyTemplate)(electron_1.app.getAppPath(), request));

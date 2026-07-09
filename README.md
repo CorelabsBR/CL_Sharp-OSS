@@ -4,7 +4,7 @@
 [![Bugs](https://img.shields.io/github/issues/girellidev/npsharp/bug.svg)](https://github.com/girellidev/npsharp/issues?q=is%3Aopen+is%3Aissue+label%3Abug)
 [![NPSharp Constructor](https://github.com/CorelabsBR/CL_NPSharp/actions/workflows/autochecker.yml/badge.svg)](https://github.com/CorelabsBR/CL_NPSharp/actions/workflows/autochecker.yml)
 
-O **NPSharp** é um editor de código aberto desenvolvido pela Corelabs, construído sobre o projeto **Code-OSS** e focado em oferecer uma experiência moderna, rápida e totalmente controlada pelo desenvolvedor.
+O **NPSharp** é um editor de código aberto desenvolvido pela Corelabs, construído sobre o projeto **NPSharp FX** e focado em oferecer uma experiência moderna, rápida e totalmente controlada pelo desenvolvedor.
 
 O objetivo do projeto é disponibilizar um ambiente de desenvolvimento independente, transparente e auditável, eliminando dependências desnecessárias e permitindo que toda a evolução do editor aconteça de forma aberta.
 
@@ -19,7 +19,7 @@ O que está aqui é o ponto de partida. É o esqueleto, o motor cru, a base veri
 ## O que este repositório é
 Este repositório contém:
 
-- Código-fonte do Code-OSS com ajustes necessários para permitir identidade própria.
+- Código-fonte do NPSharp com ajustes necessários para permitir identidade própria.
 - Configurações, patches e modificações essenciais para manter compatibilidade e independência.
 - Ambiente pronto para contribuições, testes e builds limpos.
 - A fundação do editor **NPSHARP Clean**, usado como base de desenvolvimento.

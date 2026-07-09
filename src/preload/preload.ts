@@ -21,6 +21,9 @@ import type {
   SaveFileRequest,
   SearchQuery,
   TemplateApplyRequest,
+  TerminalDataEvent,
+  TerminalExitEvent,
+  TerminalCreateRequest,
   TerminalRunRequest
 } from "../shared/types";
 
@@ -85,7 +88,23 @@ const api: NpsharpApi = {
     history: (repo: string) => invoke("git:history", repo)
   },
   terminal: {
-    run: (request: TerminalRunRequest) => invoke("terminal:run", request)
+    run: (request: TerminalRunRequest) => invoke("terminal:run", request),
+    shells: () => invoke("terminal:shells"),
+    create: (request: TerminalCreateRequest) => invoke("terminal:create", request),
+    write: (id: string, data: string) => invoke("terminal:write", id, data),
+    resize: (id: string, cols: number, rows: number) => invoke("terminal:resize", id, cols, rows),
+    kill: (id: string) => invoke("terminal:kill", id),
+    close: (id: string) => invoke("terminal:close", id),
+    onData: (callback: (event: TerminalDataEvent) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: TerminalDataEvent) => callback(payload);
+      ipcRenderer.on("terminal:data", listener);
+      return () => ipcRenderer.removeListener("terminal:data", listener);
+    },
+    onExit: (callback: (event: TerminalExitEvent) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: TerminalExitEvent) => callback(payload);
+      ipcRenderer.on("terminal:exit", listener);
+      return () => ipcRenderer.removeListener("terminal:exit", listener);
+    }
   },
   runtime: {
     list: () => invoke("runtime:list"),

@@ -1,5 +1,7 @@
 import type { EditorDiagnostic, SearchResult } from "../../shared/types";
 import { configureMonaco, languageForPath, monaco } from "../../editor/monacoSetup";
+import type { ShortcutBinding } from "../shortcuts/keybindings";
+import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
 import { api } from "../services/api";
 import { el, fileIcon, icon } from "../utils/dom";
 import { reportError } from "../utils/errors";
@@ -14,7 +16,7 @@ const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
   { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
   { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
   { terms: ["corelabs","Npsharp","NPSharp"], className: "brand-highlight-red" },
-  // { terms: ["andrieli","andy"], className: "brand-highlight-special" }
+  { terms: ["andrieli","andy"], className: "brand-highlight-special" }
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;
@@ -31,6 +33,14 @@ export interface EditorTab {
   model: monaco.editor.ITextModel;
 }
 
+interface ClosedEditorTab {
+  readonly title: string;
+  readonly path?: string;
+  readonly virtualUri?: string;
+  readonly content: string;
+  readonly lineEnding: "\n" | "\r\n";
+}
+
 export class EditorTabs {
   readonly element = el("section", { className: "editor-shell" });
   private readonly tabsBar = el("div", { className: "tabs-bar" });
@@ -40,6 +50,10 @@ export class EditorTabs {
   private editor: monaco.editor.IStandaloneCodeEditor;
   private tabs: EditorTab[] = [];
   private activeId: string | undefined;
+  private closedTabs: ClosedEditorTab[] = [];
+  private navigationBackStack: string[] = [];
+  private navigationForwardStack: string[] = [];
+  private navigatingHistory = false;
   private untitledCounter = 1;
   private recentFiles: string[] = [];
   private diagnostics: EditorDiagnostic[] = [];
@@ -78,18 +92,6 @@ export class EditorTabs {
     });
     this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor());
     this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus());
-    this.editor.addAction({
-      id: "npsharp-save",
-      label: "NPSharp Save",
-      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
-      run: () => this.saveCurrentFile()
-    });
-    this.editor.addAction({
-      id: "npsharp-toggle-line-comment",
-      label: "Toggle Line Comment",
-      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash],
-      run: () => this.toggleLineComment()
-    });
     this.render();
   }
 
@@ -111,6 +113,17 @@ export class EditorTabs {
 
   getRecentFiles(): string[] {
     return [...this.recentFiles];
+  }
+
+  registerMonacoShortcuts(shortcuts: readonly ShortcutBinding[]): void {
+    for (const shortcut of shortcuts) {
+      if (shortcut.scope !== "editor") continue;
+      for (const key of shortcut.keys) {
+        const keybinding = monacoKeybindingFromShortcut(key);
+        if (keybinding === undefined) continue;
+        this.editor.addCommand(keybinding, () => void shortcut.run());
+      }
+    }
   }
 
   applySettings(settings: { editorFontFamily: string; editorFontSize: number; editorTabSize: number; editorWordWrap: boolean; editorLineNumbers: boolean; errorLensEnabled?: boolean; brandSpecialName?: string }): void {
@@ -269,6 +282,53 @@ export class EditorTabs {
     }
   }
 
+  reopenClosedTab(): void {
+    const closed = this.closedTabs.shift();
+    if (!closed) {
+      this.onStatus("Nenhuma aba fechada para reabrir");
+      return;
+    }
+
+    if (closed.path) {
+      void this.openFile(closed.path);
+      return;
+    }
+
+    const model = monaco.editor.createModel(
+      closed.content,
+      languageForPath(closed.title),
+      monaco.Uri.parse(closed.virtualUri ? `npsharp:${encodeURIComponent(closed.virtualUri)}` : `untitled:${closed.title}-${crypto.randomUUID()}`)
+    );
+    const tab: EditorTab = {
+      id: closed.virtualUri ?? crypto.randomUUID(),
+      title: closed.title,
+      initialContent: closed.virtualUri ? closed.content : "",
+      dirty: !closed.virtualUri && closed.content.length > 0,
+      lineEnding: closed.lineEnding,
+      virtualUri: closed.virtualUri,
+      model
+    };
+    this.tabs.push(tab);
+    this.selectTab(tab.id);
+    this.onStatus(`Reaberto ${closed.title}`);
+  }
+
+  nextTab(): void {
+    this.selectTabByOffset(1);
+  }
+
+  previousTab(): void {
+    this.selectTabByOffset(-1);
+  }
+
+  navigateBack(): void {
+    this.navigateTabHistory(this.navigationBackStack, this.navigationForwardStack, "Sem navegacao anterior");
+  }
+
+  navigateForward(): void {
+    this.navigateTabHistory(this.navigationForwardStack, this.navigationBackStack, "Sem navegacao futura");
+  }
+
   undo(): void {
     this.editor.trigger("keyboard", "undo", null);
   }
@@ -302,11 +362,43 @@ export class EditorTabs {
   }
 
   moveLineUp(): void {
-    this.editor.trigger("keyboard", "editor.action.moveLinesUpAction", null);
+    this.runEditorAction("editor.action.moveLinesUpAction", "Linha movida");
   }
 
   moveLineDown(): void {
-    this.editor.trigger("keyboard", "editor.action.moveLinesDownAction", null);
+    this.runEditorAction("editor.action.moveLinesDownAction", "Linha movida");
+  }
+
+  copyLineUp(): void {
+    this.runEditorAction("editor.action.copyLinesUpAction", "Linha copiada");
+  }
+
+  copyLineDown(): void {
+    this.runEditorAction("editor.action.copyLinesDownAction", "Linha copiada");
+  }
+
+  insertLineBelow(): void {
+    this.runEditorAction("editor.action.insertLineAfter", "Linha inserida");
+  }
+
+  insertLineAbove(): void {
+    this.runEditorAction("editor.action.insertLineBefore", "Linha inserida");
+  }
+
+  selectNextOccurrence(): void {
+    this.runEditorAction("editor.action.addSelectionToNextFindMatch", "Ocorrencia selecionada");
+  }
+
+  selectAllOccurrences(): void {
+    this.runEditorAction("editor.action.selectHighlights", "Ocorrencias selecionadas");
+  }
+
+  addLineComment(): void {
+    this.runEditorAction("editor.action.addCommentLine", "Comentario aplicado", () => this.commentSelectedLines(true));
+  }
+
+  removeLineComment(): void {
+    this.runEditorAction("editor.action.removeCommentLine", "Comentario removido", () => this.commentSelectedLines(false));
   }
 
 addLineComment(): void {
@@ -385,19 +477,19 @@ toggleBlockComment(): void {
   this.editor.trigger("keyboard", "editor.action.blockComment", null);
 }
   formatDocument(): void {
-    this.editor.trigger("keyboard", "editor.action.formatDocument", null);
+    this.runEditorAction("editor.action.formatDocument", "Formatacao solicitada");
   }
 
   find(): void {
-    this.editor.getAction("actions.find")?.run();
+    this.runEditorAction("actions.find", "Busca no arquivo aberta");
   }
 
   replace(): void {
-    this.editor.getAction("editor.action.startFindReplaceAction")?.run();
+    this.runEditorAction("editor.action.startFindReplaceAction", "Replace no arquivo aberto");
   }
 
   goToLine(): void {
-    this.editor.getAction("editor.action.gotoLine")?.run();
+    this.runEditorAction("editor.action.gotoLine", "Ir para linha");
   }
 
   goToStartOfFile(): void {
@@ -449,6 +541,73 @@ toggleBlockComment(): void {
 
   layout(): void {
     this.editor.layout();
+  }
+
+  private runEditorAction(actionId: string, status?: string, fallback?: () => void): void {
+    this.editor.focus();
+    const action = this.editor.getAction(actionId);
+    if (action) {
+      void action.run();
+    } else {
+      this.editor.trigger("keyboard", actionId, null);
+      fallback?.();
+    }
+    if (status) this.onStatus(status);
+  }
+
+  private commentSelectedLines(add: boolean): void {
+    const model = this.editor.getModel();
+    const selection = this.editor.getSelection();
+    if (!model || !selection) return;
+
+    const language = model.getLanguageId();
+    const token = lineCommentToken(language);
+    if (!token) {
+      this.onStatus(`Comentario de linha nao configurado para ${language}`);
+      return;
+    }
+
+    const startLine = selection.startLineNumber;
+    const endLine =
+      selection.endColumn === 1 && selection.endLineNumber > startLine
+        ? selection.endLineNumber - 1
+        : selection.endLineNumber;
+
+    const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
+
+    for (let line = startLine; line <= endLine; line += 1) {
+      const text = model.getLineContent(line);
+      const firstNonWhitespace = text.search(/\S/);
+      const column = firstNonWhitespace === -1 ? 1 : firstNonWhitespace + 1;
+
+      if (add) {
+        edits.push({
+          range: new monaco.Range(line, column, line, column),
+          text: `${token} `
+        });
+        continue;
+      }
+
+      const trimmedStart = firstNonWhitespace === -1 ? 0 : firstNonWhitespace;
+      const afterIndent = text.slice(trimmedStart);
+
+      if (afterIndent.startsWith(`${token} `)) {
+        edits.push({
+          range: new monaco.Range(line, trimmedStart + 1, line, trimmedStart + token.length + 2),
+          text: ""
+        });
+      } else if (afterIndent.startsWith(token)) {
+        edits.push({
+          range: new monaco.Range(line, trimmedStart + 1, line, trimmedStart + token.length + 1),
+          text: ""
+        });
+      }
+    }
+
+    if (!edits.length) return;
+
+    this.editor.executeEdits("npsharp-comment-lines", edits);
+    this.editor.pushUndoStop();
   }
 
   private async saveTab(tab: EditorTab, forceSaveAs: boolean): Promise<void> {
@@ -505,8 +664,18 @@ toggleBlockComment(): void {
     if (tab.dirty && !confirm(`Descartar alteracoes em ${tab.title}?`)) {
       return false;
     }
+    this.closedTabs.unshift({
+      title: tab.title,
+      path: tab.path,
+      virtualUri: tab.virtualUri,
+      content: tab.model.getValue(),
+      lineEnding: tab.lineEnding
+    });
+    this.closedTabs = this.closedTabs.slice(0, 20);
     const index = this.tabs.indexOf(tab);
     this.tabs.splice(index, 1);
+    this.navigationBackStack = this.navigationBackStack.filter(item => item !== id);
+    this.navigationForwardStack = this.navigationForwardStack.filter(item => item !== id);
     tab.model.dispose();
     if (this.activeId === id) {
       const next = this.tabs[Math.max(0, index - 1)] ?? this.tabs[0];
@@ -518,6 +687,11 @@ toggleBlockComment(): void {
   }
 
   private selectTab(id: string): void {
+    if (!this.navigatingHistory && this.activeId && this.activeId !== id) {
+      this.navigationBackStack.push(this.activeId);
+      this.navigationBackStack = this.navigationBackStack.slice(-50);
+      this.navigationForwardStack = [];
+    }
     this.activeId = id;
     const tab = this.activeTab;
     this.editor.setModel(tab?.model ?? null);
@@ -533,6 +707,33 @@ toggleBlockComment(): void {
   private selectTabByPath(filePath: string): void {
     const tab = this.tabs.find(item => item.path === filePath);
     if (tab) this.selectTab(tab.id);
+  }
+
+  private selectTabByOffset(offset: number): void {
+    if (!this.tabs.length || !this.activeId) {
+      this.onStatus("Nenhuma aba aberta");
+      return;
+    }
+    const index = this.tabs.findIndex(tab => tab.id === this.activeId);
+    const nextIndex = (index + offset + this.tabs.length) % this.tabs.length;
+    this.selectTab(this.tabs[nextIndex].id);
+  }
+
+  private navigateTabHistory(from: string[], to: string[], emptyMessage: string): void {
+    const current = this.activeId;
+    while (from.length) {
+      const next = from.pop();
+      if (!next || !this.tabs.some(tab => tab.id === next)) continue;
+      if (current) to.push(current);
+      this.navigatingHistory = true;
+      try {
+        this.selectTab(next);
+      } finally {
+        this.navigatingHistory = false;
+      }
+      return;
+    }
+    this.onStatus(emptyMessage);
   }
 
   private markDirtyFromEditor(): void {

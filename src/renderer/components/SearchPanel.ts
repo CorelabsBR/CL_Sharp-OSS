@@ -1,5 +1,5 @@
 import type { SearchResult } from "../../shared/types";
-import { api } from "../services/api";
+import { api, platform } from "../services/api";
 import { el } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { basename } from "../utils/path";
@@ -31,6 +31,11 @@ export class SearchPanel {
   focus(): void {
     this.query.focus();
     this.query.select();
+  }
+
+  focusReplace(): void {
+    this.replace.focus();
+    this.replace.select();
   }
 
   private build(): void {
@@ -66,7 +71,9 @@ export class SearchPanel {
       return;
     }
     if (!this.workspace) {
-      this.summary.textContent = "Open a folder to search";
+      this.summary.textContent = platform.isMobile
+        ? "Open a mobile workspace to search"
+        : "Open a folder to search";
       return;
     }
 
@@ -93,7 +100,9 @@ export class SearchPanel {
       return;
     }
     if (!this.workspace) {
-      this.summary.textContent = "Open a folder to replace across files";
+      this.summary.textContent = platform.isMobile
+        ? "Open a mobile workspace to replace across files"
+        : "Open a folder to replace across files";
       return;
     }
     if (!confirm(`Replace "${text}" in ${basename(this.workspace)}?`)) {
@@ -119,18 +128,29 @@ export class SearchPanel {
 
   private renderResults(results: SearchResult[]): void {
     this.list.replaceChildren();
+    const grouped = new Map<string, SearchResult[]>();
     for (const result of results) {
-      const row = el("button", { className: "search-result" });
-      const title = el("div", { className: "search-title", text: `${basename(result.filePath)}  Ln ${result.line}, Col ${result.column}` });
-      const preview = el("div", { className: "search-preview", text: result.preview });
-      const replaceOne = el("button", { className: "mini-action", text: "Replace" });
-      replaceOne.addEventListener("click", event => {
-        event.stopPropagation();
-        void this.replaceSingle(result);
-      });
-      row.append(title, preview, replaceOne);
-      row.addEventListener("click", () => this.openResult(result));
-      this.list.append(row);
+      const key = result.relativePath || result.filePath;
+      grouped.set(key, [...(grouped.get(key) ?? []), result]);
+    }
+
+    for (const [file, fileResults] of grouped) {
+      const group = el("section", { className: "search-file-group" });
+      group.append(el("div", { className: "search-file-title", text: `${file} (${fileResults.length})` }));
+      for (const result of fileResults) {
+        const row = el("button", { className: "search-result" });
+        const title = el("div", { className: "search-title", text: `Ln ${result.line}, Col ${result.column}` });
+        const preview = el("div", { className: "search-preview", text: result.preview });
+        const replaceOne = el("button", { className: "mini-action", text: "Replace" });
+        replaceOne.addEventListener("click", event => {
+          event.stopPropagation();
+          void this.replaceSingle(result);
+        });
+        row.append(title, preview, replaceOne);
+        row.addEventListener("click", () => this.openResult(result));
+        group.append(row);
+      }
+      this.list.append(group);
     }
   }
 

@@ -15,10 +15,13 @@ const IGNORED_DIRECTORY_NAMES = new Set([
   "node_modules",
   "target",
   "build",
+  ".cache",
   "dist",
+  "dist-electron",
   "out",
   "bin",
   "obj",
+  "release",
   "vendor",
   "coverage"
 ]);
@@ -228,9 +231,12 @@ function isSearchablePath(file: string): boolean {
     normalized.includes("/node_modules/") ||
     normalized.includes("/target/") ||
     normalized.includes("/build/") ||
+    normalized.includes("/.cache/") ||
     normalized.includes("/dist/") ||
+    normalized.includes("/dist-electron/") ||
     normalized.includes("/out/") ||
     normalized.includes("/bin/") ||
+    normalized.includes("/release/") ||
     normalized.includes("/.idea/") ||
     normalized.includes("/.gradle/") ||
     normalized.includes("/.settings/") ||

@@ -43,6 +43,15 @@ import { loadSession, loadSettings, resetSettings, saveSession, saveSettings } f
 import { applyTemplate } from "../services/node/templateService";
 import { runJavaDiagnostics } from "../services/node/diagnosticsService";
 import {
+  closeAllTerminals,
+  closeTerminal,
+  createTerminalSession,
+  killTerminal,
+  listTerminalShells,
+  resizeTerminal,
+  writeTerminal
+} from "../services/node/terminalService";
+import {
   deleteRemote,
   executeRemote,
   listRemote,
@@ -74,6 +83,7 @@ import type {
   SaveFileRequest,
   SearchQuery,
   TemplateApplyRequest,
+  TerminalCreateRequest,
   TerminalRunRequest
 } from "../shared/types";
 
@@ -115,6 +125,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   void stopAllLiveServers();
+  closeAllTerminals();
 });
 
 async function createMainWindow(): Promise<void> {
@@ -183,6 +194,7 @@ function createApplicationMenu(): void {
         { label: "Salvar Tudo", click: () => sendCommand("file:saveAll") },
         { type: "separator" },
         { label: "Fechar Editor", accelerator: "CmdOrCtrl+W", click: () => sendCommand("file:close") },
+        { label: "Reabrir Editor Fechado", accelerator: "CmdOrCtrl+Shift+T", click: () => sendCommand("file:reopenClosed") },
         { label: "Fechar Todos os Editores", accelerator: "CmdOrCtrl+Shift+W", click: () => sendCommand("file:closeAll") },
         { type: "separator" },
         { label: "Abrir pasta...", accelerator: "CmdOrCtrl+K CmdOrCtrl+O", click: () => sendCommand("workspace:openFolder") },
@@ -203,6 +215,7 @@ function createApplicationMenu(): void {
         { label: "Find", accelerator: "CmdOrCtrl+F", click: () => sendCommand("editor:find") },
         { label: "Replace", accelerator: "CmdOrCtrl+H", click: () => sendCommand("editor:replace") },
         { label: "Find in Files", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
+        { label: "Replace in Files", accelerator: "CmdOrCtrl+Shift+H", click: () => sendCommand("view:replaceInFiles") },
         { type: "separator" },
         { label: "Comment Line", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:commentLine") },
         { label: "Uncomment Line", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:uncommentLine") },
@@ -223,8 +236,11 @@ function createApplicationMenu(): void {
         { label: "Run and Debug", accelerator: "CmdOrCtrl+Shift+D", click: () => sendCommand("view:run") },
         { label: "Arduino", click: () => sendCommand("view:arduino") },
         { label: "Terminal", accelerator: "CmdOrCtrl+`", click: () => sendCommand("view:terminal") },
-        { label: "Problems", accelerator: "F8", click: () => sendCommand("view:problems") },
-        { label: "Debug Console", click: () => sendCommand("view:debugConsole") },
+        { label: "Toggle Panel", accelerator: "CmdOrCtrl+J", click: () => sendCommand("view:terminal") },
+        { label: "Problems", accelerator: "CmdOrCtrl+Shift+M", click: () => sendCommand("view:problems") },
+        { label: "Output", accelerator: "CmdOrCtrl+Shift+U", click: () => sendCommand("view:output") },
+        { label: "Keyboard Shortcuts", accelerator: "CmdOrCtrl+K CmdOrCtrl+S", click: () => sendCommand("view:keyboardShortcuts") },
+        { label: "Extensions", accelerator: "CmdOrCtrl+Shift+X", click: () => sendCommand("view:extensions") },
         { type: "separator" },
         { role: "zoomIn", label: "Zoom In" },
         { role: "zoomOut", label: "Zoom Out" },
@@ -237,7 +253,8 @@ function createApplicationMenu(): void {
       label: "Tools",
       submenu: [
         { label: "Build Project", accelerator: "CmdOrCtrl+Shift+B", click: () => sendCommand("tools:build") },
-        { label: "Run", accelerator: "CmdOrCtrl+Alt+N", click: () => sendCommand("tools:run") },
+        { label: "Run Current File", accelerator: "CmdOrCtrl+Alt+R", click: () => sendCommand("tools:run") },
+        { label: "Run Without Debugging", accelerator: "CmdOrCtrl+F5", click: () => sendCommand("tools:runWithoutDebug") },
         { label: "Debug Program", accelerator: "F5", click: () => sendCommand("tools:run") },
         { label: "Arduino", click: () => sendCommand("view:arduino") },
         { type: "separator" },
@@ -248,6 +265,8 @@ function createApplicationMenu(): void {
         { label: "Ports", click: () => sendCommand("terminal:ports") },
         { label: "Git", click: () => sendCommand("terminal:git") },
         { label: "Clear Terminal", click: () => sendCommand("terminal:clear") },
+        { label: "Kill Process", click: () => sendCommand("terminal:kill") },
+        { label: "Close Terminal", click: () => sendCommand("terminal:close") },
         { type: "separator" },
         { label: "Git Pull", click: () => sendCommand("git:pull") },
         { label: "Git Push", click: () => sendCommand("git:push") },
@@ -258,6 +277,7 @@ function createApplicationMenu(): void {
       label: "more",
       submenu: [
         { label: "Command Palette", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
+        { label: "Command Center", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
         { label: "About NPSharp", click: () => sendCommand("help:about") }
       ]
     }
@@ -354,6 +374,15 @@ function registerIpcHandlers(): void {
     const result = await runShell(request.command, cwd, request.shell);
     return { cwd, output: result.output, code: result.code };
   });
+  ipcMain.handle("terminal:shells", () => listTerminalShells());
+  ipcMain.handle("terminal:create", (event, request: TerminalCreateRequest) => createTerminalSession(request, {
+    onData: data => event.sender.send("terminal:data", data),
+    onExit: exit => event.sender.send("terminal:exit", exit)
+  }));
+  ipcMain.handle("terminal:write", (_event, id: string, data: string) => writeTerminal(id, data));
+  ipcMain.handle("terminal:resize", (_event, id: string, cols: number, rows: number) => resizeTerminal(id, cols, rows));
+  ipcMain.handle("terminal:kill", (_event, id: string) => killTerminal(id));
+  ipcMain.handle("terminal:close", (_event, id: string) => closeTerminal(id));
 
   ipcMain.handle("runtime:list", () => listRuntimes());
   ipcMain.handle("runtime:discover", () => discoverRuntimes(true));

@@ -180,6 +180,46 @@ export interface TerminalRunResult {
   code: number | null;
 }
 
+export type TerminalBackend = "node-pty" | "child_process";
+
+export interface TerminalShellOption {
+  id: string;
+  label: string;
+  path: string;
+  available: boolean;
+  default: boolean;
+  platform: "linux" | "darwin" | "win32";
+}
+
+export interface TerminalCreateRequest {
+  cwd: string;
+  shell?: string;
+  name?: string;
+  cols?: number;
+  rows?: number;
+}
+
+export interface TerminalSessionInfo {
+  id: string;
+  name: string;
+  cwd: string;
+  shell: string;
+  backend: TerminalBackend;
+  pid?: number;
+  running: boolean;
+}
+
+export interface TerminalDataEvent {
+  id: string;
+  data: string;
+}
+
+export interface TerminalExitEvent {
+  id: string;
+  code: number | null;
+  signal?: string;
+}
+
 export interface LanguageRuntime {
   id: string;
   displayName: string;
@@ -383,6 +423,14 @@ export interface NpsharpApi {
   };
   terminal: {
     run(request: TerminalRunRequest): Promise<TerminalRunResult>;
+    shells(): Promise<TerminalShellOption[]>;
+    create(request: TerminalCreateRequest): Promise<TerminalSessionInfo>;
+    write(id: string, data: string): Promise<void>;
+    resize(id: string, cols: number, rows: number): Promise<void>;
+    kill(id: string): Promise<void>;
+    close(id: string): Promise<void>;
+    onData(callback: (event: TerminalDataEvent) => void): () => void;
+    onExit(callback: (event: TerminalExitEvent) => void): () => void;
   };
   runtime: {
     list(): Promise<InstalledRuntime[]>;

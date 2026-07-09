@@ -36,8 +36,13 @@ import type {
   SearchQuery,
   SearchResult,
   TemplateApplyRequest,
+  TerminalCreateRequest,
+  TerminalDataEvent,
+  TerminalExitEvent,
   TerminalRunRequest,
   TerminalRunResult,
+  TerminalSessionInfo,
+  TerminalShellOption,
   WorkspaceEntry
 } from "../../shared/types";
 import { basename, dirname, extname, joinPath, relativePath } from "../utils/path";
@@ -121,6 +126,7 @@ const MOBILE_TERMINAL_MESSAGE = "Terminal real Node nao esta disponivel no mobil
 const WEB_TERMINAL_MESSAGE = "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
 const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use este painel para manter configuracao e sketches; compile/upload dependem do desktop.";
 const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
+const SEARCH_IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "dist-electron", "release", ".git", "build", ".cache"]);
 
 class CapacitorSandboxFs implements FsApi {
   async listDir(path: string): Promise<WorkspaceEntry[]> {
@@ -404,7 +410,22 @@ function createBrowserApi(): NpsharpApi {
         cwd: request.cwd,
         output: `${platform.isMobile ? MOBILE_TERMINAL_MESSAGE : WEB_TERMINAL_MESSAGE}\n`,
         code: 1
-      })
+      }),
+      shells: async (): Promise<TerminalShellOption[]> => [],
+      create: async (request: TerminalCreateRequest): Promise<TerminalSessionInfo> => ({
+        id: crypto.randomUUID(),
+        name: "Output",
+        cwd: request.cwd,
+        shell: request.shell ?? "unavailable",
+        backend: "child_process",
+        running: false
+      }),
+      write: async (_id: string, _data: string) => undefined,
+      resize: async (_id: string, _cols: number, _rows: number) => undefined,
+      kill: async (_id: string) => undefined,
+      close: async (_id: string) => undefined,
+      onData: (_callback: (event: TerminalDataEvent) => void) => () => undefined,
+      onExit: (_callback: (event: TerminalExitEvent) => void) => () => undefined
     },
     runtime: {
       list: async () => [],
@@ -485,7 +506,7 @@ function createUnavailableGitApi(): NpsharpApi["git"] {
 function createSearchApi(fs: FsApi): NpsharpApi["search"] {
   return {
     workspace: async query => {
-      const files = await collectFiles(fs, query.workspace, query.limit ?? 5000);
+      const files = await collectFiles(fs, query.workspace, query.limit ?? 5000, query.includeHidden ?? false);
       const results: SearchResult[] = [];
       for (const filePath of files) {
         const file = await fs.readFile(filePath);
@@ -495,7 +516,7 @@ function createSearchApi(fs: FsApi): NpsharpApi["search"] {
       return results;
     },
     replaceAll: async request => {
-      const files = await collectFiles(fs, request.workspace, request.limit ?? 5000);
+      const files = await collectFiles(fs, request.workspace, request.limit ?? 5000, request.includeHidden ?? false);
       let changedFiles = 0;
       let replacements = 0;
       for (const filePath of files) {
@@ -677,13 +698,14 @@ function fallbackMessageFor(feature: "git" | "terminal" | "liveServer" | "run"):
   return messages[feature];
 }
 
-async function collectFiles(fs: FsApi, root: string, limit: number): Promise<string[]> {
+async function collectFiles(fs: FsApi, root: string, limit: number, includeHidden: boolean): Promise<string[]> {
   const files: string[] = [];
   async function walk(dir: string): Promise<void> {
     if (files.length >= limit) return;
     const entries = await fs.listDir(dir);
     for (const entry of entries) {
-      if (entry.hidden || entry.name === "node_modules" || entry.name === ".git") continue;
+      const lowerName = entry.name.toLowerCase();
+      if ((!includeHidden && entry.hidden) || SEARCH_IGNORED_DIRECTORIES.has(lowerName)) continue;
       if (entry.directory) await walk(entry.path);
       else files.push(entry.path);
       if (files.length >= limit) return;

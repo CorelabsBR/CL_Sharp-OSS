@@ -62,13 +62,40 @@ const api = {
         history: (repo) => invoke("git:history", repo)
     },
     terminal: {
-        run: (request) => invoke("terminal:run", request)
+        run: (request) => invoke("terminal:run", request),
+        shells: () => invoke("terminal:shells"),
+        create: (request) => invoke("terminal:create", request),
+        write: (id, data) => invoke("terminal:write", id, data),
+        resize: (id, cols, rows) => invoke("terminal:resize", id, cols, rows),
+        kill: (id) => invoke("terminal:kill", id),
+        close: (id) => invoke("terminal:close", id),
+        onData: (callback) => {
+            const listener = (_event, payload) => callback(payload);
+            electron_1.ipcRenderer.on("terminal:data", listener);
+            return () => electron_1.ipcRenderer.removeListener("terminal:data", listener);
+        },
+        onExit: (callback) => {
+            const listener = (_event, payload) => callback(payload);
+            electron_1.ipcRenderer.on("terminal:exit", listener);
+            return () => electron_1.ipcRenderer.removeListener("terminal:exit", listener);
+        }
     },
     runtime: {
         list: () => invoke("runtime:list"),
         discover: () => invoke("runtime:discover"),
         configure: (languageId, executablePath) => invoke("runtime:configure", languageId, executablePath),
         runFile: (request) => invoke("runtime:runFile", request)
+    },
+    arduino: {
+        detect: (request) => invoke("arduino:detect", request),
+        loadConfig: (request) => invoke("arduino:loadConfig", request),
+        saveConfig: (request) => invoke("arduino:saveConfig", request),
+        listPorts: (request) => invoke("arduino:listPorts", request),
+        listBoards: (request) => invoke("arduino:listBoards", request),
+        createSketch: (request) => invoke("arduino:createSketch", request),
+        compile: (request) => invoke("arduino:compile", request),
+        upload: (request) => invoke("arduino:upload", request),
+        monitor: (request) => invoke("arduino:monitor", request)
     },
     liveServer: {
         open: (request) => invoke("liveServer:open", request),

@@ -1,7 +1,7 @@
 import type { LanguageRuntime } from "../../shared/types";
 
 export const LANGUAGE_RUNTIMES: LanguageRuntime[] = [
-  { id: "python", displayName: "Python", executableCandidates: ["python", "python3", "py"], extensions: [".py"] },
+  { id: "python", displayName: "Python", executableCandidates: ["python3", "python", "py"], extensions: [".py"] },
   { id: "node", displayName: "JavaScript/TypeScript", executableCandidates: ["node"], extensions: [".js", ".mjs", ".cjs", ".ts", ".tsx"] },
   { id: "java", displayName: "Java", executableCandidates: ["java"], extensions: [".java"] },
   { id: "cpp", displayName: "C/C++", executableCandidates: ["clang", "gcc", "g++"], extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"] },

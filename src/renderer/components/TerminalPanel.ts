@@ -1,7 +1,10 @@
+import type { TerminalDataEvent, TerminalExitEvent, TerminalShellOption } from "../../shared/types";
 import { api, platform } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { dirname, joinPath } from "../utils/path";
+
+type TerminalMode = "terminal" | "debug" | "problems" | "output" | "ports" | "git";
 
 interface TerminalSession {
   id: string;
@@ -10,7 +13,13 @@ interface TerminalSession {
   output: string;
   history: string[];
   historyIndex: number;
+  shell: string;
+  backend: "node-pty" | "child_process" | "local";
+  running: boolean;
+  localOnly: boolean;
 }
+
+const MAX_SCROLLBACK = 240000;
 
 export class TerminalPanel {
   readonly element = el("section", { className: "terminal-panel" });
@@ -21,10 +30,15 @@ export class TerminalPanel {
   private readonly debugOutput = el("pre", { className: "terminal-output debug-output" });
   private readonly debugInput = el("input", { className: "terminal-input debug-input", attrs: { placeholder: "Entrada do programa..." } });
   private readonly auxOutput = el("pre", { className: "terminal-output aux-output" });
+  private readonly shellSelect = el("select", { className: "terminal-shell-select", title: "Shell" });
   private sessions: TerminalSession[] = [];
+  private shellOptions: TerminalShellOption[] = [];
   private activeId?: string;
-  private mode: "terminal" | "debug" | "problems" | "output" | "ports" | "git" = "terminal";
+  private mode: TerminalMode = "terminal";
   private shell?: string;
+  private terminalCounter = 0;
+  private enabled = true;
+  private creatingTerminal?: Promise<void>;
 
   constructor(
     private readonly cwdSupplier: () => string,
@@ -35,29 +49,29 @@ export class TerminalPanel {
   }
 
   hasTerminal(): boolean {
-    return this.sessions.length > 0;
+    return this.sessions.length > 0 || Boolean(this.creatingTerminal);
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
   }
 
   setShell(shell?: string): void {
     this.shell = shell?.trim() || undefined;
+    this.renderShellOptions();
   }
 
   newTerminal(): void {
-    const session: TerminalSession = {
-      id: crypto.randomUUID(),
-      name: `Terminal ${this.sessions.length + 1}`,
-      cwd: this.cwdSupplier(),
-      output: "",
-      history: [],
-      historyIndex: -1
-    };
-    session.output = platform.canUseTerminal
-      ? this.prompt(session)
-      : `${terminalUnavailableMessage()}\n${this.prompt(session)}`;
-    this.sessions.push(session);
-    this.activeId = session.id;
-    this.mode = "terminal";
-    this.render();
+    void this.startTerminalCreation();
+  }
+
+  async ensureTerminal(): Promise<void> {
+    if (this.sessions.length > 0) return;
+    if (this.creatingTerminal) {
+      await this.creatingTerminal;
+      return;
+    }
+    await this.startTerminalCreation();
   }
 
   splitTerminal(): void {
@@ -65,12 +79,11 @@ export class TerminalPanel {
   }
 
   killCurrentTerminal(): void {
-    const index = this.sessions.findIndex(item => item.id === this.activeId);
-    if (index >= 0) {
-      this.sessions.splice(index, 1);
-      this.activeId = this.sessions[Math.max(0, index - 1)]?.id;
-    }
-    this.render();
+    void this.killCurrentProcess();
+  }
+
+  closeCurrentTerminal(): void {
+    void this.closeActiveTerminal();
   }
 
   clearCurrentTerminal(): void {
@@ -85,11 +98,13 @@ export class TerminalPanel {
     }
     const session = this.activeSession();
     if (!session) return;
-    session.output = this.prompt(session);
+    session.output = session.localOnly ? this.prompt(session) : "";
     this.render();
   }
 
   focusCurrentTerminal(): void {
+    this.mode = "terminal";
+    this.render();
     this.input.focus();
   }
 
@@ -148,46 +163,62 @@ export class TerminalPanel {
     this.render();
   }
 
+  appendTerminalOutput(text: string): void {
+    void this.ensureTerminal().then(() => {
+      this.mode = "terminal";
+      const session = this.activeSession();
+      if (!session) return;
+      session.output = trimScrollback(`${session.output}${ensureTrailingNewline(text)}`);
+      this.render();
+    });
+  }
+
   async runCommand(command: string): Promise<void> {
-    if (!this.hasTerminal()) this.newTerminal();
+    await this.ensureTerminal();
     this.mode = "terminal";
     const session = this.activeSession();
-    if (!session || !command.trim()) return;
+    const normalized = command.trim();
+    if (!session || !normalized) return;
 
     session.history.push(command);
     session.historyIndex = session.history.length;
-    session.output += `${command}\n`;
-    const cdTarget = parseCd(command);
-    if (cdTarget !== undefined) {
-      session.cwd = resolveCwd(session.cwd, cdTarget);
-      session.output += this.prompt(session);
+
+    if (normalized === "clear" || normalized === "cls") {
+      this.clearCurrentTerminal();
+      return;
+    }
+
+    if (session.localOnly) {
+      this.runLocalCommand(session, command);
       this.render();
       return;
     }
 
-    if (!platform.canUseTerminal) {
-      session.output += `${terminalUnavailableMessage()}\n${this.prompt(session)}`;
-      this.updateStatus("Terminal indisponivel neste ambiente");
+    if (!session.running) {
+      session.output = trimScrollback(`${session.output}\n[terminal] Processo encerrado. Abra um novo terminal.\n`);
+      this.updateStatus("Processo do terminal encerrado");
       this.render();
       return;
     }
 
-    this.render();
+    if (session.backend === "child_process") {
+      session.output = trimScrollback(`${session.output}${this.prompt(session)}${command}\n`);
+    }
+
     try {
-      const result = await api.terminal.run({ cwd: session.cwd, command, shell: this.shell });
-      session.cwd = result.cwd;
-      session.output += result.output;
-      if (result.output && !result.output.endsWith("\n")) session.output += "\n";
-      session.output += this.prompt(session);
-      this.updateStatus(`Command exited with ${result.code ?? 1}`);
+      await api.terminal.write(session.id, `${command}\n`);
     } catch (error) {
       const message = reportError(error, this.updateStatus, "Terminal command failed");
-      session.output += `${message}\n${this.prompt(session)}`;
+      session.output = trimScrollback(`${session.output}${message}\n`);
     }
     this.render();
   }
 
   private build(): void {
+    api.terminal.onData(event => this.handleTerminalData(event));
+    api.terminal.onExit(event => this.handleTerminalExit(event));
+    void this.loadShellOptions();
+
     const problemsTab = el("button", { className: "panel-tab", text: "PROBLEMS", attrs: { "data-mode": "problems" } });
     problemsTab.addEventListener("click", () => this.showProblemsPanel());
     const outputTab = el("button", { className: "panel-tab", text: "OUTPUT", attrs: { "data-mode": "output" } });
@@ -200,15 +231,22 @@ export class TerminalPanel {
     portsTab.addEventListener("click", () => this.showPortsPanel());
     const gitTab = el("button", { className: "panel-tab", text: "GIT", attrs: { "data-mode": "git" } });
     gitTab.addEventListener("click", () => this.showGitPanel());
+
+    this.shellSelect.addEventListener("change", () => {
+      this.shell = this.shellSelect.value;
+      this.updateStatus(`Shell selecionado: ${this.shellLabel(this.shell)}`);
+    });
+
     const actions = el("div", { className: "terminal-actions" });
     actions.append(
       buttonIcon("add", "New Terminal", () => this.newTerminal()),
       buttonIcon("split-horizontal", "Split Terminal", () => this.splitTerminal()),
-      buttonIcon("clear-all", "Clear", () => this.mode === "debug" ? this.clearDebugConsole() : this.clearCurrentTerminal()),
-      buttonIcon("trash", "Kill Terminal", () => this.killCurrentTerminal()),
+      buttonIcon("clear-all", "Clear Terminal", () => this.clearCurrentTerminal()),
+      buttonIcon("debug-stop", "Kill Process", () => this.killCurrentTerminal()),
+      buttonIcon("trash", "Close Terminal", () => this.closeCurrentTerminal()),
       buttonIcon("close", "Close Terminal Panel", () => this.closePanel())
     );
-    this.header.append(problemsTab, outputTab, debugTab, terminalTab, portsTab, gitTab, el("div", { className: "spacer" }), actions);
+    this.header.append(problemsTab, outputTab, debugTab, terminalTab, portsTab, gitTab, el("div", { className: "spacer" }), this.shellSelect, actions);
     this.input.addEventListener("keydown", event => {
       const session = this.activeSession();
       if (event.key === "Enter") {
@@ -237,10 +275,154 @@ export class TerminalPanel {
     this.newTerminal();
   }
 
+  private async loadShellOptions(): Promise<void> {
+    try {
+      this.shellOptions = await api.terminal.shells();
+    } catch {
+      this.shellOptions = [];
+    }
+    this.renderShellOptions();
+  }
+
+  private startTerminalCreation(): Promise<void> {
+    const promise = this.createTerminal();
+    this.creatingTerminal = promise;
+    void promise.finally(() => {
+      if (this.creatingTerminal === promise) this.creatingTerminal = undefined;
+    });
+    return promise;
+  }
+
+  private async createTerminal(): Promise<void> {
+    const cwd = this.cwdSupplier();
+    const name = `Terminal ${++this.terminalCounter}`;
+    const shell = this.selectedShell();
+
+    if (!this.enabled || !platform.canUseTerminal) {
+      const session = this.localSession(name, cwd, shell, this.enabled ? terminalUnavailableMessage() : "Terminal desativado nas configuracoes.");
+      this.sessions.push(session);
+      this.activeId = session.id;
+      this.mode = "terminal";
+      this.render();
+      return;
+    }
+
+    try {
+      const info = await api.terminal.create({ cwd, shell, name, cols: this.terminalCols(), rows: 30 });
+      const output = info.backend === "child_process"
+        ? `[terminal] Fallback child_process ativo: ${info.shell}\n`
+        : "";
+      this.sessions.push({
+        id: info.id,
+        name: info.name,
+        cwd: info.cwd,
+        output,
+        history: [],
+        historyIndex: -1,
+        shell: info.shell,
+        backend: info.backend,
+        running: info.running,
+        localOnly: false
+      });
+      this.activeId = info.id;
+      this.mode = "terminal";
+      this.updateStatus(`${info.name} aberto com ${this.shellLabel(info.shell)}`);
+    } catch (error) {
+      const message = reportError(error, this.updateStatus, "Terminal failed");
+      this.sessions.push(this.localSession(name, cwd, shell, message));
+      this.activeId = this.sessions.at(-1)?.id;
+    }
+    this.render();
+  }
+
+  private localSession(name: string, cwd: string, shell: string, message: string): TerminalSession {
+    return {
+      id: crypto.randomUUID(),
+      name,
+      cwd,
+      output: `${message}\n${cwd}> `,
+      history: [],
+      historyIndex: -1,
+      shell,
+      backend: "local",
+      running: false,
+      localOnly: true
+    };
+  }
+
+  private async killCurrentProcess(): Promise<void> {
+    const session = this.activeSession();
+    if (!session) return;
+    if (session.localOnly || !session.running) {
+      session.output = trimScrollback(`${session.output}\n[terminal] Nenhum processo ativo para encerrar.\n`);
+      this.render();
+      return;
+    }
+    try {
+      await api.terminal.kill(session.id);
+      session.output = trimScrollback(`${session.output}\n[terminal] Encerrando processo...\n`);
+      this.updateStatus("Processo do terminal encerrado");
+    } catch (error) {
+      const message = reportError(error, this.updateStatus, "Kill terminal failed");
+      session.output = trimScrollback(`${session.output}${message}\n`);
+    }
+    this.render();
+  }
+
+  private async closeActiveTerminal(): Promise<void> {
+    const index = this.sessions.findIndex(item => item.id === this.activeId);
+    if (index < 0) return;
+    const [session] = this.sessions.splice(index, 1);
+    if (!session.localOnly) {
+      try {
+        await api.terminal.close(session.id);
+      } catch (error) {
+        reportError(error, this.updateStatus, "Close terminal failed");
+      }
+    }
+    this.activeId = this.sessions[Math.min(index, this.sessions.length - 1)]?.id;
+    if (!this.activeId && this.sessions[0]) this.activeId = this.sessions[0].id;
+    this.render();
+  }
+
+  private handleTerminalData(event: TerminalDataEvent): void {
+    const session = this.sessions.find(item => item.id === event.id);
+    if (!session) return;
+    const normalized = normalizeTerminalData(event.data);
+    if (normalized.clear) session.output = "";
+    session.output = trimScrollback(`${session.output}${normalized.text}`);
+    if (session.id === this.activeId && this.mode === "terminal") this.render();
+  }
+
+  private handleTerminalExit(event: TerminalExitEvent): void {
+    const session = this.sessions.find(item => item.id === event.id);
+    if (!session) return;
+    session.running = false;
+    const suffix = event.signal ? ` (${event.signal})` : "";
+    session.output = trimScrollback(`${session.output}\n[terminal] Processo finalizado com codigo ${event.code ?? 0}${suffix}.\n`);
+    if (session.id === this.activeId && this.mode === "terminal") this.render();
+  }
+
+  private runLocalCommand(session: TerminalSession, command: string): void {
+    session.output = trimScrollback(`${session.output}${command}\n`);
+    const cdTarget = parseCd(command);
+    if (cdTarget !== undefined) {
+      session.cwd = resolveCwd(session.cwd, cdTarget);
+      session.output = trimScrollback(`${session.output}${this.prompt(session)}`);
+      return;
+    }
+    session.output = trimScrollback(`${session.output}${terminalUnavailableMessage()}\n${this.prompt(session)}`);
+    this.updateStatus("Terminal indisponivel neste ambiente");
+  }
+
   private render(): void {
     this.tabs.replaceChildren();
     for (const session of this.sessions) {
-      const button = el("button", { className: `terminal-tab ${session.id === this.activeId ? "active" : ""}`, text: session.name });
+      const button = el("button", {
+        className: `terminal-tab ${session.id === this.activeId ? "active" : ""} ${session.running ? "running" : "stopped"}`.trim(),
+        text: session.name,
+        title: `${this.shellLabel(session.shell)} - ${session.running ? "running" : "stopped"}`
+      });
       button.addEventListener("click", () => {
         this.activeId = session.id;
         this.mode = "terminal";
@@ -253,6 +435,9 @@ export class TerminalPanel {
     this.output.hidden = this.mode !== "terminal";
     this.tabs.hidden = this.mode !== "terminal";
     this.input.hidden = this.mode !== "terminal";
+    this.input.disabled = this.mode !== "terminal" || !session;
+    this.input.placeholder = session?.running || session?.localOnly ? "Command" : "Process stopped";
+    this.shellSelect.hidden = this.mode !== "terminal";
     this.debugOutput.hidden = this.mode !== "debug";
     this.debugInput.hidden = this.mode !== "debug";
     this.auxOutput.hidden = !["problems", "output", "ports", "git"].includes(this.mode);
@@ -264,8 +449,41 @@ export class TerminalPanel {
     }
   }
 
+  private renderShellOptions(): void {
+    const selected = this.selectedShell();
+    this.shellSelect.replaceChildren();
+    const available = this.shellOptions.filter(option => option.available);
+    const options = available.length ? available : this.shellOptions;
+    for (const option of options) {
+      this.shellSelect.append(el("option", {
+        text: option.available ? option.label : `${option.label} (missing)`,
+        attrs: { value: option.path }
+      }));
+    }
+    if (selected && !Array.from(this.shellSelect.options).some(option => option.value === selected)) {
+      this.shellSelect.append(el("option", { text: this.shellLabel(selected), attrs: { value: selected } }));
+    }
+    this.shellSelect.value = selected;
+  }
+
   private activeSession(): TerminalSession | undefined {
     return this.sessions.find(item => item.id === this.activeId);
+  }
+
+  private selectedShell(): string {
+    const fromSelect = this.shellSelect.value?.trim();
+    const configured = this.shell?.trim();
+    const detectedDefault = this.shellOptions.find(option => option.default && option.available)?.path;
+    const firstAvailable = this.shellOptions.find(option => option.available)?.path;
+    return fromSelect || configured || detectedDefault || firstAvailable || "";
+  }
+
+  private shellLabel(shell: string): string {
+    return this.shellOptions.find(option => option.path === shell)?.label || shell.split(/[\\/]/).pop() || shell || "default";
+  }
+
+  private terminalCols(): number {
+    return Math.max(40, Math.floor((this.output.clientWidth || 960) / 8));
   }
 
   private prompt(session: TerminalSession): string {
@@ -289,4 +507,22 @@ function terminalUnavailableMessage(): string {
   return platform.isMobile
     ? "Terminal real Node nao esta disponivel no mobile. Use este painel como Output/Command Log."
     : "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
+}
+
+function normalizeTerminalData(data: string): { text: string; clear: boolean } {
+  const clear = /\x1bc|\x1B\[[0-?]*[ -/]*[HJ]/.test(data);
+  const text = data
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
+    .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "");
+  return { text, clear };
+}
+
+function trimScrollback(text: string): string {
+  return text.length > MAX_SCROLLBACK ? text.slice(text.length - MAX_SCROLLBACK) : text;
+}
+
+function ensureTrailingNewline(text: string): string {
+  return text.endsWith("\n") ? text : `${text}\n`;
 }
