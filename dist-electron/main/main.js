@@ -189,6 +189,8 @@ function createApplicationMenu() {
                 { label: "Ports", click: () => sendCommand("terminal:ports") },
                 { label: "Git", click: () => sendCommand("terminal:git") },
                 { label: "Clear Terminal", click: () => sendCommand("terminal:clear") },
+                { label: "Kill Process", click: () => sendCommand("terminal:kill") },
+                { label: "Close Terminal", click: () => sendCommand("terminal:close") },
                 { type: "separator" },
                 { label: "Git Pull", click: () => sendCommand("git:pull") },
                 { label: "Git Push", click: () => sendCommand("git:push") },

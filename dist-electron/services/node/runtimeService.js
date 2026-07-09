@@ -115,12 +115,12 @@ async function runNodeLikeFile(displayName, filePath, runtime) {
     const extension = node_path_1.default.extname(filePath).toLowerCase();
     let command;
     if (extension === ".ts" || extension === ".tsx") {
-        const tsx = await (0, processService_1.commandExists)("tsx");
         const tsNode = await (0, processService_1.commandExists)("ts-node");
-        if (tsx)
-            command = [tsx, filePath];
-        else if (tsNode)
+        const tsx = await (0, processService_1.commandExists)("tsx");
+        if (tsNode)
             command = [tsNode, filePath];
+        else if (tsx)
+            command = [tsx, filePath];
     }
     else if (runtime) {
         command = [runtime.executablePath, filePath];
