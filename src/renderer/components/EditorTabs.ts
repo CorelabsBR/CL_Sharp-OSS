@@ -401,74 +401,9 @@ export class EditorTabs {
     this.runEditorAction("editor.action.removeCommentLine", "Comentario removido", () => this.commentSelectedLines(false));
   }
 
-addLineComment(): void {
-  this.editor.focus();
-  this.commentSelectedLines(true);
-}
-
-removeLineComment(): void {
-  this.editor.focus();
-  this.commentSelectedLines(false);
-}
-
 toggleLineComment(): void {
   this.editor.focus();
   this.editor.trigger("keyboard", "editor.action.commentLine", null);
-}
-
-private commentSelectedLines(add: boolean): void {
-  const model = this.editor.getModel();
-  const selection = this.editor.getSelection();
-  if (!model || !selection) return;
-
-  const language = model.getLanguageId();
-  const token = lineCommentToken(language);
-  if (!token) {
-    this.onStatus(`Comentario de linha nao configurado para ${language}`);
-    return;
-  }
-
-  const startLine = selection.startLineNumber;
-  const endLine =
-    selection.endColumn === 1 && selection.endLineNumber > startLine
-      ? selection.endLineNumber - 1
-      : selection.endLineNumber;
-
-  const edits: monaco.editor.IIdentifiedSingleEditOperation[] = [];
-
-  for (let line = startLine; line <= endLine; line += 1) {
-    const text = model.getLineContent(line);
-    const firstNonWhitespace = text.search(/\S/);
-    const column = firstNonWhitespace === -1 ? 1 : firstNonWhitespace + 1;
-
-    if (add) {
-      edits.push({
-        range: new monaco.Range(line, column, line, column),
-        text: `${token} `
-      });
-      continue;
-    }
-
-    const trimmedStart = firstNonWhitespace === -1 ? 0 : firstNonWhitespace;
-    const afterIndent = text.slice(trimmedStart);
-
-    if (afterIndent.startsWith(`${token} `)) {
-      edits.push({
-        range: new monaco.Range(line, trimmedStart + 1, line, trimmedStart + token.length + 2),
-        text: ""
-      });
-    } else if (afterIndent.startsWith(token)) {
-      edits.push({
-        range: new monaco.Range(line, trimmedStart + 1, line, trimmedStart + token.length + 1),
-        text: ""
-      });
-    }
-  }
-
-  if (!edits.length) return;
-
-  this.editor.executeEdits("npsharp-comment-lines", edits);
-  this.editor.pushUndoStop();
 }
 
 
