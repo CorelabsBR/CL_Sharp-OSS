@@ -201,7 +201,7 @@ async function loadVSCodeTheme(url: string): Promise<VSCodeThemeFile | undefined
       console.warn(`[NPSharp assets] Theme file returned ${response.status}: ${url}`);
       return undefined;
     }
-    return JSON.parse(stripJsonComments(await response.text())) as VSCodeThemeFile;
+    return JSON.parse(stripJsonc(await response.text())) as VSCodeThemeFile;
   } catch (error) {
     console.warn(`[NPSharp assets] Failed to load theme file: ${url}`, error);
     return undefined;
@@ -299,8 +299,108 @@ function toResourcePath(path: string): string {
   return resourceUrl(`themes/${path.replace(/^\.\//, "")}`);
 }
 
+function stripJsonc(input: string): string {
+  return removeTrailingCommas(stripJsonComments(input));
+}
+
 function stripJsonComments(input: string): string {
-  return input
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  let output = "";
+  let inString = false;
+  let escaped = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    const next = input[index + 1];
+
+    if (inLineComment) {
+      if (char === "\n" || char === "\r") {
+        inLineComment = false;
+        output += char;
+      }
+      continue;
+    }
+
+    if (inBlockComment) {
+      if (char === "\n" || char === "\r") output += char;
+      if (char === "*" && next === "/") {
+        inBlockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      output += char;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      inLineComment = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      inBlockComment = true;
+      index += 1;
+      continue;
+    }
+
+    output += char;
+  }
+
+  return output;
+}
+
+function removeTrailingCommas(input: string): string {
+  let output = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      output += char;
+      continue;
+    }
+
+    if (char === ",") {
+      let lookahead = index + 1;
+      while (/\s/.test(input[lookahead] ?? "")) lookahead += 1;
+      if (input[lookahead] === "}" || input[lookahead] === "]") continue;
+    }
+
+    output += char;
+  }
+
+  return output;
 }

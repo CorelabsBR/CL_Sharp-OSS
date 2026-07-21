@@ -56,7 +56,7 @@ export class IdePage {
   private shortcutController?: GlobalShortcutController;
   private activePanel: PanelId = "explorer";
   private settings!: AppSettings;
-  private session: PersistedSession = { openFiles: [], sidePanel: "explorer", terminalVisible: true };
+  private session: PersistedSession = { openFiles: [], sidePanel: "explorer", terminalVisible: false };
   private diagnostics: EditorDiagnostic[] = [];
   private diagnosticIndex = -1;
   private settingsCategory: SettingsCategory = "Appearance";
@@ -65,7 +65,7 @@ export class IdePage {
   private appInfoPath = "";
   private commandCenterForced = false;
   private focusMode = false;
-  private terminalVisibleBeforeFocus = true;
+  private terminalVisibleBeforeFocus = false;
   private sidebarHiddenBeforeFocus = false;
   private compactPreview = false;
   private liveServerActive = false;
@@ -775,7 +775,8 @@ export class IdePage {
       return (await api.terminal.shells())
         .filter(option => option.available)
         .map(option => ({ value: option.path, label: option.label }));
-    } catch {
+    } catch (error) {
+      console.warn("[NPSharp terminal] Failed to list shells for settings.", error);
       return [];
     }
   }
@@ -916,7 +917,8 @@ export class IdePage {
     if (await api.fs.exists(path)) {
       try {
         entries = JSON.parse((await api.fs.readFile(path)).content) as Array<{ url: string; savedAt: string }>;
-      } catch {
+      } catch (error) {
+        console.warn(`[NPSharp remote] Failed to read saved remote projects from ${path}; starting with an empty list.`, error);
         entries = [];
       }
     }
@@ -1172,7 +1174,8 @@ export class IdePage {
         if (pkg.scripts?.dev) return "npm run dev";
         if (pkg.scripts?.start) return "npm start";
         if (pkg.scripts?.test) return "npm test";
-      } catch {
+      } catch (error) {
+        console.warn(`[NPSharp runtime] Failed to inspect ${packageJson}.`, error);
         this.updateStatus("package.json invalido para Run");
       }
     }
@@ -1699,7 +1702,7 @@ function panelTitle(panel: PanelId): string {
 
 function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
-  const path = el("span", { className: "settings-path", text: platform.isMobile ? "Documents/NPSharp/settings.json" : "~/.npsharp/settings.json" });
+  const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/NPSharp/settings.json" : "~/.npsharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
   const save = el("button", { className: "wide-action", text: "Save" });
   save.addEventListener("click", onSave);

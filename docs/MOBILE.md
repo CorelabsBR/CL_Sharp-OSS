@@ -10,16 +10,18 @@ O NPSharp usa a mesma base renderer para Electron, Capacitor e fallback web. A c
 
 ## Mobile Workspace
 
-No mobile nao existe um workspace arbitrario do sistema como no desktop. O NPSharp cria uma area persistente em:
+No mobile nao existe um workspace arbitrario do sistema como no desktop. O NPSharp separa dados internos da area de arquivos do usuario:
 
 ```text
-Documents/NPSharp/
-Documents/NPSharp/settings.json
+Directory.Data/NPSharp/settings.json
+Directory.Data/NPSharp/session.json
 Documents/NPSharp/notes.nps.md
 Documents/NPSharp/workspaces/
 ```
 
-O Command Center mostra "Abrir workspace mobile" e cria/abre pastas dentro de `Documents/NPSharp/workspaces`.
+Settings, sessao e configuracoes internas usam `Directory.Data` e nao dependem da permissao publica de armazenamento. Notes, Explorer, busca e workspaces usam `Documents/NPSharp`; antes da primeira operacao o app chama `Filesystem.checkPermissions()`/`Filesystem.requestPermissions()`. Se a permissao for negada, a operacao e interrompida com uma mensagem clara ao usuario.
+
+O Command Center mostra "Abrir workspace mobile" e cria/abre pastas dentro de `Documents/NPSharp/workspaces` apos a autorizacao do sistema.
 
 ## Recursos
 
@@ -49,6 +51,8 @@ appId/applicationId: br.com.corelabs.npsharp
 appName: NPSharp
 webDir: dist
 ```
+
+O manifesto declara `READ_EXTERNAL_STORAGE` ate Android 12L, `WRITE_EXTERNAL_STORAGE` ate Android 10 e `requestLegacyExternalStorage` para compatibilidade com Android 10. Em Android 11 ou superior, `Directory.Documents` continua limitado pelo proprio sistema aos arquivos/pastas que o app criou.
 
 Depois de alterar assets ou dependencias Capacitor:
 

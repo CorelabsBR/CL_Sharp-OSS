@@ -1,6 +1,6 @@
 {
   "name": "npsharp-electron",
-  "version": "1.0.0",
+  "version": "26.3.2",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -68,8 +68,11 @@
         ]
       }
     ],
+    "npmRebuild": true,
+    "nativeRebuilder": "parallel",
     "asarUnpack": [
-      "node_modules/node-pty/**/*"
+      "node_modules/node-pty/**/*",
+      "node_modules/cpu-features/**/*"
     ],
     "linux": {
       "target": [
@@ -104,6 +107,7 @@
     },
     "deb": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "afterInstall": "build/linux-after-install.sh",
       "fpm": [
         "--deb-no-default-config-files"
       ],
@@ -113,6 +117,10 @@
         "libnss3",
         "libxss1",
         "libxtst6",
+        "libasound2",
+        "libgbm1",
+        "libdrm2",
+        "libxkbcommon0",
         "xdg-utils",
         "libatspi2.0-0",
         "libuuid1",

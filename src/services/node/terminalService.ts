@@ -49,6 +49,7 @@ interface ShellCandidate {
 
 const sessions = new Map<string, ManagedTerminal>();
 let cachedPty: NodePtyModule | null | undefined;
+const TERMINAL_FORCE_CLOSE_DELAY_MS = 1500;
 
 export async function listTerminalShells(): Promise<TerminalShellOption[]> {
   const candidates = shellCandidates();
@@ -140,12 +141,17 @@ function createPtySession(
     const info = terminalInfo(id, name, cwd, shell, "node-pty", terminal.pid);
     let exited = false;
     let closed = false;
+    let forceCloseTimer: NodeJS.Timeout | undefined;
     terminal.onData(data => {
       if (!closed) callbacks.onData({ id, data });
     });
     terminal.onExit(event => {
       if (exited) return;
       exited = true;
+      if (forceCloseTimer) {
+        clearTimeout(forceCloseTimer);
+        forceCloseTimer = undefined;
+      }
       info.running = false;
       if (!closed) callbacks.onExit({ id, code: event.exitCode, signal: event.signal ? String(event.signal) : undefined });
     });
@@ -156,11 +162,16 @@ function createPtySession(
       },
       resize: (nextCols, nextRows) => terminal.resize?.(nextCols, nextRows),
       kill: () => {
-        if (info.running) terminal.kill("SIGTERM");
+        if (info.running) terminatePty(terminal, "SIGTERM", id);
       },
       close: () => {
         closed = true;
-        if (info.running) terminal.kill("SIGKILL");
+        if (!exited && info.running) {
+          terminatePty(terminal, "SIGTERM", id);
+          forceCloseTimer = scheduleForceClose(() => {
+            if (!exited) terminatePty(terminal, "SIGKILL", id);
+          });
+        }
         info.running = false;
       }
     };
@@ -182,10 +193,15 @@ function createChildProcessSession(
   const info = terminalInfo(id, name, cwd, shell, "child_process");
   let exited = false;
   let closed = false;
+  let forceCloseTimer: NodeJS.Timeout | undefined;
 
   const finish = (code: number | null, signal?: NodeJS.Signals | string | null) => {
     if (exited) return;
     exited = true;
+    if (forceCloseTimer) {
+      clearTimeout(forceCloseTimer);
+      forceCloseTimer = undefined;
+    }
     info.running = false;
     if (closed) return;
     callbacks.onExit({ id, code, signal: signal ? String(signal) : undefined });
@@ -222,16 +238,52 @@ function createChildProcessSession(
     },
     resize: () => undefined,
     kill: () => {
-      if (info.running) child?.kill("SIGTERM");
+      if (info.running) terminateChild(child, "SIGTERM", id);
     },
     close: () => {
       closed = true;
       child?.stdout.removeAllListeners("data");
       child?.stderr.removeAllListeners("data");
-      if (info.running) child?.kill("SIGKILL");
+      if (!exited && info.running) {
+        terminateChild(child, "SIGTERM", id);
+        forceCloseTimer = scheduleForceClose(() => {
+          if (!exited) terminateChild(child, "SIGKILL", id);
+        });
+      }
       info.running = false;
     }
   };
+}
+
+function scheduleForceClose(callback: () => void): NodeJS.Timeout {
+  const timer = setTimeout(callback, TERMINAL_FORCE_CLOSE_DELAY_MS);
+  timer.unref?.();
+  return timer;
+}
+
+function terminatePty(terminal: PtyProcess, signal: string, id: string): void {
+  try {
+    terminal.kill(signal);
+  } catch (error) {
+    if (!isNoSuchProcessError(error)) {
+      console.warn(`[NPSharp terminal] Failed to send ${signal} to PTY ${id}.`, error);
+    }
+  }
+}
+
+function terminateChild(child: ChildProcessWithoutNullStreams | undefined, signal: NodeJS.Signals, id: string): void {
+  if (!child || child.killed) return;
+  try {
+    child.kill(signal);
+  } catch (error) {
+    if (!isNoSuchProcessError(error)) {
+      console.warn(`[NPSharp terminal] Failed to send ${signal} to child process ${id}.`, error);
+    }
+  }
+}
+
+function isNoSuchProcessError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === "ESRCH";
 }
 
 function terminalInfo(id: string, name: string, cwd: string, shell: string, backend: TerminalBackend, pid?: number): TerminalSessionInfo {

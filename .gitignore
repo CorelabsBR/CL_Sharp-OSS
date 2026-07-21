@@ -24,7 +24,8 @@ dist/
 dist-electron/
 node_modules/
 target/
-build/
+build/*
+!build/linux-after-install.sh
 *.AppImage
 *.deb
 *.rpm

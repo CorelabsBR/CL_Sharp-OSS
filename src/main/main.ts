@@ -90,6 +90,8 @@ import type {
 } from "../shared/types";
 
 let mainWindow: BrowserWindow | undefined;
+let shuttingDown = false;
+let runtimeResourcesClosed = false;
 
 interface WorkspaceWatcherRegistration {
   readonly dispose: () => void;
@@ -105,6 +107,8 @@ interface TerminalRegistration {
 const workspaceWatchers = new Map<string, WorkspaceWatcherRegistration>();
 const terminalRegistrations = new Map<WebContents, TerminalRegistration>();
 
+installProcessLifecycleHandlers();
+
 const gotLock = process.env.VITE_DEV_SERVER_URL ? true : app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -112,6 +116,7 @@ if (!gotLock) {
 
 if (!process.env.VITE_DEV_SERVER_URL) {
   app.on("second-instance", () => {
+    if (shuttingDown) return;
     const window = currentMainWindow();
     if (!window) return;
     if (window.isMinimized()) window.restore();
@@ -125,7 +130,7 @@ app.whenReady().then(async () => {
   await createMainWindow();
 
   app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!shuttingDown && BrowserWindow.getAllWindows().length === 0) {
       await createMainWindow();
     }
   });
@@ -141,9 +146,13 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  void stopAllLiveServers();
-  closeRegisteredTerminals();
-  closeWorkspaceWatchers();
+  shuttingDown = true;
+  cleanupRuntimeResources();
+});
+
+app.on("will-quit", () => {
+  shuttingDown = true;
+  cleanupRuntimeResources();
 });
 
 async function createMainWindow(): Promise<void> {
@@ -232,7 +241,7 @@ function createApplicationMenu(): void {
         { label: "Reabrir Editor Fechado", accelerator: "CmdOrCtrl+Shift+T", click: () => sendCommand("file:reopenClosed") },
         { label: "Fechar Todos os Editores", accelerator: "CmdOrCtrl+Shift+W", click: () => sendCommand("file:closeAll") },
         { type: "separator" },
-        { label: "Abrir pasta...", accelerator: "CmdOrCtrl+K CmdOrCtrl+O", click: () => sendCommand("workspace:openFolder") },
+        { label: "Abrir pasta...", click: () => sendCommand("workspace:openFolder") },
         { type: "separator" },
         { role: "quit", label: "Exit" }
       ]
@@ -274,7 +283,7 @@ function createApplicationMenu(): void {
         { label: "Toggle Panel", accelerator: "CmdOrCtrl+J", click: () => sendCommand("view:terminal") },
         { label: "Problems", accelerator: "CmdOrCtrl+Shift+M", click: () => sendCommand("view:problems") },
         { label: "Output", accelerator: "CmdOrCtrl+Shift+U", click: () => sendCommand("view:output") },
-        { label: "Keyboard Shortcuts", accelerator: "CmdOrCtrl+K CmdOrCtrl+S", click: () => sendCommand("view:keyboardShortcuts") },
+        { label: "Keyboard Shortcuts", click: () => sendCommand("view:keyboardShortcuts") },
         { label: "Extensions", accelerator: "CmdOrCtrl+Shift+X", click: () => sendCommand("view:extensions") },
         { type: "separator" },
         { role: "zoomIn", label: "Zoom In" },
@@ -322,6 +331,7 @@ function createApplicationMenu(): void {
 }
 
 function sendCommand(command: string): void {
+  if (shuttingDown) return;
   const contents = currentMainWindow()?.webContents;
   if (isUsableWebContents(contents)) contents.send("command", command);
 }
@@ -393,7 +403,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fs:watch:start", (event, watchId: string, targetPath: string) => {
     disposeWorkspaceWatcher(watchId);
     const sender = event.sender;
-    if (!isUsableWebContents(sender)) return;
+    if (shuttingDown || !isUsableWebContents(sender)) return;
     const dispose = watchWorkspace(
       targetPath,
       payload => {
@@ -403,6 +413,10 @@ function registerIpcHandlers(): void {
         console.warn(`[NPSharp fs] Workspace watcher issue (${targetPath})`, error);
       }
     );
+    if (shuttingDown || !isUsableWebContents(sender)) {
+      dispose();
+      return;
+    }
     const onSenderDestroyed = () => disposeWorkspaceWatcher(watchId, false);
     sender.once("destroyed", onSenderDestroyed);
     workspaceWatchers.set(watchId, { dispose, sender, onSenderDestroyed });
@@ -434,13 +448,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle("terminal:shells", () => listTerminalShells());
   ipcMain.handle("terminal:create", (event, request: TerminalCreateRequest) => {
     const sender = event.sender;
-    if (!isUsableWebContents(sender)) {
+    if (shuttingDown || !isUsableWebContents(sender)) {
       throw new Error("Terminal renderer is no longer available.");
     }
     const info = createTerminalSession(request, {
       onData: data => sendToWebContents(sender, "terminal:data", data),
       onExit: exit => sendToWebContents(sender, "terminal:exit", exit)
     });
+    if (shuttingDown || !isUsableWebContents(sender)) {
+      closeTerminal(info.id);
+      throw new Error("Terminal renderer closed before the terminal could be registered.");
+    }
     trackTerminalForSender(sender, info.id);
     return info;
   });
@@ -484,6 +502,35 @@ function registerIpcHandlers(): void {
   ipcMain.handle("remote:execute", (_event, request: RemoteCommandRequest) => executeRemote(request));
 }
 
+function installProcessLifecycleHandlers(): void {
+  process.once("SIGTERM", () => requestApplicationShutdown("SIGTERM"));
+  process.once("SIGINT", () => requestApplicationShutdown("SIGINT"));
+}
+
+function requestApplicationShutdown(_reason: NodeJS.Signals): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  cleanupRuntimeResources();
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.close();
+  }
+  if (app.isReady()) {
+    app.quit();
+  } else {
+    app.exit(0);
+  }
+}
+
+function cleanupRuntimeResources(): void {
+  if (runtimeResourcesClosed) return;
+  runtimeResourcesClosed = true;
+  closeRegisteredTerminals();
+  closeWorkspaceWatchers();
+  void stopAllLiveServers().catch(error => {
+    console.warn("[NPSharp lifecycle] Failed to stop live servers during shutdown.", error);
+  });
+}
+
 function closeWorkspaceWatchers(): void {
   for (const watchId of [...workspaceWatchers.keys()]) {
     disposeWorkspaceWatcher(watchId);
@@ -497,7 +544,11 @@ function disposeWorkspaceWatcher(watchId: string, removeDestroyedListener = true
   if (removeDestroyedListener && isUsableWebContents(registration.sender)) {
     registration.sender.removeListener("destroyed", registration.onSenderDestroyed);
   }
-  registration.dispose();
+  try {
+    registration.dispose();
+  } catch (error) {
+    console.warn(`[NPSharp fs] Failed to dispose workspace watcher ${watchId}.`, error);
+  }
 }
 
 function closeWorkspaceWatchersForSender(sender: WebContents, removeDestroyedListener = true): void {
@@ -555,7 +606,7 @@ function closeRegisteredTerminals(): void {
 }
 
 function currentMainWindow(): BrowserWindow | undefined {
-  return isUsableWindow(mainWindow) ? mainWindow : undefined;
+  return !shuttingDown && isUsableWindow(mainWindow) ? mainWindow : undefined;
 }
 
 function isUsableWindow(window: BrowserWindow | undefined): window is BrowserWindow {
@@ -567,17 +618,31 @@ function isUsableWebContents(contents: WebContents | undefined): contents is Web
 }
 
 function sendToWebContents(contents: WebContents, channel: string, payload: unknown): void {
-  if (isUsableWebContents(contents)) contents.send(channel, payload);
+  if (!shuttingDown && isUsableWebContents(contents)) contents.send(channel, payload);
 }
 
 async function showOpenDialog(options: OpenDialogOptions): Promise<Electron.OpenDialogReturnValue> {
+  if (shuttingDown) return { canceled: true, filePaths: [] };
   const window = currentMainWindow();
-  return window ? dialog.showOpenDialog(window, options) : dialog.showOpenDialog(options);
+  if (!window) return dialog.showOpenDialog(options);
+  try {
+    return await dialog.showOpenDialog(window, options);
+  } catch (error) {
+    if (shuttingDown || window.isDestroyed()) return { canceled: true, filePaths: [] };
+    throw error;
+  }
 }
 
 async function showSaveDialog(options: SaveDialogOptions): Promise<Electron.SaveDialogReturnValue> {
+  if (shuttingDown) return { canceled: true, filePath: "" };
   const window = currentMainWindow();
-  return window ? dialog.showSaveDialog(window, options) : dialog.showSaveDialog(options);
+  if (!window) return dialog.showSaveDialog(options);
+  try {
+    return await dialog.showSaveDialog(window, options);
+  } catch (error) {
+    if (shuttingDown || window.isDestroyed()) return { canceled: true, filePath: "" };
+    throw error;
+  }
 }
 
 function normalizeDialogPaths(paths: string[]): string[] {

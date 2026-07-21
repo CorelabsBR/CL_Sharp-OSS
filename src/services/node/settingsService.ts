@@ -74,13 +74,13 @@ export async function loadSession(): Promise<PersistedSession> {
       openFiles: parsed.openFiles ?? parsed.recentFiles ?? [],
       activeFile: parsed.activeFile,
       sidePanel: parsed.sidePanel ?? "explorer",
-      terminalVisible: parsed.terminalVisible ?? true
+      terminalVisible: parsed.terminalVisible ?? false
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       console.warn(`[NPSharp settings] Failed to load session from ${recentFilesPath()}; empty session will be used.`, error);
     }
-    return { openFiles: [], sidePanel: "explorer", terminalVisible: true };
+    return { openFiles: [], sidePanel: "explorer", terminalVisible: false };
   }
 }
 

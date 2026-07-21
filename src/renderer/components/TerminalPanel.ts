@@ -287,13 +287,14 @@ export class TerminalPanel {
       this.render();
     });
     this.element.append(this.header, this.tabs, this.output, this.debugOutput, this.auxOutput, this.input, this.debugInput);
-    this.newTerminal();
+    this.render();
   }
 
   private async loadShellOptions(): Promise<void> {
     try {
       this.shellOptions = await api.terminal.shells();
-    } catch {
+    } catch (error) {
+      console.warn("[NPSharp terminal] Failed to load shell options.", error);
       this.shellOptions = [];
     }
     if (this.disposed) return;

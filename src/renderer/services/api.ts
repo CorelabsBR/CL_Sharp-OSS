@@ -1,4 +1,5 @@
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import type { PermissionState } from "@capacitor/core";
 import type {
   AppInfo,
   AppSettings,
@@ -116,7 +117,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 const DEFAULT_SESSION: PersistedSession = {
   openFiles: [],
   sidePanel: "explorer",
-  terminalVisible: true
+  terminalVisible: false
 };
 
 const NOTES_TEMPLATE = "# NPSharp Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n";
@@ -126,13 +127,21 @@ const MOBILE_TERMINAL_MESSAGE = "Terminal real Node nao esta disponivel no mobil
 const WEB_TERMINAL_MESSAGE = "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
 const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use este painel para manter configuracao e sketches; compile/upload dependem do desktop.";
 const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
+const MOBILE_STORAGE_DENIED_MESSAGE = "Acesso ao armazenamento negado. Permita o acesso ao armazenamento para usar arquivos em Documents/NPSharp.";
 const SEARCH_IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "dist-electron", "release", ".git", "build", ".cache"]);
 
 class CapacitorSandboxFs implements FsApi {
+  private rootReady?: Promise<void>;
+  private storageAccessReady?: Promise<void>;
+
+  constructor(
+    private readonly directory: Directory,
+    private readonly requiresPublicStorageAccess: boolean
+  ) {}
+
   async listDir(path: string): Promise<WorkspaceEntry[]> {
-    await this.ensureRoot();
     const target = normalizeSandboxPath(path);
-    const result = await Filesystem.readdir({ path: target, directory: Directory.Documents });
+    const result = await this.runFsOperation(() => Filesystem.readdir({ path: target, directory: this.directory }));
     return result.files
       .map(file => ({
         path: joinPath(target, file.name),
@@ -146,9 +155,8 @@ class CapacitorSandboxFs implements FsApi {
   }
 
   async readFile(path: string): Promise<FileReadResult> {
-    await this.ensureRoot();
     const target = normalizeSandboxPath(path);
-    const result = await Filesystem.readFile({ path: target, directory: Directory.Documents, encoding: Encoding.UTF8 });
+    const result = await this.runFsOperation(() => Filesystem.readFile({ path: target, directory: this.directory, encoding: Encoding.UTF8 }));
     const content = typeof result.data === "string" ? result.data : await result.data.text();
     return fileReadResult(target, content);
   }
@@ -157,50 +165,50 @@ class CapacitorSandboxFs implements FsApi {
     await this.ensureRoot();
     const target = normalizeSandboxPath(path);
     await this.ensureParent(target);
-    await Filesystem.writeFile({
+    await this.handleFsError(Filesystem.writeFile({
       path: target,
       data: content,
-      directory: Directory.Documents,
+      directory: this.directory,
       encoding: Encoding.UTF8,
       recursive: true
-    });
+    }));
   }
 
   async createFile(path: string): Promise<void> {
+    await this.ensureRoot();
     const target = normalizeSandboxPath(path);
     if (!target) return;
-    if (!await this.exists(target)) {
+    if (!await this.pathExists(target)) {
       await this.writeFile(target, "");
     }
   }
 
   async createFolder(path: string): Promise<void> {
+    await this.ensureRoot();
     const target = normalizeSandboxPath(path);
     if (!target) return;
-    try {
-      await Filesystem.mkdir({ path: target, directory: Directory.Documents, recursive: true });
-    } catch (error) {
-      if (!await this.exists(target)) throw error;
-    }
+    await this.mkdirIfMissing(target);
   }
 
   async rename(oldPath: string, newPath: string): Promise<void> {
     await this.ensureRoot();
     const from = normalizeSandboxPath(oldPath);
     const to = normalizeSandboxPath(newPath);
+    if (!from || !to) throw new Error("Caminho invalido para renomear.");
     await this.ensureParent(to);
-    await Filesystem.rename({ from, to, directory: Directory.Documents });
+    await this.handleFsError(Filesystem.rename({ from, to, directory: this.directory }));
   }
 
   async delete(path: string): Promise<void> {
     await this.ensureRoot();
     const target = normalizeSandboxPath(path);
-    const stat = await Filesystem.stat({ path: target, directory: Directory.Documents });
+    if (!target) throw new Error("Caminho invalido para excluir.");
+    const stat = await this.handleFsError(Filesystem.stat({ path: target, directory: this.directory }));
     if (stat.type === "directory") {
-      await Filesystem.rmdir({ path: target, directory: Directory.Documents, recursive: true });
+      await this.handleFsError(Filesystem.rmdir({ path: target, directory: this.directory, recursive: true }));
       return;
     }
-    await Filesystem.deleteFile({ path: target, directory: Directory.Documents });
+    await this.handleFsError(Filesystem.deleteFile({ path: target, directory: this.directory }));
   }
 
   async reveal(_path: string): Promise<void> {
@@ -208,12 +216,8 @@ class CapacitorSandboxFs implements FsApi {
   }
 
   async exists(path: string): Promise<boolean> {
-    try {
-      await Filesystem.stat({ path: normalizeSandboxPath(path), directory: Directory.Documents });
-      return true;
-    } catch {
-      return false;
-    }
+    await this.ensureRoot();
+    return this.pathExists(normalizeSandboxPath(path));
   }
 
   watch(_path: string, _callback: (event: import("../../shared/types").WorkspaceChangeEvent) => void): () => void {
@@ -221,14 +225,85 @@ class CapacitorSandboxFs implements FsApi {
   }
 
   private async ensureRoot(): Promise<void> {
-    await this.createFolder(MOBILE_ROOT);
-    await this.createFolder(MOBILE_WORKSPACES_ROOT);
-    await this.createFolder(DEFAULT_MOBILE_WORKSPACE);
+    await this.ensureStorageAccess();
+    this.rootReady ??= this.createInitialFolders().catch(error => {
+      this.rootReady = undefined;
+      throw error;
+    });
+    await this.rootReady;
   }
 
   private async ensureParent(path: string): Promise<void> {
     const parent = dirname(path);
-    if (parent) await this.createFolder(parent);
+    if (parent) await this.mkdirIfMissing(parent);
+  }
+
+  private async ensureStorageAccess(): Promise<void> {
+    if (!this.requiresPublicStorageAccess) return;
+    this.storageAccessReady ??= this.requestStorageAccess().catch(error => {
+      this.storageAccessReady = undefined;
+      throw error;
+    });
+    await this.storageAccessReady;
+  }
+
+  private async requestStorageAccess(): Promise<void> {
+    const checked = await this.handleFsError(Filesystem.checkPermissions());
+    if (hasStorageAccess(checked.publicStorage)) return;
+
+    const requested = await this.handleFsError(Filesystem.requestPermissions());
+    if (!hasStorageAccess(requested.publicStorage)) {
+      throw new StorageAccessDeniedError(requested.publicStorage);
+    }
+  }
+
+  private async createInitialFolders(): Promise<void> {
+    await this.mkdirIfMissing(MOBILE_ROOT);
+    await this.mkdirIfMissing(MOBILE_WORKSPACES_ROOT);
+    await this.mkdirIfMissing(DEFAULT_MOBILE_WORKSPACE);
+  }
+
+  private async mkdirIfMissing(path: string): Promise<void> {
+    const target = normalizeSandboxPath(path);
+    if (!target) return;
+    try {
+      await this.handleFsError(Filesystem.mkdir({ path: target, directory: this.directory, recursive: true }));
+    } catch (error) {
+      if (await this.pathExists(target)) return;
+      throw error;
+    }
+  }
+
+  private async pathExists(path: string): Promise<boolean> {
+    const target = normalizeSandboxPath(path);
+    if (!target) return false;
+    try {
+      await this.handleFsError(Filesystem.stat({ path: target, directory: this.directory }));
+      return true;
+    } catch (error) {
+      if (isMissingPathError(error)) return false;
+      throw error;
+    }
+  }
+
+  private async runFsOperation<T>(operation: () => Promise<T>): Promise<T> {
+    await this.ensureRoot();
+    return this.handleFsError(operation());
+  }
+
+  private async handleFsError<T>(operation: Promise<T>): Promise<T> {
+    try {
+      return await operation;
+    } catch (error) {
+      throw normalizeCapacitorFsError(error);
+    }
+  }
+}
+
+class StorageAccessDeniedError extends Error {
+  constructor(state?: PermissionState) {
+    super(state ? `${MOBILE_STORAGE_DENIED_MESSAGE} Estado atual: ${state}.` : MOBILE_STORAGE_DENIED_MESSAGE);
+    this.name = "StorageAccessDeniedError";
   }
 }
 
@@ -346,7 +421,8 @@ class LocalSandboxFs implements FsApi {
     try {
       const parsed = JSON.parse(raw) as Record<string, StoredEntry>;
       this.entries = new Map(Object.entries(parsed));
-    } catch {
+    } catch (error) {
+      console.warn("[NPSharp browser storage] Failed to parse web filesystem state; clearing invalid state.", error);
       this.entries.clear();
     }
   }
@@ -357,23 +433,24 @@ class LocalSandboxFs implements FsApi {
 }
 
 function createBrowserApi(): NpsharpApi {
-  const fs = platform.kind === "capacitor" ? new CapacitorSandboxFs() : new LocalSandboxFs();
+  const fs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Documents, true) : new LocalSandboxFs();
+  const appDataFs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Data, false) : fs;
 
   const loadSettings = async (): Promise<AppSettings> => {
-    const saved = await readJsonFile<Partial<AppSettings>>(fs, SETTINGS_PATH, {});
+    const saved = await readJsonFile<Partial<AppSettings>>(appDataFs, SETTINGS_PATH, {});
     const settings = { ...DEFAULT_SETTINGS, ...saved };
-    await writeJsonFile(fs, SETTINGS_PATH, settings);
+    await writeJsonFile(appDataFs, SETTINGS_PATH, settings);
     return settings;
   };
 
   const saveSettings = async (settings: AppSettings): Promise<AppSettings> => {
     const merged = { ...DEFAULT_SETTINGS, ...settings };
-    await writeJsonFile(fs, SETTINGS_PATH, merged);
+    await writeJsonFile(appDataFs, SETTINGS_PATH, merged);
     return merged;
   };
 
   const loadSession = async (): Promise<PersistedSession> => {
-    const saved = await readJsonFile<Partial<PersistedSession>>(fs, SESSION_PATH, {});
+    const saved = await readJsonFile<Partial<PersistedSession>>(appDataFs, SESSION_PATH, {});
     return {
       ...DEFAULT_SESSION,
       ...saved,
@@ -383,7 +460,7 @@ function createBrowserApi(): NpsharpApi {
   };
 
   const saveSession = async (session: PersistedSession): Promise<void> => {
-    await writeJsonFile(fs, SESSION_PATH, { ...DEFAULT_SESSION, ...session });
+    await writeJsonFile(appDataFs, SESSION_PATH, { ...DEFAULT_SESSION, ...session });
   };
 
   return {
@@ -449,7 +526,7 @@ function createBrowserApi(): NpsharpApi {
     templates: {
       apply: request => applyFallbackTemplate(fs, request)
     },
-    remote: createRemoteFallbackApi(fs)
+    remote: createRemoteFallbackApi(appDataFs)
   };
 }
 
@@ -684,7 +761,7 @@ function browserAppInfo(): AppInfo {
     name: "NPSharp",
     version: "1.0.0",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
-    userDataPath: platform.kind === "capacitor" ? `Documents/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
+    userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,
     npsharpHome: MOBILE_ROOT
   };
@@ -835,7 +912,11 @@ async function readJsonFile<T>(fs: FsApi, path: string, fallback: T): Promise<T>
     if (!await fs.exists(path)) return fallback;
     const file = await fs.readFile(path);
     return JSON.parse(file.content) as T;
-  } catch {
+  } catch (error) {
+    if (isStorageAccessDeniedError(error)) throw error;
+    if (!isMissingPathError(error) && !(error instanceof SyntaxError)) {
+      console.warn(`[NPSharp browser storage] Failed to read ${path}; fallback value will be used.`, error);
+    }
     return fallback;
   }
 }
@@ -861,6 +942,50 @@ function normalizeSandboxPath(path: string): string {
   return parts.join("/");
 }
 
+function hasStorageAccess(state: PermissionState): boolean {
+  return state === "granted";
+}
+
+function normalizeCapacitorFsError(error: unknown): Error {
+  if (isStorageAccessDeniedError(error)) return error as Error;
+  if (isPermissionDeniedError(error)) return new StorageAccessDeniedError();
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function isStorageAccessDeniedError(error: unknown): boolean {
+  return error instanceof StorageAccessDeniedError || errorName(error) === "StorageAccessDeniedError";
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  const code = errorCode(error);
+  if (code === "EACCES" || code === "EPERM") return true;
+  return /permission|denied|not allowed|security|unauthori[sz]ed/i.test(errorMessageText(error));
+}
+
+function isMissingPathError(error: unknown): boolean {
+  const code = errorCode(error);
+  if (code === "ENOENT" || code === "NOT_FOUND") return true;
+  return /not found|no such file|does not exist|file not found/i.test(errorMessageText(error));
+}
+
+function errorCode(error: unknown): string | undefined {
+  return typeof (error as { code?: unknown } | undefined)?.code === "string"
+    ? (error as { code: string }).code
+    : undefined;
+}
+
+function errorName(error: unknown): string | undefined {
+  return typeof (error as { name?: unknown } | undefined)?.name === "string"
+    ? (error as { name: string }).name
+    : undefined;
+}
+
+function errorMessageText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "";
+}
+
 function sanitizeName(name: string): string {
   return name.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ") || "Main";
 }
@@ -873,7 +998,8 @@ function sortEntries(left: WorkspaceEntry, right: WorkspaceEntry): number {
 function readStorage(key: string): string | undefined {
   try {
     return window.localStorage.getItem(key) ?? undefined;
-  } catch {
+  } catch (error) {
+    console.warn(`[NPSharp browser storage] Failed to read ${key} from localStorage.`, error);
     return undefined;
   }
 }
@@ -881,8 +1007,8 @@ function readStorage(key: string): string | undefined {
 function writeStorage(key: string, value: string): void {
   try {
     window.localStorage.setItem(key, value);
-  } catch {
-    return;
+  } catch (error) {
+    console.warn(`[NPSharp browser storage] Failed to write ${key} to localStorage.`, error);
   }
 }
 
