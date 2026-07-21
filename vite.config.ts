@@ -18,10 +18,20 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    sourcemap: true
+    sourcemap: true,
+    chunkSizeWarningLimit: 3000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/monaco-editor")) return "monaco";
+          if (id.includes("node_modules/@capacitor")) return "capacitor";
+          if (id.includes("node_modules")) return "vendor";
+        }
+      }
+    }
   },
   server: {
-    host: "127.0.0.1",
+    host: "0.0.0.0",
     port: Number.isFinite(vitePort) ? vitePort : 5173,
     strictPort: true
   }

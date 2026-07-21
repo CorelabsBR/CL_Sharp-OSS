@@ -12,7 +12,9 @@ exports.renamePath = renamePath;
 exports.deletePath = deletePath;
 exports.revealPath = revealPath;
 exports.exists = exists;
+exports.watchWorkspace = watchWorkspace;
 const electron_1 = require("electron");
+const node_fs_1 = __importDefault(require("node:fs"));
 const promises_1 = __importDefault(require("node:fs/promises"));
 const node_path_1 = __importDefault(require("node:path"));
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -106,5 +108,114 @@ async function exists(targetPath) {
     catch {
         return false;
     }
+}
+function watchWorkspace(rootPath, onChange, onError) {
+    let disposed = false;
+    let pollTimer;
+    let nativeWatcher;
+    let previousSnapshot;
+    const emit = debounce((event) => {
+        if (!disposed)
+            onChange(event);
+    }, 250);
+    const startPolling = () => {
+        const poll = async () => {
+            if (disposed)
+                return;
+            try {
+                const nextSnapshot = await snapshotWorkspace(rootPath);
+                if (previousSnapshot && snapshotsDiffer(previousSnapshot, nextSnapshot)) {
+                    emit({ root: rootPath, eventType: "change", path: rootPath });
+                }
+                previousSnapshot = nextSnapshot;
+            }
+            catch (error) {
+                onError(error);
+                emit({ root: rootPath, eventType: "error", path: rootPath, error: errorMessage(error) });
+            }
+            finally {
+                if (!disposed)
+                    pollTimer = setTimeout(poll, 2000);
+            }
+        };
+        void poll();
+    };
+    try {
+        nativeWatcher = node_fs_1.default.watch(rootPath, { recursive: true }, (eventType, filename) => {
+            const eventPath = filename ? node_path_1.default.join(rootPath, filename.toString()) : rootPath;
+            emit({ root: rootPath, eventType, path: eventPath });
+        });
+        nativeWatcher.on("error", error => {
+            onError(error);
+            emit({ root: rootPath, eventType: "error", path: rootPath, error: errorMessage(error) });
+            nativeWatcher?.close();
+            nativeWatcher = undefined;
+            if (!pollTimer)
+                startPolling();
+        });
+    }
+    catch (error) {
+        onError(error);
+        startPolling();
+    }
+    return () => {
+        disposed = true;
+        nativeWatcher?.close();
+        if (pollTimer)
+            clearTimeout(pollTimer);
+    };
+}
+function debounce(callback, delayMs) {
+    let timer;
+    return (...args) => {
+        if (timer)
+            clearTimeout(timer);
+        timer = setTimeout(() => callback(...args), delayMs);
+    };
+}
+async function snapshotWorkspace(rootPath, limit = 10000) {
+    const snapshot = new Map();
+    async function walk(dir) {
+        if (snapshot.size >= limit)
+            return;
+        const entries = await promises_1.default.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isDirectory() && IGNORED_DIRECTORY_NAMES.has(entry.name.toLowerCase()))
+                continue;
+            const fullPath = node_path_1.default.join(dir, entry.name);
+            let stat;
+            try {
+                stat = await promises_1.default.stat(fullPath);
+            }
+            catch {
+                continue;
+            }
+            snapshot.set(fullPath, `${entry.isDirectory() ? "d" : "f"}:${stat.size}:${stat.mtimeMs}`);
+            if (entry.isDirectory())
+                await walk(fullPath);
+            if (snapshot.size >= limit)
+                return;
+        }
+    }
+    const rootStat = await promises_1.default.stat(rootPath);
+    snapshot.set(rootPath, `d:${rootStat.size}:${rootStat.mtimeMs}`);
+    await walk(rootPath);
+    return snapshot;
+}
+function snapshotsDiffer(left, right) {
+    if (left.size !== right.size)
+        return true;
+    for (const [key, value] of left) {
+        if (right.get(key) !== value)
+            return true;
+    }
+    return false;
+}
+function errorMessage(error) {
+    if (error instanceof Error)
+        return error.message;
+    if (typeof error === "string")
+        return error;
+    return JSON.stringify(error);
 }
 //# sourceMappingURL=fileSystemService.js.map

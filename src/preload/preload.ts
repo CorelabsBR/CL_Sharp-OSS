@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { randomUUID } from "node:crypto";
 import type {
   AppSettings,
   ArduinoCliRequest,
@@ -24,7 +25,8 @@ import type {
   TerminalDataEvent,
   TerminalExitEvent,
   TerminalCreateRequest,
-  TerminalRunRequest
+  TerminalRunRequest,
+  WorkspaceChangeEvent
 } from "../shared/types";
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
@@ -66,7 +68,23 @@ const api: NpsharpApi = {
     rename: (oldPath: string, newPath: string) => invoke("fs:rename", oldPath, newPath),
     delete: (targetPath: string) => invoke("fs:delete", targetPath),
     reveal: (targetPath: string) => invoke("fs:reveal", targetPath),
-    exists: (targetPath: string) => invoke("fs:exists", targetPath)
+    exists: (targetPath: string) => invoke("fs:exists", targetPath),
+    watch: (targetPath: string, callback: (event: WorkspaceChangeEvent) => void) => {
+      const watchId = randomUUID();
+      const listener = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent & { watchId: string }) => {
+        if (payload.watchId === watchId) callback(payload);
+      };
+      ipcRenderer.on("fs:watch:event", listener);
+      void invoke<void>("fs:watch:start", watchId, targetPath).catch(error => {
+        console.error(`[NPSharp IPC] fs:watch:start failed (${targetPath})`, error);
+      });
+      return () => {
+        ipcRenderer.removeListener("fs:watch:event", listener);
+        void invoke<void>("fs:watch:stop", watchId).catch(error => {
+          console.error(`[NPSharp IPC] fs:watch:stop failed (${targetPath})`, error);
+        });
+      };
+    }
   },
   search: {
     workspace: (query: SearchQuery) => invoke("search:workspace", query),

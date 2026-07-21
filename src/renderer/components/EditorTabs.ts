@@ -5,6 +5,7 @@ import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
 import { api } from "../services/api";
 import { el, fileIcon, icon } from "../utils/dom";
 import { reportError } from "../utils/errors";
+import { DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, extname } from "../utils/path";
 
 interface BrandHighlightRule {
@@ -16,7 +17,7 @@ const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
   { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
   { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
   { terms: ["corelabs","Npsharp","NPSharp"], className: "brand-highlight-red" },
-  { terms: ["andrieli","andy"], className: "brand-highlight-special" }
+  { terms: ["andrieli","andy","amor"], className: "brand-highlight-special" }
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;
@@ -46,7 +47,7 @@ export class EditorTabs {
   private readonly tabsBar = el("div", { className: "tabs-bar" });
   private readonly editorHost = el("div", { className: "editor-host" });
   private readonly welcome = el("div", { className: "welcome-pane" });
-  private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: "/logos/app.png", alt: "NPSharp" } });
+  private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } });
   private editor: monaco.editor.IStandaloneCodeEditor;
   private tabs: EditorTab[] = [];
   private activeId: string | undefined;
@@ -141,7 +142,7 @@ export class EditorTabs {
   }
 
   applyTheme(theme: { welcomeLogo?: string }): void {
-    this.welcomeLogo.src = theme.welcomeLogo ?? "/logos/app.png";
+    this.welcomeLogo.src = theme.welcomeLogo ?? DEFAULT_LOGO_URL;
   }
 
   async restoreFiles(files: string[], activeFile?: string): Promise<void> {

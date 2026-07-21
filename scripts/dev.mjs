@@ -4,8 +4,9 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const electron = process.platform === "win32"
   ? path.join(root, "node_modules", ".bin", "electron.cmd")

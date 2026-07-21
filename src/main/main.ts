@@ -20,6 +20,7 @@ import {
   readFile,
   renamePath,
   revealPath,
+  watchWorkspace,
   writeFile
 } from "../services/node/fileSystemService";
 import {
@@ -37,6 +38,7 @@ import {
 import { openLiveServer, stopAllLiveServers } from "../services/node/liveServerService";
 import { npsharpHome } from "../services/node/paths";
 import { normalizeCwd, runShell } from "../services/node/processService";
+import { resourcePath, resourcesRoot } from "../services/node/resourcePaths";
 import { configureRuntime, discoverRuntimes, listRuntimes, runFile } from "../services/node/runtimeService";
 import { replaceAll, searchWorkspace } from "../services/node/searchService";
 import { loadSession, loadSettings, resetSettings, saveSession, saveSettings } from "../services/node/settingsService";
@@ -88,6 +90,7 @@ import type {
 } from "../shared/types";
 
 let mainWindow: BrowserWindow | undefined;
+const workspaceWatchers = new Map<string, () => void>();
 
 const gotLock = process.env.VITE_DEV_SERVER_URL ? true : app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -126,6 +129,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   void stopAllLiveServers();
   closeAllTerminals();
+  closeWorkspaceWatchers();
 });
 
 async function createMainWindow(): Promise<void> {
@@ -164,7 +168,7 @@ function resolveWindowIcon(): string {
     : process.platform === "darwin"
       ? "icon.icns"
       : "icon.png";
-  return path.join(app.getAppPath(), "resources", iconFile);
+  return resourcePath(app.getAppPath(), app.isPackaged, iconFile);
 }
 
 async function loadDevServer(window: BrowserWindow, url: string): Promise<void> {
@@ -353,6 +357,28 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fs:delete", (_event, targetPath: string) => deletePath(targetPath));
   ipcMain.handle("fs:reveal", (_event, targetPath: string) => revealPath(targetPath));
   ipcMain.handle("fs:exists", (_event, targetPath: string) => exists(targetPath));
+  ipcMain.handle("fs:watch:start", (event, watchId: string, targetPath: string) => {
+    workspaceWatchers.get(watchId)?.();
+    const sender = event.sender;
+    const dispose = watchWorkspace(
+      targetPath,
+      payload => {
+        if (!sender.isDestroyed()) sender.send("fs:watch:event", { watchId, ...payload });
+      },
+      error => {
+        console.warn(`[NPSharp fs] Workspace watcher issue (${targetPath})`, error);
+      }
+    );
+    workspaceWatchers.set(watchId, dispose);
+    sender.once("destroyed", () => {
+      workspaceWatchers.get(watchId)?.();
+      workspaceWatchers.delete(watchId);
+    });
+  });
+  ipcMain.handle("fs:watch:stop", (_event, watchId: string) => {
+    workspaceWatchers.get(watchId)?.();
+    workspaceWatchers.delete(watchId);
+  });
 
   ipcMain.handle("search:workspace", (_event, query: SearchQuery) => searchWorkspace(query));
   ipcMain.handle("search:replaceAll", (_event, request: ReplaceAllRequest) => replaceAll(request));
@@ -401,7 +427,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("liveServer:open", (_event, request: LiveServerRequest) => openLiveServer(request));
   ipcMain.handle("liveServer:stopAll", () => stopAllLiveServers());
-  ipcMain.handle("templates:apply", (_event, request: TemplateApplyRequest) => applyTemplate(app.getAppPath(), request));
+  ipcMain.handle("templates:apply", (_event, request: TemplateApplyRequest) => applyTemplate(resourcesRoot(app.getAppPath(), app.isPackaged), request));
 
   ipcMain.handle("remote:loadHosts", () => loadHosts());
   ipcMain.handle("remote:saveHosts", (_event, hosts: RemoteHostConfig[]) => saveHosts(hosts));
@@ -414,4 +440,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle("remote:rename", (_event, request: RemoteFileRequest & { newPath: string }) => renameRemote(request));
   ipcMain.handle("remote:delete", (_event, request: RemoteFileRequest) => deleteRemote(request));
   ipcMain.handle("remote:execute", (_event, request: RemoteCommandRequest) => executeRemote(request));
+}
+
+function closeWorkspaceWatchers(): void {
+  for (const dispose of workspaceWatchers.values()) {
+    dispose();
+  }
+  workspaceWatchers.clear();
 }

@@ -31,14 +31,14 @@
     "mobile:android": "npm run android:open"
   },
   "dependencies": {
-    "@capacitor/android": "^8.4.1",
-    "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/filesystem": "^8.1.2",
     "monaco-editor": "^0.52.2",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
     "@types/node": "^22.10.2",
     "@types/ssh2": "^1.15.4",
     "electron": "^33.2.1",
@@ -56,16 +56,27 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "resources/**/*",
       "build/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*"
     ],
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "resources/icon.png",
+      "icon": "icon.png",
       "category": "Development",
       "maintainer": "CoreLabs",
       "synopsis": "NPSharp IDE",
@@ -78,11 +89,14 @@
       }
     },
     "win": {
-      "target": "nsis",
-      "icon": "resources/icon.ico"
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.ico"
     },
     "mac": {
-      "icon": "resources/icon.icns",
+      "icon": "icon.icns",
       "category": "public.app-category.developer-tools"
     },
     "appImage": {
@@ -90,6 +104,9 @@
     },
     "deb": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "fpm": [
+        "--deb-no-default-config-files"
+      ],
       "depends": [
         "libgtk-3-0",
         "libnotify4",

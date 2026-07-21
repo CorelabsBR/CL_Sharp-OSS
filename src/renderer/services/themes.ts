@@ -1,5 +1,6 @@
 import { monaco } from "../../editor/monacoSetup";
 import type { AppSettings } from "../../shared/types";
+import { cssUrl, DEFAULT_LOGO_URL, resourceUrl } from "../utils/assets";
 
 type ThemeColors = Record<string, string>;
 
@@ -47,7 +48,7 @@ export interface ThemeSummary {
   tokenColors?: TokenColor[];
 }
 
-const DEFAULT_WELCOME_LOGO = "/logos/app.png";
+const DEFAULT_WELCOME_LOGO = DEFAULT_LOGO_URL;
 
 const BUILT_IN_FALLBACKS: ThemeSummary[] = [
   {
@@ -105,8 +106,15 @@ const BUILT_IN_FALLBACKS: ThemeSummary[] = [
 ];
 
 export async function listThemes(): Promise<ThemeSummary[]> {
-  const response = await fetch("/themes/package.json").catch(() => undefined);
-  if (!response?.ok) return BUILT_IN_FALLBACKS;
+  const manifestUrl = resourceUrl("themes/package.json");
+  const response = await fetch(manifestUrl).catch(error => {
+    console.warn(`[NPSharp assets] Failed to load theme manifest: ${manifestUrl}`, error);
+    return undefined;
+  });
+  if (!response?.ok) {
+    if (response) console.warn(`[NPSharp assets] Theme manifest returned ${response.status}: ${manifestUrl}`);
+    return BUILT_IN_FALLBACKS;
+  }
 
   try {
     const pack = JSON.parse(await response.text()) as ThemePackage;
@@ -114,7 +122,8 @@ export async function listThemes(): Promise<ThemeSummary[]> {
     themes.push(...manifestEntriesToThemes(pack.contributes?.themes ?? [], false));
     themes.push(...manifestEntriesToThemes(pack.contributes?.specialThemes ?? [], true));
     return hydrateThemeSwatches(themes);
-  } catch {
+  } catch (error) {
+    console.warn(`[NPSharp assets] Failed to parse theme manifest: ${manifestUrl}`, error);
     return BUILT_IN_FALLBACKS;
   }
 }
@@ -128,11 +137,12 @@ export async function applyTheme(settings: AppSettings): Promise<ThemeSummary> {
     ...(loadedTheme ? mapVSCodeColors(loadedTheme.colors ?? {}, selected.uiTheme) : {})
   };
   const tokenColors = loadedTheme?.tokenColors ?? selected.tokenColors ?? [];
+  const welcomeLogo = selected.welcomeLogo ?? DEFAULT_WELCOME_LOGO;
   const appliedTheme: ThemeSummary = {
     ...selected,
     colors,
     tokenColors,
-    welcomeLogo: selected.welcomeLogo ?? DEFAULT_WELCOME_LOGO
+    welcomeLogo
   };
 
   for (const [key, value] of Object.entries(colors)) {
@@ -140,7 +150,7 @@ export async function applyTheme(settings: AppSettings): Promise<ThemeSummary> {
   }
   document.documentElement.style.setProperty("--editor-font-family", settings.editorFontFamily);
   document.documentElement.style.setProperty("--editor-font-size", `${settings.editorFontSize}px`);
-  document.documentElement.style.setProperty("--welcome-logo-url", `url("${appliedTheme.welcomeLogo}")`);
+  document.documentElement.style.setProperty("--welcome-logo-url", cssUrl(welcomeLogo));
   document.documentElement.style.colorScheme = monacoBase(selected, loadedTheme) === "vs" ? "light" : "dark";
 
   applyMonacoTheme(appliedTheme, loadedTheme);
@@ -187,9 +197,13 @@ function findTheme(themes: ThemeSummary[], configuredTheme: string): ThemeSummar
 async function loadVSCodeTheme(url: string): Promise<VSCodeThemeFile | undefined> {
   try {
     const response = await fetch(url);
-    if (!response.ok) return undefined;
+    if (!response.ok) {
+      console.warn(`[NPSharp assets] Theme file returned ${response.status}: ${url}`);
+      return undefined;
+    }
     return JSON.parse(stripJsonComments(await response.text())) as VSCodeThemeFile;
-  } catch {
+  } catch (error) {
+    console.warn(`[NPSharp assets] Failed to load theme file: ${url}`, error);
     return undefined;
   }
 }
@@ -282,7 +296,7 @@ function baseColors(uiTheme = "vs-dark"): ThemeColors {
 }
 
 function toResourcePath(path: string): string {
-  return `/themes/${path.replace(/^\.\//, "")}`;
+  return resourceUrl(`themes/${path.replace(/^\.\//, "")}`);
 }
 
 function stripJsonComments(input: string): string {

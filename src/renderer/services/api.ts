@@ -216,6 +216,10 @@ class CapacitorSandboxFs implements FsApi {
     }
   }
 
+  watch(_path: string, _callback: (event: import("../../shared/types").WorkspaceChangeEvent) => void): () => void {
+    return () => undefined;
+  }
+
   private async ensureRoot(): Promise<void> {
     await this.createFolder(MOBILE_ROOT);
     await this.createFolder(MOBILE_WORKSPACES_ROOT);
@@ -317,6 +321,10 @@ class LocalSandboxFs implements FsApi {
 
   async exists(path: string): Promise<boolean> {
     return this.entries.has(normalizeSandboxPath(path));
+  }
+
+  watch(_path: string, _callback: (event: import("../../shared/types").WorkspaceChangeEvent) => void): () => void {
+    return () => undefined;
   }
 
   private ensureFolderSync(path: string): void {

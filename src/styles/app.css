@@ -13,7 +13,7 @@
   --button-fg: #ffffff;
   --selection-bg: #264f78;
   --hover-bg: #2a2d2e;
-  --welcome-logo-url: url("/logos/app.png");
+  --welcome-logo-url: none;
   --editor-font-family: "JetBrains Mono", "Cascadia Code", monospace;
   --editor-font-size: 14px;
   color-scheme: dark;

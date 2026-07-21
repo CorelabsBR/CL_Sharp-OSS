@@ -11,6 +11,7 @@ const gitService_1 = require("../services/node/gitService");
 const liveServerService_1 = require("../services/node/liveServerService");
 const paths_1 = require("../services/node/paths");
 const processService_1 = require("../services/node/processService");
+const resourcePaths_1 = require("../services/node/resourcePaths");
 const runtimeService_1 = require("../services/node/runtimeService");
 const searchService_1 = require("../services/node/searchService");
 const settingsService_1 = require("../services/node/settingsService");
@@ -19,6 +20,7 @@ const diagnosticsService_1 = require("../services/node/diagnosticsService");
 const terminalService_1 = require("../services/node/terminalService");
 const remoteService_1 = require("../services/node/remoteService");
 let mainWindow;
+const workspaceWatchers = new Map();
 const gotLock = process.env.VITE_DEV_SERVER_URL ? true : electron_1.app.requestSingleInstanceLock();
 if (!gotLock) {
     electron_1.app.quit();
@@ -53,6 +55,7 @@ electron_1.app.on("window-all-closed", () => {
 electron_1.app.on("before-quit", () => {
     void (0, liveServerService_1.stopAllLiveServers)();
     (0, terminalService_1.closeAllTerminals)();
+    closeWorkspaceWatchers();
 });
 async function createMainWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -88,7 +91,7 @@ function resolveWindowIcon() {
         : process.platform === "darwin"
             ? "icon.icns"
             : "icon.png";
-    return node_path_1.default.join(electron_1.app.getAppPath(), "resources", iconFile);
+    return (0, resourcePaths_1.resourcePath)(electron_1.app.getAppPath(), electron_1.app.isPackaged, iconFile);
 }
 async function loadDevServer(window, url) {
     let lastError;
@@ -140,10 +143,9 @@ function createApplicationMenu() {
                 { label: "Find in Files", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
                 { label: "Replace in Files", accelerator: "CmdOrCtrl+Shift+H", click: () => sendCommand("view:replaceInFiles") },
                 { type: "separator" },
-                { label: "Toggle Line Comment", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:toggleLineComment") },
-                { label: "Comment Line", accelerator: "CmdOrCtrl+K CmdOrCtrl+C", click: () => sendCommand("editor:commentLine") },
-                { label: "Uncomment Line", accelerator: "CmdOrCtrl+K CmdOrCtrl+U", click: () => sendCommand("editor:uncommentLine") },
-                { label: "Comment Block", accelerator: "Shift+Alt+A", click: () => sendCommand("editor:commentBlock") },
+                { label: "Comment Line", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:commentLine") },
+                { label: "Uncomment Line", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:uncommentLine") },
+                { label: "Comment Block", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:commentBlock") },
                 { type: "separator" },
                 { label: "Go to Line", accelerator: "CmdOrCtrl+G", click: () => sendCommand("editor:goToLine") },
                 { label: "Go to Start", accelerator: "CmdOrCtrl+Home", click: () => sendCommand("editor:start") },
@@ -274,6 +276,25 @@ function registerIpcHandlers() {
     electron_1.ipcMain.handle("fs:delete", (_event, targetPath) => (0, fileSystemService_1.deletePath)(targetPath));
     electron_1.ipcMain.handle("fs:reveal", (_event, targetPath) => (0, fileSystemService_1.revealPath)(targetPath));
     electron_1.ipcMain.handle("fs:exists", (_event, targetPath) => (0, fileSystemService_1.exists)(targetPath));
+    electron_1.ipcMain.handle("fs:watch:start", (event, watchId, targetPath) => {
+        workspaceWatchers.get(watchId)?.();
+        const sender = event.sender;
+        const dispose = (0, fileSystemService_1.watchWorkspace)(targetPath, payload => {
+            if (!sender.isDestroyed())
+                sender.send("fs:watch:event", { watchId, ...payload });
+        }, error => {
+            console.warn(`[NPSharp fs] Workspace watcher issue (${targetPath})`, error);
+        });
+        workspaceWatchers.set(watchId, dispose);
+        sender.once("destroyed", () => {
+            workspaceWatchers.get(watchId)?.();
+            workspaceWatchers.delete(watchId);
+        });
+    });
+    electron_1.ipcMain.handle("fs:watch:stop", (_event, watchId) => {
+        workspaceWatchers.get(watchId)?.();
+        workspaceWatchers.delete(watchId);
+    });
     electron_1.ipcMain.handle("search:workspace", (_event, query) => (0, searchService_1.searchWorkspace)(query));
     electron_1.ipcMain.handle("search:replaceAll", (_event, request) => (0, searchService_1.replaceAll)(request));
     electron_1.ipcMain.handle("diagnostics:java", (_event, workspace, filePath) => (0, diagnosticsService_1.runJavaDiagnostics)(workspace, filePath));
@@ -316,7 +337,7 @@ function registerIpcHandlers() {
     electron_1.ipcMain.handle("arduino:monitor", (_event, request) => (0, arduinoService_1.monitorArduinoSerial)(request));
     electron_1.ipcMain.handle("liveServer:open", (_event, request) => (0, liveServerService_1.openLiveServer)(request));
     electron_1.ipcMain.handle("liveServer:stopAll", () => (0, liveServerService_1.stopAllLiveServers)());
-    electron_1.ipcMain.handle("templates:apply", (_event, request) => (0, templateService_1.applyTemplate)(electron_1.app.getAppPath(), request));
+    electron_1.ipcMain.handle("templates:apply", (_event, request) => (0, templateService_1.applyTemplate)((0, resourcePaths_1.resourcesRoot)(electron_1.app.getAppPath(), electron_1.app.isPackaged), request));
     electron_1.ipcMain.handle("remote:loadHosts", () => (0, remoteService_1.loadHosts)());
     electron_1.ipcMain.handle("remote:saveHosts", (_event, hosts) => (0, remoteService_1.saveHosts)(hosts));
     electron_1.ipcMain.handle("remote:test", (_event, request) => (0, remoteService_1.testRemote)(request));
@@ -328,5 +349,11 @@ function registerIpcHandlers() {
     electron_1.ipcMain.handle("remote:rename", (_event, request) => (0, remoteService_1.renameRemote)(request));
     electron_1.ipcMain.handle("remote:delete", (_event, request) => (0, remoteService_1.deleteRemote)(request));
     electron_1.ipcMain.handle("remote:execute", (_event, request) => (0, remoteService_1.executeRemote)(request));
+}
+function closeWorkspaceWatchers() {
+    for (const dispose of workspaceWatchers.values()) {
+        dispose();
+    }
+    workspaceWatchers.clear();
 }
 //# sourceMappingURL=main.js.map

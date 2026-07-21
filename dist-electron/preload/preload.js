@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
+const node_crypto_1 = require("node:crypto");
 async function invoke(channel, ...args) {
     try {
         return await electron_1.ipcRenderer.invoke(channel, ...args);
@@ -40,7 +41,24 @@ const api = {
         rename: (oldPath, newPath) => invoke("fs:rename", oldPath, newPath),
         delete: (targetPath) => invoke("fs:delete", targetPath),
         reveal: (targetPath) => invoke("fs:reveal", targetPath),
-        exists: (targetPath) => invoke("fs:exists", targetPath)
+        exists: (targetPath) => invoke("fs:exists", targetPath),
+        watch: (targetPath, callback) => {
+            const watchId = (0, node_crypto_1.randomUUID)();
+            const listener = (_event, payload) => {
+                if (payload.watchId === watchId)
+                    callback(payload);
+            };
+            electron_1.ipcRenderer.on("fs:watch:event", listener);
+            void invoke("fs:watch:start", watchId, targetPath).catch(error => {
+                console.error(`[NPSharp IPC] fs:watch:start failed (${targetPath})`, error);
+            });
+            return () => {
+                electron_1.ipcRenderer.removeListener("fs:watch:event", listener);
+                void invoke("fs:watch:stop", watchId).catch(error => {
+                    console.error(`[NPSharp IPC] fs:watch:stop failed (${targetPath})`, error);
+                });
+            };
+        }
     },
     search: {
         workspace: (query) => invoke("search:workspace", query),

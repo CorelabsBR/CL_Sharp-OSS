@@ -17,6 +17,7 @@ import { api, DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, pla
 import { applyTheme, listThemes } from "../services/themes";
 import { buttonIcon, el, icon } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
+import { cssUrl, DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, dirname, extname, fileUri, joinPath } from "../utils/path";
 import type { CommandAction } from "../components/CommandPalette";
 
@@ -111,7 +112,7 @@ export class IdePage {
 
   private buildTitleBar(): void {
     const logo = el("div", { className: "title-logo" });
-    logo.append(el("img", { attrs: { src: "/logos/app.png", alt: "NPSharp" } }), el("span", { text: "NPSharp" }));
+    logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } }), el("span", { text: "NPSharp" }));
     const menus = el("div", { className: "title-menus" });
     const openWorkspaceLabel = platform.isMobile ? "Open Mobile Workspace" : "Open Folder";
     menus.append(
@@ -785,9 +786,13 @@ export class IdePage {
       this.updateStatus("Seletor nativo de wallpaper disponivel apenas no desktop.");
       return;
     }
-    const result = await api.dialog.chooseWallpaper();
-    if (!result.canceled && result.paths[0]) {
-      await this.updateSettings({ ...this.settings, wallpaperPath: result.paths[0] });
+    try {
+      const result = await api.dialog.chooseWallpaper();
+      if (!result.canceled && result.paths[0]) {
+        await this.updateSettings({ ...this.settings, wallpaperPath: result.paths[0] });
+      }
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Choose wallpaper failed");
     }
   }
 
@@ -1050,7 +1055,7 @@ export class IdePage {
       return;
     }
     const wallpaper = platform.isDesktop ? fileUri(this.settings.wallpaperPath) : this.settings.wallpaperPath;
-    this.wallpaper.style.backgroundImage = `url("${wallpaper}")`;
+    this.wallpaper.style.backgroundImage = cssUrl(wallpaper);
     this.wallpaper.style.opacity = String(this.settings.wallpaperOpacity);
   }
 
@@ -1572,7 +1577,7 @@ Designed by developers, for developers.
       el("section", {
         className: "fatal-screen",
         children: [
-          el("img", { className: "welcome-logo", attrs: { src: "/logos/app.png", alt: "NPSharp" } }),
+          el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } }),
           el("h1", { text: "NPSharp failed to start" }),
           el("pre", { text: errorMessage(error) })
         ]

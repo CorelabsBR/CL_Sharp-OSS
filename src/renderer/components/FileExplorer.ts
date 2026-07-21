@@ -1,4 +1,4 @@
-import type { WorkspaceEntry } from "../../shared/types";
+import type { WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
 import { api, platform } from "../services/api";
 import { buttonIcon, contextMenu, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
@@ -17,6 +17,10 @@ export class FileExplorer {
   private readonly empty = el("div", { className: "empty-state" });
   private root?: string;
   private nodes = new Map<string, TreeNode>();
+  private unwatchWorkspace?: () => void;
+  private refreshTimer?: number;
+  private refreshInFlight = false;
+  private refreshQueued = false;
 
   onWorkspaceChanged: (workspace?: string) => void = () => undefined;
 
@@ -39,41 +43,70 @@ export class FileExplorer {
   }
 
   async openFolder(folder: string): Promise<void> {
+    const previousRoot = this.root;
+    const previousNodes = new Map(this.nodes);
+    this.stopWatching();
     this.root = folder;
-    this.nodes.clear();
+    this.nodes = new Map();
     const rootEntry: WorkspaceEntry = { path: folder, name: basename(folder), directory: true, size: 0, modifiedAt: 0, hidden: false };
     this.nodes.set(folder, { entry: rootEntry, childrenLoaded: false, expanded: true });
-    this.onWorkspaceChanged(folder);
-    await this.loadChildren(folder);
-    this.render();
-    this.updateStatus(`Workspace aberto: ${folder}`);
+    try {
+      await this.loadChildren(folder, true);
+      this.watchFolder(folder);
+      this.onWorkspaceChanged(folder);
+      this.render();
+      this.updateStatus(`Workspace aberto: ${folder}`);
+    } catch (error) {
+      this.root = previousRoot;
+      this.nodes = previousNodes;
+      this.watchFolder(previousRoot);
+      this.render();
+      reportError(error, this.updateStatus, `Nao foi possivel abrir workspace (${folder})`);
+    }
   }
 
   clearFolder(): void {
+    this.stopWatching();
     this.root = undefined;
-    this.nodes.clear();
+    this.nodes = new Map();
     this.onWorkspaceChanged(undefined);
     this.render();
   }
 
-  async refresh(): Promise<void> {
-    if (!this.root) {
-      this.render();
+  async refresh(options: { silent?: boolean } = {}): Promise<void> {
+    if (this.refreshInFlight) {
+      this.refreshQueued = true;
       return;
     }
-    const expanded = new Set([...this.nodes.values()].filter(node => node.expanded).map(node => node.entry.path));
-    const root = this.root;
-    this.nodes.clear();
-    this.nodes.set(root, { entry: { path: root, name: basename(root), directory: true, size: 0, modifiedAt: 0, hidden: false }, childrenLoaded: false, expanded: true });
-    await this.loadChildren(root);
-    for (const item of expanded) {
-      const node = this.nodes.get(item);
-      if (node?.entry.directory) {
-        node.expanded = true;
-        await this.loadChildren(item);
+    this.refreshInFlight = true;
+    try {
+      if (!this.root) {
+        this.render();
+        return;
+      }
+      const expanded = new Set([...this.nodes.values()].filter(node => node.expanded).map(node => node.entry.path));
+      const root = this.root;
+      this.nodes = new Map();
+      this.nodes.set(root, { entry: { path: root, name: basename(root), directory: true, size: 0, modifiedAt: 0, hidden: false }, childrenLoaded: false, expanded: true });
+      await this.loadChildren(root, true);
+      for (const item of expanded) {
+        const node = this.nodes.get(item);
+        if (node?.entry.directory) {
+          node.expanded = true;
+          await this.loadChildren(item, true);
+        }
+      }
+      this.render();
+      if (!options.silent) this.updateStatus("Explorer atualizado");
+    } catch (error) {
+      reportError(error, this.updateStatus, "Nao foi possivel atualizar o Explorer");
+    } finally {
+      this.refreshInFlight = false;
+      if (this.refreshQueued) {
+        this.refreshQueued = false;
+        void this.refresh({ silent: true });
       }
     }
-    this.render();
   }
 
   collapseAll(): void {
@@ -92,7 +125,7 @@ export class FileExplorer {
       const node = this.nodes.get(current);
       if (node) {
         node.expanded = true;
-        await this.loadChildren(current);
+        await this.loadChildren(current, true);
       }
     }
     this.render();
@@ -118,14 +151,34 @@ export class FileExplorer {
     this.render();
   }
 
-  private async loadChildren(dir: string): Promise<void> {
+  private async loadChildren(dir: string, force = false): Promise<void> {
     const node = this.nodes.get(dir);
-    if (!node || node.childrenLoaded || !node.entry.directory) return;
+    if (!node || !node.entry.directory) return;
+    if (node.childrenLoaded && !force) return;
     const entries = await api.fs.listDir(dir);
+    const paths = new Set(entries.map(entry => entry.path));
+    for (const childPath of [...this.nodes.keys()]) {
+      if (dirname(childPath) === dir && childPath !== dir && !paths.has(childPath)) {
+        this.removeSubtree(childPath);
+      }
+    }
     for (const entry of entries) {
-      this.nodes.set(entry.path, this.nodes.get(entry.path) ?? { entry, childrenLoaded: false, expanded: false });
+      const existing = this.nodes.get(entry.path);
+      this.nodes.set(entry.path, {
+        entry,
+        childrenLoaded: existing?.childrenLoaded ?? false,
+        expanded: existing?.expanded ?? false
+      });
     }
     node.childrenLoaded = true;
+  }
+
+  private removeSubtree(targetPath: string): void {
+    for (const nodePath of [...this.nodes.keys()]) {
+      if (nodePath === targetPath || isSubPath(targetPath, nodePath)) {
+        this.nodes.delete(nodePath);
+      }
+    }
   }
 
   private render(): void {
@@ -168,7 +221,14 @@ export class FileExplorer {
   private async openNode(node: TreeNode): Promise<void> {
     if (node.entry.directory) {
       node.expanded = !node.expanded;
-      if (node.expanded) await this.loadChildren(node.entry.path);
+      if (node.expanded) {
+        try {
+          await this.loadChildren(node.entry.path, true);
+        } catch (error) {
+          node.expanded = false;
+          reportError(error, this.updateStatus, `Nao foi possivel listar pasta (${node.entry.path})`);
+        }
+      }
       this.render();
       return;
     }
@@ -188,8 +248,8 @@ export class FileExplorer {
       { label: "Nova pasta", action: () => void this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), true) },
       { label: "Renomear", action: () => void this.rename(node.entry.path) },
       { label: "Excluir", danger: true, action: () => void this.delete(node.entry.path) },
-      { label: "Copiar caminho", action: () => void navigator.clipboard.writeText(node.entry.path) },
-      { label: "Copiar caminho relativo", action: () => void navigator.clipboard.writeText(this.root ? relativePath(this.root, node.entry.path) : node.entry.path) },
+      { label: "Copiar caminho", action: () => this.copyToClipboard(node.entry.path) },
+      { label: "Copiar caminho relativo", action: () => this.copyToClipboard(this.root ? relativePath(this.root, node.entry.path) : node.entry.path) },
       { label: "Atualizar", action: () => void this.refresh() }
     ], x, y);
   }
@@ -239,10 +299,47 @@ export class FileExplorer {
 
   private async openLiveServer(filePath: string): Promise<void> {
     if (!this.root) return;
-    const result = await api.liveServer.open({ workspace: this.root, filePath });
-    if (result.url) {
-      window.open(result.url, "_blank", "noopener,noreferrer");
+    try {
+      const result = await api.liveServer.open({ workspace: this.root, filePath });
+      if (result.url) {
+        window.open(result.url, "_blank", "noopener,noreferrer");
+      }
+      this.updateStatus(result.output);
+    } catch (error) {
+      reportError(error, this.updateStatus, "Open with Live Server failed");
     }
-    this.updateStatus(result.output);
+  }
+
+  private watchFolder(folder: string | undefined): void {
+    this.stopWatching();
+    if (!folder) return;
+    this.unwatchWorkspace = api.fs.watch(folder, event => this.handleWorkspaceChange(event));
+  }
+
+  private stopWatching(): void {
+    if (this.refreshTimer !== undefined) {
+      window.clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
+    this.unwatchWorkspace?.();
+    this.unwatchWorkspace = undefined;
+  }
+
+  private handleWorkspaceChange(event: WorkspaceChangeEvent): void {
+    if (!this.root || event.root !== this.root) return;
+    if (event.error) {
+      console.warn(`[NPSharp explorer] Workspace watcher reported an error (${event.root})`, event.error);
+    }
+    if (this.refreshTimer !== undefined) window.clearTimeout(this.refreshTimer);
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = undefined;
+      void this.refresh({ silent: true });
+    }, 300);
+  }
+
+  private copyToClipboard(text: string): void {
+    void navigator.clipboard.writeText(text).catch(error => {
+      reportError(error, this.updateStatus, "Nao foi possivel copiar caminho");
+    });
   }
 }

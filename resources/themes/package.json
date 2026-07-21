@@ -113,7 +113,7 @@
     "specialThemes": [
       {
         "id": "sakura",
-        "label": "Sakura (Pink Spectrum)",
+        "label": "Andy's Pink Spectrum",
         "uiTheme": "vs-dark",
         "path": "./sakura.json",
         "categories": [
@@ -121,17 +121,6 @@
         ],
         "preview": "./previews/sakura.png",
         "welcomeLogo": "./welcomelogos/sakura.png"
-      },
-      {
-        "id": "amethyst",
-        "label": "Amethyst (Purple Protocol)",
-        "uiTheme": "vs-dark",
-        "path": "./amethyst.json",
-        "categories": [
-          "Special Themes"
-        ],
-        "preview": "./previews/amethyst.png",
-        "welcomeLogo": "./welcomelogos/amethyst.png"
       },
       {
         "id": "crimson_screen",

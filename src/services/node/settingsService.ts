@@ -43,7 +43,10 @@ export async function loadSettings(): Promise<AppSettings> {
       return { ...DEFAULT_SETTINGS };
     }
     return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } as AppSettings;
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`[NPSharp settings] Failed to load settings from ${file}; defaults will be used.`, error);
+    }
     await saveSettings(DEFAULT_SETTINGS);
     return { ...DEFAULT_SETTINGS };
   }
@@ -73,7 +76,10 @@ export async function loadSession(): Promise<PersistedSession> {
       sidePanel: parsed.sidePanel ?? "explorer",
       terminalVisible: parsed.terminalVisible ?? true
     };
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`[NPSharp settings] Failed to load session from ${recentFilesPath()}; empty session will be used.`, error);
+    }
     return { openFiles: [], sidePanel: "explorer", terminalVisible: true };
   }
 }

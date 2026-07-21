@@ -21,6 +21,13 @@ export interface WorkspaceEntry {
   hidden: boolean;
 }
 
+export interface WorkspaceChangeEvent {
+  root: string;
+  eventType: "change" | "rename" | "error";
+  path?: string;
+  error?: string;
+}
+
 export interface FileReadResult {
   path: string;
   name: string;
@@ -401,6 +408,7 @@ export interface NpsharpApi {
     delete(path: string): Promise<void>;
     reveal(path: string): Promise<void>;
     exists(path: string): Promise<boolean>;
+    watch(path: string, callback: (event: WorkspaceChangeEvent) => void): () => void;
   };
   search: {
     workspace(query: SearchQuery): Promise<SearchResult[]>;

@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.applyTemplate = applyTemplate;
 const promises_1 = __importDefault(require("node:fs/promises"));
 const node_path_1 = __importDefault(require("node:path"));
-async function applyTemplate(appPath, request) {
-    const templatePath = node_path_1.default.join(appPath, "resources", "templates", "java", `${request.template}.java.tpl`);
+async function applyTemplate(resourcesRoot, request) {
+    const templatePath = node_path_1.default.join(resourcesRoot, "templates", "java", `${request.template}.java.tpl`);
     const raw = await promises_1.default.readFile(templatePath, "utf8");
     return raw
         .replaceAll("${PACKAGE}", request.packageName ?? "")

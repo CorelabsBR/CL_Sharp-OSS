@@ -159,7 +159,8 @@ function createPtySession(
         if (info.running) terminal.kill("SIGKILL");
       }
     };
-  } catch {
+  } catch (error) {
+    console.warn("[NPSharp terminal] node-pty failed, falling back to child_process.", error);
     return createChildProcessSession(id, name, shell, args, cwd, callbacks);
   }
 }
@@ -234,7 +235,10 @@ function loadNodePty(): NodePtyModule | undefined {
   if (cachedPty !== undefined) return cachedPty ?? undefined;
   try {
     cachedPty = optionalRequire("node-pty") as NodePtyModule;
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND") {
+      console.warn("[NPSharp terminal] node-pty could not be loaded.", error);
+    }
     cachedPty = null;
   }
   return cachedPty ?? undefined;

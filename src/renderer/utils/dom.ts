@@ -1,3 +1,5 @@
+import { cssUrl, resourceUrl } from "./assets";
+
 export interface ElementOptions {
   className?: string;
   text?: string;
@@ -23,7 +25,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, options: Eleme
 
 export function icon(name: string, title = name): HTMLElement {
   const span = el("span", { className: "codicon-mask", title });
-  span.style.setProperty("--icon-url", `url("/codicons/${name}.svg")`);
+  span.style.setProperty("--icon-url", cssUrl(resourceUrl(`codicons/${name}.svg`)));
   return span;
 }
 
@@ -32,7 +34,7 @@ export function fileIcon(fileName: string, directory = false, expanded = false):
   const iconName = directory
     ? (expanded ? "folder-open-dark.svg" : "folder-dark.svg")
     : iconForFile(fileName);
-  span.style.setProperty("--file-icon-url", `url("/fileicons/icons/${iconName}")`);
+  span.style.setProperty("--file-icon-url", cssUrl(resourceUrl(`fileicons/icons/${iconName}`)));
   return span;
 }
 
