@@ -1,5 +1,11 @@
 import { cssUrl, resourceUrl } from "./assets";
 
+const contextMenuCleanup = Symbol("contextMenuCleanup");
+
+type ManagedContextMenu = HTMLElement & {
+  [contextMenuCleanup]?: () => void;
+};
+
 export interface ElementOptions {
   className?: string;
   text?: string;
@@ -48,22 +54,47 @@ export function buttonIcon(iconName: string, title: string, action: () => void):
 }
 
 export function contextMenu(items: Array<{ label: string; action: () => void; disabled?: boolean; danger?: boolean }>, x: number, y: number): HTMLElement {
-  document.querySelector(".context-menu")?.remove();
+  closeContextMenus();
   const menu = el("div", { className: "context-menu" });
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
+  const close = installContextMenuDismiss(menu);
   for (const item of items) {
     const row = el("button", { className: `menu-row ${item.danger ? "danger" : ""}`, text: item.label });
     row.disabled = Boolean(item.disabled);
     row.addEventListener("click", () => {
-      menu.remove();
+      close();
       item.action();
     });
     menu.append(row);
   }
   document.body.append(menu);
-  setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
   return menu;
+}
+
+export function closeContextMenus(): void {
+  document.querySelectorAll<ManagedContextMenu>(".context-menu").forEach(menu => {
+    menu[contextMenuCleanup]?.();
+    menu.remove();
+  });
+}
+
+export function installContextMenuDismiss(menu: HTMLElement): () => void {
+  const managed = menu as ManagedContextMenu;
+  managed[contextMenuCleanup]?.();
+  const controller = new AbortController();
+  const close = () => {
+    controller.abort();
+    menu.remove();
+  };
+  const closeOnPointerDown = (event: PointerEvent) => {
+    const target = event.target;
+    if (target instanceof Node && menu.contains(target)) return;
+    close();
+  };
+  document.addEventListener("pointerdown", closeOnPointerDown, { capture: true, signal: controller.signal });
+  managed[contextMenuCleanup] = () => controller.abort();
+  return close;
 }
 
 function iconForFile(fileName: string): string {

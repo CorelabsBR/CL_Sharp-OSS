@@ -23,14 +23,15 @@ const IGNORED_DIRECTORY_NAMES = new Set([
 ]);
 
 export async function listDir(targetPath: string): Promise<WorkspaceEntry[]> {
-  const entries = await fsp.readdir(targetPath, { withFileTypes: true });
+  const directoryPath = normalizeFsPath(targetPath);
+  const entries = await fsp.readdir(directoryPath, { withFileTypes: true });
   const result: WorkspaceEntry[] = [];
 
   for (const entry of entries) {
     if (entry.isDirectory() && IGNORED_DIRECTORY_NAMES.has(entry.name.toLowerCase())) {
       continue;
     }
-    const fullPath = path.join(targetPath, entry.name);
+    const fullPath = path.join(directoryPath, entry.name);
     let stat;
     try {
       stat = await fsp.stat(fullPath);
@@ -54,10 +55,11 @@ export async function listDir(targetPath: string): Promise<WorkspaceEntry[]> {
 }
 
 export async function readFile(targetPath: string): Promise<FileReadResult> {
-  const content = await fsp.readFile(targetPath, "utf8");
+  const filePath = normalizeFsPath(targetPath);
+  const content = await fsp.readFile(filePath, "utf8");
   return {
-    path: targetPath,
-    name: path.basename(targetPath),
+    path: filePath,
+    name: path.basename(filePath),
     content,
     lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
     encoding: "utf8"
@@ -65,38 +67,43 @@ export async function readFile(targetPath: string): Promise<FileReadResult> {
 }
 
 export async function writeFile(targetPath: string, content: string): Promise<void> {
-  await fsp.mkdir(path.dirname(targetPath), { recursive: true });
-  await fsp.writeFile(targetPath, content ?? "", "utf8");
+  const filePath = normalizeFsPath(targetPath);
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
+  await fsp.writeFile(filePath, content ?? "", "utf8");
 }
 
 export async function createFile(targetPath: string): Promise<void> {
-  await fsp.mkdir(path.dirname(targetPath), { recursive: true });
+  const filePath = normalizeFsPath(targetPath);
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
   try {
-    await fsp.writeFile(targetPath, "", { flag: "wx" });
+    await fsp.writeFile(filePath, "", { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
 }
 
 export async function createFolder(targetPath: string): Promise<void> {
-  await fsp.mkdir(targetPath, { recursive: true });
+  await fsp.mkdir(normalizeFsPath(targetPath), { recursive: true });
 }
 
 export async function renamePath(oldPath: string, newPath: string): Promise<void> {
-  await fsp.rename(oldPath, newPath);
+  const from = normalizeFsPath(oldPath);
+  const to = normalizeFsPath(newPath);
+  await fsp.mkdir(path.dirname(to), { recursive: true });
+  await fsp.rename(from, to);
 }
 
 export async function deletePath(targetPath: string): Promise<void> {
-  await fsp.rm(targetPath, { recursive: true, force: true });
+  await fsp.rm(normalizeFsPath(targetPath), { recursive: true, force: true });
 }
 
 export async function revealPath(targetPath: string): Promise<void> {
-  await shell.showItemInFolder(targetPath);
+  shell.showItemInFolder(normalizeFsPath(targetPath));
 }
 
 export async function exists(targetPath: string): Promise<boolean> {
   try {
-    await fsp.access(targetPath);
+    await fsp.access(normalizeFsPath(targetPath));
     return true;
   } catch {
     return false;
@@ -108,6 +115,7 @@ export function watchWorkspace(
   onChange: (event: WorkspaceChangeEvent) => void,
   onError: (error: unknown) => void
 ): () => void {
+  const root = normalizeFsPath(rootPath);
   let disposed = false;
   let pollTimer: NodeJS.Timeout | undefined;
   let nativeWatcher: fs.FSWatcher | undefined;
@@ -121,14 +129,16 @@ export function watchWorkspace(
     const poll = async (): Promise<void> => {
       if (disposed) return;
       try {
-        const nextSnapshot = await snapshotWorkspace(rootPath);
+        const nextSnapshot = await snapshotWorkspace(root);
+        if (disposed) return;
         if (previousSnapshot && snapshotsDiffer(previousSnapshot, nextSnapshot)) {
-          emit({ root: rootPath, eventType: "change", path: rootPath });
+          emit.run({ root, eventType: "change", path: root });
         }
         previousSnapshot = nextSnapshot;
       } catch (error) {
+        if (disposed) return;
         onError(error);
-        emit({ root: rootPath, eventType: "error", path: rootPath, error: errorMessage(error) });
+        emit.run({ root, eventType: "error", path: root, error: errorMessage(error) });
       } finally {
         if (!disposed) pollTimer = setTimeout(poll, 2000);
       }
@@ -137,13 +147,15 @@ export function watchWorkspace(
   };
 
   try {
-    nativeWatcher = fs.watch(rootPath, { recursive: true }, (eventType, filename) => {
-      const eventPath = filename ? path.join(rootPath, filename.toString()) : rootPath;
-      emit({ root: rootPath, eventType, path: eventPath });
+    nativeWatcher = fs.watch(root, { recursive: true }, (eventType, filename) => {
+      if (disposed) return;
+      const eventPath = filename ? path.join(root, filename.toString()) : root;
+      emit.run({ root, eventType, path: eventPath });
     });
     nativeWatcher.on("error", error => {
+      if (disposed) return;
       onError(error);
-      emit({ root: rootPath, eventType: "error", path: rootPath, error: errorMessage(error) });
+      emit.run({ root, eventType: "error", path: root, error: errorMessage(error) });
       nativeWatcher?.close();
       nativeWatcher = undefined;
       if (!pollTimer) startPolling();
@@ -157,18 +169,35 @@ export function watchWorkspace(
     disposed = true;
     nativeWatcher?.close();
     if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = undefined;
+    emit.cancel();
   };
 }
 
-function debounce<T extends unknown[]>(callback: (...args: T) => void, delayMs: number): (...args: T) => void {
+interface DebouncedCallback<T extends unknown[]> {
+  run(...args: T): void;
+  cancel(): void;
+}
+
+function debounce<T extends unknown[]>(callback: (...args: T) => void, delayMs: number): DebouncedCallback<T> {
   let timer: NodeJS.Timeout | undefined;
-  return (...args: T) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => callback(...args), delayMs);
+  return {
+    run(...args: T) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        callback(...args);
+      }, delayMs);
+    },
+    cancel() {
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+    }
   };
 }
 
 async function snapshotWorkspace(rootPath: string, limit = 10000): Promise<Map<string, string>> {
+  const root = normalizeFsPath(rootPath);
   const snapshot = new Map<string, string>();
 
   async function walk(dir: string): Promise<void> {
@@ -189,9 +218,9 @@ async function snapshotWorkspace(rootPath: string, limit = 10000): Promise<Map<s
     }
   }
 
-  const rootStat = await fsp.stat(rootPath);
-  snapshot.set(rootPath, `d:${rootStat.size}:${rootStat.mtimeMs}`);
-  await walk(rootPath);
+  const rootStat = await fsp.stat(root);
+  snapshot.set(root, `d:${rootStat.size}:${rootStat.mtimeMs}`);
+  await walk(root);
   return snapshot;
 }
 
@@ -207,4 +236,11 @@ function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return JSON.stringify(error);
+}
+
+function normalizeFsPath(targetPath: string): string {
+  if (!targetPath?.trim()) {
+    throw new Error("Caminho invalido.");
+  }
+  return path.resolve(path.normalize(targetPath));
 }

@@ -62,6 +62,8 @@ export class EditorTabs {
   private errorLensDecorations?: monaco.editor.IEditorDecorationsCollection;
   private brandHighlightName = "";
   private brandDecorations?: monaco.editor.IEditorDecorationsCollection;
+  private readonly disposables: monaco.IDisposable[] = [];
+  private disposed = false;
 
   onTabsChanged: () => void = () => undefined;
   onFileActivated: (filePath?: string) => void = () => undefined;
@@ -91,8 +93,10 @@ export class EditorTabs {
       scrollBeyondLastLine: false,
       bracketPairColorization: { enabled: true }
     });
-    this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor());
-    this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus());
+    this.disposables.push(
+      this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor()),
+      this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus())
+    );
     this.render();
   }
 
@@ -100,15 +104,34 @@ export class EditorTabs {
     return this.tabs.find(tab => tab.id === this.activeId);
   }
 
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const disposable of this.disposables.splice(0)) {
+      disposable.dispose();
+    }
+    this.errorLensDecorations?.clear();
+    this.brandDecorations?.clear();
+    for (const tab of this.tabs) {
+      if (!tab.model.isDisposed()) tab.model.dispose();
+    }
+    this.tabs = [];
+    this.closedTabs = [];
+    this.editor.dispose();
+  }
+
   getOpenFiles(): string[] {
+    if (this.disposed) return [];
     return this.tabs.map(tab => tab.path).filter((value): value is string => Boolean(value));
   }
 
   getCurrentText(): string {
+    if (this.disposed) return "";
     return this.activeTab?.model.getValue() ?? "";
   }
 
   getCurrentFile(): string | undefined {
+    if (this.disposed) return undefined;
     return this.activeTab?.path;
   }
 
@@ -117,6 +140,7 @@ export class EditorTabs {
   }
 
   registerMonacoShortcuts(shortcuts: readonly ShortcutBinding[]): void {
+    if (this.disposed) return;
     for (const shortcut of shortcuts) {
       if (shortcut.scope !== "editor") continue;
       for (const key of shortcut.keys) {
@@ -128,6 +152,7 @@ export class EditorTabs {
   }
 
   applySettings(settings: { editorFontFamily: string; editorFontSize: number; editorTabSize: number; editorWordWrap: boolean; editorLineNumbers: boolean; errorLensEnabled?: boolean; brandSpecialName?: string }): void {
+    if (this.disposed) return;
     this.errorLensEnabled = settings.errorLensEnabled ?? true;
     this.brandHighlightName = settings.brandSpecialName?.trim() ?? "";
     this.editor.updateOptions({
@@ -142,18 +167,22 @@ export class EditorTabs {
   }
 
   applyTheme(theme: { welcomeLogo?: string }): void {
+    if (this.disposed) return;
     this.welcomeLogo.src = theme.welcomeLogo ?? DEFAULT_LOGO_URL;
   }
 
   async restoreFiles(files: string[], activeFile?: string): Promise<void> {
     for (const file of files) {
+      if (this.disposed) return;
       await this.openFile(file, { silent: true, context: `Restore file failed (${file})` });
     }
+    if (this.disposed) return;
     if (activeFile) this.selectTabByPath(activeFile);
     this.render();
   }
 
   newTab(content = "", suggestedExtension = ".txt"): void {
+    if (this.disposed) return;
     const title = `Untitled-${this.untitledCounter++}${suggestedExtension}`;
     const model = monaco.editor.createModel(content, languageForPath(title), monaco.Uri.parse(`untitled:${title}-${crypto.randomUUID()}`));
     const tab: EditorTab = {
@@ -171,8 +200,10 @@ export class EditorTabs {
   }
 
   async openFileFromDialog(): Promise<void> {
+    if (this.disposed) return;
     try {
       const result = await api.dialog.openFile();
+      if (this.disposed) return;
       if (!result.canceled && result.paths[0]) await this.openFile(result.paths[0]);
     } catch (error) {
       reportError(error, this.onStatus, "Open file dialog failed");
@@ -180,6 +211,7 @@ export class EditorTabs {
   }
 
   async openFile(filePath: string, options: { silent?: boolean; context?: string } = {}): Promise<void> {
+    if (this.disposed) return;
     const existing = this.tabs.find(tab => tab.path === filePath);
     if (existing) {
       this.selectTab(existing.id);
@@ -188,6 +220,7 @@ export class EditorTabs {
 
     try {
       const file = await api.fs.readFile(filePath);
+      if (this.disposed) return;
       const model = monaco.editor.createModel(file.content, languageForPath(filePath), monaco.Uri.file(filePath));
       const tab: EditorTab = {
         id: filePath,
@@ -209,6 +242,7 @@ export class EditorTabs {
   }
 
   openVirtualFile(title: string, uri: string, content: string, saveHandler?: (content: string) => Promise<void>): void {
+    if (this.disposed) return;
     const existing = this.tabs.find(tab => tab.virtualUri === uri);
     if (existing) {
       this.selectTab(existing.id);
@@ -231,6 +265,7 @@ export class EditorTabs {
   }
 
   async saveCurrentFile(): Promise<void> {
+    if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab) return;
     try {
@@ -241,6 +276,7 @@ export class EditorTabs {
   }
 
   async saveCurrentFileAs(): Promise<void> {
+    if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab) return;
     try {
@@ -251,16 +287,19 @@ export class EditorTabs {
   }
 
   async saveAll(): Promise<void> {
+    if (this.disposed) return;
     for (const tab of this.tabs) {
       if (tab.dirty) await this.saveTab(tab, false);
     }
   }
 
   async revertCurrentFile(): Promise<void> {
+    if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab?.path) return;
     try {
       const file = await api.fs.readFile(tab.path);
+      if (this.disposed) return;
       tab.model.setValue(file.content);
       tab.initialContent = file.content;
       tab.lineEnding = file.lineEnding;
@@ -667,6 +706,7 @@ export class EditorTabs {
   }
 
   private render(): void {
+    if (this.disposed) return;
     this.renderTabs();
     this.welcome.hidden = Boolean(this.activeTab);
     this.onTabsChanged();

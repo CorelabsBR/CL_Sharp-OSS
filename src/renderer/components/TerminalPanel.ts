@@ -39,6 +39,8 @@ export class TerminalPanel {
   private terminalCounter = 0;
   private enabled = true;
   private creatingTerminal?: Promise<void>;
+  private readonly disposers: Array<() => void> = [];
+  private disposed = false;
 
   constructor(
     private readonly cwdSupplier: () => string,
@@ -50,6 +52,16 @@ export class TerminalPanel {
 
   hasTerminal(): boolean {
     return this.sessions.length > 0 || Boolean(this.creatingTerminal);
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const dispose of this.disposers.splice(0)) {
+      dispose();
+    }
+    this.sessions = [];
+    this.activeId = undefined;
   }
 
   setEnabled(enabled: boolean): void {
@@ -165,6 +177,7 @@ export class TerminalPanel {
 
   appendTerminalOutput(text: string): void {
     void this.ensureTerminal().then(() => {
+      if (this.disposed) return;
       this.mode = "terminal";
       const session = this.activeSession();
       if (!session) return;
@@ -215,8 +228,10 @@ export class TerminalPanel {
   }
 
   private build(): void {
-    api.terminal.onData(event => this.handleTerminalData(event));
-    api.terminal.onExit(event => this.handleTerminalExit(event));
+    this.disposers.push(
+      api.terminal.onData(event => this.handleTerminalData(event)),
+      api.terminal.onExit(event => this.handleTerminalExit(event))
+    );
     void this.loadShellOptions();
 
     const problemsTab = el("button", { className: "panel-tab", text: "PROBLEMS", attrs: { "data-mode": "problems" } });
@@ -281,6 +296,7 @@ export class TerminalPanel {
     } catch {
       this.shellOptions = [];
     }
+    if (this.disposed) return;
     this.renderShellOptions();
   }
 
@@ -294,6 +310,7 @@ export class TerminalPanel {
   }
 
   private async createTerminal(): Promise<void> {
+    if (this.disposed) return;
     const cwd = this.cwdSupplier();
     const name = `Terminal ${++this.terminalCounter}`;
     const shell = this.selectedShell();
@@ -309,6 +326,10 @@ export class TerminalPanel {
 
     try {
       const info = await api.terminal.create({ cwd, shell, name, cols: this.terminalCols(), rows: 30 });
+      if (this.disposed) {
+        void api.terminal.close(info.id).catch(() => undefined);
+        return;
+      }
       const output = info.backend === "child_process"
         ? `[terminal] Fallback child_process ativo: ${info.shell}\n`
         : "";
@@ -386,6 +407,7 @@ export class TerminalPanel {
   }
 
   private handleTerminalData(event: TerminalDataEvent): void {
+    if (this.disposed) return;
     const session = this.sessions.find(item => item.id === event.id);
     if (!session) return;
     const normalized = normalizeTerminalData(event.data);
@@ -395,6 +417,7 @@ export class TerminalPanel {
   }
 
   private handleTerminalExit(event: TerminalExitEvent): void {
+    if (this.disposed) return;
     const session = this.sessions.find(item => item.id === event.id);
     if (!session) return;
     session.running = false;
@@ -416,6 +439,7 @@ export class TerminalPanel {
   }
 
   private render(): void {
+    if (this.disposed) return;
     this.tabs.replaceChildren();
     for (const session of this.sessions) {
       const button = el("button", {

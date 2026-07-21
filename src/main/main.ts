@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
 import path from "node:path";
 import {
   compileArduinoSketch,
@@ -90,7 +90,20 @@ import type {
 } from "../shared/types";
 
 let mainWindow: BrowserWindow | undefined;
-const workspaceWatchers = new Map<string, () => void>();
+
+interface WorkspaceWatcherRegistration {
+  readonly dispose: () => void;
+  readonly sender: WebContents;
+  readonly onSenderDestroyed: () => void;
+}
+
+interface TerminalRegistration {
+  readonly ids: Set<string>;
+  readonly onSenderDestroyed: () => void;
+}
+
+const workspaceWatchers = new Map<string, WorkspaceWatcherRegistration>();
+const terminalRegistrations = new Map<WebContents, TerminalRegistration>();
 
 const gotLock = process.env.VITE_DEV_SERVER_URL ? true : app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -99,9 +112,10 @@ if (!gotLock) {
 
 if (!process.env.VITE_DEV_SERVER_URL) {
   app.on("second-instance", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+    const window = currentMainWindow();
+    if (!window) return;
+    if (window.isMinimized()) window.restore();
+    window.focus();
   });
 }
 
@@ -128,12 +142,12 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   void stopAllLiveServers();
-  closeAllTerminals();
+  closeRegisteredTerminals();
   closeWorkspaceWatchers();
 });
 
 async function createMainWindow(): Promise<void> {
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 1280,
     height: 760,
     minWidth: 800,
@@ -150,15 +164,30 @@ async function createMainWindow(): Promise<void> {
       devTools: true
     }
   });
+  const webContents = window.webContents;
+  mainWindow = window;
 
-  mainWindow.once("ready-to-show", () => {
-    mainWindow?.show();
+  window.once("ready-to-show", () => {
+    if (!window.isDestroyed()) window.show();
+  });
+  webContents.once("destroyed", () => {
+    closeWorkspaceWatchersForSender(webContents, false);
+    closeTerminalsForSender(webContents, false);
+  });
+  window.once("closed", () => {
+    closeWorkspaceWatchersForSender(webContents, false);
+    closeTerminalsForSender(webContents, false);
+    if (mainWindow === window) mainWindow = undefined;
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
-    await loadDevServer(mainWindow, process.env.VITE_DEV_SERVER_URL);
-  } else {
-    await mainWindow.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
+    await loadDevServer(window, process.env.VITE_DEV_SERVER_URL);
+  } else if (!window.isDestroyed()) {
+    try {
+      await window.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
+    } catch (error) {
+      if (!window.isDestroyed()) throw error;
+    }
   }
 }
 
@@ -174,10 +203,12 @@ function resolveWindowIcon(): string {
 async function loadDevServer(window: BrowserWindow, url: string): Promise<void> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 40; attempt++) {
+    if (window.isDestroyed()) return;
     try {
       await window.loadURL(url);
       return;
     } catch (error) {
+      if (window.isDestroyed()) return;
       lastError = error;
       await new Promise(resolve => setTimeout(resolve, 250));
     }
@@ -291,7 +322,8 @@ function createApplicationMenu(): void {
 }
 
 function sendCommand(command: string): void {
-  mainWindow?.webContents.send("command", command);
+  const contents = currentMainWindow()?.webContents;
+  if (isUsableWebContents(contents)) contents.send("command", command);
 }
 
 function registerIpcHandlers(): void {
@@ -304,39 +336,40 @@ function registerIpcHandlers(): void {
     npsharpHome: npsharpHome()
   }));
 
-  ipcMain.handle("window:minimize", () => mainWindow?.minimize());
+  ipcMain.handle("window:minimize", () => currentMainWindow()?.minimize());
   ipcMain.handle("window:maximize", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMaximized()) mainWindow.unmaximize();
-    else mainWindow.maximize();
+    const window = currentMainWindow();
+    if (!window) return;
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
   });
-  ipcMain.handle("window:close", () => mainWindow?.close());
-  ipcMain.handle("window:isMaximized", () => mainWindow?.isMaximized() ?? false);
+  ipcMain.handle("window:close", () => currentMainWindow()?.close());
+  ipcMain.handle("window:isMaximized", () => currentMainWindow()?.isMaximized() ?? false);
 
   ipcMain.handle("dialog:openFile", async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, { properties: ["openFile"] });
-    return { canceled: result.canceled, paths: result.filePaths };
+    const result = await showOpenDialog({ properties: ["openFile"] });
+    return { canceled: result.canceled, paths: normalizeDialogPaths(result.filePaths) };
   });
   ipcMain.handle("dialog:openFolder", async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, { properties: ["openDirectory"] });
-    return { canceled: result.canceled, paths: result.filePaths };
+    const result = await showOpenDialog({ properties: ["openDirectory"] });
+    return { canceled: result.canceled, paths: normalizeDialogPaths(result.filePaths) };
   });
   ipcMain.handle("dialog:chooseWallpaper", async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, {
+    const result = await showOpenDialog({
       properties: ["openFile"],
       filters: [
         { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] },
         { name: "All Files", extensions: ["*"] }
       ]
     });
-    return { canceled: result.canceled, paths: result.filePaths };
+    return { canceled: result.canceled, paths: normalizeDialogPaths(result.filePaths) };
   });
   ipcMain.handle("dialog:saveFile", async (_event, request: SaveFileRequest) => {
     let targetPath = request.path;
     if (!targetPath) {
-      const result = await dialog.showSaveDialog(mainWindow!, { defaultPath: request.suggestedName || "untitled.txt" });
+      const result = await showSaveDialog({ defaultPath: request.suggestedName || "untitled.txt" });
       if (result.canceled || !result.filePath) return { canceled: true };
-      targetPath = result.filePath;
+      targetPath = normalizeDialogPath(result.filePath);
     }
     await writeFile(targetPath, request.content);
     return { canceled: false, path: targetPath };
@@ -358,26 +391,24 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fs:reveal", (_event, targetPath: string) => revealPath(targetPath));
   ipcMain.handle("fs:exists", (_event, targetPath: string) => exists(targetPath));
   ipcMain.handle("fs:watch:start", (event, watchId: string, targetPath: string) => {
-    workspaceWatchers.get(watchId)?.();
+    disposeWorkspaceWatcher(watchId);
     const sender = event.sender;
+    if (!isUsableWebContents(sender)) return;
     const dispose = watchWorkspace(
       targetPath,
       payload => {
-        if (!sender.isDestroyed()) sender.send("fs:watch:event", { watchId, ...payload });
+        sendToWebContents(sender, "fs:watch:event", { watchId, ...payload });
       },
       error => {
         console.warn(`[NPSharp fs] Workspace watcher issue (${targetPath})`, error);
       }
     );
-    workspaceWatchers.set(watchId, dispose);
-    sender.once("destroyed", () => {
-      workspaceWatchers.get(watchId)?.();
-      workspaceWatchers.delete(watchId);
-    });
+    const onSenderDestroyed = () => disposeWorkspaceWatcher(watchId, false);
+    sender.once("destroyed", onSenderDestroyed);
+    workspaceWatchers.set(watchId, { dispose, sender, onSenderDestroyed });
   });
   ipcMain.handle("fs:watch:stop", (_event, watchId: string) => {
-    workspaceWatchers.get(watchId)?.();
-    workspaceWatchers.delete(watchId);
+    disposeWorkspaceWatcher(watchId);
   });
 
   ipcMain.handle("search:workspace", (_event, query: SearchQuery) => searchWorkspace(query));
@@ -401,14 +432,25 @@ function registerIpcHandlers(): void {
     return { cwd, output: result.output, code: result.code };
   });
   ipcMain.handle("terminal:shells", () => listTerminalShells());
-  ipcMain.handle("terminal:create", (event, request: TerminalCreateRequest) => createTerminalSession(request, {
-    onData: data => event.sender.send("terminal:data", data),
-    onExit: exit => event.sender.send("terminal:exit", exit)
-  }));
+  ipcMain.handle("terminal:create", (event, request: TerminalCreateRequest) => {
+    const sender = event.sender;
+    if (!isUsableWebContents(sender)) {
+      throw new Error("Terminal renderer is no longer available.");
+    }
+    const info = createTerminalSession(request, {
+      onData: data => sendToWebContents(sender, "terminal:data", data),
+      onExit: exit => sendToWebContents(sender, "terminal:exit", exit)
+    });
+    trackTerminalForSender(sender, info.id);
+    return info;
+  });
   ipcMain.handle("terminal:write", (_event, id: string, data: string) => writeTerminal(id, data));
   ipcMain.handle("terminal:resize", (_event, id: string, cols: number, rows: number) => resizeTerminal(id, cols, rows));
   ipcMain.handle("terminal:kill", (_event, id: string) => killTerminal(id));
-  ipcMain.handle("terminal:close", (_event, id: string) => closeTerminal(id));
+  ipcMain.handle("terminal:close", (_event, id: string) => {
+    closeTerminal(id);
+    untrackTerminal(id);
+  });
 
   ipcMain.handle("runtime:list", () => listRuntimes());
   ipcMain.handle("runtime:discover", () => discoverRuntimes(true));
@@ -443,8 +485,105 @@ function registerIpcHandlers(): void {
 }
 
 function closeWorkspaceWatchers(): void {
-  for (const dispose of workspaceWatchers.values()) {
-    dispose();
+  for (const watchId of [...workspaceWatchers.keys()]) {
+    disposeWorkspaceWatcher(watchId);
   }
-  workspaceWatchers.clear();
+}
+
+function disposeWorkspaceWatcher(watchId: string, removeDestroyedListener = true): void {
+  const registration = workspaceWatchers.get(watchId);
+  if (!registration) return;
+  workspaceWatchers.delete(watchId);
+  if (removeDestroyedListener && isUsableWebContents(registration.sender)) {
+    registration.sender.removeListener("destroyed", registration.onSenderDestroyed);
+  }
+  registration.dispose();
+}
+
+function closeWorkspaceWatchersForSender(sender: WebContents, removeDestroyedListener = true): void {
+  for (const [watchId, registration] of [...workspaceWatchers.entries()]) {
+    if (registration.sender === sender) {
+      disposeWorkspaceWatcher(watchId, removeDestroyedListener);
+    }
+  }
+}
+
+function trackTerminalForSender(sender: WebContents, id: string): void {
+  let registration = terminalRegistrations.get(sender);
+  if (!registration) {
+    const onSenderDestroyed = () => closeTerminalsForSender(sender, false);
+    registration = { ids: new Set(), onSenderDestroyed };
+    terminalRegistrations.set(sender, registration);
+    sender.once("destroyed", onSenderDestroyed);
+  }
+  registration.ids.add(id);
+}
+
+function untrackTerminal(id: string): void {
+  for (const [sender, registration] of [...terminalRegistrations.entries()]) {
+    if (!registration.ids.delete(id)) continue;
+    if (registration.ids.size === 0) {
+      terminalRegistrations.delete(sender);
+      if (isUsableWebContents(sender)) {
+        sender.removeListener("destroyed", registration.onSenderDestroyed);
+      }
+    }
+    return;
+  }
+}
+
+function closeTerminalsForSender(sender: WebContents, removeDestroyedListener = true): void {
+  const registration = terminalRegistrations.get(sender);
+  if (!registration) return;
+  terminalRegistrations.delete(sender);
+  if (removeDestroyedListener && isUsableWebContents(sender)) {
+    sender.removeListener("destroyed", registration.onSenderDestroyed);
+  }
+  for (const id of registration.ids) {
+    closeTerminal(id);
+  }
+}
+
+function closeRegisteredTerminals(): void {
+  for (const [sender, registration] of terminalRegistrations.entries()) {
+    if (isUsableWebContents(sender)) {
+      sender.removeListener("destroyed", registration.onSenderDestroyed);
+    }
+  }
+  terminalRegistrations.clear();
+  closeAllTerminals();
+}
+
+function currentMainWindow(): BrowserWindow | undefined {
+  return isUsableWindow(mainWindow) ? mainWindow : undefined;
+}
+
+function isUsableWindow(window: BrowserWindow | undefined): window is BrowserWindow {
+  return Boolean(window && !window.isDestroyed());
+}
+
+function isUsableWebContents(contents: WebContents | undefined): contents is WebContents {
+  return Boolean(contents && !contents.isDestroyed());
+}
+
+function sendToWebContents(contents: WebContents, channel: string, payload: unknown): void {
+  if (isUsableWebContents(contents)) contents.send(channel, payload);
+}
+
+async function showOpenDialog(options: OpenDialogOptions): Promise<Electron.OpenDialogReturnValue> {
+  const window = currentMainWindow();
+  return window ? dialog.showOpenDialog(window, options) : dialog.showOpenDialog(options);
+}
+
+async function showSaveDialog(options: SaveDialogOptions): Promise<Electron.SaveDialogReturnValue> {
+  const window = currentMainWindow();
+  return window ? dialog.showSaveDialog(window, options) : dialog.showSaveDialog(options);
+}
+
+function normalizeDialogPaths(paths: string[]): string[] {
+  return paths.map(normalizeDialogPath);
+}
+
+function normalizeDialogPath(targetPath: string): string {
+  return path.resolve(path.normalize(targetPath));
 }

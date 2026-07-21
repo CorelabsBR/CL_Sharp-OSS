@@ -15,6 +15,8 @@ export class SearchPanel {
   private readonly list = el("div", { className: "search-results" });
   private workspace?: string;
   private debounce?: number;
+  private requestVersion = 0;
+  private disposed = false;
 
   constructor(
     private readonly openResult: (result: SearchResult) => void,
@@ -23,17 +25,31 @@ export class SearchPanel {
     this.build();
   }
 
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.requestVersion += 1;
+    if (this.debounce !== undefined) {
+      window.clearTimeout(this.debounce);
+      this.debounce = undefined;
+    }
+    this.list.replaceChildren();
+  }
+
   setWorkspace(workspace?: string): void {
+    if (this.disposed) return;
     this.workspace = workspace;
     void this.runSearch();
   }
 
   focus(): void {
+    if (this.disposed) return;
     this.query.focus();
     this.query.select();
   }
 
   focusReplace(): void {
+    if (this.disposed) return;
     this.replace.focus();
     this.replace.select();
   }
@@ -59,11 +75,17 @@ export class SearchPanel {
   }
 
   private scheduleSearch(): void {
-    if (this.debounce) window.clearTimeout(this.debounce);
-    this.debounce = window.setTimeout(() => void this.runSearch(), 300);
+    if (this.disposed) return;
+    if (this.debounce !== undefined) window.clearTimeout(this.debounce);
+    this.debounce = window.setTimeout(() => {
+      this.debounce = undefined;
+      void this.runSearch();
+    }, 300);
   }
 
   private async runSearch(): Promise<void> {
+    if (this.disposed) return;
+    const version = ++this.requestVersion;
     const text = this.query.value;
     if (!text) {
       this.summary.textContent = "Type to search";
@@ -86,14 +108,17 @@ export class SearchPanel {
         caseSensitive: this.caseSensitive.checked,
         wholeWord: this.wholeWord.checked
       });
+      if (this.disposed || version !== this.requestVersion) return;
       this.renderResults(results);
       this.summary.textContent = `${results.length} result(s) in ${basename(this.workspace)}`;
     } catch (error) {
+      if (this.disposed || version !== this.requestVersion) return;
       this.summary.textContent = reportError(error, this.updateStatus, "Search failed");
     }
   }
 
   private async replaceAll(): Promise<void> {
+    if (this.disposed) return;
     const text = this.query.value;
     if (!text) {
       this.summary.textContent = "Nothing to replace";
@@ -119,14 +144,17 @@ export class SearchPanel {
         caseSensitive: this.caseSensitive.checked,
         wholeWord: this.wholeWord.checked
       });
+      if (this.disposed) return;
       this.summary.textContent = `${result.replacements} occurrence(s) replaced`;
       await this.runSearch();
     } catch (error) {
+      if (this.disposed) return;
       this.summary.textContent = reportError(error, this.updateStatus, "Replace failed");
     }
   }
 
   private renderResults(results: SearchResult[]): void {
+    if (this.disposed) return;
     this.list.replaceChildren();
     const grouped = new Map<string, SearchResult[]>();
     for (const result of results) {
@@ -155,22 +183,27 @@ export class SearchPanel {
   }
 
   private async replaceSingle(result: SearchResult): Promise<void> {
+    if (this.disposed) return;
     try {
       const file = await api.fs.readFile(result.filePath);
+      if (this.disposed) return;
       const content = file.content;
       if (result.start < 0 || result.end <= result.start || result.end > content.length) {
         this.summary.textContent = "Invalid result position";
         return;
       }
       await api.fs.writeFile(result.filePath, content.slice(0, result.start) + this.replace.value + content.slice(result.end));
+      if (this.disposed) return;
       this.summary.textContent = "1 occurrence replaced";
       await this.runSearch();
     } catch (error) {
+      if (this.disposed) return;
       this.summary.textContent = reportError(error, this.updateStatus, "Replace failed");
     }
   }
 
   private handleShortcut(event: KeyboardEvent): void {
+    if (this.disposed) return;
     if (!(event.ctrlKey || event.metaKey) || !event.altKey) return;
     const key = event.key.toLowerCase();
     if (key === "r") {

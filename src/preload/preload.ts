@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import type {
   AppSettings,
   ArduinoCliRequest,
@@ -71,6 +73,7 @@ const api: NpsharpApi = {
     exists: (targetPath: string) => invoke("fs:exists", targetPath),
     watch: (targetPath: string, callback: (event: WorkspaceChangeEvent) => void) => {
       const watchId = randomUUID();
+      let disposed = false;
       const listener = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent & { watchId: string }) => {
         if (payload.watchId === watchId) callback(payload);
       };
@@ -79,10 +82,10 @@ const api: NpsharpApi = {
         console.error(`[NPSharp IPC] fs:watch:start failed (${targetPath})`, error);
       });
       return () => {
+        if (disposed) return;
+        disposed = true;
         ipcRenderer.removeListener("fs:watch:event", listener);
-        void invoke<void>("fs:watch:stop", watchId).catch(error => {
-          console.error(`[NPSharp IPC] fs:watch:stop failed (${targetPath})`, error);
-        });
+        void ipcRenderer.invoke("fs:watch:stop", watchId).catch(() => undefined);
       };
     }
   },
@@ -165,6 +168,26 @@ const api: NpsharpApi = {
 
 contextBridge.exposeInMainWorld("npsharp", api);
 contextBridge.exposeInMainWorld("npsharpApi", api);
+contextBridge.exposeInMainWorld("npsharpPath", {
+  sep: path.sep,
+  delimiter: path.delimiter,
+  basename: (targetPath: string) => path.basename(path.normalize(targetPath)),
+  dirname: (targetPath: string) => path.dirname(path.normalize(targetPath)),
+  extname: (targetPath: string) => path.extname(path.normalize(targetPath)),
+  join: (...parts: string[]) => path.join(...parts),
+  normalize: (targetPath: string) => path.normalize(targetPath),
+  parse: (targetPath: string) => path.parse(path.normalize(targetPath)),
+  relative: (from: string, to: string) => path.relative(path.normalize(from), path.normalize(to)),
+  resolve: (...parts: string[]) => path.resolve(...parts),
+  isAbsolute: (targetPath: string) => path.isAbsolute(path.normalize(targetPath)),
+  isSubPath: (root: string, target: string) => {
+    const normalizedRoot = path.resolve(path.normalize(root));
+    const normalizedTarget = path.resolve(path.normalize(target));
+    const relative = path.relative(normalizedRoot, normalizedTarget);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  },
+  fileUri: (targetPath: string) => pathToFileURL(path.resolve(path.normalize(targetPath))).toString()
+});
 contextBridge.exposeInMainWorld("npsharpEvents", {
   onCommand(callback: (command: string) => void): () => void {
     const listener = (_event: Electron.IpcRendererEvent, command: string) => callback(command);

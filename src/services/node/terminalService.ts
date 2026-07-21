@@ -139,12 +139,15 @@ function createPtySession(
     });
     const info = terminalInfo(id, name, cwd, shell, "node-pty", terminal.pid);
     let exited = false;
-    terminal.onData(data => callbacks.onData({ id, data }));
+    let closed = false;
+    terminal.onData(data => {
+      if (!closed) callbacks.onData({ id, data });
+    });
     terminal.onExit(event => {
       if (exited) return;
       exited = true;
       info.running = false;
-      callbacks.onExit({ id, code: event.exitCode, signal: event.signal ? String(event.signal) : undefined });
+      if (!closed) callbacks.onExit({ id, code: event.exitCode, signal: event.signal ? String(event.signal) : undefined });
     });
     return {
       info,
@@ -156,7 +159,9 @@ function createPtySession(
         if (info.running) terminal.kill("SIGTERM");
       },
       close: () => {
+        closed = true;
         if (info.running) terminal.kill("SIGKILL");
+        info.running = false;
       }
     };
   } catch (error) {
@@ -176,11 +181,13 @@ function createChildProcessSession(
   let child: ChildProcessWithoutNullStreams | undefined;
   const info = terminalInfo(id, name, cwd, shell, "child_process");
   let exited = false;
+  let closed = false;
 
   const finish = (code: number | null, signal?: NodeJS.Signals | string | null) => {
     if (exited) return;
     exited = true;
     info.running = false;
+    if (closed) return;
     callbacks.onExit({ id, code, signal: signal ? String(signal) : undefined });
   };
 
@@ -192,15 +199,19 @@ function createChildProcessSession(
       windowsHide: false
     });
     info.pid = child.pid;
-    child.stdout.on("data", chunk => callbacks.onData({ id, data: chunk.toString() }));
-    child.stderr.on("data", chunk => callbacks.onData({ id, data: chunk.toString() }));
+    child.stdout.on("data", chunk => {
+      if (!closed) callbacks.onData({ id, data: chunk.toString() });
+    });
+    child.stderr.on("data", chunk => {
+      if (!closed) callbacks.onData({ id, data: chunk.toString() });
+    });
     child.on("error", error => {
-      callbacks.onData({ id, data: `\n[terminal] ${error.message}\n` });
+      if (!closed) callbacks.onData({ id, data: `\n[terminal] ${error.message}\n` });
       finish(1);
     });
     child.on("close", (code, signal) => finish(code, signal));
   } catch (error) {
-    callbacks.onData({ id, data: `\n[terminal] ${error instanceof Error ? error.message : String(error)}\n` });
+    if (!closed) callbacks.onData({ id, data: `\n[terminal] ${error instanceof Error ? error.message : String(error)}\n` });
     finish(1);
   }
 
@@ -214,7 +225,11 @@ function createChildProcessSession(
       if (info.running) child?.kill("SIGTERM");
     },
     close: () => {
+      closed = true;
+      child?.stdout.removeAllListeners("data");
+      child?.stderr.removeAllListeners("data");
       if (info.running) child?.kill("SIGKILL");
+      info.running = false;
     }
   };
 }

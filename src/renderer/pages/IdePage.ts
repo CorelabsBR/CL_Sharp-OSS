@@ -15,10 +15,10 @@ import { useGlobalShortcuts, type GlobalShortcutController } from "../shortcuts/
 import { TerminalPanel } from "../components/TerminalPanel";
 import { api, DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform } from "../services/api";
 import { applyTheme, listThemes } from "../services/themes";
-import { buttonIcon, el, icon } from "../utils/dom";
+import { buttonIcon, closeContextMenus, el, icon, installContextMenuDismiss } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
 import { cssUrl, DEFAULT_LOGO_URL } from "../utils/assets";
-import { basename, dirname, extname, fileUri, joinPath } from "../utils/path";
+import { basename, dirname, extname, fileUri, isAbsolutePath, joinPath } from "../utils/path";
 import type { CommandAction } from "../components/CommandPalette";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "arduino" | "settings" | "problems";
@@ -70,22 +70,51 @@ export class IdePage {
   private compactPreview = false;
   private liveServerActive = false;
   private pendingChord: string | undefined;
+  private pendingChordTimer?: number;
+  private readonly disposers: Array<() => void> = [];
+  private disposed = false;
+  private readonly dispose = (): void => {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.pendingChordTimer !== undefined) {
+      window.clearTimeout(this.pendingChordTimer);
+      this.pendingChordTimer = undefined;
+    }
+    this.shortcutController?.dispose();
+    this.shortcutController = undefined;
+    for (const dispose of this.disposers.splice(0)) {
+      dispose();
+    }
+    this.explorer.dispose();
+    this.search.dispose();
+    this.terminal.dispose();
+    this.editor.dispose();
+    this.palette.close();
+    this.keyboardShortcuts.close();
+    closeContextMenus();
+    document.querySelector(".html-preview-overlay")?.remove();
+  };
 
   constructor() {
-    void this.init().catch(error => this.renderFatalError(error));
     this.handleShortcut = this.handleShortcut.bind(this);
+    void this.init().catch(error => this.renderFatalError(error));
   }
 
   private async init(): Promise<void> {
     this.element.dataset.platform = platform.kind;
     this.settings = await api.settings.load();
+    if (this.disposed) return;
     const appInfo = await api.appInfo();
+    if (this.disposed) return;
     this.appPlatform = appInfo.platform;
     this.appInfoPath = appInfo.npsharpHome;
     this.terminal.setEnabled(this.settings.terminalEnabled);
     this.terminal.setShell(this.terminalShell());
     this.session = await api.settings.loadSession();
-    this.editor.applyTheme(await applyTheme(this.settings));
+    if (this.disposed) return;
+    const theme = await applyTheme(this.settings);
+    if (this.disposed) return;
+    this.editor.applyTheme(theme);
     this.applyWallpaper();
     this.editor.applySettings(this.settings);
     this.wireEvents();
@@ -288,11 +317,23 @@ export class IdePage {
       if (this.settings.compileOnSave) void this.runDiagnostics();
     };
     this.palette.setFileOpener(file => void this.editor.openFile(file));
+    const handleError = (event: ErrorEvent) => this.updateStatus(`Error: ${errorMessage(event.error ?? event.message)}`);
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => this.updateStatus(`Error: ${errorMessage(event.reason)}`);
     window.addEventListener("keydown", this.handleShortcut, true);
-    window.addEventListener("error", event => this.updateStatus(`Error: ${errorMessage(event.error ?? event.message)}`));
-    window.addEventListener("unhandledrejection", event => this.updateStatus(`Error: ${errorMessage(event.reason)}`));
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("beforeunload", this.dispose, { once: true });
+    window.addEventListener("pagehide", this.dispose, { once: true });
+    this.disposers.push(
+      () => window.removeEventListener("keydown", this.handleShortcut, true),
+      () => window.removeEventListener("error", handleError),
+      () => window.removeEventListener("unhandledrejection", handleUnhandledRejection),
+      () => window.removeEventListener("beforeunload", this.dispose),
+      () => window.removeEventListener("pagehide", this.dispose)
+    );
     const events = window as typeof window & { npsharpEvents?: { onCommand(callback: (command: string) => void): () => void } };
-    events.npsharpEvents?.onCommand(command => this.handleCommand(command));
+    const disposeCommandListener = events.npsharpEvents?.onCommand(command => this.handleCommand(command));
+    if (disposeCommandListener) this.disposers.push(disposeCommandListener);
   }
 
   private registerCommands(): void {
@@ -357,9 +398,12 @@ export class IdePage {
   private async restoreSession(): Promise<void> {
     try {
       if (this.session.workspace && await api.fs.exists(this.session.workspace)) {
+        if (this.disposed) return;
         await this.explorer.openFolder(this.session.workspace);
       }
+      if (this.disposed) return;
       await this.editor.restoreFiles(this.session.openFiles, this.session.activeFile);
+      if (this.disposed) return;
       this.showPanel((this.session.sidePanel as PanelId) || "explorer");
       this.setTerminalVisible(this.session.terminalVisible, false);
       this.updateCommandCenter();
@@ -472,12 +516,12 @@ export class IdePage {
   }
 
   private showSettingsMenu(anchor: HTMLElement): void {
-    document.querySelector(".context-menu")?.remove();
+    closeContextMenus();
     const rect = anchor.getBoundingClientRect();
     const menu = el("div", { className: "context-menu manage-menu" });
     menu.addEventListener("click", event => event.stopPropagation());
 
-    const close = () => menu.remove();
+    let close = () => menu.remove();
     const addSeparator = () => menu.append(el("div", { className: "menu-separator" }));
     const addRow = (label: string, shortcut = "", action?: MenuAction, className = ""): HTMLButtonElement => {
       const row = el("button", { className: `menu-row ${className}`.trim() });
@@ -529,11 +573,11 @@ export class IdePage {
     addRow("Download Update (1)");
 
     document.body.append(menu);
+    close = installContextMenuDismiss(menu);
     const left = Math.min(rect.right + 2, window.innerWidth - menu.offsetWidth - 8);
     const top = Math.min(rect.top, window.innerHeight - menu.offsetHeight - 8);
     menu.style.left = `${Math.max(8, left)}px`;
     menu.style.top = `${Math.max(8, top)}px`;
-    setTimeout(() => document.addEventListener("click", close, { once: true }), 0);
   }
 
   private settingsPanel(): HTMLElement {
@@ -1288,7 +1332,6 @@ export class IdePage {
     this.terminal.element.hidden = !visible;
     this.editorStack.classList.toggle("terminal-visible", visible);
     this.session.terminalVisible = visible;
-    requestAnimationFrame(() => this.editor.layout());
     if (persist) this.persist();
   }
 
@@ -1338,6 +1381,10 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
     event.preventDefault();
     event.stopPropagation();
     this.pendingChord = undefined;
+    if (this.pendingChordTimer !== undefined) {
+      window.clearTimeout(this.pendingChordTimer);
+      this.pendingChordTimer = undefined;
+    }
     action();
   };
 
@@ -1365,9 +1412,11 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
     this.pendingChord = "Ctrl+K";
     this.updateStatus("Ctrl+K...");
 
-    window.setTimeout(() => {
+    if (this.pendingChordTimer !== undefined) window.clearTimeout(this.pendingChordTimer);
+    this.pendingChordTimer = window.setTimeout(() => {
       if (this.pendingChord === "Ctrl+K") {
         this.pendingChord = undefined;
+        this.pendingChordTimer = undefined;
         this.updateStatus("Atalho cancelado");
       }
     }, 1600);
@@ -1540,6 +1589,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
   }
 
   private updateStatus(text: string): void {
+    if (this.disposed) return;
     this.statusLeft.textContent = text;
     this.statusRight.textContent = this.editor.getCurrentFile() ? basename(this.editor.getCurrentFile()!) : "NPSharp";
   }
@@ -1549,6 +1599,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
   }
 
   private persist(): void {
+    if (this.disposed) return;
     this.session.workspace = this.explorer.workspace;
     if (this.explorer.workspace) this.rememberWorkspace(this.explorer.workspace);
     this.session.openFiles = this.editor.getOpenFiles();
@@ -1573,6 +1624,7 @@ Designed by developers, for developers.
 }
 
   private renderFatalError(error: unknown): void {
+    if (this.disposed) return;
     this.element.replaceChildren(
       el("section", {
         className: "fatal-screen",
@@ -1584,10 +1636,6 @@ Designed by developers, for developers.
       })
     );
   }
-}
-
-function isAbsolutePath(filePath: string): boolean {
-  return filePath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(filePath);
 }
 
 function cloneFolderName(url: string): string {
@@ -1609,22 +1657,22 @@ function menuButton(label: string, items: Array<[string, string, MenuAction]>): 
   const button = el("button", { className: "title-menu", text: label });
   button.addEventListener("click", event => {
     event.stopPropagation();
-    document.querySelector(".context-menu")?.remove();
+    closeContextMenus();
     const rect = button.getBoundingClientRect();
     const menu = el("div", { className: "context-menu title-context" });
     menu.style.left = `${rect.left}px`;
     menu.style.top = `${rect.bottom}px`;
+    const close = installContextMenuDismiss(menu);
     for (const [text, shortcut, action] of items) {
       const row = el("button", { className: "menu-row" });
       row.append(el("span", { text }), el("span", { className: "menu-shortcut", text: shortcut }));
       row.addEventListener("click", event => {
-        menu.remove();
+        close();
         action(event);
       });
       menu.append(row);
     }
     document.body.append(menu);
-    setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
   });
   return button;
 }
