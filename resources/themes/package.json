@@ -113,7 +113,7 @@
     "specialThemes": [
       {
         "id": "sakura",
-        "label": "Andy's Pink Spectrum",
+        "label": "Pink Spectrum",
         "uiTheme": "vs-dark",
         "path": "./sakura.json",
         "categories": [
