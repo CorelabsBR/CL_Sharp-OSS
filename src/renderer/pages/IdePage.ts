@@ -1613,7 +1613,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
   }
 private about(): void {
   alert(`NPSharp IDE
-Version 1.0.2
+Version 26.3.3
 
 Developed by CoreLabs.
 
