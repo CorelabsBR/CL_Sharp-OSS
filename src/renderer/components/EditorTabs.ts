@@ -22,7 +22,7 @@ const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;
-// const HEX_COLOR_PATTERN = /#[\da-fA-F]{3,4}(?:[\da-fA-F]{2}){0,2}\b/g;
+const HEX_COLOR_PATTERN = /#[\da-fA-F]{3,4}(?:[\da-fA-F]{2}){0,2}\b/g;
 
 export interface EditorTab {
   id: string;
