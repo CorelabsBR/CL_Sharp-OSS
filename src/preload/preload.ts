@@ -51,7 +51,7 @@ const api: NpsharpApi = {
   window: {
     minimize: () => invoke("window:minimize"),
     maximize: () => invoke("window:maximize"),
-    close: () => invoke(""),
+    close: () => invoke("window:close"),
     isMaximized: () => invoke("window:isMaximized")
   },
   dialog: {
