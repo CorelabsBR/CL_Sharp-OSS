@@ -1,0 +1,41 @@
+import type { AIModel, AIProviderDescriptor, AIProviderId, AISettings } from "../../../shared/types";
+import type { AIProvider } from "./AIProvider";
+import { AISettingsService } from "./AISettingsService";
+import { GeminiProvider } from "./providers/GeminiProvider";
+import { OllamaProvider } from "./providers/OllamaProvider";
+import { OpenAIProvider } from "./providers/OpenAIProvider";
+import { OpenRouterProvider } from "./providers/OpenRouterProvider";
+
+export class ProviderManager {
+  private readonly providers = new Map<AIProviderId, AIProvider>();
+
+  constructor(private readonly settingsService: AISettingsService) {
+    this.register(new OpenAIProvider("openai"));
+    this.register(new OpenAIProvider("codex"));
+    this.register(new GeminiProvider());
+    this.register(new OpenRouterProvider());
+    this.register(new OllamaProvider());
+  }
+
+  descriptors(): AIProviderDescriptor[] {
+    return [...this.providers.values()].map(provider => provider.descriptor);
+  }
+
+  get(id: AIProviderId): AIProvider {
+    const provider = this.providers.get(id);
+    if (!provider) throw new Error(`Unknown AI provider: ${id}`);
+    return provider;
+  }
+
+  async listModels(id: AIProviderId, settings: AISettings): Promise<AIModel[]> {
+    return this.get(id).listModels(await this.settingsService.apiKey(id), settings);
+  }
+
+  register(provider: AIProvider): void {
+    if (this.providers.has(provider.descriptor.id)) {
+      throw new Error(`AI provider already registered: ${provider.descriptor.id}`);
+    }
+    this.providers.set(provider.descriptor.id, provider);
+  }
+}
+

@@ -1,12 +1,13 @@
-import type { EditorDiagnostic, SearchResult } from "../../shared/types";
-import { configureMonaco, languageForPath, monaco } from "../../editor/monacoSetup";
+import type { EditorDiagnostic, FileOpenResult, SearchResult } from "../../shared/types";
+import { COMPACT_MINIMAP_OPTIONS, configureMonaco, languageForPath, monaco } from "../../editor/monacoSetup";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
 import { api } from "../services/api";
-import { el, fileIcon, icon } from "../utils/dom";
+import { buttonIcon, el, fileIcon, icon } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, extname } from "../utils/path";
+import { ImageViewer } from "./ImageViewer";
 
 interface BrandHighlightRule {
   readonly terms: string[];
@@ -21,6 +22,7 @@ const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;
+// const HEX_COLOR_PATTERN = /#[\da-fA-F]{3,4}(?:[\da-fA-F]{2}){0,2}\b/g;
 
 export interface EditorTab {
   id: string;
@@ -50,6 +52,7 @@ export class EditorTabs {
   private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } });
   private editor: monaco.editor.IStandaloneCodeEditor;
   private tabs: EditorTab[] = [];
+  private readonly imageViewers = new Map<string, ImageViewer>();
   private activeId: string | undefined;
   private closedTabs: ClosedEditorTab[] = [];
   private navigationBackStack: string[] = [];
@@ -62,12 +65,16 @@ export class EditorTabs {
   private errorLensDecorations?: monaco.editor.IEditorDecorationsCollection;
   private brandHighlightName = "";
   private brandDecorations?: monaco.editor.IEditorDecorationsCollection;
+  private colorDecorations?: monaco.editor.IEditorDecorationsCollection;
+  private readonly colorStyle = document.createElement("style");
+  private readonly colorClasses = new Map<string, string>();
   private readonly disposables: monaco.IDisposable[] = [];
   private disposed = false;
 
   onTabsChanged: () => void = () => undefined;
   onFileActivated: (filePath?: string) => void = () => undefined;
   onFileSaved: (filePath?: string) => void = () => undefined;
+  onAIAction: (action: string) => void = () => undefined;
   onStatus: (text: string) => void;
   action: any;
 
@@ -85,7 +92,8 @@ export class EditorTabs {
       fontSize: 14,
       tabSize: 4,
       insertSpaces: true,
-      minimap: { enabled: true },
+      minimap: COMPACT_MINIMAP_OPTIONS,
+      colorDecorators: false,
       glyphMargin: true,
       renderLineHighlight: "all",
       lineNumbers: "on",
@@ -97,6 +105,8 @@ export class EditorTabs {
       this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor()),
       this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus())
     );
+    document.head.append(this.colorStyle);
+    this.registerAIContextActions();
     this.render();
   }
 
@@ -112,9 +122,13 @@ export class EditorTabs {
     }
     this.errorLensDecorations?.clear();
     this.brandDecorations?.clear();
+    this.colorDecorations?.clear();
+    this.colorStyle.remove();
     for (const tab of this.tabs) {
       if (!tab.model.isDisposed()) tab.model.dispose();
     }
+    for (const viewer of this.imageViewers.values()) viewer.dispose();
+    this.imageViewers.clear();
     this.tabs = [];
     this.closedTabs = [];
     this.editor.dispose();
@@ -135,6 +149,47 @@ export class EditorTabs {
     return this.activeTab?.path;
   }
 
+  getSelectedText(): string {
+    if (this.disposed) return "";
+    const selection = this.editor.getSelection();
+    return selection ? this.editor.getModel()?.getValueInRange(selection) ?? "" : "";
+  }
+
+  getOpenEditorContents(): Array<{ path: string; content: string }> {
+    if (this.disposed) return [];
+    return this.tabs
+      .filter((tab): tab is EditorTab & { path: string } => Boolean(tab.path))
+      .map(tab => ({ path: tab.path, content: tab.model.getValue() }));
+  }
+
+  insertBelow(code: string): void {
+    const model = this.editor.getModel();
+    const selection = this.editor.getSelection();
+    if (!model || !selection) return;
+    const line = selection.endLineNumber;
+    const range = new monaco.Range(line, model.getLineMaxColumn(line), line, model.getLineMaxColumn(line));
+    this.editor.executeEdits("npsharp.ai.insertBelow", [{ range, text: `\n${code}`, forceMoveMarkers: true }]);
+    this.editor.focus();
+  }
+
+  replaceSelection(code: string): void {
+    const selection = this.editor.getSelection();
+    if (!selection) return;
+    this.editor.executeEdits("npsharp.ai.replaceSelection", [{ range: selection, text: code, forceMoveMarkers: true }]);
+    this.editor.focus();
+  }
+
+  replaceCurrentFile(code: string): void {
+    const model = this.editor.getModel();
+    if (!model) return;
+    this.editor.executeEdits("npsharp.ai.replaceFile", [{
+      range: model.getFullModelRange(),
+      text: code,
+      forceMoveMarkers: true
+    }]);
+    this.editor.focus();
+  }
+
   getRecentFiles(): string[] {
     return [...this.recentFiles];
   }
@@ -151,6 +206,29 @@ export class EditorTabs {
     }
   }
 
+  private registerAIContextActions(): void {
+    const actions = [
+      ["ask", "Ask AI"],
+      ["explain", "AI: Explain"],
+      ["refactor", "AI: Refactor"],
+      ["optimize", "AI: Optimize"],
+      ["docs", "AI: Generate Docs"],
+      ["tests", "AI: Generate Tests"],
+      ["fix", "AI: Fix Code"],
+      ["convert", "AI: Convert Language"],
+      ["review", "AI: Review Code"]
+    ] as const;
+    actions.forEach(([id, label], index) => {
+      this.disposables.push(this.editor.addAction({
+        id: `npsharp.ai.${id}`,
+        label,
+        contextMenuGroupId: "9_ai",
+        contextMenuOrder: index + 1,
+        run: () => this.onAIAction(id)
+      }));
+    });
+  }
+
   applySettings(settings: { editorFontFamily: string; editorFontSize: number; editorTabSize: number; editorWordWrap: boolean; editorLineNumbers: boolean; errorLensEnabled?: boolean; brandSpecialName?: string }): void {
     if (this.disposed) return;
     this.errorLensEnabled = settings.errorLensEnabled ?? true;
@@ -159,11 +237,13 @@ export class EditorTabs {
       fontFamily: settings.editorFontFamily,
       fontSize: settings.editorFontSize,
       tabSize: settings.editorTabSize,
+      minimap: COMPACT_MINIMAP_OPTIONS,
       wordWrap: settings.editorWordWrap ? "on" : "off",
       lineNumbers: settings.editorLineNumbers ? "on" : "off"
     });
     this.renderErrorLens();
     this.renderBrandHighlights();
+    this.renderHexColorDecorators();
   }
 
   applyTheme(theme: { welcomeLogo?: string }): void {
@@ -210,7 +290,7 @@ export class EditorTabs {
     }
   }
 
-  async openFile(filePath: string, options: { silent?: boolean; context?: string } = {}): Promise<void> {
+  async openFile(filePath: string, options: { silent?: boolean; context?: string } = {}, forceText = false): Promise<void> {
     if (this.disposed) return;
     const existing = this.tabs.find(tab => tab.path === filePath);
     if (existing) {
@@ -219,16 +299,26 @@ export class EditorTabs {
     }
 
     try {
-      const file = await api.fs.readFile(filePath);
+      const file = await api.fs.openFile(filePath, forceText);
       if (this.disposed) return;
-      const model = monaco.editor.createModel(file.content, languageForPath(filePath), monaco.Uri.file(filePath));
+      if (file.editor === "binary") {
+        if (!await this.resolveBinaryFile(file)) return;
+        return this.openFile(filePath, options, true);
+      }
+      if (file.editor === "image") {
+        this.openImageFile(file);
+        if (!options.silent) this.onStatus(`Aberto ${filePath}`);
+        return;
+      }
+      const content = file.content ?? "";
+      const model = monaco.editor.createModel(content, languageForPath(filePath), monaco.Uri.file(filePath));
       const tab: EditorTab = {
         id: filePath,
         title: basename(filePath),
         path: filePath,
-        initialContent: file.content,
+        initialContent: content,
         dirty: false,
-        lineEnding: file.lineEnding,
+        lineEnding: file.lineEnding ?? "\n",
         model
       };
       this.tabs.push(tab);
@@ -239,6 +329,43 @@ export class EditorTabs {
     } catch (error) {
       reportError(error, this.onStatus, options.context ?? `Open file failed (${filePath})`);
     }
+  }
+
+  private openImageFile(file: FileOpenResult): void {
+    const model = monaco.editor.createModel("", "plaintext", monaco.Uri.file(file.path));
+    const tab: EditorTab = { id: file.path, title: file.name, path: file.path, initialContent: "", dirty: false, lineEnding: "\n", model };
+    const viewer = new ImageViewer(file, text => {
+      if (this.activeId === tab.id) this.onStatus(text);
+    });
+    viewer.element.hidden = true;
+    this.imageViewers.set(tab.id, viewer);
+    this.editorHost.append(viewer.element);
+    this.tabs.push(tab);
+    this.addRecent(file.path);
+    this.selectTab(tab.id);
+  }
+
+  private async resolveBinaryFile(file: FileOpenResult): Promise<boolean> {
+    const extension = extname(file.path).toLowerCase() || "[sem extensao]";
+    const settings = await api.settings.load();
+    if (settings.binaryFileTypesIgnored.includes(extension)) return true;
+    return new Promise(resolve => {
+      const overlay = el("div", { className: "binary-file-dialog" });
+      const card = el("div", { className: "binary-file-card" });
+      const remember = el("input", { attrs: { type: "checkbox", id: "binary-file-remember" } }) as HTMLInputElement;
+      const finish = (open: boolean) => {
+        overlay.remove();
+        if (open && remember.checked) void api.settings.save({ ...settings, binaryFileTypesIgnored: [...new Set([...settings.binaryFileTypesIgnored, extension])] });
+        resolve(open);
+      };
+      const open = el("button", { className: "primary", text: "Abrir como Texto" });
+      open.addEventListener("click", () => finish(true));
+      const cancel = el("button", { text: "Cancelar" });
+      cancel.addEventListener("click", () => finish(false));
+      card.append(el("h2", { text: "Arquivo binario" }), el("p", { text: "Este arquivo parece ser um arquivo binario." }), el("p", { text: "Abrir como texto podera exibir caracteres ilegiveis. O arquivo nunca sera executado." }), el("label", { children: [remember, document.createTextNode(" Nao perguntar novamente para este tipo")] }), el("div", { className: "binary-file-actions", children: [open, cancel] }));
+      overlay.append(card);
+      document.body.append(overlay);
+    });
   }
 
   openVirtualFile(title: string, uri: string, content: string, saveHandler?: (content: string) => Promise<void>): void {
@@ -268,6 +395,10 @@ export class EditorTabs {
     if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab) return;
+    if (this.imageViewers.has(tab.id)) {
+      this.onStatus("Imagens abertas no visualizador nao sao alteradas pelo editor de texto");
+      return;
+    }
     try {
       await this.saveTab(tab, false);
     } catch (error) {
@@ -279,6 +410,10 @@ export class EditorTabs {
     if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab) return;
+    if (this.imageViewers.has(tab.id)) {
+      this.onStatus("Imagens abertas no visualizador nao podem ser salvas como texto");
+      return;
+    }
     try {
       await this.saveTab(tab, true);
     } catch (error) {
@@ -297,6 +432,10 @@ export class EditorTabs {
     if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab?.path) return;
+    if (this.imageViewers.has(tab.id)) {
+      this.onStatus("A imagem exibida corresponde ao arquivo salvo em disco");
+      return;
+    }
     try {
       const file = await api.fs.readFile(tab.path);
       if (this.disposed) return;
@@ -632,6 +771,9 @@ export class EditorTabs {
     this.closedTabs = this.closedTabs.slice(0, 20);
     const index = this.tabs.indexOf(tab);
     this.tabs.splice(index, 1);
+    this.imageViewers.get(id)?.dispose();
+    this.imageViewers.get(id)?.element.remove();
+    this.imageViewers.delete(id);
     this.navigationBackStack = this.navigationBackStack.filter(item => item !== id);
     this.navigationForwardStack = this.navigationForwardStack.filter(item => item !== id);
     tab.model.dispose();
@@ -652,14 +794,18 @@ export class EditorTabs {
     }
     this.activeId = id;
     const tab = this.activeTab;
+    const imageViewer = tab ? this.imageViewers.get(tab.id) : undefined;
     this.editor.setModel(tab?.model ?? null);
+    this.editorHost.querySelector(".monaco-editor")?.toggleAttribute("hidden", Boolean(imageViewer));
+    for (const [viewerId, viewer] of this.imageViewers) viewer.setActive(viewerId === tab?.id);
     this.welcome.hidden = Boolean(tab);
     this.render();
     this.onFileActivated(tab?.path);
     this.renderErrorLens();
     this.renderBrandHighlights();
+    this.renderHexColorDecorators();
     this.updateCaretStatus();
-    this.editor.focus();
+    if (!imageViewer) this.editor.focus();
   }
 
   private selectTabByPath(filePath: string): void {
@@ -715,41 +861,41 @@ export class EditorTabs {
   private renderTabs(): void {
     this.tabsBar.replaceChildren();
     for (const tab of this.tabs) {
+      const shell = el("div", { className: "tab-shell" });
       const button = el("button", {
         className: `tab ${tab.id === this.activeId ? "active" : ""}`,
         title: tab.path ?? tab.virtualUri ?? tab.title
       });
       button.append(fileIcon(tab.title, false), el("span", { text: `${tab.dirty ? "● " : ""}${tab.title}` }));
-      const close = el("span", { className: "tab-close", text: "x", title: "Close" });
-      close.addEventListener("click", event => {
-        event.stopPropagation();
-        this.closeTab(tab.id);
-      });
-      button.append(close);
       button.addEventListener("click", () => this.selectTab(tab.id));
-      this.tabsBar.append(button);
+      shell.append(
+        button,
+        buttonIcon("close", "Fechar aba", () => this.closeTab(tab.id))
+      );
+      this.tabsBar.append(shell);
     }
 
-    const add = el("button", { className: "tab-action", title: "New File", children: [icon("add", "New File")] });
+    const add = el("button", { className: "tab-action", title: "Novo arquivo", children: [icon("add", "Novo arquivo")] });
     add.addEventListener("click", () => this.newTab());
     this.tabsBar.append(add);
   }
 
   private buildWelcome(): void {
     const title = el("h1", { text: "NPSharp" });
-    const subtitle = el("p", { text: "Código, Controle, Dominio" });
+    const subtitle = el("p", { text: "Código, controle e domínio" });
     const actions = el("div", { className: "welcome-actions" });
     this.welcome.append(this.welcomeLogo, title, subtitle, actions);
   }
 
   private updateCaretStatus(): void {
     const tab = this.activeTab;
+    if (tab && this.imageViewers.has(tab.id)) return;
     const position = this.editor.getPosition();
     if (!tab || !position) {
-      this.onStatus("Ready");
+      this.onStatus("Pronto");
       return;
     }
-    this.onStatus(`${tab.path ?? tab.virtualUri ?? tab.title} | Ln ${position.lineNumber}, Col ${position.column} | ${this.languageLabel(tab.title)}`);
+    this.onStatus(`${tab.path ?? tab.virtualUri ?? tab.title} | Linha ${position.lineNumber}, Coluna ${position.column} | ${this.languageLabel(tab.title)}`);
   }
 
   private renderErrorLens(): void {
@@ -812,6 +958,45 @@ export class EditorTabs {
       }
     }
     this.brandDecorations.set(decorations);
+  }
+
+  private renderHexColorDecorators(): void {
+    this.colorDecorations ??= this.editor.createDecorationsCollection();
+    const tab = this.activeTab;
+    if (!tab || this.imageViewers.has(tab.id)) {
+      this.colorDecorations.clear();
+      return;
+    }
+    const model = tab.model;
+    const decorations: monaco.editor.IModelDeltaDecoration[] = [];
+    const content = model.getValue();
+    for (const match of content.matchAll(HEX_COLOR_PATTERN)) {
+      if (match.index === undefined) continue;
+      const color = match[0];
+      const position = model.getPositionAt(match.index);
+      decorations.push({
+        range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+        options: {
+          before: {
+            content: "■ ",
+            inlineClassName: this.colorClass(color),
+            cursorStops: monaco.editor.InjectedTextCursorStops.None
+          },
+          hoverMessage: { value: `Cor: \`${color}\`` }
+        }
+      });
+    }
+    this.colorDecorations.set(decorations);
+  }
+
+  private colorClass(color: string): string {
+    const normalized = color.toLowerCase();
+    const existing = this.colorClasses.get(normalized);
+    if (existing) return existing;
+    const className = `npsharp-hex-color-${this.colorClasses.size}`;
+    this.colorClasses.set(normalized, className);
+    this.colorStyle.append(`${className}{color:${normalized};font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.7);}`);
+    return className;
   }
 
   private brandHighlightRules(): BrandHighlightRule[] {

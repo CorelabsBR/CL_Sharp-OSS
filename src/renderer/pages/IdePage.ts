@@ -1,10 +1,13 @@
 import type { AppSettings, EditorDiagnostic, PersistedSession } from "../../shared/types";
 import { ArduinoPanel } from "../components/ArduinoPanel";
+import { AIChatPanel } from "../components/AIChatPanel";
 import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
 import { CommandPalette } from "../components/CommandPalette";
 import { EditorTabs } from "../components/EditorTabs";
+import { ExtensionManagerPanel } from "../components/ExtensionManagerPanel";
 import { FileExplorer } from "../components/FileExplorer";
 import { KeyboardShortcutsModal } from "../components/KeyboardShortcutsModal";
+import { LanguageRuntimesDialog } from "../components/LanguageRuntimesDialog";
 import { RemotePanel } from "../components/RemotePanel";
 import { RuntimePanel } from "../components/RuntimePanel";
 import { SearchPanel } from "../components/SearchPanel";
@@ -21,7 +24,7 @@ import { cssUrl, DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, dirname, extname, fileUri, isAbsolutePath, joinPath } from "../utils/path";
 import type { CommandAction } from "../components/CommandPalette";
 
-type PanelId = "explorer" | "search" | "source" | "run" | "remote" | "arduino" | "settings" | "problems";
+type PanelId = "explorer" | "search" | "source" | "run" | "extensions" | "remote" | "arduino" | "ai" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench";
 type MenuAction = (event: MouseEvent) => void;
 
@@ -35,7 +38,7 @@ export class IdePage {
   private readonly sideContent = el("div", { className: "side-content" });
   private readonly workbench = el("section", { className: "workbench" });
   private readonly editorStack = el("section", { className: "editor-stack" });
-  private readonly statusLeft = el("span", { text: "Ready" });
+  private readonly statusLeft = el("span", { text: "Pronto" });
   private readonly statusRight = el("span", { text: "" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
   private readonly commandBar = el("input", { className: "command-bar", attrs: { readonly: "true" } });
@@ -45,7 +48,24 @@ export class IdePage {
   private readonly search = new SearchPanel(result => void this.editor.openSearchResult(result), text => this.updateStatus(text));
   private readonly source = new SourceControlPanel((title, uri, content) => this.editor.openVirtualFile(title, uri, content), text => this.updateStatus(text));
   private readonly terminal = new TerminalPanel(() => this.terminalCwd(), text => this.updateStatus(text), () => this.closeTerminalPanel());
-  private readonly runtime = new RuntimePanel(() => this.runCurrentFile(), text => this.updateStatus(text));
+  private readonly aiChat = new AIChatPanel({
+    workspace: () => this.explorer.workspace,
+    currentFile: () => this.editor.getCurrentFile(),
+    currentText: () => this.editor.getCurrentText(),
+    selection: () => this.editor.getSelectedText(),
+    openEditors: () => this.editor.getOpenEditorContents(),
+    terminalOutput: () => this.terminal.getContextOutput(),
+    gitDiff: () => this.source.getDiffContext(),
+    diagnostics: () => this.diagnostics
+  }, {
+    insertBelow: code => this.editor.insertBelow(code),
+    replaceSelection: code => this.editor.replaceSelection(code),
+    replaceFile: code => this.editor.replaceCurrentFile(code),
+    createNewFile: (code, language) => this.editor.newTab(code, extensionForAILanguage(language))
+  }, text => this.updateStatus(text));
+  private readonly languageRuntimes = new LanguageRuntimesDialog(text => this.updateStatus(text));
+  private readonly runtime = new RuntimePanel(() => this.runCurrentFile(), text => this.updateStatus(text), () => void this.showLanguageRuntimes());
+  private readonly extensions = new ExtensionManagerPanel(text => this.updateStatus(text));
   private readonly remote = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text));
   private readonly arduino = new ArduinoPanel(() => this.explorer.workspace, file => this.editor.openFile(file), text => this.updateStatus(text));
   private readonly palette = new CommandPalette();
@@ -88,8 +108,10 @@ export class IdePage {
     this.explorer.dispose();
     this.search.dispose();
     this.terminal.dispose();
+    this.aiChat.dispose();
     this.editor.dispose();
     this.palette.close();
+    this.languageRuntimes.close();
     this.keyboardShortcuts.close();
     closeContextMenus();
     document.querySelector(".html-preview-overlay")?.remove();
@@ -143,13 +165,13 @@ export class IdePage {
     const logo = el("div", { className: "title-logo" });
     logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } }), el("span", { text: "NPSharp" }));
     const menus = el("div", { className: "title-menus" });
-    const openWorkspaceLabel = platform.isMobile ? "Open Mobile Workspace" : "Open Folder";
+    const openWorkspaceLabel = platform.isMobile ? "Abrir workspace mobile" : "Abrir pasta";
     menus.append(
-      menuButton("File", [
-        ["New File", "Ctrl+N", () => this.editor.newTab()],
-        ["Open File", "Ctrl+O", () => void this.editor.openFileFromDialog()],
+      menuButton("Arquivo", [
+        ["Novo arquivo", "Ctrl+N", () => this.editor.newTab()],
+        ["Abrir arquivo", "Ctrl+O", () => void this.editor.openFileFromDialog()],
         [openWorkspaceLabel, "Ctrl+K Ctrl+O", () => void this.explorer.openFolderFromDialog()],
-        ["Close Folder", "", () => this.explorer.clearFolder()],
+        ["Fechar pasta", "", () => this.explorer.clearFolder()],
         ["Save", "Ctrl+S", () => void this.editor.saveCurrentFile()],
         ["Save As", "Ctrl+Shift+S", () => void this.editor.saveCurrentFileAs()],
         ["Save All", "", () => void this.editor.saveAll()],
@@ -195,7 +217,7 @@ export class IdePage {
         ["Problems", "F8", () => this.showPanel("problems")],
         ["Output", "Ctrl+Shift+U", () => this.showOutput()],
         ["Keyboard Shortcuts", "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
-        ["Extensions", "Ctrl+Shift+X", () => this.showExtensionsPlaceholder()],
+        ["Extensions", "Ctrl+Shift+X", () => this.showPanel("extensions")],
         ["Toggle Sidebar", "Ctrl+B", () => this.toggleSidebar()],
         ["Toggle Terminal", "Ctrl+`", () => this.toggleTerminal()],
         ["Toggle Panel", "Ctrl+J", () => this.toggleTerminal()]
@@ -205,7 +227,7 @@ export class IdePage {
         ["Run Without Debugging", "Ctrl+F5", () => void this.runWithoutDebug()],
         ["Build Project", "Ctrl+Shift+B", () => void this.buildProject()],
         ["Arduino", "", () => this.showPanel("arduino")],
-        ["Runtime Paths", "", () => this.showPanel("run")]
+        ["Runtime Paths", "", () => void this.showLanguageRuntimes()]
       ]),
       menuButton("Terminal", [
         ["New Terminal", "Ctrl+Shift+`", () => this.showTerminal(true)],
@@ -221,6 +243,7 @@ export class IdePage {
       menuButton("Preferences", [
         ["Command Palette", "Ctrl+Shift+P", () => this.palette.showCommands()],
         ["Settings", "Ctrl+,", () => this.showSettings()],
+        ["Configure Language Runtimes", "", () => void this.showLanguageRuntimes()],
         ["Color Theme", "", event => void this.showThemePicker(event.shiftKey)],
         ["Wallpaper", "", () => void this.chooseWallpaper()],
         ["Clear Wallpaper", "", () => void this.clearWallpaper()],
@@ -232,9 +255,9 @@ export class IdePage {
     this.commandBar.addEventListener("click", () => this.palette.showQuickOpen());
     const nav = el("div", { className: "title-nav" });
     nav.append(
-      buttonIcon("arrow-left", "Back", () => this.updateStatus("Back")),
-      buttonIcon("arrow-right", "Forward", () => this.updateStatus("Forward")),
-      buttonIcon("play", "Run Current File", () => void this.runCurrentFile())
+      // buttonIcon("arrow-left", "Back", () => this.updateStatus("Back")),
+      // buttonIcon("arrow-right", "Forward", () => this.updateStatus("Forward")),
+      // buttonIcon("play", "Run Current File", () => void this.runCurrentFile())
     );
     const windowButtons = el("div", { className: "window-buttons" });
     if (platform.isDesktop) {
@@ -253,8 +276,10 @@ export class IdePage {
       this.activityButton("search", "search", "Search"),
       this.activityButton("source", "source-control", "Source Control"),
       this.activityButton("run", "debug-alt", "Run and Debug"),
+      this.activityButton("extensions", "extensions-large", "Extensions"),
       this.activityButton("remote", "remote", "Remote Host"),
       this.activityButton("arduino", "circuit-board", "Arduino"),
+      // this.activityButton("ai", "copilot-large", "AI Chat"),
       this.activityButton("problems", "warning", "Problems"),
       el("div", { className: "activity-spacer" }),
       this.settingsActivityButton()
@@ -266,8 +291,10 @@ export class IdePage {
     this.panels.set("search", this.search.element);
     this.panels.set("source", this.source.element);
     this.panels.set("run", this.runtime.element);
+    this.panels.set("extensions", this.extensions.element);
     this.panels.set("remote", this.remote.element);
     this.panels.set("arduino", this.arduino.element);
+    this.panels.set("ai", this.aiChat.element);
     this.panels.set("settings", this.settingsPanel());
     this.panels.set("problems", this.problemsPanel);
     this.sideBar.append(this.sideTitle, this.sideContent);
@@ -316,6 +343,10 @@ export class IdePage {
     this.editor.onFileSaved = () => {
       if (this.settings.compileOnSave) void this.runDiagnostics();
     };
+    this.editor.onAIAction = action => {
+      this.showPanel("ai");
+      void this.aiChat.runAction(action);
+    };
     this.palette.setFileOpener(file => void this.editor.openFile(file));
     const handleError = (event: ErrorEvent) => this.updateStatus(`Error: ${errorMessage(event.error ?? event.message)}`);
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => this.updateStatus(`Error: ${errorMessage(event.reason)}`);
@@ -355,7 +386,21 @@ export class IdePage {
       { label: "View: Search", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
       { label: "View: Source Control", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
       { label: "View: Run and Debug", shortcut: "Ctrl+Shift+D", run: () => this.showPanel("run") },
+      { label: "View: Extensions", shortcut: "Ctrl+Shift+X", run: () => this.showPanel("extensions") },
       { label: "View: Arduino", run: () => this.showPanel("arduino") },
+      { label: "AI: Open Chat", shortcut: "Ctrl+Alt+I", keywords: "copilot chat assistant", run: () => this.openAIChat() },
+      { label: "AI: New Conversation", run: () => { this.openAIChat(); return this.aiChat.newConversation(); } },
+      { label: "AI: Clear Conversation", run: () => this.aiChat.clearConversation() },
+      { label: "AI: Change Provider", run: () => this.aiChat.changeProvider() },
+      { label: "AI: Change Model", run: () => this.aiChat.changeModel() },
+      { label: "AI: Explain Selection", run: () => this.runAIAction("explain") },
+      { label: "AI: Refactor Selection", run: () => this.runAIAction("refactor") },
+      { label: "AI: Optimize Selection", run: () => this.runAIAction("optimize") },
+      { label: "AI: Generate Documentation", run: () => this.runAIAction("docs") },
+      { label: "AI: Generate Unit Tests", run: () => this.runAIAction("tests") },
+      { label: "AI: Fix Errors", run: () => this.runAIAction("fix") },
+      { label: "AI: Commit Message", run: () => this.runAIAction("commit") },
+      { label: "AI: Rename Symbols with AI", run: () => this.runAIAction("rename") },
       { label: "View: Problems", shortcut: "F8", run: () => this.showPanel("problems") },
       { label: "Terminal: Toggle Terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
       { label: "Terminal: New Terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
@@ -364,6 +409,12 @@ export class IdePage {
       { label: "Run: Run Current File", shortcut: "F5", run: () => this.runCurrentFile() },
       { label: "Run: Build Project", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
       { label: "Preferences: Settings", shortcut: "Ctrl+,", run: () => this.showSettings() },
+      { id: "npsharp.configureLanguageRuntimes", label: "Configure Language Runtimes", keywords: "runtimes path executables", run: () => this.showLanguageRuntimes() },
+      { label: "Extensions: Install from VSIX", keywords: "vsix local extension install", run: () => this.installExtensionFromVsix() },
+      { label: "Extensions: Reload", keywords: "reload extension manager", run: () => this.reloadExtensionsCommand() },
+      { label: "Extensions: Enable", keywords: "enable extension manager", run: () => this.toggleExtensionCommand(true) },
+      { label: "Extensions: Disable", keywords: "disable extension manager", run: () => this.toggleExtensionCommand(false) },
+      { label: "Extensions: Show Installed", keywords: "installed extension manager", run: () => this.showInstalledExtensions() },
       { label: "Preferences: Color Theme", run: () => this.showThemePicker() },
       { label: "Preferences: Wallpaper", run: () => this.chooseWallpaper() },
       { label: "Preferences: Clear Wallpaper", run: () => this.clearWallpaper() },
@@ -381,6 +432,7 @@ export class IdePage {
       { label: "View: Quick Open", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
       { label: "View: Explorer", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
       { label: "View: Source Control", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
+      { label: "View: Extensions", shortcut: "Ctrl+Shift+X", run: () => this.showPanel("extensions") },
       { label: "View: Problems", shortcut: "Ctrl+Shift+M", run: () => this.showPanel("problems") },
       { label: "View: Toggle Sidebar", shortcut: "Ctrl+B", run: () => this.toggleSidebar() },
       { label: "Terminal: Toggle Terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
@@ -424,8 +476,10 @@ export class IdePage {
     if (panelId === "search") this.search.focus();
     if (panelId === "source") void this.source.refresh();
     if (panelId === "run") void this.runtime.refresh();
+    if (panelId === "extensions") void this.extensions.refresh();
     if (panelId === "remote") void this.remote.refresh();
     if (panelId === "arduino") void this.arduino.refresh();
+    if (panelId === "ai") this.aiChat.focusInput();
     this.updateCommandCenter();
     this.updateStatus(panelTitle(panelId));
     this.persist();
@@ -435,6 +489,16 @@ export class IdePage {
     this.showPanel("search");
     this.search.focus();
     this.updateStatus("Busca global aberta");
+  }
+
+  private openAIChat(): void {
+    this.showPanel("ai");
+    this.aiChat.focusInput();
+  }
+
+  private runAIAction(action: string): void {
+    this.openAIChat();
+    void this.aiChat.runAction(action);
   }
 
   private openGlobalReplace(): void {
@@ -459,8 +523,59 @@ export class IdePage {
     this.updateStatus("Output aberto");
   }
 
-  private showExtensionsPlaceholder(): void {
-    this.updateStatus("Extensions ainda esta em desenvolvimento");
+  private async showLanguageRuntimes(): Promise<void> {
+    await this.languageRuntimes.show();
+    this.updateStatus("Configure Language Runtimes");
+  }
+
+  private async installExtensionFromVsix(): Promise<void> {
+    this.showPanel("extensions");
+    await this.extensions.installFromVsix();
+  }
+
+  private async showInstalledExtensions(): Promise<void> {
+    this.showPanel("extensions");
+    await this.extensions.refresh();
+    this.extensions.focusSearch();
+    this.updateStatus("Installed extensions");
+  }
+
+  private async reloadExtensionsCommand(): Promise<void> {
+    this.showPanel("extensions");
+    const installed = await this.extensions.refresh();
+    if (!installed.length) {
+      await this.extensions.reload();
+      return;
+    }
+    this.palette.showPicker("Reload extension", [
+      { label: "Extensions: Reload All", hint: `${installed.length} installed`, run: async () => { await this.extensions.reload(); } },
+      ...installed.map(extension => ({
+        label: extension.displayName,
+        hint: extension.id,
+        keywords: extension.description,
+        run: async () => { await this.extensions.reload(extension.id); }
+      }))
+    ]);
+  }
+
+  private async toggleExtensionCommand(enabled: boolean): Promise<void> {
+    this.showPanel("extensions");
+    const installed = await api.extensions.list();
+    const candidates = installed.filter(extension => extension.enabled !== enabled);
+    if (!candidates.length) {
+      this.updateStatus(enabled ? "No disabled extensions" : "No enabled extensions");
+      return;
+    }
+    this.palette.showPicker(enabled ? "Enable extension" : "Disable extension", candidates.map(extension => ({
+      label: extension.displayName,
+      hint: extension.id,
+      keywords: extension.description,
+      run: async () => {
+        await (enabled ? api.extensions.enable(extension.id) : api.extensions.disable(extension.id));
+        await this.extensions.refresh();
+        this.updateStatus(`${enabled ? "Enabled" : "Disabled"} ${extension.displayName}`);
+      }
+    })));
   }
 
   private canCloseTransient(): boolean {
@@ -540,6 +655,8 @@ export class IdePage {
 
     addRow("Command Palette...", "Ctrl+Shift+P", () => this.palette.showCommands());
     addRow("Settings", "Ctrl+,", () => this.showSettings());
+    addRow("Configure Language Runtimes", "", () => void this.showLanguageRuntimes());
+    addRow("Extensions", "Ctrl+Shift+X", () => this.showPanel("extensions"));
     addRow("Keyboard Shortcuts", "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
     addRow("Snippets", "", () => this.updateStatus("Snippets"));
     addRow("Tasks", "", () => this.updateStatus("Tasks"));
@@ -1280,6 +1397,8 @@ export class IdePage {
       { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? "Executar git clone em uma pasta escolhida." : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
       { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir Output", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponivel neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
       { id: "arduino", label: "Arduino", detail: platform.canUseNodeBackend ? "Boards, portas, compile e upload via Arduino CLI." : "Modo limitado para sketches Arduino.", iconName: "circuit-board", run: () => this.showPanel("arduino") },
+      { id: "extensions", label: "Extensions", detail: "Install local VSIX packages and manage installed extensions.", iconName: "extensions-large", run: () => this.showPanel("extensions") },
+      { id: "language-runtimes", label: "Language Runtimes", detail: "Configure executable paths outside general Settings.", iconName: "server-environment", run: () => void this.showLanguageRuntimes() },
       { id: "notes", label: "Abrir Notes", detail: platform.isMobile ? "Abrir ou criar Documents/NPSharp/notes.nps.md." : "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
       { id: "theme-lab", label: "Abrir Theme Lab", detail: "Abrir o seletor de temas incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
@@ -1374,7 +1493,7 @@ const isTyping =
     (active instanceof HTMLElement && active.isContentEditable)
   );
 
-if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includes(key)) {
+if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+Alt+I"].includes(key)) {
   return;
 }
 
@@ -1428,6 +1547,10 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
   }
 
   switch (key) {
+    case "Ctrl+Alt+I":
+      run(() => this.openAIChat());
+      return;
+
     case "Ctrl+F":
       run(() => this.editor.find());
       return;
@@ -1486,6 +1609,10 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
 
     case "Ctrl+Shift+G":
       run(() => this.showPanel("source"));
+      return;
+
+    case "Ctrl+Shift+X":
+      run(() => this.showPanel("extensions"));
       return;
 
     case "Ctrl+Shift+M":
@@ -1563,7 +1690,14 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
       "view:settings": () => this.showSettings(),
       "view:terminal": () => this.toggleTerminal(),
       "view:output": () => this.showOutput(),
-      "view:extensions": () => this.showExtensionsPlaceholder(),
+      "view:extensions": () => this.showPanel("extensions"),
+      "ai:openChat": () => this.openAIChat(),
+      "ai:newConversation": () => { this.openAIChat(); void this.aiChat.newConversation(); },
+      "extensions:installVsix": () => void this.installExtensionFromVsix(),
+      "extensions:reload": () => void this.reloadExtensionsCommand(),
+      "extensions:enable": () => void this.toggleExtensionCommand(true),
+      "extensions:disable": () => void this.toggleExtensionCommand(false),
+      "extensions:showInstalled": () => void this.showInstalledExtensions(),
       "terminal:new": () => this.showTerminal(true),
       "terminal:output": () => this.terminal.showOutputPanel(),
       "terminal:problems": () => this.terminal.showProblemsPanel(),
@@ -1586,7 +1720,8 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
       "preferences:errorLensToggle": () => this.toggleErrorLens(),
       "help:about": () => this.about(),
       "notes:open": () => void this.openNotes(),
-      "npsharp:commandCenter": () => this.openCommandCenter()
+      "npsharp:commandCenter": () => this.openCommandCenter(),
+      "npsharp:configureLanguageRuntimes": () => void this.showLanguageRuntimes()
     };
     map[command]?.();
   }
@@ -1613,7 +1748,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P"].includ
   }
 private about(): void {
   alert(`NPSharp IDE
-Version 26.3.3
+Version 26.6.4
 
 Developed by CoreLabs.
 
@@ -1692,12 +1827,24 @@ function panelTitle(panel: PanelId): string {
     search: "SEARCH",
     source: "SOURCE CONTROL",
     run: "RUN AND DEBUG",
+    extensions: "EXTENSIONS",
     remote: "REMOTE HOST",
     arduino: "ARDUINO",
+    ai: "AI CHAT",
     settings: "SETTINGS",
     problems: "PROBLEMS"
   };
   return titles[panel];
+}
+
+function extensionForAILanguage(language: string): string {
+  const extensions: Record<string, string> = {
+    typescript: ".ts", ts: ".ts", javascript: ".js", js: ".js", python: ".py", py: ".py",
+    java: ".java", csharp: ".cs", cs: ".cs", cpp: ".cpp", c: ".c", rust: ".rs", go: ".go",
+    html: ".html", css: ".css", json: ".json", markdown: ".md", md: ".md", shell: ".sh",
+    bash: ".sh", powershell: ".ps1", php: ".php", ruby: ".rb", kotlin: ".kt"
+  };
+  return extensions[language.toLocaleLowerCase()] ?? ".txt";
 }
 
 function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {

@@ -16,6 +16,7 @@ export class FileExplorer {
   private readonly tree = el("div", { className: "file-tree" });
   private readonly empty = el("div", { className: "empty-state" });
   private root?: string;
+  private selectedPath?: string;
   private nodes = new Map<string, TreeNode>();
   private unwatchWorkspace?: () => void;
   private refreshTimer?: number;
@@ -60,6 +61,7 @@ export class FileExplorer {
     const previousNodes = new Map(this.nodes);
     this.stopWatching();
     this.root = normalizedFolder;
+    this.selectedPath = normalizedFolder;
     this.nodes = new Map();
     const rootEntry: WorkspaceEntry = { path: normalizedFolder, name: basename(normalizedFolder), directory: true, size: 0, modifiedAt: 0, hidden: false };
     this.nodes.set(normalizedFolder, { entry: rootEntry, childrenLoaded: false, expanded: true });
@@ -84,6 +86,7 @@ export class FileExplorer {
     if (this.disposed) return;
     this.stopWatching();
     this.root = undefined;
+    this.selectedPath = undefined;
     this.nodes = new Map();
     this.onWorkspaceChanged(undefined);
     this.render();
@@ -217,12 +220,15 @@ export class FileExplorer {
 
   private renderNode(nodePath: string, depth: number): HTMLElement {
     const node = this.nodes.get(nodePath)!;
-    const row = el("div", { className: "tree-row", attrs: { "data-path": nodePath } });
+    const row = el("div", { className: `tree-row${samePath(this.selectedPath ?? "", nodePath) ? " selected" : ""}`, attrs: { "data-path": nodePath } });
     row.style.paddingLeft = `${depth * 14 + 6}px`;
     const twisty = el("span", { className: "tree-twisty", text: node.entry.directory ? (node.expanded ? "▾" : "▸") : "" });
     row.append(twisty, fileIcon(node.entry.name, node.entry.directory, node.expanded), el("span", { className: "tree-label", text: node.entry.name }));
 
-    row.addEventListener("click", () => void this.openNode(node));
+    row.addEventListener("click", () => {
+      this.selectedPath = node.entry.path;
+      void this.openNode(node);
+    });
     row.addEventListener("contextmenu", event => {
       event.preventDefault();
       this.showMenu(node, event.clientX, event.clientY);
@@ -281,7 +287,8 @@ export class FileExplorer {
   }
 
   private async createInSelected(folder: boolean): Promise<void> {
-    await this.createIn(this.root, folder);
+    const selected = this.selectedPath ? this.nodes.get(this.selectedPath) : undefined;
+    await this.createIn(selected?.entry.directory ? selected.entry.path : selected ? dirname(selected.entry.path) : this.root, folder);
   }
 
   private async createIn(baseDir: string | undefined, folder: boolean): Promise<void> {

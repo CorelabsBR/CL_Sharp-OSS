@@ -3,6 +3,11 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
+  AIChatRequest,
+  AIConversationUpdate,
+  AIProviderId,
+  AISaveSettingsRequest,
+  AIStreamEvent,
   AppSettings,
   ArduinoCliRequest,
   ArduinoCompileRequest,
@@ -12,6 +17,7 @@ import type {
   ArduinoSaveConfigRequest,
   ArduinoUploadRequest,
   GitFileStatus,
+  LanguageRuntimeConfig,
   LiveServerRequest,
   NpsharpApi,
   PersistedSession,
@@ -45,12 +51,13 @@ const api: NpsharpApi = {
   window: {
     minimize: () => invoke("window:minimize"),
     maximize: () => invoke("window:maximize"),
-    close: () => invoke("window:close"),
+    close: () => invoke(""),
     isMaximized: () => invoke("window:isMaximized")
   },
   dialog: {
     openFile: () => invoke("dialog:openFile"),
     openFolder: () => invoke("dialog:openFolder"),
+    openVsix: () => invoke("dialog:openVsix"),
     saveFile: (request: SaveFileRequest) => invoke("dialog:saveFile", request),
     chooseWallpaper: () => invoke("dialog:chooseWallpaper")
   },
@@ -61,9 +68,27 @@ const api: NpsharpApi = {
     loadSession: () => invoke("settings:loadSession"),
     saveSession: (session: PersistedSession) => invoke("settings:saveSession", session)
   },
+  ai: {
+    providers: () => invoke("ai:providers"),
+    listModels: (provider: AIProviderId) => invoke("ai:listModels", provider),
+    loadSettings: () => invoke("ai:settings:load"),
+    saveSettings: (settings: AISaveSettingsRequest) => invoke("ai:settings:save", settings),
+    listConversations: () => invoke("ai:conversations:list"),
+    createConversation: (provider?: AIProviderId, model?: string) => invoke("ai:conversations:create", provider, model),
+    updateConversation: (update: AIConversationUpdate) => invoke("ai:conversations:update", update),
+    deleteConversation: (id: string) => invoke("ai:conversations:delete", id),
+    send: (request: AIChatRequest) => invoke("ai:send", request),
+    cancel: (requestId: string) => invoke("ai:cancel", requestId),
+    onStream: (callback: (event: AIStreamEvent) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: AIStreamEvent) => callback(payload);
+      ipcRenderer.on("ai:stream", listener);
+      return () => ipcRenderer.removeListener("ai:stream", listener);
+    }
+  },
   fs: {
     listDir: (targetPath: string) => invoke("fs:listDir", targetPath),
     readFile: (targetPath: string) => invoke("fs:readFile", targetPath),
+    openFile: (targetPath: string, forceText = false) => invoke("fs:openFile", targetPath, forceText),
     writeFile: (targetPath: string, content: string) => invoke("fs:writeFile", targetPath, content),
     createFile: (targetPath: string) => invoke("fs:createFile", targetPath),
     createFolder: (targetPath: string) => invoke("fs:createFolder", targetPath),
@@ -131,7 +156,19 @@ const api: NpsharpApi = {
     list: () => invoke("runtime:list"),
     discover: () => invoke("runtime:discover"),
     configure: (languageId: string, executablePath: string) => invoke("runtime:configure", languageId, executablePath),
+    config: () => invoke("runtime:config"),
+    updateConfig: (languageId: string, config: LanguageRuntimeConfig) => invoke("runtime:updateConfig", languageId, config),
+    autoDetect: (languageId: string) => invoke("runtime:autoDetect", languageId),
+    validate: (languageId: string, executablePath?: string) => invoke("runtime:validate", languageId, executablePath),
     runFile: (request: RuntimeRunRequest) => invoke("runtime:runFile", request)
+  },
+  extensions: {
+    list: () => invoke("extensions:list"),
+    installVsix: (vsixPath: string) => invoke("extensions:installVsix", vsixPath),
+    enable: (id: string) => invoke("extensions:enable", id),
+    disable: (id: string) => invoke("extensions:disable", id),
+    uninstall: (id: string) => invoke("extensions:uninstall", id),
+    reload: (id?: string) => invoke("extensions:reload", id)
   },
   arduino: {
     detect: (request?: ArduinoCliRequest) => invoke("arduino:detect", request),

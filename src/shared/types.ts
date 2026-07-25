@@ -36,6 +36,21 @@ export interface FileReadResult {
   encoding: "utf8";
 }
 
+export type FileEditorKind = "text" | "image" | "binary";
+
+export interface FileOpenResult {
+  path: string;
+  name: string;
+  editor: FileEditorKind;
+  size: number;
+  type: string;
+  content?: string;
+  lineEnding?: "\n" | "\r\n";
+  encoding?: "utf8" | "utf16le" | "utf16be" | "latin1" | "windows-1252";
+  imageDataUrl?: string;
+  binaryReason?: string;
+}
+
 export interface SaveFileRequest {
   path?: string;
   suggestedName?: string;
@@ -74,6 +89,7 @@ export interface AppSettings {
   statusBarVisible: boolean;
   activityBarVisible: boolean;
   sideBarVisible: boolean;
+  binaryFileTypesIgnored: string[];
 }
 
 export interface PersistedSession {
@@ -243,6 +259,55 @@ export interface InstalledRuntime {
   source: "system" | "configured" | "internal";
 }
 
+export interface LanguageRuntimeConfig {
+  path: string;
+  autoDetect: boolean;
+}
+
+export type LanguageRuntimeStatus = "installed" | "invalid" | "missing";
+
+export interface LanguageRuntimeValidation {
+  languageId: string;
+  path?: string;
+  version?: string;
+  status: LanguageRuntimeStatus;
+  message: string;
+}
+
+export interface LanguageRuntimeState extends LanguageRuntimeValidation {
+  language: LanguageRuntime;
+  config: LanguageRuntimeConfig;
+  detectedPath?: string;
+  source: "auto" | "configured" | "internal" | "missing";
+}
+
+export interface ExtensionManifest {
+  id: string;
+  displayName: string;
+  version: string;
+  publisher: string;
+  description: string;
+  icon?: string;
+  iconPath?: string;
+  categories: string[];
+}
+
+export interface InstalledExtension extends ExtensionManifest {
+  enabled: boolean;
+  path: string;
+}
+
+export interface ExtensionRegistryEntry {
+  id: string;
+  enabled: boolean;
+  path: string;
+  version: string;
+}
+
+export interface ExtensionRegistry {
+  installed: ExtensionRegistryEntry[];
+}
+
 export interface RuntimeRunRequest {
   filePath: string;
   content?: string;
@@ -382,12 +447,120 @@ export interface WindowControlsApi {
   isMaximized(): Promise<boolean>;
 }
 
+export type AIProviderId = "openai" | "codex" | "gemini" | "openrouter" | "ollama";
+export type AIMessageRole = "user" | "assistant" | "system";
+export type AIContextSource =
+  | "currentFile"
+  | "selection"
+  | "openEditors"
+  | "workspaceTree"
+  | "workspaceFiles"
+  | "terminal"
+  | "buildOutput"
+  | "gitDiff"
+  | "diagnostics"
+  | "problems"
+  | "clipboard"
+  | "files";
+
+export interface AIProviderDescriptor {
+  id: AIProviderId;
+  displayName: string;
+  supportsStreaming: boolean;
+  requiresApiKey: boolean;
+  defaultModel: string;
+}
+
+export interface AIModel {
+  id: string;
+  displayName: string;
+  contextSize?: number;
+}
+
+export interface AISettings {
+  provider: AIProviderId;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  streaming: boolean;
+  systemPrompt: string;
+  contextSize: number;
+  ollamaBaseUrl: string;
+  apiKeyConfigured: boolean;
+}
+
+export interface AISaveSettingsRequest extends Omit<AISettings, "apiKeyConfigured"> {
+  apiKey?: string;
+  clearApiKey?: boolean;
+}
+
+export interface AIContextItem {
+  id: string;
+  source: AIContextSource;
+  label: string;
+  content: string;
+  language?: string;
+  path?: string;
+  truncated?: boolean;
+}
+
+export interface AIMessage {
+  id: string;
+  role: AIMessageRole;
+  content: string;
+  timestamp: string;
+  contexts?: AIContextItem[];
+  stopped?: boolean;
+  error?: string;
+}
+
+export interface AIConversation {
+  id: string;
+  title: string;
+  provider: AIProviderId;
+  model: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: AIMessage[];
+}
+
+export interface AIChatRequest {
+  requestId: string;
+  conversationId: string;
+  messages: AIMessage[];
+  contexts: AIContextItem[];
+  settings: AISettings;
+}
+
+export type AIStreamEventType = "start" | "delta" | "complete" | "error" | "cancelled";
+
+export interface AIStreamEvent {
+  requestId: string;
+  type: AIStreamEventType;
+  delta?: string;
+  message?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
+}
+
+export interface AIConversationUpdate {
+  id: string;
+  title?: string;
+  provider?: AIProviderId;
+  model?: string;
+  messages?: AIMessage[];
+}
+
 export interface NpsharpApi {
   appInfo(): Promise<AppInfo>;
   window: WindowControlsApi;
   dialog: {
     openFile(): Promise<DialogFileResult>;
     openFolder(): Promise<DialogFileResult>;
+    openVsix(): Promise<DialogFileResult>;
     saveFile(request: SaveFileRequest): Promise<SaveFileResult>;
     chooseWallpaper(): Promise<DialogFileResult>;
   };
@@ -398,9 +571,23 @@ export interface NpsharpApi {
     loadSession(): Promise<PersistedSession>;
     saveSession(session: PersistedSession): Promise<void>;
   };
+  ai: {
+    providers(): Promise<AIProviderDescriptor[]>;
+    listModels(provider: AIProviderId): Promise<AIModel[]>;
+    loadSettings(): Promise<AISettings>;
+    saveSettings(settings: AISaveSettingsRequest): Promise<AISettings>;
+    listConversations(): Promise<AIConversation[]>;
+    createConversation(provider?: AIProviderId, model?: string): Promise<AIConversation>;
+    updateConversation(update: AIConversationUpdate): Promise<AIConversation>;
+    deleteConversation(id: string): Promise<void>;
+    send(request: AIChatRequest): Promise<void>;
+    cancel(requestId: string): Promise<void>;
+    onStream(callback: (event: AIStreamEvent) => void): () => void;
+  };
   fs: {
     listDir(path: string): Promise<WorkspaceEntry[]>;
     readFile(path: string): Promise<FileReadResult>;
+    openFile(path: string, forceText?: boolean): Promise<FileOpenResult>;
     writeFile(path: string, content: string): Promise<void>;
     createFile(path: string): Promise<void>;
     createFolder(path: string): Promise<void>;
@@ -444,7 +631,19 @@ export interface NpsharpApi {
     list(): Promise<InstalledRuntime[]>;
     discover(): Promise<InstalledRuntime[]>;
     configure(languageId: string, executablePath: string): Promise<InstalledRuntime[]>;
+    config(): Promise<LanguageRuntimeState[]>;
+    updateConfig(languageId: string, config: LanguageRuntimeConfig): Promise<LanguageRuntimeState[]>;
+    autoDetect(languageId: string): Promise<LanguageRuntimeState[]>;
+    validate(languageId: string, executablePath?: string): Promise<LanguageRuntimeValidation>;
     runFile(request: RuntimeRunRequest): Promise<RuntimeRunResult>;
+  };
+  extensions: {
+    list(): Promise<InstalledExtension[]>;
+    installVsix(vsixPath: string): Promise<InstalledExtension>;
+    enable(id: string): Promise<InstalledExtension[]>;
+    disable(id: string): Promise<InstalledExtension[]>;
+    uninstall(id: string): Promise<InstalledExtension[]>;
+    reload(id?: string): Promise<InstalledExtension[]>;
   };
   arduino: {
     detect(request?: ArduinoCliRequest): Promise<ArduinoCliInfo>;

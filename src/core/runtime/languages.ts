@@ -2,9 +2,10 @@ import type { LanguageRuntime } from "../../shared/types";
 
 export const LANGUAGE_RUNTIMES: LanguageRuntime[] = [
   { id: "python", displayName: "Python", executableCandidates: ["python3", "python", "py"], extensions: [".py"] },
-  { id: "node", displayName: "JavaScript/TypeScript", executableCandidates: ["node"], extensions: [".js", ".mjs", ".cjs", ".ts", ".tsx"] },
+  { id: "node", displayName: "Node.js", executableCandidates: ["node"], extensions: [".js", ".mjs", ".cjs", ".ts", ".tsx"] },
   { id: "java", displayName: "Java", executableCandidates: ["java"], extensions: [".java"] },
-  { id: "cpp", displayName: "C/C++", executableCandidates: ["clang", "gcc", "g++"], extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"] },
+  { id: "c", displayName: "C", executableCandidates: ["clang", "gcc", "cc"], extensions: [".c", ".h"] },
+  { id: "cpp", displayName: "C++", executableCandidates: ["clang++", "g++", "c++", "clang"], extensions: [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"] },
   { id: "csharp", displayName: "C#", executableCandidates: ["dotnet"], extensions: [".cs"] },
   { id: "go", displayName: "Go", executableCandidates: ["go"], extensions: [".go"] },
   { id: "rust", displayName: "Rust", executableCandidates: ["rustc", "cargo"], extensions: [".rs"] },

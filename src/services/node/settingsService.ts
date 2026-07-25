@@ -29,7 +29,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   buildSkipTests: true,
   statusBarVisible: true,
   activityBarVisible: true,
-  sideBarVisible: true
+  sideBarVisible: true,
+  binaryFileTypesIgnored: []
 };
 
 export async function loadSettings(): Promise<AppSettings> {

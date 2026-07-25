@@ -1,6 +1,7 @@
 import { el } from "../utils/dom";
 
 export interface CommandAction {
+  id?: string;
   label: string;
   shortcut?: string;
   keywords?: string;
@@ -41,7 +42,7 @@ export class CommandPalette {
     this.show(">", this.commands.map(command => ({
       label: command.label,
       hint: command.shortcut ?? "",
-      keywords: command.keywords,
+      keywords: [command.id ?? "", command.keywords ?? ""].join(" "),
       run: command.run
     })));
   }

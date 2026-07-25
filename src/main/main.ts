@@ -17,12 +17,14 @@ import {
   deletePath,
   exists,
   listDir,
+  openFile,
   readFile,
   renamePath,
   revealPath,
   watchWorkspace,
   writeFile
 } from "../services/node/fileSystemService";
+import { ExtensionManager } from "../services/node/extensionManager";
 import {
   checkout,
   commit,
@@ -39,11 +41,25 @@ import { openLiveServer, stopAllLiveServers } from "../services/node/liveServerS
 import { npsharpHome } from "../services/node/paths";
 import { normalizeCwd, runShell } from "../services/node/processService";
 import { resourcePath, resourcesRoot } from "../services/node/resourcePaths";
-import { configureRuntime, discoverRuntimes, listRuntimes, runFile } from "../services/node/runtimeService";
+import {
+  autoDetectRuntime,
+  configureRuntime,
+  discoverRuntimes,
+  listRuntimeConfigStates,
+  listRuntimes,
+  runFile,
+  updateRuntimeConfig,
+  validateRuntime
+} from "../services/node/runtimeService";
 import { replaceAll, searchWorkspace } from "../services/node/searchService";
 import { loadSession, loadSettings, resetSettings, saveSession, saveSettings } from "../services/node/settingsService";
 import { applyTemplate } from "../services/node/templateService";
 import { runJavaDiagnostics } from "../services/node/diagnosticsService";
+import { AIService } from "../services/node/ai/AIService";
+import { AISettingsService } from "../services/node/ai/AISettingsService";
+import { ConversationManager } from "../services/node/ai/ConversationManager";
+import { ProviderManager } from "../services/node/ai/ProviderManager";
+import { StreamingController } from "../services/node/ai/StreamingController";
 import {
   closeAllTerminals,
   closeTerminal,
@@ -67,6 +83,10 @@ import {
   writeRemoteFile
 } from "../services/node/remoteService";
 import type {
+  AIChatRequest,
+  AIConversationUpdate,
+  AIProviderId,
+  AISaveSettingsRequest,
   ArduinoCliRequest,
   ArduinoCompileRequest,
   ArduinoConfigRequest,
@@ -75,6 +95,7 @@ import type {
   ArduinoSaveConfigRequest,
   ArduinoUploadRequest,
   GitFileStatus,
+  LanguageRuntimeConfig,
   LiveServerRequest,
   RemoteCommandRequest,
   RemoteFileRequest,
@@ -92,6 +113,7 @@ import type {
 let mainWindow: BrowserWindow | undefined;
 let shuttingDown = false;
 let runtimeResourcesClosed = false;
+let aiStreamingController: StreamingController | undefined;
 
 interface WorkspaceWatcherRegistration {
   readonly dispose: () => void;
@@ -301,6 +323,7 @@ function createApplicationMenu(): void {
         { label: "Run Without Debugging", accelerator: "CmdOrCtrl+F5", click: () => sendCommand("tools:runWithoutDebug") },
         { label: "Debug Program", accelerator: "F5", click: () => sendCommand("tools:run") },
         { label: "Arduino", click: () => sendCommand("view:arduino") },
+        { label: "Configure Language Runtimes", click: () => sendCommand("npsharp:configureLanguageRuntimes") },
         { type: "separator" },
         { label: "New Terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendCommand("terminal:new") },
         { label: "Output", click: () => sendCommand("terminal:output") },
@@ -322,6 +345,7 @@ function createApplicationMenu(): void {
       submenu: [
         { label: "Command Palette", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
         { label: "Command Center", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
+        { label: "Install Extension from VSIX", click: () => sendCommand("extensions:installVsix") },
         { label: "About NPSharp", click: () => sendCommand("help:about") }
       ]
     }
@@ -337,6 +361,13 @@ function sendCommand(command: string): void {
 }
 
 function registerIpcHandlers(): void {
+  const extensionManager = new ExtensionManager(app.getPath("userData"));
+  const aiSettings = new AISettingsService(app.getPath("userData"));
+  const conversations = new ConversationManager(app.getPath("userData"));
+  const providerManager = new ProviderManager(aiSettings);
+  aiStreamingController = new StreamingController();
+  const aiService = new AIService(providerManager, aiSettings, aiStreamingController);
+
   ipcMain.handle("app:info", () => ({
     name: app.getName(),
     version: app.getVersion(),
@@ -362,6 +393,16 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle("dialog:openFolder", async () => {
     const result = await showOpenDialog({ properties: ["openDirectory"] });
+    return { canceled: result.canceled, paths: normalizeDialogPaths(result.filePaths) };
+  });
+  ipcMain.handle("dialog:openVsix", async () => {
+    const result = await showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        { name: "VSIX Extensions", extensions: ["vsix"] },
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
     return { canceled: result.canceled, paths: normalizeDialogPaths(result.filePaths) };
   });
   ipcMain.handle("dialog:chooseWallpaper", async () => {
@@ -391,8 +432,28 @@ function registerIpcHandlers(): void {
   ipcMain.handle("settings:loadSession", () => loadSession());
   ipcMain.handle("settings:saveSession", (_event, session) => saveSession(session));
 
+  ipcMain.handle("ai:providers", () => providerManager.descriptors());
+  ipcMain.handle("ai:listModels", async (_event, provider: AIProviderId) => {
+    const settings = await aiSettings.load();
+    return providerManager.listModels(provider, { ...settings, provider });
+  });
+  ipcMain.handle("ai:settings:load", () => aiSettings.load());
+  ipcMain.handle("ai:settings:save", (_event, settings: AISaveSettingsRequest) => aiSettings.save(settings));
+  ipcMain.handle("ai:conversations:list", () => conversations.list());
+  ipcMain.handle("ai:conversations:create", (_event, provider?: AIProviderId, model?: string) => conversations.create(provider, model));
+  ipcMain.handle("ai:conversations:update", (_event, update: AIConversationUpdate) => conversations.update(update));
+  ipcMain.handle("ai:conversations:delete", (_event, id: string) => conversations.delete(id));
+  ipcMain.handle("ai:send", async (event, request: AIChatRequest) => {
+    const sender = event.sender;
+    await aiService.ask(request, payload => sendToWebContents(sender, "ai:stream", payload));
+  });
+  ipcMain.handle("ai:cancel", (_event, requestId: string) => {
+    aiStreamingController?.cancel(requestId);
+  });
+
   ipcMain.handle("fs:listDir", (_event, targetPath: string) => listDir(targetPath));
   ipcMain.handle("fs:readFile", (_event, targetPath: string) => readFile(targetPath));
+  ipcMain.handle("fs:openFile", (_event, targetPath: string, forceText = false) => openFile(targetPath, forceText));
   ipcMain.handle("fs:writeFile", (_event, targetPath: string, content: string) => writeFile(targetPath, content));
   ipcMain.handle("fs:createFile", (_event, targetPath: string) => createFile(targetPath));
   ipcMain.handle("fs:createFolder", (_event, targetPath: string) => createFolder(targetPath));
@@ -473,7 +534,18 @@ function registerIpcHandlers(): void {
   ipcMain.handle("runtime:list", () => listRuntimes());
   ipcMain.handle("runtime:discover", () => discoverRuntimes(true));
   ipcMain.handle("runtime:configure", (_event, languageId: string, executablePath: string) => configureRuntime(languageId, executablePath));
+  ipcMain.handle("runtime:config", () => listRuntimeConfigStates());
+  ipcMain.handle("runtime:updateConfig", (_event, languageId: string, config: LanguageRuntimeConfig) => updateRuntimeConfig(languageId, config));
+  ipcMain.handle("runtime:autoDetect", (_event, languageId: string) => autoDetectRuntime(languageId));
+  ipcMain.handle("runtime:validate", (_event, languageId: string, executablePath?: string) => validateRuntime(languageId, executablePath));
   ipcMain.handle("runtime:runFile", (_event, request: RuntimeRunRequest) => runFile(request));
+
+  ipcMain.handle("extensions:list", () => extensionManager.listInstalled());
+  ipcMain.handle("extensions:installVsix", (_event, vsixPath: string) => extensionManager.installVsix(vsixPath));
+  ipcMain.handle("extensions:enable", (_event, id: string) => extensionManager.enable(id));
+  ipcMain.handle("extensions:disable", (_event, id: string) => extensionManager.disable(id));
+  ipcMain.handle("extensions:uninstall", (_event, id: string) => extensionManager.uninstall(id));
+  ipcMain.handle("extensions:reload", (_event, id?: string) => extensionManager.reload(id));
 
   ipcMain.handle("arduino:detect", (_event, request?: ArduinoCliRequest) => detectArduinoCli(request));
   ipcMain.handle("arduino:loadConfig", (_event, request: ArduinoConfigRequest) => loadArduinoConfig(request));
@@ -524,6 +596,7 @@ function requestApplicationShutdown(_reason: NodeJS.Signals): void {
 function cleanupRuntimeResources(): void {
   if (runtimeResourcesClosed) return;
   runtimeResourcesClosed = true;
+  aiStreamingController?.cancelAll();
   closeRegisteredTerminals();
   closeWorkspaceWatchers();
   void stopAllLiveServers().catch(error => {

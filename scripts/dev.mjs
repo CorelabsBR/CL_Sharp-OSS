@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { watch } from "node:fs";
 import fs from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
@@ -17,6 +18,9 @@ const devServerPort = requestedDevServerUrl ? requestedDevServerPort : await fin
 const devServerUrl = requestedDevServerUrl ?? `http://127.0.0.1:${devServerPort}`;
 const mainFile = path.join(root, "dist-electron", "main", "main.js");
 const children = [];
+let electronProcess;
+let restartTimer;
+let restartingElectron = false;
 
 function spawnChild(command, args, extraEnv = {}) {
   const env = { ...process.env, ...extraEnv };
@@ -73,10 +77,36 @@ async function findAvailablePort(startPort) {
 }
 
 function shutdown(code = 0) {
+  if (restartTimer) clearTimeout(restartTimer);
   for (const child of children) {
     if (!child.killed) child.kill();
   }
   process.exit(code);
+}
+
+function startElectron() {
+  electronProcess = spawnChild(electron, ["."], { VITE_DEV_SERVER_URL: devServerUrl });
+  electronProcess.on("exit", code => {
+    if (!restartingElectron) shutdown(code ?? 0);
+  });
+}
+
+function restartElectron() {
+  if (!electronProcess || electronProcess.killed) return;
+  restartingElectron = true;
+  electronProcess.once("exit", () => {
+    restartingElectron = false;
+    startElectron();
+  });
+  electronProcess.kill();
+}
+
+function scheduleElectronRestart() {
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = setTimeout(() => {
+    restartTimer = undefined;
+    restartElectron();
+  }, 350);
 }
 
 process.on("SIGINT", () => shutdown(0));
@@ -88,5 +118,14 @@ spawnChild(npm, ["run", "dev:renderer"], { VITE_PORT: String(devServerPort), VIT
 await waitForFile(mainFile);
 await waitForUrl(devServerUrl);
 
-const electronProcess = spawnChild(electron, ["."], { VITE_DEV_SERVER_URL: devServerUrl });
-electronProcess.on("exit", code => shutdown(code ?? 0));
+startElectron();
+
+for (const directory of [path.join(root, "dist-electron", "main"), path.join(root, "dist-electron", "preload")]) {
+  try {
+    watch(directory, { persistent: true }, (_eventType, fileName) => {
+      if (fileName?.endsWith(".js")) scheduleElectronRestart();
+    });
+  } catch (error) {
+    console.warn(`[NPSharp dev] Failed to watch Electron output (${directory}); restart Electron manually after backend changes.`, error);
+  }
+}

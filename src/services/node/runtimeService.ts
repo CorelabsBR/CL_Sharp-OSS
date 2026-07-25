@@ -1,67 +1,92 @@
 import fs from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import type { InstalledRuntime, RuntimeRunRequest, RuntimeRunResult } from "../../shared/types";
+import type {
+  InstalledRuntime,
+  LanguageRuntime,
+  LanguageRuntimeConfig,
+  LanguageRuntimeState,
+  LanguageRuntimeValidation,
+  RuntimeRunRequest,
+  RuntimeRunResult
+} from "../../shared/types";
 import { PortugolInterpreter } from "../../core/portugol/interpreter";
 import { LANGUAGE_RUNTIMES, languageFromFileName } from "../../core/runtime/languages";
 import { commandExists, runProcess } from "./processService";
-import { runtimeRegistryPath, toolBinDir } from "./paths";
+import { languageRuntimesPath, runtimeRegistryPath, toolBinDir } from "./paths";
+
+const CONFIGURABLE_LANGUAGE_IDS = ["c", "cpp", "csharp", "java", "node", "python", "go", "rust", "php", "lua", "kotlin", "dart"] as const;
+const CONFIGURABLE_LANGUAGE_SET = new Set<string>(CONFIGURABLE_LANGUAGE_IDS);
+
+type RuntimeConfigFile = Record<string, Partial<LanguageRuntimeConfig>>;
 
 export async function listRuntimes(): Promise<InstalledRuntime[]> {
   return discoverRuntimes(false);
 }
 
 export async function discoverRuntimes(rescan = true): Promise<InstalledRuntime[]> {
-  const configured = await loadRegistry();
+  const states = await resolveRuntimeStates(rescan, rescan);
   const installed: InstalledRuntime[] = [];
-
-  for (const language of LANGUAGE_RUNTIMES) {
-    if (language.id === "portugol") {
-      installed.push({ language, rootPath: toolBinDir(), executablePath: path.join(toolBinDir(), "internal-portugol"), debuggerPath: path.join(toolBinDir(), "internal-portugol"), version: "npsharp", source: "internal" });
-      continue;
-    }
-
-    const configuredRuntime = configured.get(language.id);
-    if (configuredRuntime) {
-      installed.push({ ...configuredRuntime, language, source: "configured" });
-      continue;
-    }
-
-    if (!rescan) continue;
-    for (const candidate of language.executableCandidates) {
-      const executable = await commandExists(candidate);
-      if (executable) {
-        installed.push({
-          language,
-          rootPath: path.dirname(executable),
-          executablePath: executable,
-          version: await readVersion(executable),
-          source: "system"
-        });
-        break;
-      }
-    }
+  for (const state of states) {
+    if (state.status !== "installed" || !state.path) continue;
+    installed.push({
+      language: state.language,
+      rootPath: state.path === path.join(toolBinDir(), "internal-portugol") ? toolBinDir() : path.dirname(state.path),
+      executablePath: state.path,
+      debuggerPath: state.language.id === "portugol" ? state.path : undefined,
+      version: state.version ?? "detected",
+      source: state.source === "auto" ? "system" : state.source === "internal" ? "internal" : "configured"
+    });
   }
-
-  await saveRegistryFromInstalled(installed);
   return installed;
 }
 
 export async function configureRuntime(languageId: string, executablePath: string): Promise<InstalledRuntime[]> {
-  const current = await loadRegistry();
-  const language = LANGUAGE_RUNTIMES.find(item => item.id === languageId);
-  if (language && executablePath) {
-    current.set(languageId, {
-      language,
-      rootPath: path.dirname(executablePath),
-      executablePath,
-      version: "configured",
-      source: "configured"
-    });
-  }
-  await saveRegistryMap(current);
+  const config = await loadRuntimeConfig();
+  const language = requireLanguage(languageId);
+  if (language.id === "portugol") return discoverRuntimes(true);
+  config.set(language.id, { path: executablePath.trim(), autoDetect: false });
+  await saveRuntimeConfig(config);
   return discoverRuntimes(true);
+}
+
+export async function listRuntimeConfigStates(): Promise<LanguageRuntimeState[]> {
+  return resolveRuntimeStates(true, true, configurableLanguages());
+}
+
+export async function updateRuntimeConfig(languageId: string, nextConfig: LanguageRuntimeConfig): Promise<LanguageRuntimeState[]> {
+  const language = requireConfigurableLanguage(languageId);
+  const config = await loadRuntimeConfig();
+  config.set(language.id, normalizeRuntimeConfig(nextConfig));
+  await saveRuntimeConfig(config);
+  return listRuntimeConfigStates();
+}
+
+export async function autoDetectRuntime(languageId: string): Promise<LanguageRuntimeState[]> {
+  const language = requireConfigurableLanguage(languageId);
+  const config = await loadRuntimeConfig();
+  const detectedPath = await detectExecutable(language);
+  config.set(language.id, { path: detectedPath ?? "", autoDetect: true });
+  await saveRuntimeConfig(config);
+  return listRuntimeConfigStates();
+}
+
+export async function validateRuntime(languageId: string, executablePath?: string): Promise<LanguageRuntimeValidation> {
+  const language = requireLanguage(languageId);
+  const value = executablePath?.trim();
+  if (value) return validateExecutable(language, value);
+
+  const config = await loadRuntimeConfig();
+  const state = await resolveLanguageState(language, config.get(language.id) ?? defaultRuntimeConfig(language), true);
+  return {
+    languageId: language.id,
+    path: state.path,
+    version: state.version,
+    status: state.status,
+    message: state.message
+  };
 }
 
 export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunResult> {
@@ -90,17 +115,17 @@ export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunRes
   }
 
   if (language.id === "java") {
-    return runJavaSource(language.displayName, request.filePath, source);
+    return runJavaSource(language.displayName, request.filePath, source, runtime);
   }
 
   if (language.id === "rust") {
-    return runRustFile(language.displayName, request.filePath);
+    return runRustFile(language.displayName, request.filePath, runtime);
   }
 
   if (!runtime) {
     return {
       language: language.displayName,
-      output: `[ERRO] Runtime nao encontrado: ${language.displayName}. Configure o caminho em Run and Debug.`,
+      output: `[ERRO] Runtime nao encontrado: ${language.displayName}. Use Configure Language Runtimes para definir ou detectar o executavel.`,
       code: 127
     };
   }
@@ -117,6 +142,233 @@ export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunRes
     output: formatRunOutput(language.displayName, command, result.output, result.code),
     code: result.code ?? 1
   };
+}
+
+async function resolveRuntimeStates(
+  rescan: boolean,
+  persistDetected: boolean,
+  languages = LANGUAGE_RUNTIMES
+): Promise<LanguageRuntimeState[]> {
+  const config = await loadRuntimeConfig();
+  const states: LanguageRuntimeState[] = [];
+  let changed = false;
+
+  for (const language of languages) {
+    const configured = config.get(language.id) ?? defaultRuntimeConfig(language);
+    const state = await resolveLanguageState(language, configured, rescan);
+    states.push(state);
+
+    if (persistDetected && CONFIGURABLE_LANGUAGE_SET.has(language.id) && state.config.autoDetect) {
+      const detectedPath = state.detectedPath ?? "";
+      const current = config.get(language.id) ?? defaultRuntimeConfig(language);
+      if (current.path !== detectedPath || current.autoDetect !== true) {
+        config.set(language.id, { path: detectedPath, autoDetect: true });
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) await saveRuntimeConfig(config);
+  return states;
+}
+
+async function resolveLanguageState(language: LanguageRuntime, config: LanguageRuntimeConfig, rescan: boolean): Promise<LanguageRuntimeState> {
+  if (language.id === "portugol") {
+    const executable = path.join(toolBinDir(), "internal-portugol");
+    return {
+      language,
+      languageId: language.id,
+      config: { path: executable, autoDetect: false },
+      path: executable,
+      version: "npsharp",
+      status: "installed",
+      source: "internal",
+      message: "Runtime interno do NPSharp."
+    };
+  }
+
+  const normalized = normalizeRuntimeConfig(config);
+  if (normalized.autoDetect) {
+    const detectedPath = rescan ? await detectExecutable(language) : normalized.path || undefined;
+    if (!detectedPath) {
+      return {
+        language,
+        languageId: language.id,
+        config: normalized,
+        status: "missing",
+        source: "missing",
+        message: `${language.displayName} nao foi encontrado no PATH.`
+      };
+    }
+    const validation = await validateExecutable(language, detectedPath);
+    return {
+      ...validation,
+      language,
+      config: normalized,
+      detectedPath,
+      source: validation.status === "installed" ? "auto" : "missing"
+    };
+  }
+
+  if (!normalized.path) {
+    return {
+      language,
+      languageId: language.id,
+      config: normalized,
+      status: "missing",
+      source: "missing",
+      message: `${language.displayName} ainda nao possui executavel configurado.`
+    };
+  }
+
+  const validation = await validateExecutable(language, normalized.path);
+  return {
+    ...validation,
+    language,
+    config: normalized,
+    source: validation.status === "installed" ? "configured" : "missing"
+  };
+}
+
+async function detectExecutable(language: LanguageRuntime): Promise<string | undefined> {
+  for (const candidate of language.executableCandidates) {
+    const executable = await commandExists(candidate);
+    if (executable) return executable;
+  }
+  return undefined;
+}
+
+async function validateExecutable(language: LanguageRuntime, executablePath: string): Promise<LanguageRuntimeValidation> {
+  const resolved = await commandExists(executablePath) ?? executablePath;
+  try {
+    await fs.access(resolved, process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK);
+  } catch {
+    return {
+      languageId: language.id,
+      path: resolved,
+      status: "invalid",
+      message: `Executavel invalido: ${resolved}`
+    };
+  }
+
+  const version = await readVersion(language.id, resolved);
+  if (!version) {
+    return {
+      languageId: language.id,
+      path: resolved,
+      status: "invalid",
+      message: `Nao foi possivel validar ${language.displayName}.`
+    };
+  }
+
+  return {
+    languageId: language.id,
+    path: resolved,
+    version,
+    status: "installed",
+    message: `${language.displayName} instalado.`
+  };
+}
+
+async function loadRuntimeConfig(): Promise<Map<string, LanguageRuntimeConfig>> {
+  const file = languageRuntimesPath();
+  try {
+    const raw = await fs.readFile(file, "utf8");
+    const parsed = JSON.parse(raw) as RuntimeConfigFile;
+    const config = configMapFromObject(parsed);
+    let changed = ensureConfigurableDefaults(config);
+    if (changed) await saveRuntimeConfig(config);
+    return config;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`[NPSharp runtime] Failed to read ${file}; defaults will be used.`, error);
+    }
+  }
+
+  const config = await loadLegacyRuntimeConfig();
+  ensureConfigurableDefaults(config);
+  await saveRuntimeConfig(config);
+  return config;
+}
+
+async function saveRuntimeConfig(config: Map<string, LanguageRuntimeConfig>): Promise<void> {
+  const file = languageRuntimesPath();
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  const payload: Record<string, LanguageRuntimeConfig> = {};
+  for (const language of configurableLanguages()) {
+    payload[language.id] = normalizeRuntimeConfig(config.get(language.id) ?? defaultRuntimeConfig(language));
+  }
+  await fs.writeFile(file, JSON.stringify(payload, null, 2) + "\n", "utf8");
+}
+
+function configMapFromObject(parsed: RuntimeConfigFile): Map<string, LanguageRuntimeConfig> {
+  const config = new Map<string, LanguageRuntimeConfig>();
+  for (const language of LANGUAGE_RUNTIMES) {
+    const value = parsed[language.id];
+    if (!value || typeof value !== "object") continue;
+    config.set(language.id, normalizeRuntimeConfig(value));
+  }
+  return config;
+}
+
+async function loadLegacyRuntimeConfig(): Promise<Map<string, LanguageRuntimeConfig>> {
+  const map = new Map<string, LanguageRuntimeConfig>();
+  try {
+    const raw = await fs.readFile(runtimeRegistryPath(), "utf8");
+    const props = parseProperties(raw);
+    for (const language of LANGUAGE_RUNTIMES) {
+      const executable = props.get(`${language.id}.exe`);
+      if (executable) map.set(language.id, { path: executable, autoDetect: false });
+    }
+  } catch {
+    // Legacy registry is optional and only used for migration.
+  }
+  return map;
+}
+
+function ensureConfigurableDefaults(config: Map<string, LanguageRuntimeConfig>): boolean {
+  let changed = false;
+  for (const language of configurableLanguages()) {
+    if (!config.has(language.id)) {
+      config.set(language.id, defaultRuntimeConfig(language));
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function defaultRuntimeConfig(language: LanguageRuntime): LanguageRuntimeConfig {
+  return {
+    path: "",
+    autoDetect: CONFIGURABLE_LANGUAGE_SET.has(language.id)
+  };
+}
+
+function normalizeRuntimeConfig(config: Partial<LanguageRuntimeConfig>): LanguageRuntimeConfig {
+  return {
+    path: typeof config.path === "string" ? config.path.trim() : "",
+    autoDetect: Boolean(config.autoDetect)
+  };
+}
+
+function configurableLanguages(): LanguageRuntime[] {
+  return CONFIGURABLE_LANGUAGE_IDS
+    .map(id => LANGUAGE_RUNTIMES.find(language => language.id === id))
+    .filter((language): language is LanguageRuntime => Boolean(language));
+}
+
+function requireLanguage(languageId: string): LanguageRuntime {
+  const language = LANGUAGE_RUNTIMES.find(item => item.id === languageId);
+  if (!language) throw new Error(`Runtime desconhecido: ${languageId}`);
+  return language;
+}
+
+function requireConfigurableLanguage(languageId: string): LanguageRuntime {
+  const language = requireLanguage(languageId);
+  if (!CONFIGURABLE_LANGUAGE_SET.has(language.id)) {
+    throw new Error(`Runtime nao configuravel: ${language.displayName}`);
+  }
+  return language;
 }
 
 async function runNodeLikeFile(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
@@ -136,8 +388,8 @@ async function runNodeLikeFile(displayName: string, filePath: string, runtime?: 
     return {
       language: displayName,
       output: extension === ".ts" || extension === ".tsx"
-        ? "[ERRO] Runtime TypeScript nao encontrado. Instale/configure tsx ou ts-node em Run and Debug."
-        : "[ERRO] Runtime Node.js nao encontrado. Configure o caminho em Run and Debug.",
+        ? "[ERRO] Runtime TypeScript nao encontrado. Instale/configure tsx ou ts-node em Configure Language Runtimes."
+        : "[ERRO] Runtime Node.js nao encontrado. Configure o caminho em Configure Language Runtimes.",
       code: 127
     };
   }
@@ -150,13 +402,13 @@ async function runNodeLikeFile(displayName: string, filePath: string, runtime?: 
   };
 }
 
-async function runJavaSource(displayName: string, filePath: string, source: string): Promise<RuntimeRunResult> {
-  const java = await commandExists("java");
+async function runJavaSource(displayName: string, filePath: string, source: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
+  const java = runtime?.executablePath ?? await commandExists("java");
   if (!java) {
-    return { language: displayName, output: "[ERRO] Runtime Java nao encontrado. Configure java em Run and Debug.", code: 127 };
+    return { language: displayName, output: "[ERRO] Runtime Java nao encontrado. Configure java em Configure Language Runtimes.", code: 127 };
   }
 
-  const javac = await commandExists("javac");
+  const javac = await siblingExecutable(java, "javac") ?? await commandExists("javac");
   if (!javac) {
     const command = [java, filePath];
     const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
@@ -193,10 +445,12 @@ async function runJavaSource(displayName: string, filePath: string, source: stri
   };
 }
 
-async function runRustFile(displayName: string, filePath: string): Promise<RuntimeRunResult> {
+async function runRustFile(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
   const cargoRoot = await findUp(path.dirname(filePath), "Cargo.toml");
   if (cargoRoot) {
-    const cargo = await commandExists("cargo");
+    const cargo = runtime && path.basename(runtime.executablePath).toLowerCase().startsWith("cargo")
+      ? runtime.executablePath
+      : await commandExists("cargo");
     if (!cargo) {
       return { language: displayName, output: "[ERRO] Cargo nao encontrado para executar este projeto Rust.", code: 127 };
     }
@@ -209,7 +463,9 @@ async function runRustFile(displayName: string, filePath: string): Promise<Runti
     };
   }
 
-  const rustc = await commandExists("rustc");
+  const rustc = runtime && path.basename(runtime.executablePath).toLowerCase().startsWith("rustc")
+    ? runtime.executablePath
+    : await commandExists("rustc");
   if (!rustc) {
     return { language: displayName, output: "[ERRO] rustc nao encontrado para executar este arquivo Rust.", code: 127 };
   }
@@ -272,6 +528,17 @@ async function findUp(startDir: string, fileName: string): Promise<string | unde
   }
 }
 
+async function siblingExecutable(executable: string, siblingName: string): Promise<string | undefined> {
+  const extension = process.platform === "win32" ? ".exe" : "";
+  const sibling = path.join(path.dirname(executable), `${siblingName}${extension}`);
+  try {
+    await fs.access(sibling, process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK);
+    return sibling;
+  } catch {
+    return undefined;
+  }
+}
+
 function formatRunOutput(displayName: string, command: string[], output: string, code: number | null): string {
   return [
     `[DEBUG] Runtime selecionado: ${displayName}`,
@@ -285,55 +552,24 @@ function formatCommand(command: string[]): string {
   return command.map(part => /\s/.test(part) ? `"${part.replace(/"/g, "\\\"")}"` : part).join(" ");
 }
 
-async function readVersion(executable: string): Promise<string> {
-  const result = await runProcess(executable, ["--version"], { timeoutMs: 5000 });
-  return result.output.split(/\r?\n/).find(Boolean)?.trim() || "detected";
+async function readVersion(languageId: string, executable: string): Promise<string> {
+  const args = versionArgs(languageId);
+  const result = await runProcess(executable, args, { timeoutMs: 5000 });
+  return result.output.split(/\r?\n/).find(Boolean)?.trim() || "";
 }
 
-async function loadRegistry(): Promise<Map<string, InstalledRuntime>> {
-  const map = new Map<string, InstalledRuntime>();
-  try {
-    const raw = await fs.readFile(runtimeRegistryPath(), "utf8");
-    const props = parseProperties(raw);
-    for (const language of LANGUAGE_RUNTIMES) {
-      const root = props.get(`${language.id}.root`);
-      const exe = props.get(`${language.id}.exe`);
-      if (!root || !exe) continue;
-      const debuggerPath = props.get(`${language.id}.debugger`);
-      map.set(language.id, {
-        language,
-        rootPath: root,
-        executablePath: exe,
-        debuggerPath: debuggerPath || undefined,
-        version: props.get(`${language.id}.version`) ?? "unknown",
-        source: "configured"
-      });
-    }
-  } catch {
-    // registry is optional
+function versionArgs(languageId: string): string[] {
+  switch (languageId) {
+    case "go":
+      return ["version"];
+    case "java":
+    case "kotlin":
+      return ["-version"];
+    case "lua":
+      return ["-v"];
+    default:
+      return ["--version"];
   }
-  return map;
-}
-
-async function saveRegistryFromInstalled(installed: InstalledRuntime[]): Promise<void> {
-  const map = new Map<string, InstalledRuntime>();
-  for (const runtime of installed) {
-    map.set(runtime.language.id, runtime);
-  }
-  await saveRegistryMap(map);
-}
-
-async function saveRegistryMap(installed: Map<string, InstalledRuntime>): Promise<void> {
-  await fs.mkdir(path.dirname(runtimeRegistryPath()), { recursive: true });
-  const lines = ["# NPSharp Runtime Registry"];
-  for (const runtime of installed.values()) {
-    lines.push(`${runtime.language.id}.root=${runtime.rootPath}`);
-    lines.push(`${runtime.language.id}.exe=${runtime.executablePath}`);
-    if (runtime.debuggerPath) lines.push(`${runtime.language.id}.debugger=${runtime.debuggerPath}`);
-    lines.push(`${runtime.language.id}.version=${runtime.version}`);
-    lines.push("");
-  }
-  await fs.writeFile(runtimeRegistryPath(), lines.join("\n"), "utf8");
 }
 
 function parseProperties(raw: string): Map<string, string> {

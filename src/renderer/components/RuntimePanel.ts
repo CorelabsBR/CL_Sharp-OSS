@@ -10,7 +10,8 @@ export class RuntimePanel {
 
   constructor(
     private readonly runCurrentFile: () => Promise<void>,
-    private readonly updateStatus: (text: string) => void
+    private readonly updateStatus: (text: string) => void,
+    private readonly configureLanguageRuntimes: () => void
   ) {
     const toolbar = el("div", { className: "panel-toolbar" });
     toolbar.append(
@@ -44,7 +45,7 @@ export class RuntimePanel {
         el("code", { text: runtime.executablePath })
       );
       const configure = el("button", { className: "mini-action", text: "Configure" });
-      configure.addEventListener("click", () => void this.configure(runtime));
+      configure.addEventListener("click", () => this.configureLanguageRuntimes());
       row.append(configure);
       this.list.append(row);
     }
@@ -60,10 +61,4 @@ export class RuntimePanel {
     }));
   }
 
-  private async configure(runtime: InstalledRuntime): Promise<void> {
-    const next = prompt(`Executable for ${runtime.language.displayName}`, runtime.executablePath);
-    if (!next?.trim()) return;
-    await api.runtime.configure(runtime.language.id, next.trim());
-    await this.refresh(false);
-  }
 }

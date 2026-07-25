@@ -1,6 +1,6 @@
 {
   "name": "npsharp-electron",
-  "version": "26.3.3",
+  "version": "26.6.4",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -33,6 +33,7 @@
   "dependencies": {
     "@capacitor/core": "^8.4.2",
     "@capacitor/filesystem": "^8.1.2",
+    "extract-zip": "^2.0.1",
     "monaco-editor": "^0.52.2",
     "ssh2": "^1.16.0"
   },

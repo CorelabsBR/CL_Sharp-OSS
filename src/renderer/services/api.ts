@@ -1,6 +1,9 @@
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import type { PermissionState } from "@capacitor/core";
 import type {
+  AIConversation,
+  AISettings,
+  AIStreamEvent,
   AppInfo,
   AppSettings,
   ArduinoCliRequest,
@@ -15,11 +18,16 @@ import type {
   DialogFileResult,
   EditorDiagnostic,
   FileReadResult,
+  FileOpenResult,
   GitCommit,
   GitFileStatus,
   GitOperationResult,
   GitRepositoryStatus,
+  InstalledExtension,
   InstalledRuntime,
+  LanguageRuntimeConfig,
+  LanguageRuntimeState,
+  LanguageRuntimeValidation,
   LiveServerRequest,
   LiveServerResult,
   NpsharpApi,
@@ -46,6 +54,7 @@ import type {
   TerminalShellOption,
   WorkspaceEntry
 } from "../../shared/types";
+import { LANGUAGE_RUNTIMES } from "../../core/runtime/languages";
 import { basename, dirname, extname, joinPath, relativePath } from "../utils/path";
 import { DEFAULT_MOBILE_WORKSPACE, getDesktopApi, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform, type PlatformInfo } from "./platform";
 
@@ -83,7 +92,10 @@ const SETTINGS_PATH = `${MOBILE_ROOT}/settings.json`;
 const SESSION_PATH = `${MOBILE_ROOT}/session.json`;
 const REMOTE_HOSTS_PATH = `${MOBILE_ROOT}/remote-hosts.json`;
 const ARDUINO_CONFIG_PATH = `${MOBILE_ROOT}/.npsharp/arduino.json`;
+const LANGUAGE_RUNTIMES_PATH = `${MOBILE_ROOT}/language-runtimes.json`;
 const NOTES_PATH = `${MOBILE_ROOT}/notes.nps.md`;
+const AI_SETTINGS_STORAGE_KEY = "npsharp:ai-settings";
+const AI_CONVERSATIONS_STORAGE_KEY = "npsharp:ai-conversations";
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: "np-dark",
@@ -111,7 +123,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   buildSkipTests: true,
   statusBarVisible: true,
   activityBarVisible: true,
-  sideBarVisible: true
+  sideBarVisible: true,
+  binaryFileTypesIgnored: []
 };
 
 const DEFAULT_SESSION: PersistedSession = {
@@ -129,6 +142,7 @@ const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use e
 const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
 const MOBILE_STORAGE_DENIED_MESSAGE = "Acesso ao armazenamento negado. Permita o acesso ao armazenamento para usar arquivos em Documents/NPSharp.";
 const SEARCH_IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "dist-electron", "release", ".git", "build", ".cache"]);
+const CONFIGURABLE_LANGUAGE_IDS = ["c", "cpp", "csharp", "java", "node", "python", "go", "rust", "php", "lua", "kotlin", "dart"];
 
 class CapacitorSandboxFs implements FsApi {
   private rootReady?: Promise<void>;
@@ -159,6 +173,10 @@ class CapacitorSandboxFs implements FsApi {
     const result = await this.runFsOperation(() => Filesystem.readFile({ path: target, directory: this.directory, encoding: Encoding.UTF8 }));
     const content = typeof result.data === "string" ? result.data : await result.data.text();
     return fileReadResult(target, content);
+  }
+
+  async openFile(path: string, forceText = false): Promise<FileOpenResult> {
+    return fallbackOpenFileResult(await this.readFile(path), forceText);
   }
 
   async writeFile(path: string, content: string): Promise<void> {
@@ -348,6 +366,10 @@ class LocalSandboxFs implements FsApi {
     return fileReadResult(target, node.content ?? "");
   }
 
+  async openFile(path: string, forceText = false): Promise<FileOpenResult> {
+    return fallbackOpenFileResult(await this.readFile(path), forceText);
+  }
+
   async writeFile(path: string, content: string): Promise<void> {
     const target = normalizeSandboxPath(path);
     this.ensureFolderSync(dirname(target));
@@ -474,6 +496,7 @@ function createBrowserApi(): NpsharpApi {
     dialog: {
       openFile: () => openSandboxFile(fs),
       openFolder: () => openSandboxWorkspace(fs),
+      openVsix: async () => ({ canceled: true, paths: [] }),
       saveFile: (request: SaveFileRequest) => saveSandboxFile(fs, request),
       chooseWallpaper: async () => ({ canceled: true, paths: [] })
     },
@@ -484,6 +507,7 @@ function createBrowserApi(): NpsharpApi {
       loadSession,
       saveSession
     },
+    ai: createAIFallbackApi(),
     fs,
     search: createSearchApi(fs),
     diagnostics: {
@@ -516,8 +540,13 @@ function createBrowserApi(): NpsharpApi {
       list: async () => [],
       discover: async () => [],
       configure: async () => [],
+      config: () => loadBrowserRuntimeStates(appDataFs),
+      updateConfig: (languageId, config) => saveBrowserRuntimeConfig(appDataFs, languageId, config),
+      autoDetect: languageId => saveBrowserRuntimeConfig(appDataFs, languageId, { path: "", autoDetect: true }),
+      validate: (languageId, executablePath) => validateBrowserRuntime(languageId, executablePath),
       runFile: async request => runInBrowserSandbox(request)
     },
+    extensions: createExtensionFallbackApi(),
     arduino: createArduinoFallbackApi(fs),
     liveServer: {
       open: request => openHtmlPreviewUrl(fs, request),
@@ -527,6 +556,103 @@ function createBrowserApi(): NpsharpApi {
       apply: request => applyFallbackTemplate(fs, request)
     },
     remote: createRemoteFallbackApi(appDataFs)
+  };
+}
+
+function createAIFallbackApi(): NpsharpApi["ai"] {
+  const listeners = new Set<(event: AIStreamEvent) => void>();
+  const defaultSettings: AISettings = {
+    provider: "ollama",
+    model: "qwen2.5-coder:7b",
+    temperature: 0.2,
+    maxTokens: 8192,
+    streaming: true,
+    systemPrompt: "You are NPSharp AI, a precise coding assistant.",
+    contextSize: 32768,
+    ollamaBaseUrl: "http://127.0.0.1:11434",
+    apiKeyConfigured: false
+  };
+  const loadAISettings = (): AISettings => {
+    const raw = readStorage(AI_SETTINGS_STORAGE_KEY);
+    if (!raw) return { ...defaultSettings };
+    try {
+      return { ...defaultSettings, ...JSON.parse(raw) as Partial<AISettings>, apiKeyConfigured: false };
+    } catch {
+      return { ...defaultSettings };
+    }
+  };
+  const loadConversations = (): AIConversation[] => {
+    const raw = readStorage(AI_CONVERSATIONS_STORAGE_KEY);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as AIConversation[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+  const saveConversations = (items: AIConversation[]): void => writeStorage(AI_CONVERSATIONS_STORAGE_KEY, JSON.stringify(items));
+  return {
+    providers: async () => [
+      { id: "openai", displayName: "OpenAI", supportsStreaming: true, requiresApiKey: true, defaultModel: "gpt-5.6-terra" },
+      { id: "codex", displayName: "Codex", supportsStreaming: true, requiresApiKey: true, defaultModel: "gpt-5.2-codex" },
+      { id: "gemini", displayName: "Google Gemini", supportsStreaming: true, requiresApiKey: true, defaultModel: "gemini-2.5-flash" },
+      { id: "openrouter", displayName: "OpenRouter", supportsStreaming: true, requiresApiKey: true, defaultModel: "openai/gpt-5.6-terra" },
+      { id: "ollama", displayName: "Ollama (Local)", supportsStreaming: true, requiresApiKey: false, defaultModel: "qwen2.5-coder:7b" }
+    ],
+    listModels: async provider => {
+      const defaults: Record<typeof provider, string[]> = {
+        openai: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
+        codex: ["gpt-5.2-codex"],
+        gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
+        openrouter: ["openai/gpt-5.6-terra"],
+        ollama: ["qwen2.5-coder:7b"]
+      };
+      return defaults[provider].map(id => ({ id, displayName: id }));
+    },
+    loadSettings: async () => loadAISettings(),
+    saveSettings: async request => {
+      const settings: AISettings = { ...request, apiKeyConfigured: false };
+      writeStorage(AI_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      return settings;
+    },
+    listConversations: async () => loadConversations().sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+    createConversation: async (provider = loadAISettings().provider, model = loadAISettings().model) => {
+      const timestamp = new Date().toISOString();
+      const conversation: AIConversation = {
+        id: crypto.randomUUID(),
+        title: "New conversation",
+        provider,
+        model,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        messages: []
+      };
+      saveConversations([conversation, ...loadConversations()]);
+      return conversation;
+    },
+    updateConversation: async update => {
+      const items = loadConversations();
+      const current = items.find(item => item.id === update.id);
+      if (!current) throw new Error("Conversation not found.");
+      const next: AIConversation = { ...current, ...update, updatedAt: new Date().toISOString() };
+      saveConversations(items.map(item => item.id === next.id ? next : item));
+      return next;
+    },
+    deleteConversation: async id => saveConversations(loadConversations().filter(item => item.id !== id)),
+    send: async request => {
+      const event: AIStreamEvent = {
+        requestId: request.requestId,
+        type: "error",
+        message: "AI providers require the Electron desktop backend so credentials and provider requests remain outside the web view."
+      };
+      for (const listener of listeners) listener(event);
+    },
+    cancel: async () => undefined,
+    onStream: callback => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    }
   };
 }
 
@@ -636,6 +762,70 @@ function createRemoteFallbackApi(fs: FsApi): RemoteApi {
     rename: async (_request: RemoteFileRequest & { newPath: string }) => undefined,
     delete: async (_request: RemoteFileRequest) => undefined,
     execute: async (_request: RemoteCommandRequest) => unavailable()
+  };
+}
+
+function createExtensionFallbackApi(): NpsharpApi["extensions"] {
+  const unavailable = "Extension Manager local depende do backend Electron/Node.";
+  const list = async (): Promise<InstalledExtension[]> => [];
+  return {
+    list,
+    installVsix: async () => {
+      throw new Error(unavailable);
+    },
+    enable: list,
+    disable: list,
+    uninstall: list,
+    reload: list
+  };
+}
+
+async function loadBrowserRuntimeStates(fs: FsApi): Promise<LanguageRuntimeState[]> {
+  const saved = await readJsonFile<Record<string, Partial<LanguageRuntimeConfig>>>(fs, LANGUAGE_RUNTIMES_PATH, {});
+  return configurableRuntimeLanguages().map(language => {
+    const config = normalizeBrowserRuntimeConfig(saved[language.id]);
+    return {
+      language,
+      languageId: language.id,
+      config,
+      path: config.path || undefined,
+      status: "missing",
+      source: "missing",
+      message: platform.isMobile
+        ? "Deteccao de executaveis depende do backend nativo futuro no mobile."
+        : "Deteccao de executaveis depende do backend Electron/Node."
+    };
+  });
+}
+
+async function saveBrowserRuntimeConfig(fs: FsApi, languageId: string, config: LanguageRuntimeConfig): Promise<LanguageRuntimeState[]> {
+  const saved = await readJsonFile<Record<string, Partial<LanguageRuntimeConfig>>>(fs, LANGUAGE_RUNTIMES_PATH, {});
+  saved[languageId] = normalizeBrowserRuntimeConfig(config);
+  await writeJsonFile(fs, LANGUAGE_RUNTIMES_PATH, saved);
+  return loadBrowserRuntimeStates(fs);
+}
+
+async function validateBrowserRuntime(languageId: string, executablePath?: string): Promise<LanguageRuntimeValidation> {
+  return {
+    languageId,
+    path: executablePath,
+    status: "missing",
+    message: platform.isMobile
+      ? "Validacao de executaveis depende do backend nativo futuro no mobile."
+      : "Validacao de executaveis depende do backend Electron/Node."
+  };
+}
+
+function configurableRuntimeLanguages(): typeof LANGUAGE_RUNTIMES {
+  return CONFIGURABLE_LANGUAGE_IDS
+    .map(id => LANGUAGE_RUNTIMES.find(language => language.id === id))
+    .filter((language): language is (typeof LANGUAGE_RUNTIMES)[number] => Boolean(language));
+}
+
+function normalizeBrowserRuntimeConfig(config?: Partial<LanguageRuntimeConfig>): LanguageRuntimeConfig {
+  return {
+    path: typeof config?.path === "string" ? config.path : "",
+    autoDetect: config?.autoDetect ?? true
   };
 }
 
@@ -759,7 +949,7 @@ async function applyFallbackTemplate(fs: FsApi, request: TemplateApplyRequest): 
 function browserAppInfo(): AppInfo {
   return {
     name: "NPSharp",
-    version: "26.3.3",
+    version: "26.6.4",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,
@@ -932,6 +1122,23 @@ function fileReadResult(path: string, content: string): FileReadResult {
     content,
     lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
     encoding: "utf8"
+  };
+}
+
+function fallbackOpenFileResult(file: FileReadResult, forceText: boolean): FileOpenResult {
+  const extension = extname(file.path).slice(1);
+  const image = /^(png|jpe?g|gif|bmp|webp|svg|ico|tiff?|avif)$/i.test(extension);
+  const binary = /^(exe|dll|so|dylib|bin|dat|elf|class|jar|war|ear|apk|ipa|dex|o|obj|a|lib|wasm|pyc|pyd)$/i.test(extension);
+  return {
+    path: file.path,
+    name: file.name,
+    editor: !forceText && image ? "image" : !forceText && binary ? "binary" : "text",
+    size: new TextEncoder().encode(file.content).byteLength,
+    type: extension.toUpperCase() || "Arquivo",
+    content: file.content,
+    lineEnding: file.lineEnding,
+    encoding: "utf8",
+    binaryReason: binary ? "A extensao indica um formato binario." : undefined
   };
 }
 

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
+import { StringDecoder } from "node:string_decoder";
 import os from "node:os";
 import path from "node:path";
 import type { TerminalRunResult } from "../../shared/types";
@@ -113,26 +114,35 @@ export function runProcess(
     });
 
     let output = "";
+    let settled = false;
+    const stdoutDecoder = new StringDecoder("utf8");
+    const stderrDecoder = new StringDecoder("utf8");
     const timeout = options.timeoutMs
       ? setTimeout(() => {
         output += "\n[ERRO] Processo excedeu o tempo limite.";
         child.kill("SIGKILL");
       }, options.timeoutMs)
       : undefined;
+    const finish = (result: ProcessResult) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      resolve(result);
+    };
 
-    child.stdout.on("data", chunk => {
-      output += chunk.toString();
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += stdoutDecoder.write(chunk);
     });
-    child.stderr.on("data", chunk => {
-      output += chunk.toString();
+    child.stderr.on("data", (chunk: Buffer) => {
+      output += stderrDecoder.write(chunk);
     });
     child.on("error", error => {
-      if (timeout) clearTimeout(timeout);
-      resolve({ output: error.message, code: 1 });
+      finish({ output: error.message, code: 1 });
     });
     child.on("close", code => {
-      if (timeout) clearTimeout(timeout);
-      resolve({ output: output.trimEnd(), code });
+      output += stdoutDecoder.end();
+      output += stderrDecoder.end();
+      finish({ output: output.trimEnd(), code });
     });
   });
 }

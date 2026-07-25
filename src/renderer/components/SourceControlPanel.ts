@@ -60,6 +60,18 @@ export class SourceControlPanel {
     await this.commitAll();
   }
 
+  async getDiffContext(): Promise<string> {
+    if (!platform.canUseGit || !this.repos.length) return "";
+    const sections: string[] = [];
+    for (const repo of this.repos) {
+      const unstaged = await api.git.run(repo.repo, ["diff"]);
+      const staged = await api.git.run(repo.repo, ["diff", "--cached"]);
+      if (unstaged.output.trim()) sections.push(`# ${repo.name} (unstaged)\n${unstaged.output}`);
+      if (staged.output.trim()) sections.push(`# ${repo.name} (staged)\n${staged.output}`);
+    }
+    return sections.join("\n\n");
+  }
+
   private build(): void {
     const toolbar = el("div", { className: "panel-toolbar" });
     const refresh = buttonIcon("refresh", "Refresh", () => void this.refresh());

@@ -54,6 +54,13 @@ export class TerminalPanel {
     return this.sessions.length > 0 || Boolean(this.creatingTerminal);
   }
 
+  getContextOutput(): string {
+    const terminal = this.activeSession()?.output ?? "";
+    const auxiliary = this.auxOutput.textContent ?? "";
+    const debug = this.debugOutput.textContent ?? "";
+    return [terminal, auxiliary, debug].filter(Boolean).join("\n\n");
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

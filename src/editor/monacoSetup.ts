@@ -206,3 +206,13 @@ export function languageForPath(filePath: string): string {
 }
 
 export { monaco };
+
+export const COMPACT_MINIMAP_OPTIONS: monaco.editor.IEditorMinimapOptions = {
+  enabled: true,
+  size: "fit",
+  scale: 1,
+  maxColumn: 80,
+  renderCharacters: false,
+  showSlider: "mouseover",
+  side: "right"
+};

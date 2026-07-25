@@ -72,7 +72,7 @@ const DEFINITIONS: ShortcutDefinition[] = [
   shortcut("view.settings", "Preferences: Settings", "Open Settings.", ["Ctrl+,"], "Preferences", "view.settings", { allowInInput: true }),
   shortcut("view.explorer", "View: Explorer", "Open Explorer.", ["Ctrl+Shift+E"], "View", "view.explorer"),
   shortcut("view.sourceControl", "View: Source Control", "Open Source Control.", ["Ctrl+Shift+G"], "Source Control", "view.sourceControl"),
-  shortcut("view.extensions", "View: Extensions", "Open the Extensions placeholder.", ["Ctrl+Shift+X"], "View", "view.extensions"),
+  shortcut("view.extensions", "View: Extensions", "Open the Extension Manager.", ["Ctrl+Shift+X"], "View", "view.extensions"),
 
   shortcut("run.debug", "Run: Start Debugging", "Run or debug the current project or file.", ["F5"], "Run", "run.debug"),
   shortcut("run.withoutDebug", "Run: Run Without Debugging", "Run the current project or file without debug mode.", ["Ctrl+F5"], "Run", "run.withoutDebug"),

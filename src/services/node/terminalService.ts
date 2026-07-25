@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
+import { StringDecoder } from "node:string_decoder";
 import os from "node:os";
 import path from "node:path";
 import type {
@@ -194,6 +195,8 @@ function createChildProcessSession(
   let exited = false;
   let closed = false;
   let forceCloseTimer: NodeJS.Timeout | undefined;
+  const stdoutDecoder = new StringDecoder("utf8");
+  const stderrDecoder = new StringDecoder("utf8");
 
   const finish = (code: number | null, signal?: NodeJS.Signals | string | null) => {
     if (exited) return;
@@ -215,17 +218,23 @@ function createChildProcessSession(
       windowsHide: false
     });
     info.pid = child.pid;
-    child.stdout.on("data", chunk => {
-      if (!closed) callbacks.onData({ id, data: chunk.toString() });
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (!closed) callbacks.onData({ id, data: stdoutDecoder.write(chunk) });
     });
-    child.stderr.on("data", chunk => {
-      if (!closed) callbacks.onData({ id, data: chunk.toString() });
+    child.stderr.on("data", (chunk: Buffer) => {
+      if (!closed) callbacks.onData({ id, data: stderrDecoder.write(chunk) });
     });
     child.on("error", error => {
       if (!closed) callbacks.onData({ id, data: `\n[terminal] ${error.message}\n` });
       finish(1);
     });
-    child.on("close", (code, signal) => finish(code, signal));
+    child.on("close", (code, signal) => {
+      if (!closed) {
+        const remaining = `${stdoutDecoder.end()}${stderrDecoder.end()}`;
+        if (remaining) callbacks.onData({ id, data: remaining });
+      }
+      finish(code, signal);
+    });
   } catch (error) {
     if (!closed) callbacks.onData({ id, data: `\n[terminal] ${error instanceof Error ? error.message : String(error)}\n` });
     finish(1);

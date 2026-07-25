@@ -13,6 +13,10 @@ export function runtimeRegistryPath(): string {
   return path.join(npsharpConfigDir(), "runtime-registry.properties");
 }
 
+export function languageRuntimesPath(): string {
+  return path.join(npsharpHome(), "language-runtimes.json");
+}
+
 export function settingsPath(): string {
   return path.join(npsharpHome(), "settings.json");
 }

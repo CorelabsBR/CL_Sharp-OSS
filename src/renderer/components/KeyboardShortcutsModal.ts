@@ -18,18 +18,18 @@ export class KeyboardShortcutsModal {
 
     const conflicts = shortcutConflicts(shortcuts);
     const overlay = el("div", { className: "keyboard-shortcuts-overlay" });
-    const dialog = el("section", { className: "keyboard-shortcuts-modal", attrs: { "aria-label": "Keyboard Shortcuts" } });
+    const dialog = el("section", { className: "keyboard-shortcuts-modal", attrs: { "aria-label": "Atalhos de teclado" } });
     const header = el("header", { className: "keyboard-shortcuts-header" });
     const title = el("div", { className: "keyboard-shortcuts-title" });
-    title.append(el("h2", { text: "Keyboard Shortcuts" }), el("span", { text: `${shortcuts.length} commands` }));
-    const close = el("button", { className: "icon-button", text: "x", attrs: { title: "Close" } });
+    title.append(el("h2", { text: "Atalhos de teclado" }), el("span", { text: `${shortcuts.length} comandos` }));
+    const close = el("button", { className: "icon-button", text: "×", attrs: { title: "Fechar" } });
     close.addEventListener("click", () => this.close());
     header.append(title, close);
 
-    const search = el("input", { className: "panel-input", attrs: { placeholder: "Search by command, category, or keys" } });
+    const search = el("input", { className: "panel-input", attrs: { placeholder: "Pesquisar por comando, categoria ou teclas" } });
     const conflictSummary = el("div", {
       className: "panel-summary",
-      text: conflicts.size ? `${conflicts.size} shortcut conflict(s) detected` : "No shortcut conflicts"
+      text: conflicts.size ? `${conflicts.size} conflito(s) de atalho detectado(s)` : "Nenhum conflito de atalho"
     });
     const list = el("div", { className: "keyboard-shortcuts-list" });
 
@@ -42,7 +42,7 @@ export class KeyboardShortcutsModal {
         const entries = grouped.get(category);
         if (!entries?.length) continue;
         const section = el("section", { className: "shortcut-category" });
-        section.append(el("h3", { text: category }));
+        section.append(el("h3", { text: categoryLabel(category) }));
         for (const shortcut of entries) {
           const row = el("div", { className: "shortcut-row" });
           const copy = el("span", { className: "shortcut-copy" });
@@ -58,7 +58,7 @@ export class KeyboardShortcutsModal {
         list.append(section);
       }
       if (!list.childElementCount) {
-        list.append(el("div", { className: "muted-row", text: "No shortcuts found." }));
+        list.append(el("div", { className: "muted-row", text: "Nenhum atalho encontrado." }));
       }
     };
 
@@ -79,7 +79,7 @@ export class KeyboardShortcutsModal {
     this.overlay = overlay;
     render();
     search.focus();
-    this.updateStatus("Keyboard Shortcuts aberto");
+    this.updateStatus("Atalhos de teclado abertos");
   }
 
   close(): void {
@@ -104,4 +104,19 @@ function groupByCategory(shortcuts: readonly ShortcutBinding[]): Map<string, Sho
     grouped.set(shortcut.category, [...(grouped.get(shortcut.category) ?? []), shortcut]);
   }
   return grouped;
+}
+
+function categoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    File: "Arquivo",
+    Search: "Busca",
+    Editor: "Editor",
+    View: "Visualização",
+    Terminal: "Terminal",
+    Run: "Executar",
+    "Source Control": "Controle de Código",
+    Preferences: "Preferências",
+    NPSharp: "NPSharp"
+  };
+  return labels[category] ?? category;
 }
