@@ -84,6 +84,11 @@ export interface SaveFileResult {
   path?: string;
 }
 
+export interface CustomShortcutBinding {
+  commandId: string;
+  key: string;
+}
+
 export interface AppSettings {
   theme: string;
   iconTheme: string;
@@ -113,6 +118,7 @@ export interface AppSettings {
   sideBarVisible: boolean;
   confirmDelete: boolean;
   binaryFileTypesIgnored: string[];
+  keyboardShortcuts: CustomShortcutBinding[];
 }
 
 export interface PersistedSession {

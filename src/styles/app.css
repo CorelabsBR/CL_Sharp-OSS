@@ -2504,7 +2504,7 @@ button {
   height: min(720px, 100%);
   min-height: 360px;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2518,6 +2518,23 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.shortcut-editor {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 0.5fr) auto minmax(180px, 0.8fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--bg) 78%, var(--accent));
+}
+
+.shortcut-editor-error {
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 12px;
 }
 
 .keyboard-shortcuts-title {
@@ -2605,6 +2622,46 @@ button {
 .shortcut-keys kbd.conflict {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.shortcut-remove {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.shortcut-remove:hover {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+@media (max-width: 720px) {
+  .keyboard-shortcuts-modal {
+    height: min(760px, 100%);
+  }
+
+  .keyboard-shortcuts-header {
+    flex-wrap: wrap;
+  }
+
+  .shortcut-editor {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .shortcut-editor-error {
+    grid-column: 1 / -1;
+  }
+
+  .shortcut-row {
+    flex-wrap: wrap;
+  }
+
+  .shortcut-copy {
+    flex: 1 1 100%;
+  }
 }
 
 .palette {

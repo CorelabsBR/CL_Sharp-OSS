@@ -130,7 +130,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   activityBarVisible: true,
   sideBarVisible: true,
   confirmDelete: true,
-  binaryFileTypesIgnored: []
+  binaryFileTypesIgnored: [],
+  keyboardShortcuts: []
 };
 
 const DEFAULT_SESSION: PersistedSession = {
@@ -1015,7 +1016,7 @@ async function applyFallbackTemplate(fs: FsApi, request: TemplateApplyRequest): 
 function browserAppInfo(): AppInfo {
   return {
     name: "NPSharp",
-    version: "26.8.5",
+    version: "26.8.6",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,

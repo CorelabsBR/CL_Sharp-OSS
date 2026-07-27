@@ -85,6 +85,7 @@ export class EditorTabs {
   private readonly colorStyle = document.createElement("style");
   private readonly colorClasses = new Map<string, string>();
   private readonly disposables: monaco.IDisposable[] = [];
+  private readonly shortcutDisposables: monaco.IDisposable[] = [];
   private disposed = false;
 
   onTabsChanged: () => void = () => undefined;
@@ -135,6 +136,9 @@ export class EditorTabs {
     if (this.disposed) return;
     this.disposed = true;
     for (const disposable of this.disposables.splice(0)) {
+      disposable.dispose();
+    }
+    for (const disposable of this.shortcutDisposables.splice(0)) {
       disposable.dispose();
     }
     this.errorLensDecorations?.clear();
@@ -238,14 +242,26 @@ export class EditorTabs {
 
   registerMonacoShortcuts(shortcuts: readonly ShortcutBinding[]): void {
     if (this.disposed) return;
+    for (const disposable of this.shortcutDisposables.splice(0)) {
+      disposable.dispose();
+    }
     for (const shortcut of shortcuts) {
       if (shortcut.scope !== "editor") continue;
-      for (const key of shortcut.keys) {
+      for (const [index, key] of shortcut.keys.entries()) {
         const keybinding = monacoKeybindingFromShortcut(key);
         if (keybinding === undefined) continue;
-        this.editor.addCommand(keybinding, () => void shortcut.run());
+        this.shortcutDisposables.push(this.editor.addAction({
+          id: `npsharp.shortcut.${shortcut.id.replace(/[^a-zA-Z0-9_.-]/g, "-")}.${index}`,
+          label: shortcut.label,
+          keybindings: [keybinding],
+          run: () => shortcut.run()
+        }));
       }
     }
+  }
+
+  runMonacoAction(actionId: string, status?: string): void {
+    this.runEditorAction(actionId, status);
   }
 
   private registerAIContextActions(): void {

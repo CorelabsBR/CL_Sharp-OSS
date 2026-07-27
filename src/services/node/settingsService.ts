@@ -31,7 +31,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   activityBarVisible: true,
   sideBarVisible: true,
   confirmDelete: true,
-  binaryFileTypesIgnored: []
+  binaryFileTypesIgnored: [],
+  keyboardShortcuts: []
 };
 
 export async function loadSettings(): Promise<AppSettings> {

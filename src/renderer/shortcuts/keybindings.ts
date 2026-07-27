@@ -1,20 +1,22 @@
 import { monaco } from "../../editor/monacoSetup";
 
 export type ShortcutCategory =
-  | "File"
-  | "Search"
+  | "Arquivo"
+  | "Busca"
   | "Editor"
-  | "View"
+  | "Visualizar"
   | "Terminal"
-  | "Run"
-  | "Source Control"
-  | "Preferences"
+  | "Executar"
+  | "Controle de Origem"
+  | "Preferências"
   | "NPSharp";
 
 export type ShortcutScope = "global" | "editor";
 
 export interface ShortcutBinding {
   id: string;
+  commandId?: string;
+  custom?: boolean;
   label: string;
   description: string;
   keys: string[];
@@ -116,6 +118,26 @@ export function normalizeShortcut(shortcut: string): string {
     .filter(Boolean)
     .map(normalizeShortcutPart)
     .join(" ");
+}
+
+export function isValidShortcut(shortcut: string): boolean {
+  const normalized = normalizeShortcut(shortcut);
+  if (!normalized) return false;
+  return normalized.split(" ").every(part => {
+    const tokens = part.split("+").filter(Boolean);
+    return tokens.some(token => !MODIFIER_ORDER.includes(token as typeof MODIFIER_ORDER[number]));
+  });
+}
+
+export function isSafeCustomShortcut(shortcut: string): boolean {
+  const normalized = normalizeShortcut(shortcut);
+  if (!isValidShortcut(normalized)) return false;
+  return normalized.split(" ").every(part => {
+    const tokens = part.split("+").filter(Boolean);
+    const hasModifier = tokens.some(token => MODIFIER_ORDER.includes(token as typeof MODIFIER_ORDER[number]));
+    const key = tokens.find(token => !MODIFIER_ORDER.includes(token as typeof MODIFIER_ORDER[number]));
+    return hasModifier || /^F(?:[1-9]|1[0-2])$/.test(key ?? "");
+  });
 }
 
 export function isTypingTarget(target: EventTarget | null | undefined): boolean {

@@ -1,10 +1,12 @@
-import { normalizeShortcut, type ShortcutBinding, type ShortcutCategory, type ShortcutScope } from "./keybindings";
+import type { CustomShortcutBinding } from "../../shared/types";
+import { isSafeCustomShortcut, normalizeShortcut, type ShortcutBinding, type ShortcutCategory, type ShortcutScope } from "./keybindings";
 
 export type ShortcutAction = () => void | Promise<void>;
 
 export interface ShortcutRegistryOptions {
   actions: Record<string, ShortcutAction>;
   when?: Record<string, () => boolean>;
+  customBindings?: readonly CustomShortcutBinding[];
 }
 
 interface ShortcutDefinition {
@@ -93,8 +95,34 @@ const DEFINITIONS: ShortcutDefinition[] = [
 ];
 
 export function createShortcutRegistry(options: ShortcutRegistryOptions): ShortcutBinding[] {
-  return DEFINITIONS.map(definition => ({
+  const defaults = DEFINITIONS.map(definition => bindingForDefinition(definition, options));
+  const definitionsById = new Map(DEFINITIONS.map(definition => [definition.id, definition]));
+  const seen = new Set<string>();
+  const custom = (Array.isArray(options.customBindings) ? options.customBindings : [])
+    .flatMap((saved, index) => {
+      if (!saved || typeof saved.commandId !== "string" || typeof saved.key !== "string") return [];
+      const definition = definitionsById.get(saved.commandId);
+      const key = normalizeShortcut(saved.key);
+      const identity = `${saved.commandId}\u0000${key}`;
+      if (!definition || !isSafeCustomShortcut(key) || seen.has(identity)) return [];
+      seen.add(identity);
+      const binding = bindingForDefinition(definition, options);
+      return [{
+        ...binding,
+        id: `custom.${definition.id}.${index}`,
+        commandId: definition.id,
+        custom: true,
+        description: `${definition.description} (atalho personalizado)`,
+        keys: [key]
+      }];
+    });
+  return [...defaults, ...custom];
+}
+
+function bindingForDefinition(definition: ShortcutDefinition, options: ShortcutRegistryOptions): ShortcutBinding {
+  return {
     id: definition.id,
+    commandId: definition.id,
     label: definition.label,
     description: definition.description,
     keys: definition.keys.map(normalizeShortcut),
@@ -103,7 +131,7 @@ export function createShortcutRegistry(options: ShortcutRegistryOptions): Shortc
     allowInInput: definition.allowInInput,
     when: definition.when ? options.when?.[definition.when] : undefined,
     run: options.actions[definition.action] ?? options.actions["fallback.unavailable"] ?? (() => undefined)
-  }));
+  };
 }
 
 export function shortcutConflicts(shortcuts: readonly ShortcutBinding[]): Map<string, ShortcutBinding[]> {

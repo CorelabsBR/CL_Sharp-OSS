@@ -1,4 +1,4 @@
-import type { AppSettings, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
+import type { AppSettings, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
 import { ArduinoPanel } from "../components/ArduinoPanel";
 import { AIChatPanel } from "../components/AIChatPanel";
 import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
@@ -12,7 +12,7 @@ import { RemotePanel } from "../components/RemotePanel";
 import { RuntimePanel } from "../components/RuntimePanel";
 import { SearchPanel } from "../components/SearchPanel";
 import { SourceControlPanel } from "../components/SourceControlPanel";
-import type { ShortcutBinding } from "../shortcuts/keybindings";
+import { isSafeCustomShortcut, normalizeShortcut, type ShortcutBinding } from "../shortcuts/keybindings";
 import { createShortcutRegistry, type ShortcutAction } from "../shortcuts/shortcutRegistry";
 import { useGlobalShortcuts, type GlobalShortcutController } from "../shortcuts/useGlobalShortcuts";
 import { TerminalPanel } from "../components/TerminalPanel";
@@ -487,7 +487,129 @@ export class IdePage {
       { label: "NPSharp: Theme Picker", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
     ];
     this.palette.setCommands(commands);
+    this.refreshShortcuts();
+  }
+
+  private refreshShortcuts(): void {
+    this.shortcutController?.dispose();
+    this.shortcuts = createShortcutRegistry({
+      actions: this.shortcutActions(),
+      when: { canCloseTransient: () => this.canCloseTransient() },
+      customBindings: this.customKeyboardShortcuts()
+    });
+    this.shortcutController = useGlobalShortcuts(this.shortcuts, { updateStatus: text => this.updateStatus(text) });
+    this.editor.registerMonacoShortcuts(this.shortcuts);
+    this.updateCommandCenter();
+  }
+
+  private shortcutActions(): Record<string, ShortcutAction> {
+    return {
+      "file.new": () => this.editor.newTab(),
+      "file.open": () => this.editor.openFileFromDialog(),
+      "file.openWorkspace": () => this.explorer.openFolderFromDialog(),
+      "file.save": () => this.editor.saveCurrentFile(),
+      "file.saveAs": () => this.editor.saveCurrentFileAs(),
+      "file.closeEditor": () => this.editor.closeCurrentTab(),
+      "file.reopenClosedEditor": () => this.editor.reopenClosedTab(),
+      "file.newWindow": () => this.openNewWindow(),
+      "file.recentWorkspaces": () => this.showRecentWorkspaces(),
+      "search.findInFile": () => this.editor.find(),
+      "search.replaceInFile": () => this.editor.replace(),
+      "search.findInWorkspace": () => this.openGlobalSearch(),
+      "search.replaceInWorkspace": () => this.openGlobalReplace(),
+      "search.nextMatch": () => this.editor.runMonacoAction("editor.action.nextMatchFindAction"),
+      "search.previousMatch": () => this.editor.runMonacoAction("editor.action.previousMatchFindAction"),
+      "view.closeTransient": () => this.closeTransient(),
+      "editor.toggleLineComment": () => this.editor.runMonacoAction("editor.action.commentLine"),
+      "editor.addLineComment": () => this.editor.addLineComment(),
+      "editor.removeLineComment": () => this.editor.removeLineComment(),
+      "editor.toggleBlockComment": () => this.editor.runMonacoAction("editor.action.blockComment"),
+      "editor.goToLine": () => this.editor.goToLine(),
+      "editor.selectNextOccurrence": () => this.editor.selectNextOccurrence(),
+      "editor.selectAllOccurrences": () => this.editor.selectAllOccurrences(),
+      "editor.moveLineUp": () => this.editor.moveLineUp(),
+      "editor.moveLineDown": () => this.editor.moveLineDown(),
+      "editor.copyLineUp": () => this.editor.copyLineUp(),
+      "editor.copyLineDown": () => this.editor.copyLineDown(),
+      "editor.insertLineBelow": () => this.editor.runMonacoAction("editor.action.insertLineAfter"),
+      "editor.insertLineAbove": () => this.editor.runMonacoAction("editor.action.insertLineBefore"),
+      "editor.renameSymbol": () => this.editor.runMonacoAction("editor.action.rename"),
+      "editor.goToDefinition": () => this.editor.runMonacoAction("editor.action.revealDefinition"),
+      "editor.peekDefinition": () => this.editor.runMonacoAction("editor.action.peekDefinition"),
+      "editor.triggerSuggest": () => this.editor.runMonacoAction("editor.action.triggerSuggest"),
+      "editor.fileSymbols": () => this.editor.runMonacoAction("editor.action.quickOutline"),
+      "editor.toggleWordWrap": () => this.toggleEditorWordWrap(),
+      "view.quickOpen": () => this.palette.showQuickOpen(),
+      "view.commandPalette": () => this.palette.showCommands(),
+      "view.toggleTerminal": () => this.toggleTerminal(),
+      "view.toggleSidebar": () => this.toggleSidebar(),
+      "view.toggleBottomPanel": () => this.setTerminalVisible(this.terminal.element.hidden),
+      "view.nextTab": () => this.editor.nextTab(),
+      "view.previousTab": () => this.editor.previousTab(),
+      "view.navigateBack": () => this.editor.navigateBack(),
+      "view.navigateForward": () => this.editor.navigateForward(),
+      "view.keyboardShortcuts": () => this.showKeyboardShortcuts(),
+      "view.problems": () => this.showPanel("problems"),
+      "view.output": () => this.showOutput(),
+      "view.settings": () => this.showSettings(),
+      "view.explorer": () => this.showPanel("explorer"),
+      "view.sourceControl": () => this.showPanel("source"),
+      "view.extensions": () => this.showPanel("extensions"),
+      "run.debug": () => this.runCurrentFile(),
+      "run.withoutDebug": () => this.runWithoutDebug(),
+      "run.build": () => this.buildProject(),
+      "npsharp.notes": () => this.openNotes(),
+      "npsharp.commandCenter": () => this.openCommandCenter(),
+      "npsharp.themeLab": () => this.showThemePicker(true),
+      "npsharp.focusMode": () => this.toggleFocusMode(),
+      "npsharp.projectHealth": () => this.openProjectHealth(),
+      "npsharp.liveServer": () => this.toggleLiveServer(),
+      "npsharp.runDetected": () => this.runCurrentFile(),
+      "npsharp.gitQuickActions": () => this.showGitQuickActions(),
+      "npsharp.mobileLayout": () => this.toggleCompactPreview(),
+      "npsharp.clearTemporaryPanels": () => this.clearTemporaryPanels(),
+      "npsharp.snapshot": () => this.snapshotWorkspace(),
+      "fallback.unavailable": () => this.updateStatus("Atalho indisponível neste contexto")
+    };
+  }
+
+  private customKeyboardShortcuts(): CustomShortcutBinding[] {
+    return Array.isArray(this.settings.keyboardShortcuts) ? this.settings.keyboardShortcuts : [];
+  }
+
+  private async createKeyboardShortcut(commandId: string, key: string): Promise<readonly ShortcutBinding[]> {
+    const normalized = normalizeShortcut(key);
+    if (!isSafeCustomShortcut(normalized)) throw new Error("Atalho inválido");
+    if (!this.shortcuts.some(shortcut => !shortcut.custom && shortcut.id === commandId)) {
+      throw new Error("Comando não encontrado");
     }
+    if (this.shortcuts.some(shortcut => shortcut.keys.includes(normalized))) {
+      throw new Error(`O atalho ${normalized} já está em uso`);
+    }
+    const firstKey = normalized.split(" ")[0];
+    if (normalized.includes(" ") && this.shortcuts.some(shortcut => shortcut.keys.includes(firstKey))) {
+      throw new Error(`A primeira combinação ${firstKey} já está em uso`);
+    }
+    const custom = this.customKeyboardShortcuts();
+    this.settings = await api.settings.save({
+      ...this.settings,
+      keyboardShortcuts: [...custom, { commandId, key: normalized }]
+    });
+    this.refreshShortcuts();
+    this.updateStatus(`Atalho ${normalized} salvo globalmente`);
+    return this.shortcuts;
+  }
+
+  private async removeKeyboardShortcut(commandId: string, key: string): Promise<readonly ShortcutBinding[]> {
+    const normalized = normalizeShortcut(key);
+    const custom = this.customKeyboardShortcuts();
+    const next = custom.filter(binding => binding.commandId !== commandId || normalizeShortcut(binding.key) !== normalized);
+    if (next.length === custom.length) throw new Error("Atalho personalizado não encontrado");
+    this.settings = await api.settings.save({ ...this.settings, keyboardShortcuts: next });
+    this.refreshShortcuts();
+    this.updateStatus(`Atalho ${normalized} removido`);
+    return this.shortcuts;
+  }
 
   private async restoreSession(): Promise<void> {
     try {
@@ -555,7 +677,10 @@ export class IdePage {
   }
 
   private showKeyboardShortcuts(): void {
-    this.keyboardShortcuts.show(this.shortcuts);
+    this.keyboardShortcuts.show(this.shortcuts, {
+      create: (commandId, key) => this.createKeyboardShortcut(commandId, key),
+      remove: (commandId, key) => this.removeKeyboardShortcut(commandId, key)
+    });
   }
 
   private openCommandCenter(): void {
@@ -969,6 +1094,7 @@ export class IdePage {
 
   private async updateSettings(settings: AppSettings): Promise<void> {
     this.settings = await api.settings.save(settings);
+    this.refreshShortcuts();
     await this.applySettingsEffects();
   }
 
@@ -1607,6 +1733,8 @@ export class IdePage {
   const key = shortcutFromEvent(event);
   if (!key) return;
 
+  if (this.shortcuts.some(shortcut => shortcut.custom && shortcut.keys.some(binding => binding.startsWith(`${key} `)))) return;
+
 const active = document.activeElement;
 const tag = active?.tagName?.toLowerCase();
 const isMonaco = Boolean(active?.closest?.(".monaco-editor"));
@@ -1649,8 +1777,8 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       run(() => this.explorer.openFolderFromDialog());
       return;
       case "Ctrl+K Ctrl+S":
-  run(() => this.updateStatus("Keyboard Shortcuts"));
-  return;
+        run(() => this.showKeyboardShortcuts());
+        return;
   }
 
   if (key === "Ctrl+K") {
@@ -1921,7 +2049,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   }
 private about(): void {
   alert(`NPSharp
-Versão 26.8.5
+Versão 26.8.6
 
 Developed by CoreLabs.
 
