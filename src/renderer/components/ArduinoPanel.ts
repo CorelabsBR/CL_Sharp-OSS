@@ -59,7 +59,7 @@ export class ArduinoPanel {
       }
       this.renderSelects();
     } catch (error) {
-      this.summary.textContent = reportError(error, this.updateStatus, "Arduino refresh failed");
+      this.summary.textContent = reportError(error, this.updateStatus, "Falha ao atualizar Arduino");
       this.renderSelects();
     }
   }
@@ -149,7 +149,7 @@ export class ArduinoPanel {
       this.appendOutput(`Sketch criado: ${basename(result.filePath)}`);
       this.updateStatus(`Sketch Arduino criado: ${result.sketchPath}`);
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Create Arduino sketch failed"));
+      this.appendOutput(reportError(error, this.updateStatus, "Falha ao criar sketch Arduino"));
     }
   }
 
@@ -160,9 +160,9 @@ export class ArduinoPanel {
     try {
       const result = await api.arduino.compile(request);
       this.appendOutput(result.output);
-      this.updateStatus(result.success ? "Arduino compile complete" : "Arduino compile failed");
+      this.updateStatus(result.success ? "Compilação do Arduino concluída" : "Falha na compilação do Arduino");
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Arduino compile failed"));
+      this.appendOutput(reportError(error, this.updateStatus, "Falha na compilação do Arduino"));
     }
   }
 
@@ -177,9 +177,9 @@ export class ArduinoPanel {
     try {
       const result = await api.arduino.upload({ ...request, port });
       this.appendOutput(result.output);
-      this.updateStatus(result.success ? "Arduino upload complete" : "Arduino upload failed");
+      this.updateStatus(result.success ? "Upload do Arduino concluído" : "Falha no upload do Arduino");
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Arduino upload failed"));
+      this.appendOutput(reportError(error, this.updateStatus, "Falha no upload do Arduino"));
     }
   }
 
@@ -203,7 +203,7 @@ export class ArduinoPanel {
       this.appendOutput(result.output);
       this.updateStatus(result.success ? "Serial monitor complete" : "Serial monitor stopped");
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Arduino serial monitor failed"));
+      this.appendOutput(reportError(error, this.updateStatus, "Falha no monitor serial do Arduino"));
     }
   }
 

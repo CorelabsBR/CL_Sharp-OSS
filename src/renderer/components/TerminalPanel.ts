@@ -26,7 +26,7 @@ export class TerminalPanel {
   private readonly header = el("div", { className: "terminal-header" });
   private readonly tabs = el("div", { className: "terminal-tabs" });
   private readonly output = el("pre", { className: "terminal-output" });
-  private readonly input = el("input", { className: "terminal-input", attrs: { placeholder: "Command" } });
+  private readonly input = el("input", { className: "terminal-input", attrs: { placeholder: "Comando" } });
   private readonly debugOutput = el("pre", { className: "terminal-output debug-output" });
   private readonly debugInput = el("input", { className: "terminal-input debug-input", attrs: { placeholder: "Entrada do programa..." } });
   private readonly auxOutput = el("pre", { className: "terminal-output aux-output" });
@@ -228,7 +228,7 @@ export class TerminalPanel {
     try {
       await api.terminal.write(session.id, `${command}\n`);
     } catch (error) {
-      const message = reportError(error, this.updateStatus, "Terminal command failed");
+      const message = reportError(error, this.updateStatus, "Falha no comando do terminal");
       session.output = trimScrollback(`${session.output}${message}\n`);
     }
     this.render();
@@ -261,12 +261,12 @@ export class TerminalPanel {
 
     const actions = el("div", { className: "terminal-actions" });
     actions.append(
-      buttonIcon("add", "New Terminal", () => this.newTerminal()),
-      buttonIcon("split-horizontal", "Split Terminal", () => this.splitTerminal()),
-      buttonIcon("clear-all", "Clear Terminal", () => this.clearCurrentTerminal()),
-      buttonIcon("debug-stop", "Kill Process", () => this.killCurrentTerminal()),
-      buttonIcon("trash", "Close Terminal", () => this.closeCurrentTerminal()),
-      buttonIcon("close", "Close Terminal Panel", () => this.closePanel())
+      buttonIcon("add", "Novo terminal", () => this.newTerminal()),
+      buttonIcon("split-horizontal", "Dividir terminal", () => this.splitTerminal()),
+      buttonIcon("clear-all", "Limpar terminal", () => this.clearCurrentTerminal()),
+      buttonIcon("debug-stop", "Encerrar processo", () => this.killCurrentTerminal()),
+      buttonIcon("trash", "Fechar terminal", () => this.closeCurrentTerminal()),
+      buttonIcon("close", "Fechar painel do terminal", () => this.closePanel())
     );
     this.header.append(problemsTab, outputTab, debugTab, terminalTab, portsTab, gitTab, el("div", { className: "spacer" }), this.shellSelect, actions);
     this.input.addEventListener("keydown", event => {
@@ -357,7 +357,7 @@ export class TerminalPanel {
       this.mode = "terminal";
       this.updateStatus(`${info.name} aberto com ${this.shellLabel(info.shell)}`);
     } catch (error) {
-      const message = reportError(error, this.updateStatus, "Terminal failed");
+      const message = reportError(error, this.updateStatus, "Falha no terminal");
       this.sessions.push(this.localSession(name, cwd, shell, message));
       this.activeId = this.sessions.at(-1)?.id;
     }
@@ -392,7 +392,7 @@ export class TerminalPanel {
       session.output = trimScrollback(`${session.output}\n[terminal] Encerrando processo...\n`);
       this.updateStatus("Processo do terminal encerrado");
     } catch (error) {
-      const message = reportError(error, this.updateStatus, "Kill terminal failed");
+      const message = reportError(error, this.updateStatus, "Falha ao encerrar o terminal");
       session.output = trimScrollback(`${session.output}${message}\n`);
     }
     this.render();
@@ -406,7 +406,7 @@ export class TerminalPanel {
       try {
         await api.terminal.close(session.id);
       } catch (error) {
-        reportError(error, this.updateStatus, "Close terminal failed");
+        reportError(error, this.updateStatus, "Falha ao fechar o terminal");
       }
     }
     this.activeId = this.sessions[Math.min(index, this.sessions.length - 1)]?.id;
@@ -468,7 +468,7 @@ export class TerminalPanel {
     this.tabs.hidden = this.mode !== "terminal";
     this.input.hidden = this.mode !== "terminal";
     this.input.disabled = this.mode !== "terminal" || !session;
-    this.input.placeholder = session?.running || session?.localOnly ? "Command" : "Process stopped";
+    this.input.placeholder = session?.running || session?.localOnly ? "Comando" : "Processo encerrado";
     this.shellSelect.hidden = this.mode !== "terminal";
     this.debugOutput.hidden = this.mode !== "debug";
     this.debugInput.hidden = this.mode !== "debug";

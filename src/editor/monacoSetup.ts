@@ -1,4 +1,10 @@
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+// The minimal editor API does not include Codicon styles. The Find widget uses
+// those glyphs for its controls (next/previous, replace and close).
+import "monaco-editor/esm/vs/base/browser/ui/codicons/codiconStyles.js";
+// editor.api does not register the Find contribution; import it explicitly so
+// Ctrl+F/Cmd+F and the title-bar command share Monaco's real Find widget.
+import "monaco-editor/esm/vs/editor/contrib/find/browser/findController.js";
 import "monaco-editor/esm/vs/basic-languages/bat/bat.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution.js";

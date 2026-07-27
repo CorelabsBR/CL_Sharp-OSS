@@ -92,7 +92,7 @@ export class LanguageRuntimesDialog {
     autoInput.addEventListener("change", () => void this.toggleAutoDetect(state, autoInput.checked));
     auto.append(autoInput, el("span", { text: "Detecção automática" }));
 
-    const version = el("span", { className: "runtime-version", text: state.version ?? "Versão desconhecida" });
+    const version = el("span", { className: "runtime-version", text: state.version ?? "--" });
 
     const actions = el("div", { className: "runtime-config-actions" });
     const browse = el("button", { className: "mini-action", text: "Procurar..." });
@@ -154,7 +154,7 @@ export class LanguageRuntimesDialog {
         status.replaceChildren(document.createTextNode(statusLabel(validation.status)));
       }
       const version = row.querySelector(".runtime-version");
-      if (version) version.textContent = validation.version ?? "Versão desconhecida";
+      if (version) version.textContent = validation.version ?? "--";
       const message = row.querySelector(".runtime-config-name span");
       if (message) message.textContent = validation.message;
       this.updateStatus(validation.message);

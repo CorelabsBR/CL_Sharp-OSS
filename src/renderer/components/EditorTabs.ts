@@ -1,4 +1,4 @@
-import type { EditorDiagnostic, FileOpenResult, SearchResult } from "../../shared/types";
+import type { EditorDiagnostic, FileOpenResult, SearchResult, TextEncoding } from "../../shared/types";
 import { COMPACT_MINIMAP_OPTIONS, configureMonaco, languageForPath, monaco } from "../../editor/monacoSetup";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
@@ -8,6 +8,7 @@ import { reportError } from "../utils/errors";
 import { DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, extname } from "../utils/path";
 import { ImageViewer } from "./ImageViewer";
+import { UniversalFileViewer } from "./UniversalFileViewer";
 
 interface BrandHighlightRule {
   readonly terms: string[];
@@ -18,7 +19,8 @@ const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
   { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
   { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
   { terms: ["corelabs","Npsharp","NPSharp"], className: "brand-highlight-red" },
-  { terms: ["ESPERA O SPOILER"], className: "brand-highlight-special" }
+  { terms: ["ESPERA O SPOILER"], className: "brand-highlight-special" },
+  { terms: ["PRF","Policia Rodoviaria Federal"], className: "brand-highlight-police" }
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;
@@ -31,6 +33,9 @@ export interface EditorTab {
   initialContent: string;
   dirty: boolean;
   lineEnding: "\n" | "\r\n";
+  encoding: TextEncoding;
+  encodingDirty?: boolean;
+  displayType?: string;
   virtualUri?: string;
   saveHandler?: (content: string) => Promise<void>;
   model: monaco.editor.ITextModel;
@@ -42,6 +47,16 @@ interface ClosedEditorTab {
   readonly virtualUri?: string;
   readonly content: string;
   readonly lineEnding: "\n" | "\r\n";
+  readonly encoding: TextEncoding;
+}
+
+export interface EditorStatusInfo {
+  readonly active: boolean;
+  readonly language: string;
+  readonly encoding: TextEncoding;
+  readonly lineEnding: "\n" | "\r\n";
+  readonly line: number;
+  readonly column: number;
 }
 
 export class EditorTabs {
@@ -52,7 +67,7 @@ export class EditorTabs {
   private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } });
   private editor: monaco.editor.IStandaloneCodeEditor;
   private tabs: EditorTab[] = [];
-  private readonly imageViewers = new Map<string, ImageViewer>();
+  private readonly fileViewers = new Map<string, ImageViewer | UniversalFileViewer>();
   private activeId: string | undefined;
   private closedTabs: ClosedEditorTab[] = [];
   private navigationBackStack: string[] = [];
@@ -62,6 +77,7 @@ export class EditorTabs {
   private recentFiles: string[] = [];
   private diagnostics: EditorDiagnostic[] = [];
   private errorLensEnabled = true;
+  private tabSize = 4;
   private errorLensDecorations?: monaco.editor.IEditorDecorationsCollection;
   private brandHighlightName = "";
   private brandDecorations?: monaco.editor.IEditorDecorationsCollection;
@@ -75,6 +91,7 @@ export class EditorTabs {
   onFileActivated: (filePath?: string) => void = () => undefined;
   onFileSaved: (filePath?: string) => void = () => undefined;
   onAIAction: (action: string) => void = () => undefined;
+  onEditorStatus: (status: EditorStatusInfo) => void = () => undefined;
   onStatus: (text: string) => void;
   action: any;
 
@@ -127,8 +144,8 @@ export class EditorTabs {
     for (const tab of this.tabs) {
       if (!tab.model.isDisposed()) tab.model.dispose();
     }
-    for (const viewer of this.imageViewers.values()) viewer.dispose();
-    this.imageViewers.clear();
+    for (const viewer of this.fileViewers.values()) viewer.dispose();
+    this.fileViewers.clear();
     this.tabs = [];
     this.closedTabs = [];
     this.editor.dispose();
@@ -147,6 +164,31 @@ export class EditorTabs {
   getCurrentFile(): string | undefined {
     if (this.disposed) return undefined;
     return this.activeTab?.path;
+  }
+
+  getStatusInfo(): EditorStatusInfo {
+    const tab = this.activeTab;
+    const position = this.editor.getPosition();
+    return {
+      active: Boolean(tab),
+      language: tab ? (tab.displayType ?? this.languageLabel(tab.title)) : "Plain Text",
+      encoding: tab?.encoding ?? "utf8",
+      lineEnding: tab?.lineEnding ?? "\n",
+      line: position?.lineNumber ?? 1,
+      column: position?.column ?? 1
+    };
+  }
+
+  setCurrentEncoding(encoding: TextEncoding): void {
+    const tab = this.activeTab;
+    if (!tab || this.fileViewers.has(tab.id) || tab.encoding === encoding) return;
+    tab.encoding = encoding;
+    tab.encodingDirty = true;
+    tab.dirty = true;
+    this.renderTabs();
+    this.onEditorStatus(this.getStatusInfo());
+    this.onStatus(`Codificação alterada para ${encodingLabel(encoding)}; salve o arquivo para aplicar.`);
+    this.onTabsChanged();
   }
 
   getSelectedText(): string {
@@ -233,14 +275,16 @@ export class EditorTabs {
     if (this.disposed) return;
     this.errorLensEnabled = settings.errorLensEnabled ?? true;
     this.brandHighlightName = settings.brandSpecialName?.trim() ?? "";
+    this.tabSize = Math.max(1, Math.min(12, Math.round(settings.editorTabSize) || 4));
     this.editor.updateOptions({
       fontFamily: settings.editorFontFamily,
       fontSize: settings.editorFontSize,
-      tabSize: settings.editorTabSize,
+      tabSize: this.tabSize,
       minimap: COMPACT_MINIMAP_OPTIONS,
       wordWrap: settings.editorWordWrap ? "on" : "off",
       lineNumbers: settings.editorLineNumbers ? "on" : "off"
     });
+    for (const tab of this.tabs) tab.model.updateOptions({ tabSize: this.tabSize });
     this.renderErrorLens();
     this.renderBrandHighlights();
     this.renderHexColorDecorators();
@@ -264,7 +308,7 @@ export class EditorTabs {
   newTab(content = "", suggestedExtension = ".txt"): void {
     if (this.disposed) return;
     const title = `Untitled-${this.untitledCounter++}${suggestedExtension}`;
-    const model = monaco.editor.createModel(content, languageForPath(title), monaco.Uri.parse(`untitled:${title}-${crypto.randomUUID()}`));
+    const model = this.createTextModel(content, languageForPath(title), monaco.Uri.parse(`untitled:${title}-${crypto.randomUUID()}`));
     const tab: EditorTab = {
       id: crypto.randomUUID(),
       title,
@@ -272,6 +316,7 @@ export class EditorTabs {
       initialContent: content,
       dirty: content.length > 0,
       lineEnding: "\n",
+      encoding: "utf8",
       model
     } as EditorTab;
     this.tabs.push(tab);
@@ -286,7 +331,7 @@ export class EditorTabs {
       if (this.disposed) return;
       if (!result.canceled && result.paths[0]) await this.openFile(result.paths[0]);
     } catch (error) {
-      reportError(error, this.onStatus, "Open file dialog failed");
+      reportError(error, this.onStatus, "Falha ao abrir o diálogo de arquivo");
     }
   }
 
@@ -301,17 +346,18 @@ export class EditorTabs {
     try {
       const file = await api.fs.openFile(filePath, forceText);
       if (this.disposed) return;
-      if (file.editor === "binary") {
-        if (!await this.resolveBinaryFile(file)) return;
-        return this.openFile(filePath, options, true);
-      }
       if (file.editor === "image") {
         this.openImageFile(file);
         if (!options.silent) this.onStatus(`Aberto ${filePath}`);
         return;
       }
+      if (file.editor !== "text") {
+        this.openUniversalFile(file);
+        if (!options.silent) this.onStatus(`Aberto ${filePath}`);
+        return;
+      }
       const content = file.content ?? "";
-      const model = monaco.editor.createModel(content, languageForPath(filePath), monaco.Uri.file(filePath));
+      const model = this.createTextModel(content, languageForPath(filePath), monaco.Uri.file(filePath));
       const tab: EditorTab = {
         id: filePath,
         title: basename(filePath),
@@ -319,6 +365,7 @@ export class EditorTabs {
         initialContent: content,
         dirty: false,
         lineEnding: file.lineEnding ?? "\n",
+        encoding: file.encoding ?? "utf8",
         model
       };
       this.tabs.push(tab);
@@ -332,40 +379,41 @@ export class EditorTabs {
   }
 
   private openImageFile(file: FileOpenResult): void {
-    const model = monaco.editor.createModel("", "plaintext", monaco.Uri.file(file.path));
-    const tab: EditorTab = { id: file.path, title: file.name, path: file.path, initialContent: "", dirty: false, lineEnding: "\n", model };
+    const model = this.createTextModel("", "plaintext", monaco.Uri.file(file.path));
+    const tab: EditorTab = { id: file.path, title: file.name, path: file.path, initialContent: "", dirty: false, lineEnding: "\n", encoding: "utf8", displayType: file.type, model };
     const viewer = new ImageViewer(file, text => {
       if (this.activeId === tab.id) this.onStatus(text);
     });
     viewer.element.hidden = true;
-    this.imageViewers.set(tab.id, viewer);
+    this.fileViewers.set(tab.id, viewer);
     this.editorHost.append(viewer.element);
     this.tabs.push(tab);
     this.addRecent(file.path);
     this.selectTab(tab.id);
   }
 
-  private async resolveBinaryFile(file: FileOpenResult): Promise<boolean> {
-    const extension = extname(file.path).toLowerCase() || "[sem extensao]";
-    const settings = await api.settings.load();
-    if (settings.binaryFileTypesIgnored.includes(extension)) return true;
-    return new Promise(resolve => {
-      const overlay = el("div", { className: "binary-file-dialog" });
-      const card = el("div", { className: "binary-file-card" });
-      const remember = el("input", { attrs: { type: "checkbox", id: "binary-file-remember" } }) as HTMLInputElement;
-      const finish = (open: boolean) => {
-        overlay.remove();
-        if (open && remember.checked) void api.settings.save({ ...settings, binaryFileTypesIgnored: [...new Set([...settings.binaryFileTypesIgnored, extension])] });
-        resolve(open);
-      };
-      const open = el("button", { className: "primary", text: "Abrir como Texto" });
-      open.addEventListener("click", () => finish(true));
-      const cancel = el("button", { text: "Cancelar" });
-      cancel.addEventListener("click", () => finish(false));
-      card.append(el("h2", { text: "Arquivo binario" }), el("p", { text: "Este arquivo parece ser um arquivo binario." }), el("p", { text: "Abrir como texto podera exibir caracteres ilegiveis. O arquivo nunca sera executado." }), el("label", { children: [remember, document.createTextNode(" Nao perguntar novamente para este tipo")] }), el("div", { className: "binary-file-actions", children: [open, cancel] }));
-      overlay.append(card);
-      document.body.append(overlay);
+  private openUniversalFile(file: FileOpenResult): void {
+    const model = this.createTextModel("", "plaintext", monaco.Uri.file(file.path));
+    const tab: EditorTab = {
+      id: file.path,
+      title: file.name,
+      path: file.path,
+      initialContent: "",
+      dirty: false,
+      lineEnding: "\n",
+      encoding: "utf8",
+      displayType: file.editor === "nbt" ? "NBT" : file.type,
+      model
+    };
+    const viewer = new UniversalFileViewer(file, text => {
+      if (this.activeId === tab.id) this.onStatus(text);
     });
+    viewer.element.hidden = true;
+    this.fileViewers.set(tab.id, viewer);
+    this.editorHost.append(viewer.element);
+    this.tabs.push(tab);
+    this.addRecent(file.path);
+    this.selectTab(tab.id);
   }
 
   openVirtualFile(title: string, uri: string, content: string, saveHandler?: (content: string) => Promise<void>): void {
@@ -375,13 +423,14 @@ export class EditorTabs {
       this.selectTab(existing.id);
       return;
     }
-    const model = monaco.editor.createModel(content, languageForPath(title), monaco.Uri.parse(`npsharp:${encodeURIComponent(uri)}`));
+    const model = this.createTextModel(content, languageForPath(title), monaco.Uri.parse(`npsharp:${encodeURIComponent(uri)}`));
     const tab: EditorTab = {
       id: uri,
       title,
       initialContent: content,
       dirty: false,
       lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
+      encoding: "utf8",
       virtualUri: uri,
       saveHandler,
       model
@@ -395,7 +444,7 @@ export class EditorTabs {
     if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab) return;
-    if (this.imageViewers.has(tab.id)) {
+    if (this.fileViewers.has(tab.id)) {
       this.onStatus("Imagens abertas no visualizador nao sao alteradas pelo editor de texto");
       return;
     }
@@ -410,7 +459,7 @@ export class EditorTabs {
     if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab) return;
-    if (this.imageViewers.has(tab.id)) {
+    if (this.fileViewers.has(tab.id)) {
       this.onStatus("Imagens abertas no visualizador nao podem ser salvas como texto");
       return;
     }
@@ -432,7 +481,7 @@ export class EditorTabs {
     if (this.disposed) return;
     const tab = this.activeTab;
     if (!tab?.path) return;
-    if (this.imageViewers.has(tab.id)) {
+    if (this.fileViewers.has(tab.id)) {
       this.onStatus("A imagem exibida corresponde ao arquivo salvo em disco");
       return;
     }
@@ -442,6 +491,8 @@ export class EditorTabs {
       tab.model.setValue(file.content);
       tab.initialContent = file.content;
       tab.lineEnding = file.lineEnding;
+      tab.encoding = file.encoding;
+      tab.encodingDirty = false;
       tab.dirty = false;
       this.renderTabs();
       this.onStatus(`Revertido ${tab.title}`);
@@ -473,7 +524,7 @@ export class EditorTabs {
       return;
     }
 
-    const model = monaco.editor.createModel(
+    const model = this.createTextModel(
       closed.content,
       languageForPath(closed.title),
       monaco.Uri.parse(closed.virtualUri ? `npsharp:${encodeURIComponent(closed.virtualUri)}` : `untitled:${closed.title}-${crypto.randomUUID()}`)
@@ -484,6 +535,7 @@ export class EditorTabs {
       initialContent: closed.virtualUri ? closed.content : "",
       dirty: !closed.virtualUri && closed.content.length > 0,
       lineEnding: closed.lineEnding,
+      encoding: closed.encoding,
       virtualUri: closed.virtualUri,
       model
     };
@@ -578,11 +630,26 @@ export class EditorTabs {
   }
 
   find(): void {
-    this.runEditorAction("actions.find", "Busca no arquivo aberta");
+    if (this.disposed || !this.editor.getModel()) {
+      this.onStatus("Abra um arquivo para pesquisar");
+      return;
+    }
+    this.editor.focus();
+    // Monaco Editor 0.52 registers the Find contribution with this action id.
+    if (!this.editor.getAction("actions.find")) {
+      this.onStatus("A busca no editor não está disponível");
+      return;
+    }
+    try {
+      this.editor.trigger("keyboard", "actions.find", null);
+      this.onStatus("Busca no arquivo aberta");
+    } catch (error) {
+      reportError(error, this.onStatus, "Não foi possível abrir a busca no arquivo");
+    }
   }
 
   replace(): void {
-    this.runEditorAction("editor.action.startFindReplaceAction", "Replace no arquivo aberto");
+    this.runEditorAction("editor.action.startFindReplaceAction", "Substituição no arquivo aberta");
   }
 
   goToLine(): void {
@@ -713,6 +780,7 @@ export class EditorTabs {
       await tab.saveHandler(content);
       tab.initialContent = content;
       tab.dirty = false;
+      tab.encodingDirty = false;
       this.renderTabs();
       this.onStatus(`Salvo ${tab.title}`);
       this.onFileSaved(tab.path);
@@ -720,9 +788,10 @@ export class EditorTabs {
     }
 
     if (tab.path && !forceSaveAs) {
-      await api.fs.writeFile(tab.path, this.applyLineEnding(content, tab.lineEnding));
+      await api.fs.writeFile(tab.path, this.applyLineEnding(content, tab.lineEnding), tab.encoding);
       tab.initialContent = content;
       tab.dirty = false;
+      tab.encodingDirty = false;
       this.addRecent(tab.path);
       this.renderTabs();
       this.onStatus(`Salvo ${tab.path}`);
@@ -732,7 +801,8 @@ export class EditorTabs {
 
     const result = await api.dialog.saveFile({
       suggestedName: tab.path ? basename(tab.path) : this.suggestedFileName(tab),
-      content: this.applyLineEnding(content, tab.lineEnding)
+      content: this.applyLineEnding(content, tab.lineEnding),
+      encoding: tab.encoding
     });
     if (result.canceled || !result.path) {
       this.onStatus("Salvar cancelado");
@@ -744,6 +814,7 @@ export class EditorTabs {
     tab.title = basename(result.path);
     tab.initialContent = content;
     tab.dirty = false;
+    tab.encodingDirty = false;
     delete tab.virtualUri;
     delete tab.saveHandler;
     this.activeId = tab.id;
@@ -766,23 +837,28 @@ export class EditorTabs {
       path: tab.path,
       virtualUri: tab.virtualUri,
       content: tab.model.getValue(),
-      lineEnding: tab.lineEnding
+      lineEnding: tab.lineEnding,
+      encoding: tab.encoding
     });
     this.closedTabs = this.closedTabs.slice(0, 20);
     const index = this.tabs.indexOf(tab);
     this.tabs.splice(index, 1);
-    this.imageViewers.get(id)?.dispose();
-    this.imageViewers.get(id)?.element.remove();
-    this.imageViewers.delete(id);
+    this.fileViewers.get(id)?.dispose();
+    this.fileViewers.get(id)?.element.remove();
+    this.fileViewers.delete(id);
     this.navigationBackStack = this.navigationBackStack.filter(item => item !== id);
     this.navigationForwardStack = this.navigationForwardStack.filter(item => item !== id);
     tab.model.dispose();
-    if (this.activeId === id) {
+    const closedActiveTab = this.activeId === id;
+    if (closedActiveTab) {
       const next = this.tabs[Math.max(0, index - 1)] ?? this.tabs[0];
       this.activeId = next?.id;
-    // depois de analizar, sobre a linha 423 do editormanager.java, do editor legado, sim, vou tentar. nova materia no keep
     }
     this.render();
+    if (closedActiveTab) {
+      this.onFileActivated(this.activeTab?.path);
+      this.updateCaretStatus();
+    }
     return true;
   }
 
@@ -794,10 +870,10 @@ export class EditorTabs {
     }
     this.activeId = id;
     const tab = this.activeTab;
-    const imageViewer = tab ? this.imageViewers.get(tab.id) : undefined;
+    const fileViewer = tab ? this.fileViewers.get(tab.id) : undefined;
     this.editor.setModel(tab?.model ?? null);
-    this.editorHost.querySelector(".monaco-editor")?.toggleAttribute("hidden", Boolean(imageViewer));
-    for (const [viewerId, viewer] of this.imageViewers) viewer.setActive(viewerId === tab?.id);
+    this.editorHost.querySelector(".monaco-editor")?.toggleAttribute("hidden", Boolean(fileViewer));
+    for (const [viewerId, viewer] of this.fileViewers) viewer.setActive(viewerId === tab?.id);
     this.welcome.hidden = Boolean(tab);
     this.render();
     this.onFileActivated(tab?.path);
@@ -805,7 +881,7 @@ export class EditorTabs {
     this.renderBrandHighlights();
     this.renderHexColorDecorators();
     this.updateCaretStatus();
-    if (!imageViewer) this.editor.focus();
+    if (!fileViewer) this.editor.focus();
   }
 
   private selectTabByPath(filePath: string): void {
@@ -844,11 +920,12 @@ export class EditorTabs {
     const tab = this.activeTab;
     if (!tab) return;
     const content = tab.model.getValue();
-    tab.dirty = content !== tab.initialContent;
+    tab.dirty = content !== tab.initialContent || Boolean(tab.encodingDirty);
     this.renderTabs();
     this.updateCaretStatus();
     this.onTabsChanged();
     this.renderBrandHighlights();
+    this.renderHexColorDecorators();
   }
 
   private render(): void {
@@ -888,14 +965,7 @@ export class EditorTabs {
   }
 
   private updateCaretStatus(): void {
-    const tab = this.activeTab;
-    if (tab && this.imageViewers.has(tab.id)) return;
-    const position = this.editor.getPosition();
-    if (!tab || !position) {
-      this.onStatus("Pronto");
-      return;
-    }
-    this.onStatus(`${tab.path ?? tab.virtualUri ?? tab.title} | Linha ${position.lineNumber}, Coluna ${position.column} | ${this.languageLabel(tab.title)}`);
+    this.onEditorStatus(this.getStatusInfo());
   }
 
   private renderErrorLens(): void {
@@ -963,7 +1033,7 @@ export class EditorTabs {
   private renderHexColorDecorators(): void {
     this.colorDecorations ??= this.editor.createDecorationsCollection();
     const tab = this.activeTab;
-    if (!tab || this.imageViewers.has(tab.id)) {
+    if (!tab || this.fileViewers.has(tab.id)) {
       this.colorDecorations.clear();
       return;
     }
@@ -973,13 +1043,16 @@ export class EditorTabs {
     for (const match of content.matchAll(HEX_COLOR_PATTERN)) {
       if (match.index === undefined) continue;
       const color = match[0];
-      const position = model.getPositionAt(match.index);
+      const start = model.getPositionAt(match.index);
+      const end = model.getPositionAt(match.index + color.length);
+      const colorClass = this.colorClass(color);
       decorations.push({
-        range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+        range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column),
         options: {
+          inlineClassName: colorClass,
           before: {
             content: "■ ",
-            inlineClassName: this.colorClass(color),
+            inlineClassName: `${colorClass} npsharp-hex-swatch`,
             cursorStops: monaco.editor.InjectedTextCursorStops.None
           },
           hoverMessage: { value: `Cor: \`${color}\`` }
@@ -995,7 +1068,7 @@ export class EditorTabs {
     if (existing) return existing;
     const className = `npsharp-hex-color-${this.colorClasses.size}`;
     this.colorClasses.set(normalized, className);
-    this.colorStyle.append(`${className}{color:${normalized};font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.7);}`);
+    this.colorStyle.append(`.${className}{color:${normalized}!important;font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.72);}.${className}.npsharp-hex-swatch{display:inline-block;font-size:1.05em;line-height:1;vertical-align:middle;text-shadow:0 0 1px rgba(0,0,0,.9);}`);
     return className;
   }
 
@@ -1041,6 +1114,12 @@ export class EditorTabs {
     this.recentFiles = [filePath, ...this.recentFiles.filter(item => item !== filePath)].slice(0, 20);
   }
 
+  private createTextModel(content: string, language: string, uri: monaco.Uri): monaco.editor.ITextModel {
+    const model = monaco.editor.createModel(content, language, uri);
+    model.updateOptions({ tabSize: this.tabSize });
+    return model;
+  }
+
   private suggestedFileName(tab: EditorTab): string {
     const extension = extname(tab.title) || ".txt";
     return tab.title.includes(".") ? tab.title : `${tab.title}${extension}`;
@@ -1076,6 +1155,10 @@ export class EditorTabs {
     };
     return labels[language] ?? "Plain Text";
   }
+}
+
+function encodingLabel(encoding: TextEncoding): string {
+  return encoding === "utf8bom" ? "UTF-8 com BOM" : encoding === "utf8" ? "UTF-8" : encoding.toUpperCase();
 }
 
 function severityToMarker(severity: EditorDiagnostic["severity"]): monaco.MarkerSeverity {

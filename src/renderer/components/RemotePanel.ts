@@ -8,7 +8,7 @@ export class RemotePanel {
   readonly element = el("div", { className: "panel remote-panel" });
   private readonly hostsBox = el("div", { className: "remote-hosts" });
   private readonly tree = el("div", { className: "remote-tree" });
-  private readonly command = el("input", { className: "panel-input", attrs: { placeholder: "Remote command" } });
+  private readonly command = el("input", { className: "panel-input", attrs: { placeholder: "Comando remoto" } });
   private hosts: RemoteHostConfig[] = [];
   private active?: RemoteHostConfig;
   private password = "";
@@ -30,7 +30,7 @@ export class RemotePanel {
     const toolbar = el("div", { className: "panel-toolbar" });
     toolbar.append(
       buttonIcon("add", "Add Host", () => void this.addHost()),
-      buttonIcon("refresh", "Refresh", () => void this.refresh()),
+      buttonIcon("refresh", "Atualizar", () => void this.refresh()),
       buttonIcon("terminal", "Execute", () => void this.executeCommand())
     );
     this.command.addEventListener("keydown", event => {
@@ -50,8 +50,8 @@ export class RemotePanel {
         contextMenu([
           { label: "Connect", action: () => void this.connect(host) },
           { label: "Test", action: () => void this.testHost(host) },
-          { label: "Edit", action: () => void this.editHost(host) },
-          { label: "Delete", danger: true, action: () => void this.deleteHost(host) }
+          { label: "Editar", action: () => void this.editHost(host) },
+          { label: "Excluir", danger: true, action: () => void this.deleteHost(host) }
         ], event.clientX, event.clientY);
       });
       this.hostsBox.append(button);
@@ -90,7 +90,7 @@ export class RemotePanel {
   private async testHost(host: RemoteHostConfig): Promise<void> {
     const password = host.authMethod === "password" ? prompt(`Password for ${host.username}@${host.host}`) ?? "" : undefined;
     const result = await api.remote.test({ config: host, password, command: "pwd" });
-    this.updateStatus(result.output || (result.success ? "Remote host connected" : "Remote host test failed"));
+    this.updateStatus(result.output || (result.success ? "Host remoto conectado" : "Falha no teste do host remoto"));
   }
 
   private promptHost(existing?: RemoteHostConfig): RemoteHostConfig | undefined {
@@ -101,8 +101,8 @@ export class RemotePanel {
     const portText = prompt("Port", String(existing?.port ?? 22)) ?? "22";
     const authInput = prompt("Auth method: password, key, agent", existing?.authMethod ?? "password") ?? "password";
     const authMethod = normalizeAuth(authInput);
-    const privateKeyPath = authMethod === "key" ? prompt("Private key path", existing?.privateKeyPath ?? "") ?? "" : "";
-    const defaultPath = prompt("Default remote path", existing?.defaultPath ?? ".") ?? ".";
+    const privateKeyPath = authMethod === "key" ? prompt("Caminho da chave privada", existing?.privateKeyPath ?? "") ?? "" : "";
+    const defaultPath = prompt("Caminho remoto padrão", existing?.defaultPath ?? ".") ?? ".";
     const name = prompt("Name", existing?.name ?? `${username}@${host}`) ?? `${username}@${host}`;
     return {
       name: name.trim() || `${username}@${host}`,
@@ -132,7 +132,7 @@ export class RemotePanel {
       this.currentPath = remotePath;
       this.renderEntries(entries);
     } catch (error) {
-      reportError(error, this.updateStatus, "Remote list failed");
+      reportError(error, this.updateStatus, "Falha ao listar arquivos remotos");
     }
   }
 
@@ -148,11 +148,11 @@ export class RemotePanel {
       row.addEventListener("contextmenu", event => {
         event.preventDefault();
         contextMenu([
-          { label: "Open", action: () => entry.directory ? void this.list(entry.path) : void this.openFile(entry.path) },
-          { label: "New File", action: () => void this.touch(entry.directory ? entry.path : this.currentPath) },
-          { label: "New Folder", action: () => void this.mkdir(entry.directory ? entry.path : this.currentPath) },
-          { label: "Rename", action: () => void this.rename(entry.path) },
-          { label: "Delete", danger: true, action: () => void this.delete(entry.path) }
+          { label: "Abrir", action: () => entry.directory ? void this.list(entry.path) : void this.openFile(entry.path) },
+          { label: "Novo arquivo", action: () => void this.touch(entry.directory ? entry.path : this.currentPath) },
+          { label: "Nova pasta", action: () => void this.mkdir(entry.directory ? entry.path : this.currentPath) },
+          { label: "Renomear", action: () => void this.rename(entry.path) },
+          { label: "Excluir", danger: true, action: () => void this.delete(entry.path) }
         ], event.clientX, event.clientY);
       });
       this.tree.append(row);
@@ -169,7 +169,7 @@ export class RemotePanel {
 
   private async touch(base: string): Promise<void> {
     if (!this.active) return;
-    const name = prompt("Remote file name", "untitled");
+    const name = prompt("Nome do arquivo remoto", "sem-título");
     if (!name) return;
     await api.remote.touch({ config: this.active, password: this.password, path: joinRemote(base, name) });
     await this.list(this.currentPath);
@@ -177,7 +177,7 @@ export class RemotePanel {
 
   private async mkdir(base: string): Promise<void> {
     if (!this.active) return;
-    const name = prompt("Remote folder name", "New Folder");
+    const name = prompt("Nome da pasta remota", "nova-pasta");
     if (!name) return;
     await api.remote.mkdir({ config: this.active, password: this.password, path: joinRemote(base, name) });
     await this.list(this.currentPath);
@@ -185,7 +185,7 @@ export class RemotePanel {
 
   private async rename(remotePath: string): Promise<void> {
     if (!this.active) return;
-    const name = prompt("New remote name", basename(remotePath));
+    const name = prompt("Novo nome remoto", basename(remotePath));
     if (!name) return;
     await api.remote.rename({ config: this.active, password: this.password, path: remotePath, newPath: joinRemote(parentRemote(remotePath), name) });
     await this.list(this.currentPath);
@@ -200,7 +200,7 @@ export class RemotePanel {
   private async executeCommand(): Promise<void> {
     if (!this.active || !this.command.value.trim()) return;
     const result = await api.remote.execute({ config: this.active, password: this.password, command: this.command.value.trim() });
-    this.updateStatus(result.output || (result.success ? "Remote command complete" : "Remote command failed"));
+    this.updateStatus(result.output || (result.success ? "Comando remoto concluído" : "Falha no comando remoto"));
   }
 }
 

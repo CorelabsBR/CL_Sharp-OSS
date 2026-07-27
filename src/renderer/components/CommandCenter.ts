@@ -23,7 +23,7 @@ export interface CommandCenterState {
 }
 
 export class CommandCenter {
-  readonly element = el("section", { className: "command-center", attrs: { "aria-label": "Command Center" } });
+  readonly element = el("section", { className: "command-center", attrs: { "aria-label": "Centro de Comando" } });
   private state: CommandCenterState = { visible: false, actions: [], recentWorkspaces: [], shortcuts: [] };
 
   constructor(private readonly openWorkspace: (workspace: string) => void) {

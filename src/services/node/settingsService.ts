@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   statusBarVisible: true,
   activityBarVisible: true,
   sideBarVisible: true,
+  confirmDelete: true,
   binaryFileTypesIgnored: []
 };
 

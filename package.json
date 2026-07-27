@@ -1,6 +1,6 @@
 {
-  "name": "npsharp-electron",
-  "version": "26.6.4",
+  "name": "NPSharp",
+  "version": "26.8.5",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -17,7 +17,9 @@
     "dev:renderer": "vite",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
     "build": "node scripts/build.mjs",
     "build:mobile": "npm run typecheck && npm run build:renderer",
     "package": "node scripts/build.mjs",

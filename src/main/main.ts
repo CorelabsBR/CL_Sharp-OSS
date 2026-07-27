@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
 import path from "node:path";
+import fs from "node:fs/promises";
 import {
   compileArduinoSketch,
   createArduinoSketch,
@@ -13,6 +14,7 @@ import {
 } from "../services/node/arduinoService";
 import {
   createFile,
+  createNewFile,
   createFolder,
   deletePath,
   exists,
@@ -97,6 +99,7 @@ import type {
   GitFileStatus,
   LanguageRuntimeConfig,
   LiveServerRequest,
+  OpenVsxExtension,
   RemoteCommandRequest,
   RemoteFileRequest,
   RemoteHostConfig,
@@ -107,7 +110,10 @@ import type {
   SearchQuery,
   TemplateApplyRequest,
   TerminalCreateRequest,
-  TerminalRunRequest
+  TerminalRunRequest,
+  WorkspaceCreateFileRequest,
+  WorkspacePathRequest,
+  WorkspaceRenameRequest
 } from "../shared/types";
 
 let mainWindow: BrowserWindow | undefined;
@@ -250,7 +256,7 @@ async function loadDevServer(window: BrowserWindow, url: string): Promise<void> 
 function createApplicationMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: "File",
+      label: "Arquivo",
       submenu: [
         { label: "Novo", accelerator: "CmdOrCtrl+N", click: () => sendCommand("file:new") },
         { label: "Abrir...", accelerator: "CmdOrCtrl+O", click: () => sendCommand("file:open") },
@@ -265,88 +271,88 @@ function createApplicationMenu(): void {
         { type: "separator" },
         { label: "Abrir pasta...", click: () => sendCommand("workspace:openFolder") },
         { type: "separator" },
-        { role: "quit", label: "Exit" }
+        { role: "quit", label: "Sair" }
       ]
     },
     {
-      label: "Edit",
+      label: "Editar",
       submenu: [
-        { role: "undo", label: "Undo" },
-        { role: "redo", label: "Redo" },
+        { role: "undo", label: "Desfazer" },
+        { role: "redo", label: "Refazer" },
         { type: "separator" },
-        { role: "cut", label: "Cut" },
-        { role: "copy", label: "Copy" },
-        { role: "paste", label: "Paste" },
+        { role: "cut", label: "Recortar" },
+        { role: "copy", label: "Copiar" },
+        { role: "paste", label: "Colar" },
         { type: "separator" },
-        { label: "Find", accelerator: "CmdOrCtrl+F", click: () => sendCommand("editor:find") },
-        { label: "Replace", accelerator: "CmdOrCtrl+H", click: () => sendCommand("editor:replace") },
-        { label: "Find in Files", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
-        { label: "Replace in Files", accelerator: "CmdOrCtrl+Shift+H", click: () => sendCommand("view:replaceInFiles") },
+        { label: "Localizar", accelerator: "CmdOrCtrl+F", click: () => sendCommand("editor:find") },
+        { label: "Substituir", accelerator: "CmdOrCtrl+H", click: () => sendCommand("editor:replace") },
+        { label: "Localizar nos arquivos", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
+        { label: "Substituir nos arquivos", accelerator: "CmdOrCtrl+Shift+H", click: () => sendCommand("view:replaceInFiles") },
         { type: "separator" },
-        { label: "Comment Line", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:commentLine") },
-        { label: "Uncomment Line", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:uncommentLine") },
-        { label: "Comment Block", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:commentBlock") },
+        { label: "Comentar linha", accelerator: "CmdOrCtrl+/", click: () => sendCommand("editor:commentLine") },
+        { label: "Descomentar linha", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:uncommentLine") },
+        { label: "Comentar bloco", accelerator: "CmdOrCtrl+Shift+/", click: () => sendCommand("editor:commentBlock") },
         { type: "separator" },
-        { label: "Go to Line", accelerator: "CmdOrCtrl+G", click: () => sendCommand("editor:goToLine") },
-        { label: "Go to Start", accelerator: "CmdOrCtrl+Home", click: () => sendCommand("editor:start") },
-        { label: "Go to End", accelerator: "CmdOrCtrl+End", click: () => sendCommand("editor:end") },
-        { label: "Format Document", accelerator: "Shift+Alt+F", click: () => sendCommand("editor:format") }
+        { label: "Ir para a linha", accelerator: "CmdOrCtrl+G", click: () => sendCommand("editor:goToLine") },
+        { label: "Ir para o início", accelerator: "CmdOrCtrl+Home", click: () => sendCommand("editor:start") },
+        { label: "Ir para o fim", accelerator: "CmdOrCtrl+End", click: () => sendCommand("editor:end") },
+        { label: "Formatar documento", accelerator: "Shift+Alt+F", click: () => sendCommand("editor:format") }
       ]
     },
     {
-      label: "View",
+      label: "Exibir",
       submenu: [
-        { label: "Explorer", accelerator: "CmdOrCtrl+Shift+E", click: () => sendCommand("view:explorer") },
-        { label: "Search", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
-        { label: "Source Control", accelerator: "CmdOrCtrl+Shift+G", click: () => sendCommand("view:source") },
-        { label: "Run and Debug", accelerator: "CmdOrCtrl+Shift+D", click: () => sendCommand("view:run") },
+        { label: "Explorador", accelerator: "CmdOrCtrl+Shift+E", click: () => sendCommand("view:explorer") },
+        { label: "Pesquisar", accelerator: "CmdOrCtrl+Shift+F", click: () => sendCommand("view:search") },
+        { label: "Controle de código-fonte", accelerator: "CmdOrCtrl+Shift+G", click: () => sendCommand("view:source") },
+        { label: "Executar e depurar", accelerator: "CmdOrCtrl+Shift+D", click: () => sendCommand("view:run") },
         { label: "Arduino", click: () => sendCommand("view:arduino") },
         { label: "Terminal", accelerator: "CmdOrCtrl+`", click: () => sendCommand("view:terminal") },
-        { label: "Toggle Panel", accelerator: "CmdOrCtrl+J", click: () => sendCommand("view:terminal") },
-        { label: "Problems", accelerator: "CmdOrCtrl+Shift+M", click: () => sendCommand("view:problems") },
-        { label: "Output", accelerator: "CmdOrCtrl+Shift+U", click: () => sendCommand("view:output") },
-        { label: "Keyboard Shortcuts", click: () => sendCommand("view:keyboardShortcuts") },
-        { label: "Extensions", accelerator: "CmdOrCtrl+Shift+X", click: () => sendCommand("view:extensions") },
+        { label: "Alternar painel", accelerator: "CmdOrCtrl+J", click: () => sendCommand("view:terminal") },
+        { label: "Problemas", accelerator: "CmdOrCtrl+Shift+M", click: () => sendCommand("view:problems") },
+        { label: "Saída", accelerator: "CmdOrCtrl+Shift+U", click: () => sendCommand("view:output") },
+        { label: "Atalhos de teclado", click: () => sendCommand("view:keyboardShortcuts") },
+        { label: "Extensões", accelerator: "CmdOrCtrl+Shift+X", click: () => sendCommand("view:extensions") },
         { type: "separator" },
-        { role: "zoomIn", label: "Zoom In" },
-        { role: "zoomOut", label: "Zoom Out" },
-        { role: "resetZoom", label: "Reset Zoom" },
+        { role: "zoomIn", label: "Ampliar" },
+        { role: "zoomOut", label: "Reduzir" },
+        { role: "resetZoom", label: "Redefinir zoom" },
         { type: "separator" },
-        { role: "togglefullscreen", label: "Full Screen" }
+        { role: "togglefullscreen", label: "Tela cheia" }
       ]
     },
     {
-      label: "Tools",
+      label: "Ferramentas",
       submenu: [
-        { label: "Build Project", accelerator: "CmdOrCtrl+Shift+B", click: () => sendCommand("tools:build") },
-        { label: "Run Current File", accelerator: "CmdOrCtrl+Alt+R", click: () => sendCommand("tools:run") },
-        { label: "Run Without Debugging", accelerator: "CmdOrCtrl+F5", click: () => sendCommand("tools:runWithoutDebug") },
-        { label: "Debug Program", accelerator: "F5", click: () => sendCommand("tools:run") },
+        { label: "Compilar projeto", accelerator: "CmdOrCtrl+Shift+B", click: () => sendCommand("tools:build") },
+        { label: "Executar arquivo atual", accelerator: "CmdOrCtrl+Alt+R", click: () => sendCommand("tools:run") },
+        { label: "Executar sem depuração", accelerator: "CmdOrCtrl+F5", click: () => sendCommand("tools:runWithoutDebug") },
+        { label: "Depurar programa", accelerator: "F5", click: () => sendCommand("tools:run") },
         { label: "Arduino", click: () => sendCommand("view:arduino") },
-        { label: "Configure Language Runtimes", click: () => sendCommand("npsharp:configureLanguageRuntimes") },
+        { label: "Configurar runtimes de linguagem", click: () => sendCommand("npsharp:configureLanguageRuntimes") },
         { type: "separator" },
-        { label: "New Terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendCommand("terminal:new") },
-        { label: "Output", click: () => sendCommand("terminal:output") },
-        { label: "Problems", click: () => sendCommand("terminal:problems") },
-        { label: "Debug Console", click: () => sendCommand("terminal:debug") },
-        { label: "Ports", click: () => sendCommand("terminal:ports") },
+        { label: "Novo terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendCommand("terminal:new") },
+        { label: "Saída", click: () => sendCommand("terminal:output") },
+        { label: "Problemas", click: () => sendCommand("terminal:problems") },
+        { label: "Console de depuração", click: () => sendCommand("terminal:debug") },
+        { label: "Portas", click: () => sendCommand("terminal:ports") },
         { label: "Git", click: () => sendCommand("terminal:git") },
-        { label: "Clear Terminal", click: () => sendCommand("terminal:clear") },
-        { label: "Kill Process", click: () => sendCommand("terminal:kill") },
-        { label: "Close Terminal", click: () => sendCommand("terminal:close") },
+        { label: "Limpar terminal", click: () => sendCommand("terminal:clear") },
+        { label: "Encerrar processo", click: () => sendCommand("terminal:kill") },
+        { label: "Fechar terminal", click: () => sendCommand("terminal:close") },
         { type: "separator" },
-        { label: "Git Pull", click: () => sendCommand("git:pull") },
-        { label: "Git Push", click: () => sendCommand("git:push") },
-        { label: "Git Fetch", click: () => sendCommand("git:fetch") }
+        { label: "Git: Pull", click: () => sendCommand("git:pull") },
+        { label: "Git: Push", click: () => sendCommand("git:push") },
+        { label: "Git: Fetch", click: () => sendCommand("git:fetch") }
       ]
     },
     {
-      label: "more",
+      label: "Mais",
       submenu: [
-        { label: "Command Palette", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
-        { label: "Command Center", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
-        { label: "Install Extension from VSIX", click: () => sendCommand("extensions:installVsix") },
-        { label: "About NPSharp", click: () => sendCommand("help:about") }
+        { label: "Paleta de comandos", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
+        { label: "Central de comandos", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
+        { label: "Instalar extensão de VSIX", click: () => sendCommand("extensions:installVsix") },
+        { label: "Sobre o NPSharp", click: () => sendCommand("help:about") }
       ]
     }
   ];
@@ -422,7 +428,7 @@ function registerIpcHandlers(): void {
       if (result.canceled || !result.filePath) return { canceled: true };
       targetPath = normalizeDialogPath(result.filePath);
     }
-    await writeFile(targetPath, request.content);
+    await writeFile(targetPath, request.content, request.encoding);
     return { canceled: false, path: targetPath };
   });
 
@@ -454,13 +460,41 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fs:listDir", (_event, targetPath: string) => listDir(targetPath));
   ipcMain.handle("fs:readFile", (_event, targetPath: string) => readFile(targetPath));
   ipcMain.handle("fs:openFile", (_event, targetPath: string, forceText = false) => openFile(targetPath, forceText));
-  ipcMain.handle("fs:writeFile", (_event, targetPath: string, content: string) => writeFile(targetPath, content));
+  ipcMain.handle("fs:writeFile", (_event, targetPath: string, content: string, encoding) => writeFile(targetPath, content, encoding));
   ipcMain.handle("fs:createFile", (_event, targetPath: string) => createFile(targetPath));
   ipcMain.handle("fs:createFolder", (_event, targetPath: string) => createFolder(targetPath));
   ipcMain.handle("fs:rename", (_event, oldPath: string, newPath: string) => renamePath(oldPath, newPath));
   ipcMain.handle("fs:delete", (_event, targetPath: string) => deletePath(targetPath));
   ipcMain.handle("fs:reveal", (_event, targetPath: string) => revealPath(targetPath));
   ipcMain.handle("fs:exists", (_event, targetPath: string) => exists(targetPath));
+  ipcMain.handle("fs:workspace:createFile", async (_event, request: WorkspaceCreateFileRequest) => {
+    const targetPath = await resolveWorkspaceTarget(request.workspace, request.path);
+    if (await exists(targetPath)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    try {
+      await createNewFile(targetPath, request.initialContent ?? "");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("Já existe um item com esse nome nesta pasta.");
+      throw error;
+    }
+  });
+  ipcMain.handle("fs:workspace:createFolder", async (_event, request: WorkspacePathRequest) => {
+    const targetPath = await resolveWorkspaceTarget(request.workspace, request.path);
+    if (await exists(targetPath)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await createFolder(targetPath);
+  });
+  ipcMain.handle("fs:workspace:rename", async (_event, request: WorkspaceRenameRequest) => {
+    const sourcePath = await resolveWorkspaceTarget(request.workspace, request.path, false);
+    const targetPath = await resolveWorkspaceTarget(request.workspace, request.newPath);
+    if (sameResolvedPath(sourcePath, targetPath)) return;
+    if (await exists(targetPath)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await renamePath(sourcePath, targetPath);
+  });
+  ipcMain.handle("fs:workspace:delete", async (_event, request: WorkspacePathRequest) => {
+    const workspace = await resolveWorkspaceRoot(request.workspace);
+    const targetPath = await resolveWorkspaceTarget(workspace, request.path, false);
+    if (sameResolvedPath(workspace, targetPath)) throw new Error("A pasta raiz do workspace não pode ser excluída.");
+    await deletePath(targetPath);
+  });
   ipcMain.handle("fs:watch:start", (event, watchId: string, targetPath: string) => {
     disposeWorkspaceWatcher(watchId);
     const sender = event.sender;
@@ -541,6 +575,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle("runtime:runFile", (_event, request: RuntimeRunRequest) => runFile(request));
 
   ipcMain.handle("extensions:list", () => extensionManager.listInstalled());
+  ipcMain.handle("extensions:searchOpenVsx", (_event, query: string) => extensionManager.searchOpenVsx(query));
+  ipcMain.handle("extensions:installOpenVsx", (_event, extension: OpenVsxExtension) => extensionManager.installOpenVsx(extension));
   ipcMain.handle("extensions:installVsix", (_event, vsixPath: string) => extensionManager.installVsix(vsixPath));
   ipcMain.handle("extensions:enable", (_event, id: string) => extensionManager.enable(id));
   ipcMain.handle("extensions:disable", (_event, id: string) => extensionManager.disable(id));
@@ -572,6 +608,65 @@ function registerIpcHandlers(): void {
   ipcMain.handle("remote:rename", (_event, request: RemoteFileRequest & { newPath: string }) => renameRemote(request));
   ipcMain.handle("remote:delete", (_event, request: RemoteFileRequest) => deleteRemote(request));
   ipcMain.handle("remote:execute", (_event, request: RemoteCommandRequest) => executeRemote(request));
+}
+
+async function resolveWorkspaceRoot(workspace: string): Promise<string> {
+  if (typeof workspace !== "string" || !workspace.trim()) throw new Error("Workspace inválido.");
+  try {
+    const stat = await fs.stat(workspace);
+    if (!stat.isDirectory()) throw new Error("O workspace informado não é uma pasta.");
+    return await fs.realpath(workspace);
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("Não foi possível acessar o workspace.");
+  }
+}
+
+async function resolveWorkspaceTarget(workspace: string, candidate: string, allowNew = true): Promise<string> {
+  if (typeof candidate !== "string" || !candidate.trim()) throw new Error("Caminho inválido.");
+  const root = await resolveWorkspaceRoot(workspace);
+  const target = path.resolve(candidate);
+  if (!isPathInside(root, target)) throw new Error("A operação deve permanecer dentro do workspace aberto.");
+
+  const existingPath = await nearestExistingAncestor(target);
+  const resolvedExistingPath = await fs.realpath(existingPath);
+  if (!isPathInside(root, resolvedExistingPath)) {
+    throw new Error("A operação não pode seguir links para fora do workspace aberto.");
+  }
+  if (!allowNew) {
+    try {
+      const resolvedTarget = await fs.realpath(target);
+      if (!isPathInside(root, resolvedTarget)) throw new Error("A operação não pode seguir links para fora do workspace aberto.");
+      return resolvedTarget;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("workspace")) throw error;
+      throw new Error("O item selecionado não existe mais.");
+    }
+  }
+  return target;
+}
+
+async function nearestExistingAncestor(target: string): Promise<string> {
+  let current = target;
+  while (true) {
+    try {
+      await fs.lstat(current);
+      return current;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const parent = path.dirname(current);
+      if (parent === current) throw new Error("Caminho inválido.");
+      current = parent;
+    }
+  }
+}
+
+function isPathInside(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+function sameResolvedPath(left: string, right: string): boolean {
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 function installProcessLifecycleHandlers(): void {

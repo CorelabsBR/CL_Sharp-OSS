@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import extract from "extract-zip";
-import type { ExtensionManifest, ExtensionRegistry, ExtensionRegistryEntry, InstalledExtension } from "../../shared/types";
+import type { ExtensionManifest, ExtensionRegistry, ExtensionRegistryEntry, InstalledExtension, OpenVsxExtension } from "../../shared/types";
+
+const OPEN_VSX_ORIGIN = "https://open-vsx.org";
+const OPEN_VSX_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024;
 
 interface ExtensionPackageJson {
   name: string;
@@ -62,6 +65,41 @@ export class ExtensionManager {
       return installed;
     } finally {
       if (installTemp) await fs.rm(installTemp, { recursive: true, force: true }).catch(() => undefined);
+      await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  async searchOpenVsx(query: string): Promise<OpenVsxExtension[]> {
+    const text = query.trim();
+    if (!text) return [];
+    const url = new URL("/api/-/search", OPEN_VSX_ORIGIN);
+    url.searchParams.set("query", text);
+    url.searchParams.set("size", "30");
+    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Open VSX respondeu com ${response.status}.`);
+    const payload = await response.json() as { extensions?: unknown };
+    if (!Array.isArray(payload.extensions)) return [];
+    return payload.extensions.map(parseOpenVsxExtension).filter((item): item is OpenVsxExtension => Boolean(item));
+  }
+
+  async installOpenVsx(extension: OpenVsxExtension): Promise<InstalledExtension> {
+    const namespace = validateOpenVsxPart(extension.namespace, "namespace");
+    const name = validateOpenVsxPart(extension.name, "nome");
+    const version = validateOpenVsxPart(extension.version, "versão");
+    const file = `${namespace}.${name}-${version}.vsix`;
+    const url = new URL(`/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/${encodeURIComponent(version)}/file/${encodeURIComponent(file)}`, OPEN_VSX_ORIGIN);
+    const response = await fetch(url, { redirect: "follow" });
+    if (!response.ok) throw new Error(`Não foi possível baixar a extensão da Open VSX (${response.status}).`);
+    const length = Number(response.headers.get("content-length") ?? "0");
+    if (Number.isFinite(length) && length > OPEN_VSX_MAX_DOWNLOAD_BYTES) throw new Error("A extensão excede o limite de 100 MB.");
+    const content = Buffer.from(await response.arrayBuffer());
+    if (content.length > OPEN_VSX_MAX_DOWNLOAD_BYTES) throw new Error("A extensão excede o limite de 100 MB.");
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "npsharp-openvsx-"));
+    const vsixPath = path.join(tempRoot, file);
+    try {
+      await fs.writeFile(vsixPath, content, { flag: "wx" });
+      return await this.installVsix(vsixPath);
+    } finally {
       await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
     }
   }
@@ -290,6 +328,29 @@ function sameExtensionId(left: string, right: string): boolean {
 
 function sanitizeExtensionFolder(id: string): string {
   return id.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-");
+}
+
+function parseOpenVsxExtension(value: unknown): OpenVsxExtension | undefined {
+  if (!isRecord(value)) return undefined;
+  const namespace = stringValue(value.namespace);
+  const name = stringValue(value.name);
+  const version = stringValue(value.version);
+  if (!namespace || !name || !version) return undefined;
+  const files = isRecord(value.files) ? value.files : undefined;
+  return {
+    namespace,
+    name,
+    version,
+    displayName: stringValue(value.displayName) || name,
+    description: stringValue(value.description),
+    iconUrl: files ? stringValue(files.icon) || undefined : undefined,
+    downloads: typeof value.downloads === "number" && Number.isFinite(value.downloads) ? value.downloads : undefined
+  };
+}
+
+function validateOpenVsxPart(value: string, label: string): string {
+  if (!/^[A-Za-z0-9._-]+$/.test(value)) throw new Error(`Identificador Open VSX inválido (${label}).`);
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

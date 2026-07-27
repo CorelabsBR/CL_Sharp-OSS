@@ -33,6 +33,14 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: Number.isFinite(vitePort) ? vitePort : 5173,
-    strictPort: true
+    strictPort: true,
+    watch: {
+      // Some Linux environments impose a very small inotify/file-descriptor limit.
+      // Polling keeps HMR available without allocating an inotify handle per path.
+      usePolling: process.platform === "linux",
+      interval: 700,
+      // Android/packaging output can contain thousands of files and must never trigger HMR.
+      ignored: ["**/.git/**", "**/dist/**", "**/dist-electron/**", "**/android/**", "**/release/**"]
+    }
   }
 });

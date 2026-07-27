@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { watch } from "node:fs";
+import { unwatchFile, watchFile } from "node:fs";
 import fs from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
@@ -17,6 +17,8 @@ const requestedDevServerPort = requestedDevServerUrl ? Number(new URL(requestedD
 const devServerPort = requestedDevServerUrl ? requestedDevServerPort : await findAvailablePort(requestedDevServerPort);
 const devServerUrl = requestedDevServerUrl ?? `http://127.0.0.1:${devServerPort}`;
 const mainFile = path.join(root, "dist-electron", "main", "main.js");
+const preloadFile = path.join(root, "dist-electron", "preload", "preload.js");
+const watchedOutputFiles = [mainFile, preloadFile];
 const children = [];
 let electronProcess;
 let restartTimer;
@@ -78,6 +80,7 @@ async function findAvailablePort(startPort) {
 
 function shutdown(code = 0) {
   if (restartTimer) clearTimeout(restartTimer);
+  for (const file of watchedOutputFiles) unwatchFile(file);
   for (const child of children) {
     if (!child.killed) child.kill();
   }
@@ -112,20 +115,17 @@ function scheduleElectronRestart() {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-spawnChild(npm, ["run", "build:electron", "--", "--watch"]);
+spawnChild(npm, ["run", "dev:electron"]);
 spawnChild(npm, ["run", "dev:renderer"], { VITE_PORT: String(devServerPort), VITE_DEV_SERVER_URL: devServerUrl });
 
 await waitForFile(mainFile);
+await waitForFile(preloadFile);
 await waitForUrl(devServerUrl);
 
 startElectron();
 
-for (const directory of [path.join(root, "dist-electron", "main"), path.join(root, "dist-electron", "preload")]) {
-  try {
-    watch(directory, { persistent: true }, (_eventType, fileName) => {
-      if (fileName?.endsWith(".js")) scheduleElectronRestart();
-    });
-  } catch (error) {
-    console.warn(`[NPSharp dev] Failed to watch Electron output (${directory}); restart Electron manually after backend changes.`, error);
-  }
+for (const file of watchedOutputFiles) {
+  watchFile(file, { interval: 500, persistent: true }, (current, previous) => {
+    if (current.mtimeMs !== previous.mtimeMs || current.size !== previous.size) scheduleElectronRestart();
+  });
 }

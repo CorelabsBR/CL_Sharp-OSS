@@ -660,6 +660,26 @@ button {
   background: var(--selection-bg);
 }
 
+.tree-create-row {
+  background: var(--selection-bg);
+}
+
+.tree-create-input {
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  padding: 1px 5px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  outline: 0;
+  color: var(--fg);
+  background: var(--input-bg);
+}
+
+.tree-create-row.has-error .tree-create-input {
+  border-color: var(--danger);
+}
+
 .title-nav {
   gap: 2px;
 }
@@ -705,6 +725,18 @@ button {
   overflow: hidden;
   display: flex;
   align-items: stretch;
+}
+
+.ai-dock {
+  width: min(430px, 38vw);
+  min-width: 300px;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.ai-dock .ai-chat-panel {
+  height: 100%;
 }
 
 .app-shell.focus-mode .title-menus,
@@ -1122,6 +1154,80 @@ button {
   background: var(--bg);
 }
 
+.universal-file-viewer {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.universal-file-toolbar,
+.universal-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.universal-file-toolbar {
+  justify-content: space-between;
+  background: var(--bg-2);
+}
+
+.universal-file-meta,
+.universal-file-warning {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.universal-file-content {
+  min-height: 0;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: var(--fg);
+  font-family: var(--editor-font-family);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.universal-file-fallback {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.universal-file-warning {
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.universal-media-wrap {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.universal-media {
+  width: min(100%, 960px);
+  max-height: 100%;
+}
+
+.universal-pdf {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: #fff;
+}
+
 .image-toolbar {
   display: flex;
   align-items: center;
@@ -1174,6 +1280,10 @@ button {
 
 .brand-highlight-special {
   color: #ff6ec7 !important;
+}
+/* Amarelo PRF clássico */
+.brand-highlight-police {
+  color: #FFD400 !important;
 }
 
 .welcome-pane {
@@ -1361,6 +1471,17 @@ button {
   -webkit-mask: none;
 }
 
+:root[data-icon-theme="minimal"] .file-icon {
+  background-color: var(--custom-icon-color, currentColor);
+  background-image: none;
+  mask: var(--file-icon-url) center / contain no-repeat;
+  -webkit-mask: var(--file-icon-url) center / contain no-repeat;
+}
+
+:root[data-icon-theme="minimal"] .codicon-mask {
+  background-color: var(--custom-icon-color, currentColor);
+}
+
 .search-options,
 .check-row,
 .setting-row {
@@ -1442,6 +1563,17 @@ button {
   align-content: start;
   gap: 8px;
   padding-right: 4px;
+}
+
+.extensions-marketplace-title {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .extension-row {
@@ -1793,6 +1925,17 @@ button {
   min-width: 0;
 }
 
+.status-left {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.status-right {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
 .status-left span,
 .status-right span {
   overflow: hidden;
@@ -1804,6 +1947,27 @@ button {
   height: 18px;
   padding: 0 6px;
   border-radius: 3px;
+}
+
+.status-item:hover:not(:disabled) {
+  background: color-mix(in srgb, #fff 16%, transparent);
+}
+
+.status-item:disabled {
+  opacity: 0.65;
+}
+
+.status-meta {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-branch .codicon-mask {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
 }
 
 .settings-list {
@@ -2005,6 +2169,34 @@ button {
   background: transparent;
 }
 
+.problems-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 6px 7px;
+  border-bottom: 1px solid var(--border);
+}
+
+.problem-severity {
+  min-width: 72px;
+}
+
+.problem-location {
+  min-width: 0;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problem-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .problem-row.error strong {
   color: var(--danger);
 }
@@ -2071,6 +2263,118 @@ button {
   place-items: center;
   padding: 24px;
   background: rgba(0, 0, 0, 0.38);
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.settings-dialog {
+  width: min(1040px, 100%);
+  height: min(720px, 100%);
+  min-height: 420px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+}
+
+.settings-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-dialog-header h2,
+.settings-dialog-header span {
+  margin: 0;
+}
+
+.settings-dialog-header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.file-delete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.file-delete-dialog {
+  width: min(400px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4);
+}
+
+.file-delete-dialog h2,
+.file-delete-dialog p {
+  margin: 0;
+}
+
+.file-delete-dialog p,
+.file-delete-remember {
+  color: var(--muted);
+}
+
+.file-delete-remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-delete-error {
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.file-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.file-delete-actions button {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.file-delete-actions .secondary {
+  background: var(--bg-3);
+}
+
+.file-delete-actions .danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+.file-delete-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .runtime-config-overlay {
@@ -2590,6 +2894,11 @@ button {
 
   .status-item {
     padding: 0 4px;
+  }
+
+  .status-author,
+  .status-line-ending {
+    display: none;
   }
 
   .html-preview-overlay {

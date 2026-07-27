@@ -339,6 +339,12 @@ export class AIChatPanel {
   private async send(): Promise<void> {
     const content = this.input.value.trim();
     if (!content || this.activeRequestId || !this.settings) return;
+    const provider = this.providers.find(item => item.id === this.settings?.provider);
+    if (provider?.requiresApiKey && !this.settings.apiKeyConfigured) {
+      this.updateStatus(`Configure a chave da API do ${provider.displayName} para enviar mensagens.`);
+      this.openSettings();
+      return;
+    }
     if (!this.current) await this.newConversation();
     if (!this.current) return;
     this.setGenerating(true);

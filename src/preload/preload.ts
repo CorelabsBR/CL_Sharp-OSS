@@ -19,6 +19,7 @@ import type {
   GitFileStatus,
   LanguageRuntimeConfig,
   LiveServerRequest,
+  OpenVsxExtension,
   NpsharpApi,
   PersistedSession,
   RemoteCommandRequest,
@@ -34,7 +35,10 @@ import type {
   TerminalExitEvent,
   TerminalCreateRequest,
   TerminalRunRequest,
-  WorkspaceChangeEvent
+  WorkspaceChangeEvent,
+  WorkspaceCreateFileRequest,
+  WorkspacePathRequest,
+  WorkspaceRenameRequest
 } from "../shared/types";
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
@@ -89,13 +93,17 @@ const api: NpsharpApi = {
     listDir: (targetPath: string) => invoke("fs:listDir", targetPath),
     readFile: (targetPath: string) => invoke("fs:readFile", targetPath),
     openFile: (targetPath: string, forceText = false) => invoke("fs:openFile", targetPath, forceText),
-    writeFile: (targetPath: string, content: string) => invoke("fs:writeFile", targetPath, content),
+    writeFile: (targetPath: string, content: string, encoding) => invoke("fs:writeFile", targetPath, content, encoding),
     createFile: (targetPath: string) => invoke("fs:createFile", targetPath),
     createFolder: (targetPath: string) => invoke("fs:createFolder", targetPath),
     rename: (oldPath: string, newPath: string) => invoke("fs:rename", oldPath, newPath),
     delete: (targetPath: string) => invoke("fs:delete", targetPath),
     reveal: (targetPath: string) => invoke("fs:reveal", targetPath),
     exists: (targetPath: string) => invoke("fs:exists", targetPath),
+    createFileInWorkspace: (request: WorkspaceCreateFileRequest) => invoke("fs:workspace:createFile", request),
+    createFolderInWorkspace: (request: WorkspacePathRequest) => invoke("fs:workspace:createFolder", request),
+    renameInWorkspace: (request: WorkspaceRenameRequest) => invoke("fs:workspace:rename", request),
+    deleteInWorkspace: (request: WorkspacePathRequest) => invoke("fs:workspace:delete", request),
     watch: (targetPath: string, callback: (event: WorkspaceChangeEvent) => void) => {
       const watchId = randomUUID();
       let disposed = false;
@@ -164,6 +172,8 @@ const api: NpsharpApi = {
   },
   extensions: {
     list: () => invoke("extensions:list"),
+    searchOpenVsx: (query: string) => invoke("extensions:searchOpenVsx", query),
+    installOpenVsx: (extension: OpenVsxExtension) => invoke("extensions:installOpenVsx", extension),
     installVsix: (vsixPath: string) => invoke("extensions:installVsix", vsixPath),
     enable: (id: string) => invoke("extensions:enable", id),
     disable: (id: string) => invoke("extensions:disable", id),

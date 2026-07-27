@@ -19,6 +19,7 @@ import type {
   EditorDiagnostic,
   FileReadResult,
   FileOpenResult,
+  TextEncoding,
   GitCommit,
   GitFileStatus,
   GitOperationResult,
@@ -30,6 +31,7 @@ import type {
   LanguageRuntimeValidation,
   LiveServerRequest,
   LiveServerResult,
+  OpenVsxExtension,
   NpsharpApi,
   PersistedSession,
   RemoteCommandRequest,
@@ -52,7 +54,10 @@ import type {
   TerminalRunResult,
   TerminalSessionInfo,
   TerminalShellOption,
-  WorkspaceEntry
+  WorkspaceEntry,
+  WorkspaceCreateFileRequest,
+  WorkspacePathRequest,
+  WorkspaceRenameRequest
 } from "../../shared/types";
 import { LANGUAGE_RUNTIMES } from "../../core/runtime/languages";
 import { basename, dirname, extname, joinPath, relativePath } from "../utils/path";
@@ -124,6 +129,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   statusBarVisible: true,
   activityBarVisible: true,
   sideBarVisible: true,
+  confirmDelete: true,
   binaryFileTypesIgnored: []
 };
 
@@ -179,13 +185,13 @@ class CapacitorSandboxFs implements FsApi {
     return fallbackOpenFileResult(await this.readFile(path), forceText);
   }
 
-  async writeFile(path: string, content: string): Promise<void> {
+  async writeFile(path: string, content: string, encoding: TextEncoding = "utf8"): Promise<void> {
     await this.ensureRoot();
     const target = normalizeSandboxPath(path);
     await this.ensureParent(target);
     await this.handleFsError(Filesystem.writeFile({
       path: target,
-      data: content,
+      data: encoding === "utf8bom" ? `\uFEFF${content}` : content,
       directory: this.directory,
       encoding: Encoding.UTF8,
       recursive: true
@@ -236,6 +242,33 @@ class CapacitorSandboxFs implements FsApi {
   async exists(path: string): Promise<boolean> {
     await this.ensureRoot();
     return this.pathExists(normalizeSandboxPath(path));
+  }
+
+  async createFileInWorkspace(request: WorkspaceCreateFileRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (await this.exists(request.path)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.writeFile(request.path, request.initialContent ?? "");
+  }
+
+  async createFolderInWorkspace(request: WorkspacePathRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (await this.exists(request.path)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.createFolder(request.path);
+  }
+
+  async renameInWorkspace(request: WorkspaceRenameRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    assertSandboxWorkspacePath(request.workspace, request.newPath);
+    if (normalizeSandboxPath(request.path) !== normalizeSandboxPath(request.newPath) && await this.exists(request.newPath)) {
+      throw new Error("Já existe um item com esse nome nesta pasta.");
+    }
+    await this.rename(request.path, request.newPath);
+  }
+
+  async deleteInWorkspace(request: WorkspacePathRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (normalizeSandboxPath(request.workspace) === normalizeSandboxPath(request.path)) throw new Error("A pasta raiz do workspace não pode ser excluída.");
+    await this.delete(request.path);
   }
 
   watch(_path: string, _callback: (event: import("../../shared/types").WorkspaceChangeEvent) => void): () => void {
@@ -370,10 +403,10 @@ class LocalSandboxFs implements FsApi {
     return fallbackOpenFileResult(await this.readFile(path), forceText);
   }
 
-  async writeFile(path: string, content: string): Promise<void> {
+  async writeFile(path: string, content: string, encoding: TextEncoding = "utf8"): Promise<void> {
     const target = normalizeSandboxPath(path);
     this.ensureFolderSync(dirname(target));
-    this.entries.set(target, { directory: false, content, modifiedAt: Date.now() });
+    this.entries.set(target, { directory: false, content: encoding === "utf8bom" ? `\uFEFF${content}` : content, modifiedAt: Date.now() });
     this.persist();
   }
 
@@ -418,6 +451,33 @@ class LocalSandboxFs implements FsApi {
 
   async exists(path: string): Promise<boolean> {
     return this.entries.has(normalizeSandboxPath(path));
+  }
+
+  async createFileInWorkspace(request: WorkspaceCreateFileRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (await this.exists(request.path)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.writeFile(request.path, request.initialContent ?? "");
+  }
+
+  async createFolderInWorkspace(request: WorkspacePathRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (await this.exists(request.path)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.createFolder(request.path);
+  }
+
+  async renameInWorkspace(request: WorkspaceRenameRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    assertSandboxWorkspacePath(request.workspace, request.newPath);
+    if (normalizeSandboxPath(request.path) !== normalizeSandboxPath(request.newPath) && await this.exists(request.newPath)) {
+      throw new Error("Já existe um item com esse nome nesta pasta.");
+    }
+    await this.rename(request.path, request.newPath);
+  }
+
+  async deleteInWorkspace(request: WorkspacePathRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (normalizeSandboxPath(request.workspace) === normalizeSandboxPath(request.path)) throw new Error("A pasta raiz do workspace não pode ser excluída.");
+    await this.delete(request.path);
   }
 
   watch(_path: string, _callback: (event: import("../../shared/types").WorkspaceChangeEvent) => void): () => void {
@@ -770,6 +830,12 @@ function createExtensionFallbackApi(): NpsharpApi["extensions"] {
   const list = async (): Promise<InstalledExtension[]> => [];
   return {
     list,
+    searchOpenVsx: async (_query: string): Promise<OpenVsxExtension[]> => {
+      throw new Error(unavailable);
+    },
+    installOpenVsx: async (_extension: OpenVsxExtension) => {
+      throw new Error(unavailable);
+    },
     installVsix: async () => {
       throw new Error(unavailable);
     },
@@ -949,7 +1015,7 @@ async function applyFallbackTemplate(fs: FsApi, request: TemplateApplyRequest): 
 function browserAppInfo(): AppInfo {
   return {
     name: "NPSharp",
-    version: "26.6.4",
+    version: "26.8.5",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,
@@ -1116,12 +1182,14 @@ async function writeJsonFile(fs: FsApi, path: string, value: unknown): Promise<v
 }
 
 function fileReadResult(path: string, content: string): FileReadResult {
+  const hasUtf8Bom = content.startsWith("\uFEFF");
+  const text = hasUtf8Bom ? content.slice(1) : content;
   return {
     path,
     name: basename(path),
-    content,
-    lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
-    encoding: "utf8"
+    content: text,
+    lineEnding: text.includes("\r\n") ? "\r\n" : "\n",
+    encoding: hasUtf8Bom ? "utf8bom" : "utf8"
   };
 }
 
@@ -1137,7 +1205,7 @@ function fallbackOpenFileResult(file: FileReadResult, forceText: boolean): FileO
     type: extension.toUpperCase() || "Arquivo",
     content: file.content,
     lineEnding: file.lineEnding,
-    encoding: "utf8",
+    encoding: file.encoding,
     binaryReason: binary ? "A extensao indica um formato binario." : undefined
   };
 }
@@ -1147,6 +1215,14 @@ function normalizeSandboxPath(path: string): string {
   const parts = normalized.split("/").filter(Boolean);
   if (parts.some(part => part === "..")) throw new Error("Caminho invalido fora do sandbox mobile.");
   return parts.join("/");
+}
+
+function assertSandboxWorkspacePath(workspace: string, target: string): void {
+  const normalizedWorkspace = normalizeSandboxPath(workspace);
+  const normalizedTarget = normalizeSandboxPath(target);
+  if (!normalizedWorkspace || (normalizedTarget !== normalizedWorkspace && !normalizedTarget.startsWith(`${normalizedWorkspace}/`))) {
+    throw new Error("A operação deve permanecer dentro do workspace aberto.");
+  }
 }
 
 function hasStorageAccess(state: PermissionState): boolean {

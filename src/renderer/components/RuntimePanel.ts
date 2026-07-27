@@ -15,8 +15,8 @@ export class RuntimePanel {
   ) {
     const toolbar = el("div", { className: "panel-toolbar" });
     toolbar.append(
-      buttonIcon("play", "Run Current File", () => void this.runCurrentFile()),
-      buttonIcon("refresh", "Discover Runtimes", () => void this.refresh(true))
+      buttonIcon("play", "Executar arquivo atual", () => void this.runCurrentFile()),
+      buttonIcon("refresh", "Detectar runtimes", () => void this.refresh(true))
     );
     this.element.append(toolbar, this.summary, this.list);
   }
@@ -30,12 +30,12 @@ export class RuntimePanel {
       const runtimes = rescan ? await api.runtime.discover() : await api.runtime.list();
       this.render(runtimes);
     } catch (error) {
-      this.summary.textContent = reportError(error, this.updateStatus, "Runtime refresh failed");
+      this.summary.textContent = reportError(error, this.updateStatus, "Falha ao atualizar runtimes");
     }
   }
 
   private render(runtimes: InstalledRuntime[]): void {
-    this.summary.textContent = `${runtimes.length} runtime(s) registered`;
+    this.summary.textContent = `${runtimes.length} runtime(s) registrado(s)`;
     this.list.replaceChildren();
     for (const runtime of runtimes) {
       const row = el("div", { className: "runtime-row" });
@@ -44,7 +44,7 @@ export class RuntimePanel {
         el("span", { text: runtime.version }),
         el("code", { text: runtime.executablePath })
       );
-      const configure = el("button", { className: "mini-action", text: "Configure" });
+      const configure = el("button", { className: "mini-action", text: "Configurar" });
       configure.addEventListener("click", () => this.configureLanguageRuntimes());
       row.append(configure);
       this.list.append(row);

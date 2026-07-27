@@ -28,15 +28,32 @@ export interface WorkspaceChangeEvent {
   error?: string;
 }
 
+/** A filesystem mutation whose target must remain inside an opened workspace. */
+export interface WorkspacePathRequest {
+  workspace: string;
+  path: string;
+}
+
+/** Initial bytes are accepted only by the atomic workspace new-file endpoint. */
+export interface WorkspaceCreateFileRequest extends WorkspacePathRequest {
+  initialContent?: string;
+}
+
+export interface WorkspaceRenameRequest extends WorkspacePathRequest {
+  newPath: string;
+}
+
+export type TextEncoding = "utf8" | "utf8bom" | "utf16le" | "utf16be" | "latin1" | "windows-1252";
+
 export interface FileReadResult {
   path: string;
   name: string;
   content: string;
   lineEnding: "\n" | "\r\n";
-  encoding: "utf8";
+  encoding: TextEncoding;
 }
 
-export type FileEditorKind = "text" | "image" | "binary";
+export type FileEditorKind = "text" | "image" | "binary" | "media" | "pdf" | "archive" | "nbt";
 
 export interface FileOpenResult {
   path: string;
@@ -46,8 +63,12 @@ export interface FileOpenResult {
   type: string;
   content?: string;
   lineEnding?: "\n" | "\r\n";
-  encoding?: "utf8" | "utf16le" | "utf16be" | "latin1" | "windows-1252";
+  encoding?: TextEncoding;
   imageDataUrl?: string;
+  dataUrl?: string;
+  previewData?: string;
+  previewTruncated?: boolean;
+  previewSummary?: string;
   binaryReason?: string;
 }
 
@@ -55,6 +76,7 @@ export interface SaveFileRequest {
   path?: string;
   suggestedName?: string;
   content: string;
+  encoding?: TextEncoding;
 }
 
 export interface SaveFileResult {
@@ -89,6 +111,7 @@ export interface AppSettings {
   statusBarVisible: boolean;
   activityBarVisible: boolean;
   sideBarVisible: boolean;
+  confirmDelete: boolean;
   binaryFileTypesIgnored: string[];
 }
 
@@ -295,6 +318,16 @@ export interface ExtensionManifest {
 export interface InstalledExtension extends ExtensionManifest {
   enabled: boolean;
   path: string;
+}
+
+export interface OpenVsxExtension {
+  namespace: string;
+  name: string;
+  version: string;
+  displayName: string;
+  description: string;
+  iconUrl?: string;
+  downloads?: number;
 }
 
 export interface ExtensionRegistryEntry {
@@ -588,13 +621,17 @@ export interface NpsharpApi {
     listDir(path: string): Promise<WorkspaceEntry[]>;
     readFile(path: string): Promise<FileReadResult>;
     openFile(path: string, forceText?: boolean): Promise<FileOpenResult>;
-    writeFile(path: string, content: string): Promise<void>;
+    writeFile(path: string, content: string, encoding?: TextEncoding): Promise<void>;
     createFile(path: string): Promise<void>;
     createFolder(path: string): Promise<void>;
     rename(oldPath: string, newPath: string): Promise<void>;
     delete(path: string): Promise<void>;
     reveal(path: string): Promise<void>;
     exists(path: string): Promise<boolean>;
+    createFileInWorkspace(request: WorkspaceCreateFileRequest): Promise<void>;
+    createFolderInWorkspace(request: WorkspacePathRequest): Promise<void>;
+    renameInWorkspace(request: WorkspaceRenameRequest): Promise<void>;
+    deleteInWorkspace(request: WorkspacePathRequest): Promise<void>;
     watch(path: string, callback: (event: WorkspaceChangeEvent) => void): () => void;
   };
   search: {
@@ -639,6 +676,8 @@ export interface NpsharpApi {
   };
   extensions: {
     list(): Promise<InstalledExtension[]>;
+    searchOpenVsx(query: string): Promise<OpenVsxExtension[]>;
+    installOpenVsx(extension: OpenVsxExtension): Promise<InstalledExtension>;
     installVsix(vsixPath: string): Promise<InstalledExtension>;
     enable(id: string): Promise<InstalledExtension[]>;
     disable(id: string): Promise<InstalledExtension[]>;
