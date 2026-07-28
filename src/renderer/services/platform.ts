@@ -69,7 +69,7 @@ function detectPlatform(): PlatformInfo {
       canUseNodeBackend: false,
       canUseNativeFilesystem: true,
       canUseGit: false,
-      canUseTerminal: false,
+      canUseTerminal: capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpTerminal"),
       canUseLiveServer: false
     };
   }

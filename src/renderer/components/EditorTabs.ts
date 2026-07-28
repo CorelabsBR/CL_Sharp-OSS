@@ -384,7 +384,7 @@ export class EditorTabs {
         return;
       }
       const content = file.content ?? "";
-      const language = languageForPath(filePath);
+      const language = file.editableStructuredKind === "nbt" ? "json" : languageForPath(filePath);
       await ensureLanguageSupport(language);
       const model = this.createTextModel(content, language, monaco.Uri.file(filePath));
       const tab: EditorTab = {
@@ -395,6 +395,10 @@ export class EditorTabs {
         dirty: false,
         lineEnding: file.lineEnding ?? "\n",
         encoding: file.encoding ?? "utf8",
+        saveHandler: file.editableStructuredKind
+          ? async nextContent => api.fs.saveStructuredFile({ path: file.path, kind: file.editableStructuredKind!, content: nextContent })
+          : undefined,
+        displayType: file.editableStructuredKind ? `${file.type} editável` : undefined,
         model
       };
       this.tabs.push(tab);
@@ -507,6 +511,22 @@ export class EditorTabs {
     if (this.disposed) return;
     for (const tab of this.tabs) {
       if (tab.dirty) await this.saveTab(tab, false);
+    }
+  }
+
+  async openActiveInOffice(): Promise<void> {
+    if (this.disposed) return;
+    const tab = this.activeTab;
+    if (!tab?.path) {
+      this.onStatus("Abra um documento ou planilha salvo para editar no LibreOffice.");
+      return;
+    }
+    try {
+      if (tab.dirty) await this.saveTab(tab, false);
+      await api.office.open(tab.path);
+      this.onStatus(`Aberto no LibreOffice: ${tab.title}`);
+    } catch (error) {
+      reportError(error, this.onStatus, "Não foi possível abrir no LibreOffice");
     }
   }
 
@@ -809,6 +829,10 @@ export class EditorTabs {
 
   private async saveTab(tab: EditorTab, forceSaveAs: boolean): Promise<void> {
     const content = tab.model.getValue();
+    if (tab.saveHandler && forceSaveAs) {
+      this.onStatus("Salvar como não é suportado para este formato estruturado. Salve o arquivo aberto.");
+      return;
+    }
     if (tab.saveHandler && !forceSaveAs) {
       await tab.saveHandler(content);
       tab.initialContent = content;

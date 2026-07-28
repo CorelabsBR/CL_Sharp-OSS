@@ -29,9 +29,12 @@ interface PendingCreate {
 export class FileExplorer {
   readonly element = el("div", { className: "panel explorer-panel" });
   private readonly toolbar = el("div", { className: "panel-toolbar" });
+  private readonly location = el("div", { className: "explorer-location" });
   private readonly tree = el("div", { className: "file-tree" });
   private readonly empty = el("div", { className: "empty-state" });
   private root?: string;
+  private rootName?: string;
+  private rootLocation?: string;
   private selectedPath?: string;
   private nodes = new Map<string, TreeNode>();
   private unwatchWorkspace?: () => void;
@@ -44,7 +47,7 @@ export class FileExplorer {
   private focusPendingCreateInput = false;
   private deleteDialog?: HTMLElement;
 
-  onWorkspaceChanged: (workspace?: string) => void = () => undefined;
+  onWorkspaceChanged: (workspace?: string, name?: string, location?: string) => void = () => undefined;
 
   constructor(
     private readonly onFileOpen: (filePath: string) => void,
@@ -74,31 +77,37 @@ export class FileExplorer {
     const result = await api.dialog.openFolder();
     if (this.disposed) return;
     if (!result.canceled && result.paths[0]) {
-      await this.openFolder(result.paths[0]);
+      await this.openFolder(result.paths[0], result.names?.[0], result.locations?.[0]);
     }
   }
 
-  async openFolder(folder: string): Promise<void> {
+  async openFolder(folder: string, displayName?: string, location?: string): Promise<void> {
     if (this.disposed) return;
     const normalizedFolder = normalizePath(folder);
     const previousRoot = this.root;
+    const previousRootName = this.rootName;
+    const previousRootLocation = this.rootLocation;
     const previousNodes = new Map(this.nodes);
     this.stopWatching();
     this.root = normalizedFolder;
+    this.rootName = displayName || basename(normalizedFolder);
+    this.rootLocation = location;
     this.selectedPath = normalizedFolder;
     this.nodes = new Map();
-    const rootEntry: WorkspaceEntry = { path: normalizedFolder, name: basename(normalizedFolder), directory: true, size: 0, modifiedAt: 0, hidden: false };
+    const rootEntry: WorkspaceEntry = { path: normalizedFolder, name: this.rootName, directory: true, size: 0, modifiedAt: 0, hidden: false };
     this.nodes.set(normalizedFolder, { entry: rootEntry, childrenLoaded: false, expanded: true });
     try {
       await this.loadChildren(normalizedFolder, true);
       if (this.disposed) return;
       this.watchFolder(normalizedFolder);
-      this.onWorkspaceChanged(normalizedFolder);
+      this.onWorkspaceChanged(normalizedFolder, this.rootName, this.rootLocation);
       this.render();
-      this.updateStatus(`Workspace aberto: ${normalizedFolder}`);
+      this.updateStatus(`Workspace aberto: ${this.rootLocation ?? normalizedFolder}`);
     } catch (error) {
       if (this.disposed) return;
       this.root = previousRoot;
+      this.rootName = previousRootName;
+      this.rootLocation = previousRootLocation;
       this.nodes = previousNodes;
       this.watchFolder(previousRoot);
       this.render();
@@ -110,6 +119,8 @@ export class FileExplorer {
     if (this.disposed) return;
     this.stopWatching();
     this.root = undefined;
+    this.rootName = undefined;
+    this.rootLocation = undefined;
     this.selectedPath = undefined;
     this.nodes = new Map();
     this.onWorkspaceChanged(undefined);
@@ -135,7 +146,7 @@ export class FileExplorer {
       }
       const root = this.root;
       this.nodes = new Map();
-      this.nodes.set(root, { entry: { path: root, name: basename(root), directory: true, size: 0, modifiedAt: 0, hidden: false }, childrenLoaded: false, expanded: true });
+      this.nodes.set(root, { entry: { path: root, name: this.rootName || basename(root), directory: true, size: 0, modifiedAt: 0, hidden: false }, childrenLoaded: false, expanded: true });
       await this.loadChildren(root, true);
       if (this.disposed) return;
       for (const item of [...expanded].sort((left, right) => this.ancestorsOf(left).length - this.ancestorsOf(right).length)) {
@@ -205,12 +216,12 @@ export class FileExplorer {
     const title = el("div", { className: "empty-title", text: platform.isMobile ? "Nenhum workspace mobile aberto" : "Nenhuma pasta aberta" });
     const subtitle = el("div", {
       className: "empty-subtitle",
-      text: platform.isMobile ? "Abra um workspace mobile no sandbox do app." : "Abra uma pasta para exibir os arquivos no Explorer."
+      text: platform.isMobile ? "Escolha uma pasta real do dispositivo para usá-la como workspace." : "Abra uma pasta para exibir os arquivos no Explorer."
     });
-    const open = el("button", { className: "primary", text: platform.isMobile ? "Abrir workspace mobile" : "Abrir pasta" });
+    const open = el("button", { className: "primary", text: platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta" });
     open.addEventListener("click", () => void this.openFolderFromDialog());
     this.empty.append(title, subtitle, open);
-    this.element.append(this.toolbar, this.tree, this.empty);
+    this.element.append(this.toolbar, this.location, this.tree, this.empty);
     this.render();
   }
 
@@ -248,6 +259,9 @@ export class FileExplorer {
     if (this.disposed) return;
     const hasRoot = Boolean(this.root);
     this.toolbar.hidden = !hasRoot;
+    this.location.hidden = !hasRoot;
+    this.location.textContent = this.rootLocation ?? this.root ?? "";
+    this.location.title = this.location.textContent;
     this.tree.hidden = !hasRoot;
     this.empty.hidden = hasRoot;
     this.tree.replaceChildren();
@@ -314,6 +328,7 @@ export class FileExplorer {
 
   private showMenu(node: TreeNode, x: number, y: number): void {
     const isLiveServerSupported = /\.(html?|php)$/i.test(node.entry.name) && !node.entry.directory;
+    const isOfficeDocument = /\.(?:docx?|odt|odf|rtf|xlsx?|xlsm|xlsb|ods|csv|tsv|pptx?|odp)$/i.test(node.entry.name) && !node.entry.directory;
     const isWorkspaceRoot = Boolean(this.root && samePath(node.entry.path, this.root));
     contextMenu([
       { label: node.entry.directory ? "Abrir pasta" : "Abrir arquivo", action: () => void this.openNode(node) },
@@ -321,6 +336,11 @@ export class FileExplorer {
         label: "Abrir com Live Server",
         disabled: !isLiveServerSupported,
         action: () => void this.openLiveServer(node.entry.path)
+      },
+      {
+        label: "Editar no LibreOffice",
+        disabled: !isOfficeDocument || !platform.isDesktop,
+        action: () => void api.office.open(node.entry.path).then(() => this.updateStatus("Aberto no LibreOffice")).catch(error => reportError(error, this.updateStatus, "Não foi possível abrir no LibreOffice"))
       },
       { label: "Novo arquivo", action: () => this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), "file") },
       { label: "Nova pasta", action: () => this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), "folder") },

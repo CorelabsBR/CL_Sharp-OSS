@@ -235,7 +235,7 @@ export class IdePage {
     const logo = el("div", { className: "title-logo" });
     logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: BUILD_CONFIG.displayName } }), el("span", { text: BUILD_CONFIG.displayName }));
     const menus = el("div", { className: "title-menus" });
-    const openWorkspaceLabel = platform.isMobile ? "Abrir workspace mobile" : "Abrir pasta";
+    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta";
     menus.append(
       menuButton("Arquivo", [
         ["Novo arquivo", "Ctrl+N", () => this.editor.newTab()],
@@ -405,7 +405,9 @@ export class IdePage {
   }
 
   private wireEvents(): void {
-    this.explorer.onWorkspaceChanged = workspace => {
+    this.explorer.onWorkspaceChanged = (workspace, name, location) => {
+      this.session.workspaceName = name;
+      this.session.workspaceLocation = location;
       this.search.setWorkspace(workspace);
       void this.source.setWorkspace(workspace);
       this.palette.setWorkspace(workspace);
@@ -499,6 +501,7 @@ export class IdePage {
       { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
       { label: "Terminal: Saída", run: () => this.terminal.showOutputPanel() },
       { label: "Terminal: Console de depuração", run: () => this.terminal.showDebugConsole() },
+      { label: "Office: Editar arquivo atual no LibreOffice", keywords: "word excel calc writer docx odt ods planilha formatação", run: () => void this.editor.openActiveInOffice() },
       { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
       { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
       { label: "NPSharp: Verificar atualizações", keywords: "atualização versão baixar", run: () => this.checkForUpdates() },
@@ -667,7 +670,7 @@ export class IdePage {
     try {
       if (this.settings.restoreWorkspaceOnStartup && this.session.workspace && await api.fs.exists(this.session.workspace)) {
         if (this.disposed) return;
-        await this.explorer.openFolder(this.session.workspace);
+        await this.explorer.openFolder(this.session.workspace, this.session.workspaceName, this.session.workspaceLocation);
       }
       if (this.disposed) return;
       await this.editor.restoreFiles(this.session.openFiles, this.session.activeFile);
@@ -1154,6 +1157,8 @@ export class IdePage {
     this.settings = await api.settings.save(settings);
     if (!this.settings.restoreWorkspaceOnStartup) {
       this.session.workspace = undefined;
+      this.session.workspaceName = undefined;
+      this.session.workspaceLocation = undefined;
       this.session.openFiles = [];
       this.session.activeFile = undefined;
       await api.settings.saveSession(this.session);
@@ -1785,8 +1790,8 @@ export class IdePage {
     const hasRunnableTarget = platform.canUseNodeBackend
       ? Boolean(this.editor.getCurrentFile() || this.explorer.workspace)
       : Boolean(this.editor.getCurrentFile());
-    const openWorkspaceLabel = platform.isMobile ? "Abrir workspace mobile" : "Abrir pasta";
-    const openWorkspaceDetail = platform.isMobile ? "Usar o sandbox Documents/NPSharp." : "Escolher um workspace local.";
+    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta";
+    const openWorkspaceDetail = platform.isMobile ? "Usar diretamente a pasta escolhida no seletor do Android." : "Escolher um workspace local.";
     return [
       { id: "open-folder", label: openWorkspaceLabel, detail: openWorkspaceDetail, iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
       { id: "new-file", label: "Novo arquivo", detail: "Criar um arquivo sem sair do hub.", iconName: "new-file", run: () => this.editor.newTab() },
@@ -1844,7 +1849,7 @@ export class IdePage {
     if (!platform.canUseTerminal) {
       this.terminal.showOutputPanel();
       this.terminal.appendOutput(platform.isMobile
-        ? "O terminal Node real não está disponível no mobile. Saída e registro de comandos ativos."
+        ? "O shell Android integrado não está disponível neste dispositivo. Saída e registro de comandos ativos."
         : "O terminal real não está disponível no modo web. Saída e registro de comandos ativos.");
     } else if (focus) {
       this.terminal.focusCurrentTerminal();
@@ -2083,6 +2088,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "file:save": () => void this.editor.saveCurrentFile(),
       "file:saveAs": () => void this.editor.saveCurrentFileAs(),
       "file:saveAll": () => void this.editor.saveAll(),
+      "office:open": () => void this.editor.openActiveInOffice(),
       "file:close": () => this.editor.closeCurrentTab(),
       "file:reopenClosed": () => this.editor.reopenClosedTab(),
       "file:closeAll": () => this.editor.closeAllTabs(),

@@ -1410,8 +1410,19 @@ button {
 .explorer-panel {
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.explorer-location {
+  min-width: 0;
+  padding: 5px 8px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-tree {
@@ -2932,6 +2943,65 @@ button {
 
   .terminal-panel {
     min-height: 132px;
+  }
+
+  .terminal-output {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .terminal-input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .palette-overlay {
+    align-items: flex-end;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.48);
+  }
+
+  .palette {
+    width: 100%;
+    max-width: none;
+    max-height: min(78dvh, 640px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .palette-input {
+    height: 52px;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+
+  .palette-list {
+    max-height: none;
+    min-height: 0;
+    padding: 6px 8px max(10px, env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+  }
+
+  .palette-row {
+    min-height: 48px;
+    gap: 8px;
+    padding: 6px 10px;
+    text-align: left;
+    touch-action: manipulation;
+  }
+
+  .palette-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .palette-row .menu-shortcut {
+    display: none;
   }
 
   .terminal-header {

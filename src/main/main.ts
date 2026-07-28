@@ -24,6 +24,7 @@ import {
   exists,
   listDir,
   openFile,
+  saveStructuredFile,
   readFile,
   renamePath,
   revealPath,
@@ -44,6 +45,7 @@ import {
   unstage
 } from "../services/node/gitService";
 import { openLiveServer, stopAllLiveServers } from "../services/node/liveServerService";
+import { officeSuiteStatus, openInOfficeSuite } from "../services/node/officeService";
 import { configureNpsharpDataRoot, npsharpHome } from "../services/node/paths";
 import { BUILD_CONFIG } from "../shared/buildConfig";
 import { detectPortableMode } from "../services/node/portableMode";
@@ -600,6 +602,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fs:readFile", (_event, targetPath: string) => readFile(targetPath));
   ipcMain.handle("fs:openFile", (_event, targetPath: string, forceText = false) => openFile(targetPath, forceText));
   ipcMain.handle("fs:writeFile", (_event, targetPath: string, content: string, encoding) => writeFile(targetPath, content, encoding));
+  ipcMain.handle("fs:saveStructuredFile", (_event, request) => saveStructuredFile(request));
+  ipcMain.handle("office:status", () => officeSuiteStatus());
+  ipcMain.handle("office:open", (_event, targetPath: string) => openInOfficeSuite(targetPath));
   ipcMain.handle("fs:createFile", (_event, targetPath: string) => createFile(targetPath));
   ipcMain.handle("fs:createFolder", (_event, targetPath: string) => createFolder(targetPath));
   ipcMain.handle("fs:rename", (_event, oldPath: string, newPath: string) => renamePath(oldPath, newPath));

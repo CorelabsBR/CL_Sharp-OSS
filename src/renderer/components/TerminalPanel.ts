@@ -18,7 +18,7 @@ interface TerminalSession {
   history: string[];
   historyIndex: number;
   shell: string;
-  backend: "node-pty" | "child_process" | "local";
+  backend: "node-pty" | "child_process" | "android-shell" | "local";
   running: boolean;
   localOnly: boolean;
 }
@@ -366,7 +366,9 @@ export class TerminalPanel {
       }
       const output = info.backend === "child_process"
         ? `[terminal] Fallback child_process ativo: ${info.shell}\n`
-        : "";
+        : info.backend === "android-shell"
+          ? `[terminal] Shell Android integrado ativo: ${info.shell}\n`
+          : "";
       this.sessions.push({
         id: info.id,
         name: info.name,

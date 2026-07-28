@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## 26.8.37 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Substitui o workspace virtual do Android pelo seletor nativo de pastas (Storage Access Framework), com permissão persistente para ler e gravar diretamente no local escolhido pelo usuário.
+- Exibe no Explorer a localização da pasta escolhida e restaura o nome e a URI do workspace ao reabrir o aplicativo.
+
+## 26.8.36 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Integra o LibreOffice instalado ao NPSharp para editar documentos e planilhas no arquivo original, preservando formatação avançada, mídia, fórmulas e revisões suportadas pela suíte.
+- Adiciona as ações `Editar no LibreOffice` no Explorer e `Office: Editar arquivo atual no LibreOffice` na Command Palette.
+
+## 26.8.35 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Torna arquivos NBT editáveis como JSON e grava novamente o conteúdo em NBT binário, preservando também a compactação gzip quando usada.
+- Adiciona leitura e edição de planilhas XLSX, XLS, XLSM, XLSB, ODS, CSV e TSV, inclusive arquivos produzidos por Excel e LibreOffice.
+- Adiciona abertura e edição de texto para DOCX, ODT e ODF, com gravação em contêineres compatíveis com Microsoft Word e OpenDocument.
+
+## 26.8.34 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Adiciona um shell Android persistente e integrado ao terminal do NPSharp, executado no sandbox do aplicativo sem exigir a instalação do Termux.
+- Ajusta a Command Palette para telas de telefone: painel inferior de largura total, controles de toque maiores e lista sem arraste horizontal.
+
 ## 26.8.33 - 2026-07-28
 
 Type: Fix

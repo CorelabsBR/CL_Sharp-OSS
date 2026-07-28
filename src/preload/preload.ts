@@ -133,6 +133,7 @@ const api: NpsharpApi = {
     readFile: (targetPath: string) => invoke("fs:readFile", targetPath),
     openFile: (targetPath: string, forceText = false) => invoke("fs:openFile", targetPath, forceText),
     writeFile: (targetPath: string, content: string, encoding) => invoke("fs:writeFile", targetPath, content, encoding),
+    saveStructuredFile: request => invoke("fs:saveStructuredFile", request),
     createFile: (targetPath: string) => invoke("fs:createFile", targetPath),
     createFolder: (targetPath: string) => invoke("fs:createFolder", targetPath),
     rename: (oldPath: string, newPath: string) => invoke("fs:rename", oldPath, newPath),
@@ -160,6 +161,10 @@ const api: NpsharpApi = {
         void ipcRenderer.invoke("fs:watch:stop", watchId).catch(() => undefined);
       };
     }
+  },
+  office: {
+    status: () => invoke("office:status"),
+    open: (targetPath: string) => invoke("office:open", targetPath)
   },
   search: {
     workspace: (query: SearchQuery) => invoke("search:workspace", query),

@@ -6,7 +6,7 @@
 export const BUILD_CONFIG = {
   "packageName": "NPSharp",
   "displayName": "NPSharp",
-  "version": "26.8.33",
+  "version": "26.8.37",
   "author": "CoreLabs",
   "copyrightOwner": "CoreLabs",
   "applicationId": "br.com.corelabs.npsharp",

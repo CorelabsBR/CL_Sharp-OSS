@@ -3,6 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { PermissionState } from "@capacitor/core";
 import type {
   AIConversation,
@@ -60,6 +61,7 @@ import type {
   TerminalRunResult,
   TerminalSessionInfo,
   TerminalShellOption,
+  WorkspaceChangeEvent,
   WorkspaceEntry,
   WorkspaceCreateFileRequest,
   WorkspacePathRequest,
@@ -75,6 +77,33 @@ export { DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform
 
 type FsApi = NpsharpApi["fs"];
 type RemoteApi = NpsharpApi["remote"];
+type TerminalApi = NpsharpApi["terminal"];
+
+interface AndroidTerminalPlugin {
+  create(options: TerminalCreateRequest): Promise<TerminalSessionInfo>;
+  write(options: { id: string; data: string }): Promise<void>;
+  resize(options: { id: string; cols: number; rows: number }): Promise<void>;
+  kill(options: { id: string }): Promise<void>;
+  close(options: { id: string }): Promise<void>;
+  shells(): Promise<{ shells: TerminalShellOption[] }>;
+  addListener(eventName: "data", listener: (event: TerminalDataEvent) => void): Promise<{ remove: () => Promise<void> }>;
+  addListener(eventName: "exit", listener: (event: TerminalExitEvent) => void): Promise<{ remove: () => Promise<void> }>;
+}
+
+const AndroidTerminal = registerPlugin<AndroidTerminalPlugin>("NpsharpTerminal");
+
+interface AndroidWorkspacePlugin {
+  pick(): Promise<{ canceled: boolean; uri?: string; name?: string; location?: string }>;
+  list(options: { uri: string; relative: string }): Promise<{ entries: Array<{ name: string; directory: boolean; size: number; modifiedAt: number; hidden: boolean }> }>;
+  read(options: { uri: string; relative: string }): Promise<{ content: string }>;
+  write(options: { uri: string; relative: string; content: string }): Promise<void>;
+  mkdir(options: { uri: string; relative: string }): Promise<void>;
+  rename(options: { uri: string; relative: string; newRelative: string }): Promise<void>;
+  delete(options: { uri: string; relative: string }): Promise<void>;
+  exists(options: { uri: string; relative: string }): Promise<{ exists: boolean }>;
+}
+
+const AndroidWorkspace = registerPlugin<AndroidWorkspacePlugin>("NpsharpWorkspace");
 
 export interface RendererApi extends NpsharpApi {
   platform: PlatformInfo;
@@ -153,7 +182,7 @@ const DEFAULT_SESSION: PersistedSession = {
 const NOTES_TEMPLATE = "# NPSharp Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n";
 const MOBILE_GIT_MESSAGE = "Git nativo ainda nao esta disponivel no mobile.";
 const WEB_GIT_MESSAGE = "Git local nao esta disponivel neste modo web.";
-const MOBILE_TERMINAL_MESSAGE = "O terminal Node real não está disponível no mobile. Use este painel como saída e registro de comandos.";
+const MOBILE_TERMINAL_MESSAGE = "O shell Android integrado não está disponível neste dispositivo. Use este painel como saída e registro de comandos.";
 const WEB_TERMINAL_MESSAGE = "O terminal real não está disponível no modo web. Use este painel como saída e registro de comandos.";
 const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use este painel para manter configuracao e sketches; compile/upload dependem do desktop.";
 const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
@@ -211,6 +240,10 @@ class CapacitorSandboxFs implements FsApi {
       encoding: Encoding.UTF8,
       recursive: true
     }));
+  }
+
+  async saveStructuredFile(): Promise<void> {
+    throw new Error("A edição de documentos estruturados está disponível no aplicativo desktop.");
   }
 
   async createFile(path: string): Promise<void> {
@@ -425,6 +458,10 @@ class LocalSandboxFs implements FsApi {
     this.persist();
   }
 
+  async saveStructuredFile(): Promise<void> {
+    throw new Error("A edição de documentos estruturados está disponível no aplicativo desktop.");
+  }
+
   async createFile(path: string): Promise<void> {
     const target = normalizeSandboxPath(path);
     if (!target || this.entries.has(target)) return;
@@ -529,8 +566,135 @@ class LocalSandboxFs implements FsApi {
   }
 }
 
+class AndroidTreeFs implements FsApi {
+  constructor(private readonly fallback: FsApi) {}
+
+  async listDir(path: string): Promise<WorkspaceEntry[]> {
+    const target = this.androidPath(path);
+    if (!target) return this.fallback.listDir(path);
+    const result = await AndroidWorkspace.list(target);
+    return result.entries.map(entry => ({
+      path: joinPath(path, entry.name),
+      name: entry.name,
+      directory: entry.directory,
+      size: entry.size,
+      modifiedAt: entry.modifiedAt,
+      hidden: entry.hidden
+    })).sort(sortEntries);
+  }
+
+  async readFile(path: string): Promise<FileReadResult> {
+    const target = this.androidPath(path);
+    if (!target) return this.fallback.readFile(path);
+    const result = await AndroidWorkspace.read(target);
+    return fileReadResult(path, result.content);
+  }
+
+  async openFile(path: string, forceText = false): Promise<FileOpenResult> {
+    const target = this.androidPath(path);
+    return target ? fallbackOpenFileResult(await this.readFile(path), forceText) : this.fallback.openFile(path, forceText);
+  }
+
+  async writeFile(path: string, content: string, _encoding: TextEncoding = "utf8"): Promise<void> {
+    const target = this.androidPath(path);
+    if (!target) return this.fallback.writeFile(path, content, _encoding);
+    await AndroidWorkspace.write({ ...target, content });
+  }
+
+  async saveStructuredFile(request: import("../../shared/types").StructuredFileSaveRequest): Promise<void> {
+    if (this.androidPath(request.path)) throw new Error("A edição estruturada de arquivos binários ainda requer o aplicativo desktop.");
+    await this.fallback.saveStructuredFile(request);
+  }
+
+  async createFile(path: string): Promise<void> {
+    if (await this.exists(path)) return;
+    await this.writeFile(path, "");
+  }
+
+  async createFolder(path: string): Promise<void> {
+    const target = this.androidPath(path);
+    if (!target) return this.fallback.createFolder(path);
+    await AndroidWorkspace.mkdir(target);
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const from = this.androidPath(oldPath);
+    const to = this.androidPath(newPath);
+    if (!from && !to) return this.fallback.rename(oldPath, newPath);
+    if (!from || !to || from.uri !== to.uri) throw new Error("Os itens só podem ser movidos dentro da pasta Android selecionada.");
+    await AndroidWorkspace.rename({ ...from, newRelative: to.relative });
+  }
+
+  async delete(path: string): Promise<void> {
+    const target = this.androidPath(path);
+    if (!target) return this.fallback.delete(path);
+    if (!target.relative) throw new Error("A pasta raiz escolhida não pode ser excluída.");
+    await AndroidWorkspace.delete(target);
+  }
+
+  async reveal(_path: string): Promise<void> {
+    return;
+  }
+
+  async exists(path: string): Promise<boolean> {
+    const target = this.androidPath(path);
+    if (!target) return this.fallback.exists(path);
+    return (await AndroidWorkspace.exists(target)).exists;
+  }
+
+  async createFileInWorkspace(request: WorkspaceCreateFileRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (await this.exists(request.path)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.writeFile(request.path, request.initialContent ?? "");
+  }
+
+  async createFolderInWorkspace(request: WorkspacePathRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (await this.exists(request.path)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.createFolder(request.path);
+  }
+
+  async renameInWorkspace(request: WorkspaceRenameRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    assertSandboxWorkspacePath(request.workspace, request.newPath);
+    if (request.path !== request.newPath && await this.exists(request.newPath)) throw new Error("Já existe um item com esse nome nesta pasta.");
+    await this.rename(request.path, request.newPath);
+  }
+
+  async deleteInWorkspace(request: WorkspacePathRequest): Promise<void> {
+    assertSandboxWorkspacePath(request.workspace, request.path);
+    if (request.workspace === request.path) throw new Error("A pasta raiz do workspace não pode ser excluída.");
+    await this.delete(request.path);
+  }
+
+  watch(_path: string, _callback: (event: WorkspaceChangeEvent) => void): () => void {
+    return () => undefined;
+  }
+
+  private androidPath(path: string): { uri: string; relative: string } | undefined {
+    const normalized = normalizeSandboxPath(path);
+    const [root, ...parts] = normalized.split("/");
+    if (!root.startsWith("android-tree-")) return undefined;
+    return { uri: decodeURIComponent(root.slice("android-tree-".length)), relative: parts.join("/") };
+  }
+}
+
+async function pickAndroidWorkspace(): Promise<DialogFileResult> {
+  const selected = await AndroidWorkspace.pick();
+  if (selected.canceled || !selected.uri) return { canceled: true, paths: [] };
+  return {
+    canceled: false,
+    paths: [`android-tree-${encodeURIComponent(selected.uri)}`],
+    names: [selected.name || "Pasta selecionada"],
+    locations: [selected.location || selected.uri]
+  };
+}
+
 function createBrowserApi(): NpsharpApi {
-  const fs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Documents, true) : new LocalSandboxFs();
+  const documentFs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Documents, true) : new LocalSandboxFs();
+  const fs = platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpWorkspace")
+    ? new AndroidTreeFs(documentFs)
+    : documentFs;
   const appDataFs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Data, false) : fs;
 
   const loadSettings = async (): Promise<AppSettings> => {
@@ -581,7 +745,9 @@ function createBrowserApi(): NpsharpApi {
     },
     dialog: {
       openFile: () => openSandboxFile(fs),
-      openFolder: () => openSandboxWorkspace(fs),
+      openFolder: () => platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpWorkspace")
+        ? pickAndroidWorkspace()
+        : openSandboxWorkspace(fs),
       openVsix: async () => ({ canceled: true, paths: [] }),
       saveFile: (request: SaveFileRequest) => saveSandboxFile(fs, request),
       chooseWallpaper: async () => ({ canceled: true, paths: [] })
@@ -600,33 +766,16 @@ function createBrowserApi(): NpsharpApi {
     },
     ai: createAIFallbackApi(),
     fs,
+    office: {
+      status: async () => ({ available: false, name: "LibreOffice" }),
+      open: async () => { throw new Error("A integração com LibreOffice está disponível no aplicativo desktop."); }
+    },
     search: createSearchApi(fs),
     diagnostics: {
       java: async () => []
     },
     git: createUnavailableGitApi(),
-    terminal: {
-      run: async (request: TerminalRunRequest) => ({
-        cwd: request.cwd,
-        output: `${platform.isMobile ? MOBILE_TERMINAL_MESSAGE : WEB_TERMINAL_MESSAGE}\n`,
-        code: 1
-      }),
-      shells: async (): Promise<TerminalShellOption[]> => [],
-      create: async (request: TerminalCreateRequest): Promise<TerminalSessionInfo> => ({
-        id: crypto.randomUUID(),
-        name: "Saída",
-        cwd: request.cwd,
-        shell: request.shell ?? "unavailable",
-        backend: "child_process",
-        running: false
-      }),
-      write: async (_id: string, _data: string) => undefined,
-      resize: async (_id: string, _cols: number, _rows: number) => undefined,
-      kill: async (_id: string) => undefined,
-      close: async (_id: string) => undefined,
-      onData: (_callback: (event: TerminalDataEvent) => void) => () => undefined,
-      onExit: (_callback: (event: TerminalExitEvent) => void) => () => undefined
-    },
+    terminal: createTerminalApi(),
     runtime: {
       list: async () => [],
       discover: async () => [],
@@ -654,6 +803,89 @@ function createBrowserApi(): NpsharpApi {
     },
     remote: createRemoteFallbackApi(appDataFs)
   };
+}
+
+function createTerminalApi(): TerminalApi {
+  if (platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpTerminal")) {
+    return new AndroidTerminalApi();
+  }
+  return {
+    run: async (request: TerminalRunRequest) => ({
+      cwd: request.cwd,
+      output: `${platform.isMobile ? MOBILE_TERMINAL_MESSAGE : WEB_TERMINAL_MESSAGE}\n`,
+      code: 1
+    }),
+    shells: async (): Promise<TerminalShellOption[]> => [],
+    create: async (request: TerminalCreateRequest): Promise<TerminalSessionInfo> => ({
+      id: crypto.randomUUID(),
+      name: "Saída",
+      cwd: request.cwd,
+      shell: request.shell ?? "unavailable",
+      backend: "child_process",
+      running: false
+    }),
+    write: async (_id: string, _data: string) => undefined,
+    resize: async (_id: string, _cols: number, _rows: number) => undefined,
+    kill: async (_id: string) => undefined,
+    close: async (_id: string) => undefined,
+    onData: (_callback: (event: TerminalDataEvent) => void) => () => undefined,
+    onExit: (_callback: (event: TerminalExitEvent) => void) => () => undefined
+  };
+}
+
+class AndroidTerminalApi implements TerminalApi {
+  private readonly dataListeners = new Set<(event: TerminalDataEvent) => void>();
+  private readonly exitListeners = new Set<(event: TerminalExitEvent) => void>();
+  private readonly listenersReady = Promise.all([
+    AndroidTerminal.addListener("data", event => this.dataListeners.forEach(listener => listener(event))),
+    AndroidTerminal.addListener("exit", event => this.exitListeners.forEach(listener => listener(event)))
+  ]);
+
+  async run(request: TerminalRunRequest): Promise<TerminalRunResult> {
+    return {
+      cwd: request.cwd,
+      output: "Abra uma sessão no Terminal integrado para executar comandos no Android.",
+      code: 1
+    };
+  }
+
+  async shells(): Promise<TerminalShellOption[]> {
+    await this.listenersReady;
+    return (await AndroidTerminal.shells()).shells;
+  }
+
+  async create(request: TerminalCreateRequest): Promise<TerminalSessionInfo> {
+    await this.listenersReady;
+    return AndroidTerminal.create(request);
+  }
+
+  async write(id: string, data: string): Promise<void> {
+    await this.listenersReady;
+    await AndroidTerminal.write({ id, data });
+  }
+
+  async resize(id: string, cols: number, rows: number): Promise<void> {
+    await this.listenersReady;
+    await AndroidTerminal.resize({ id, cols, rows });
+  }
+
+  async kill(id: string): Promise<void> {
+    await AndroidTerminal.kill({ id });
+  }
+
+  async close(id: string): Promise<void> {
+    await AndroidTerminal.close({ id });
+  }
+
+  onData(callback: (event: TerminalDataEvent) => void): () => void {
+    this.dataListeners.add(callback);
+    return () => this.dataListeners.delete(callback);
+  }
+
+  onExit(callback: (event: TerminalExitEvent) => void): () => void {
+    this.exitListeners.add(callback);
+    return () => this.exitListeners.delete(callback);
+  }
 }
 
 function createAIFallbackApi(): NpsharpApi["ai"] {

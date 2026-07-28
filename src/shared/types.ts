@@ -22,9 +22,17 @@ export interface AppUpdateStatus {
   message: string;
 }
 
+export interface OfficeSuiteStatus {
+  available: boolean;
+  name: string;
+  executable?: string;
+}
+
 export interface DialogFileResult {
   canceled: boolean;
   paths: string[];
+  names?: string[];
+  locations?: string[];
 }
 
 export interface WorkspaceEntry {
@@ -69,6 +77,7 @@ export interface FileReadResult {
 }
 
 export type FileEditorKind = "text" | "image" | "binary" | "media" | "pdf" | "archive" | "nbt" | "document" | "database" | "design" | "game";
+export type EditableStructuredKind = "nbt" | "document" | "spreadsheet";
 
 export interface FileOpenResult {
   path: string;
@@ -85,6 +94,13 @@ export interface FileOpenResult {
   previewTruncated?: boolean;
   previewSummary?: string;
   binaryReason?: string;
+  editableStructuredKind?: EditableStructuredKind;
+}
+
+export interface StructuredFileSaveRequest {
+  path: string;
+  kind: EditableStructuredKind;
+  content: string;
 }
 
 export interface SaveFileRequest {
@@ -140,6 +156,8 @@ export interface AppSettings {
 
 export interface PersistedSession {
   workspace?: string;
+  workspaceName?: string;
+  workspaceLocation?: string;
   recentWorkspaces?: string[];
   openFiles: string[];
   activeFile?: string;
@@ -249,7 +267,7 @@ export interface TerminalRunResult {
   code: number | null;
 }
 
-export type TerminalBackend = "node-pty" | "child_process";
+export type TerminalBackend = "node-pty" | "child_process" | "android-shell";
 
 export interface TerminalShellOption {
   id: string;
@@ -257,7 +275,7 @@ export interface TerminalShellOption {
   path: string;
   available: boolean;
   default: boolean;
-  platform: "linux" | "darwin" | "win32";
+  platform: "linux" | "darwin" | "win32" | "android";
 }
 
 export interface TerminalCreateRequest {
@@ -677,6 +695,7 @@ export interface NpsharpApi {
     readFile(path: string): Promise<FileReadResult>;
     openFile(path: string, forceText?: boolean): Promise<FileOpenResult>;
     writeFile(path: string, content: string, encoding?: TextEncoding): Promise<void>;
+    saveStructuredFile(request: StructuredFileSaveRequest): Promise<void>;
     createFile(path: string): Promise<void>;
     createFolder(path: string): Promise<void>;
     rename(oldPath: string, newPath: string): Promise<void>;
@@ -688,6 +707,10 @@ export interface NpsharpApi {
     renameInWorkspace(request: WorkspaceRenameRequest): Promise<void>;
     deleteInWorkspace(request: WorkspacePathRequest): Promise<void>;
     watch(path: string, callback: (event: WorkspaceChangeEvent) => void): () => void;
+  };
+  office: {
+    status(): Promise<OfficeSuiteStatus>;
+    open(path: string): Promise<void>;
   };
   search: {
     workspace(query: SearchQuery): Promise<SearchResult[]>;

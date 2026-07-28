@@ -7,8 +7,11 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { gunzipSync, inflateRawSync } from "node:zlib";
-import type { FileOpenResult, FileReadResult, TextEncoding, WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
+import { gunzipSync, gzipSync, inflateRawSync } from "node:zlib";
+import JSZip from "jszip";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
+import type { FileOpenResult, FileReadResult, StructuredFileSaveRequest, TextEncoding, WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
 
 const IGNORED_DIRECTORY_NAMES = new Set([
   ".git",
@@ -33,6 +36,8 @@ const BINARY_EXTENSIONS = new Set([".exe", ".dll", ".so", ".dylib", ".bin", ".da
 const MEDIA_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".oga", ".m4a", ".aac", ".flac", ".mp4", ".webm", ".ogv", ".mov", ".mkv"]);
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".jar", ".war", ".ear", ".apk", ".vsix"]);
 const NBT_EXTENSIONS = new Set([".nbt", ".schem", ".schematic"]);
+const SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".xlsm", ".xlsb", ".ods", ".csv", ".tsv"]);
+const EDITABLE_DOCUMENT_EXTENSIONS = new Set([".docx", ".odt", ".odf"]);
 const DOCUMENT_CONTAINER_EXTENSIONS = new Set([".docx", ".odt", ".ods", ".pptx", ".pages", ".numbers", ".key"]);
 const IWORK_PACKAGE_EXTENSIONS = new Set([".pages", ".numbers", ".key"]);
 const SQLITE_EXTENSIONS = new Set([".sqlite", ".sqlite3", ".db", ".db3"]);
@@ -112,6 +117,82 @@ export async function readFile(targetPath: string): Promise<FileReadResult> {
   };
 }
 
+async function openEditableDocument(filePath: string, buffer: Buffer, extension: string): Promise<FileOpenResult> {
+  let content: string;
+  let type: string;
+  if (extension === ".docx") {
+    const extracted = await mammoth.extractRawText({ buffer });
+    content = normalizeDocumentText(extracted.value);
+    type = "Word DOCX";
+  } else {
+    const entries = zipEntries(buffer);
+    const xml = entries ? zipText(buffer, entries, "content.xml") : "";
+    if (!xml) throw new Error("O pacote OpenDocument não contém content.xml legível.");
+    content = normalizeDocumentText(xmlToText(xml));
+    type = extension === ".odt" ? "OpenDocument Text (ODT)" : "OpenDocument Text (ODF)";
+  }
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    editor: "text",
+    size: buffer.byteLength,
+    type,
+    content,
+    editableStructuredKind: "document"
+  };
+}
+
+function openSpreadsheetFile(filePath: string, buffer: Buffer, extension: string): FileOpenResult {
+  try {
+    const workbook = XLSX.read(buffer, { type: "buffer", cellFormula: true, cellNF: true, cellText: false, raw: true });
+    const sheets = workbook.SheetNames.map(name => spreadsheetSheetToText(name, workbook.Sheets[name])).join("\n\n");
+    const content = `# Planilha editável: células são separadas por TAB e fórmulas começam com =.\n# Inicie cada aba com ## Sheet: Nome da aba.\n\n${sheets}`;
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      editor: "text",
+      size: buffer.byteLength,
+      type: spreadsheetType(extension),
+      content: content || "## Sheet: Planilha1\n",
+      editableStructuredKind: "spreadsheet"
+    };
+  } catch (error) {
+    throw new Error(`Não foi possível ler esta planilha. ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function spreadsheetSheetToText(name: string, sheet: XLSX.WorkSheet | undefined): string {
+  const rows: string[] = [`## Sheet: ${name.replace(/[\r\n]/g, " ")}`];
+  const ref = sheet?.["!ref"];
+  if (!sheet || !ref) return rows.join("\n");
+  const range = XLSX.utils.decode_range(ref);
+  for (let row = range.s.r; row <= range.e.r; row++) {
+    const values: string[] = [];
+    for (let column = range.s.c; column <= range.e.c; column++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
+      const value = cell?.f ? `=${cell.f}` : spreadsheetCellText(cell?.v);
+      values.push(value.replace(/[\t\r\n]/g, " "));
+    }
+    while (values.length && !values.at(-1)) values.pop();
+    rows.push(values.join("\t"));
+  }
+  return rows.join("\n");
+}
+
+function spreadsheetCellText(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function spreadsheetType(extension: string): string {
+  return ({ ".xlsx": "Excel XLSX", ".xls": "Excel XLS", ".xlsm": "Excel XLSM", ".xlsb": "Excel XLSB", ".ods": "OpenDocument Spreadsheet (ODS)", ".csv": "CSV", ".tsv": "TSV" } as Record<string, string>)[extension] ?? "Planilha";
+}
+
+function normalizeDocumentText(content: string): string {
+  return content.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
 /** Resolves the editor from both the file signature/content and its extension. */
 export async function openFile(targetPath: string, forceText = false): Promise<FileOpenResult> {
   const filePath = normalizeFsPath(targetPath);
@@ -141,6 +222,14 @@ export async function openFile(targetPath: string, forceText = false): Promise<F
 
   if (!forceText && MEDIA_EXTENSIONS.has(extension)) {
     return binaryPreview(filePath, buffer, type, "media", "Mídia", extension);
+  }
+
+  if (!forceText && SPREADSHEET_EXTENSIONS.has(extension)) {
+    return openSpreadsheetFile(filePath, buffer, extension);
+  }
+
+  if (!forceText && EDITABLE_DOCUMENT_EXTENSIONS.has(extension) && isZipArchive(buffer)) {
+    return await openEditableDocument(filePath, buffer, extension);
   }
 
   if (!forceText && DOCUMENT_CONTAINER_EXTENSIONS.has(extension) && isZipArchive(buffer)) {
@@ -203,11 +292,11 @@ export async function openFile(targetPath: string, forceText = false): Promise<F
       return {
         path: filePath,
         name: path.basename(filePath),
-        editor: "nbt",
+        editor: "text",
         size: buffer.byteLength,
         type: "NBT",
         content: nbt,
-        previewSummary: "Estrutura NBT em modo somente leitura"
+        editableStructuredKind: "nbt"
       };
     }
   }
@@ -620,6 +709,92 @@ function tryParseNbt(input: Buffer): string | undefined {
   }
 }
 
+async function saveNbtFile(filePath: string, content: string): Promise<void> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error) {
+    throw new Error(`NBT precisa ser JSON válido antes de salvar. ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("O JSON NBT precisa conter um objeto raiz.");
+  }
+  const rootEntries = Object.entries(parsed as Record<string, unknown>);
+  const [rootName, rootValue] = rootEntries.length === 1 ? rootEntries[0] : ["root", parsed];
+  if (!rootValue || Array.isArray(rootValue) || typeof rootValue !== "object") {
+    throw new Error("A raiz NBT deve ser um compound (objeto JSON).");
+  }
+  const source = await fsp.readFile(filePath).catch(() => Buffer.alloc(0));
+  const binary = encodeNbtRoot(rootName, rootValue);
+  await fsp.writeFile(filePath, source.subarray(0, 2).equals(Buffer.from([0x1f, 0x8b])) ? gzipSync(binary) : binary);
+}
+
+function encodeNbtRoot(name: string, value: object): Buffer {
+  const chunks: Buffer[] = [Buffer.from([10]), encodeNbtString(name)];
+  encodeNbtPayload(10, value, chunks);
+  return Buffer.concat(chunks);
+}
+
+function encodeNbtPayload(type: number, value: unknown, chunks: Buffer[]): void {
+  switch (type) {
+    case 1: chunks.push(Buffer.from([Number(value) & 0xff])); return;
+    case 2: { const buffer = Buffer.allocUnsafe(2); buffer.writeInt16BE(Number(value)); chunks.push(buffer); return; }
+    case 3: { const buffer = Buffer.allocUnsafe(4); buffer.writeInt32BE(Number(value)); chunks.push(buffer); return; }
+    case 4: { const buffer = Buffer.allocUnsafe(8); buffer.writeBigInt64BE(nbtLong(value)); chunks.push(buffer); return; }
+    case 5: { const buffer = Buffer.allocUnsafe(4); buffer.writeFloatBE(Number(value)); chunks.push(buffer); return; }
+    case 6: { const buffer = Buffer.allocUnsafe(8); buffer.writeDoubleBE(Number(value)); chunks.push(buffer); return; }
+    case 8: chunks.push(encodeNbtString(String(value))); return;
+    case 9: {
+      const list = Array.isArray(value) ? value : [];
+      const elementType = list.length ? nbtTypeFor(list[0]) : 1;
+      chunks.push(Buffer.from([elementType]), encodeNbtInt(list.length));
+      for (const item of list) encodeNbtPayload(elementType, item, chunks);
+      return;
+    }
+    case 10: {
+      const object = value as Record<string, unknown>;
+      for (const [key, child] of Object.entries(object)) {
+        const childType = nbtTypeFor(child);
+        chunks.push(Buffer.from([childType]), encodeNbtString(key));
+        encodeNbtPayload(childType, child, chunks);
+      }
+      chunks.push(Buffer.from([0]));
+      return;
+    }
+    default: throw new Error(`Tipo NBT ${type} não suportado para gravação.`);
+  }
+}
+
+function nbtTypeFor(value: unknown): number {
+  if (typeof value === "boolean") return 1;
+  if (typeof value === "number") return Number.isInteger(value) && value >= -2147483648 && value <= 2147483647 ? 3 : 6;
+  if (typeof value === "string" && /^-?\d+n$/.test(value)) return 4;
+  if (typeof value === "string") return 8;
+  if (Array.isArray(value)) return 9;
+  if (value && typeof value === "object") return 10;
+  throw new Error("Valores NBT devem ser booleanos, números, strings, listas ou objetos.");
+}
+
+function encodeNbtString(value: string): Buffer {
+  const text = Buffer.from(value, "utf8");
+  if (text.byteLength > 65535) throw new Error("Uma string NBT não pode ultrapassar 65.535 bytes.");
+  const length = Buffer.allocUnsafe(2);
+  length.writeUInt16BE(text.byteLength);
+  return Buffer.concat([length, text]);
+}
+
+function encodeNbtInt(value: number): Buffer {
+  const buffer = Buffer.allocUnsafe(4);
+  buffer.writeInt32BE(value);
+  return buffer;
+}
+
+function nbtLong(value: unknown): bigint {
+  if (typeof value === "string" && /^-?\d+n$/.test(value)) return BigInt(value.slice(0, -1));
+  if (typeof value === "bigint") return value;
+  return BigInt(Math.trunc(Number(value)));
+}
+
 const nbtJsonReplacer = (_key: string, value: unknown): unknown => typeof value === "bigint" ? `${value}n` : value;
 
 class NbtReader {
@@ -710,6 +885,106 @@ function mimeTypeFor(extension: string): string {
     ".pdf": "application/pdf", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".oga": "audio/ogg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".flac": "audio/flac",
     ".mp4": "video/mp4", ".webm": "video/webm", ".ogv": "video/ogg", ".mov": "video/quicktime", ".mkv": "video/x-matroska"
   } as Record<string, string>)[extension] ?? "application/octet-stream";
+}
+
+export async function saveStructuredFile(request: StructuredFileSaveRequest): Promise<void> {
+  const filePath = normalizeFsPath(request.path);
+  switch (request.kind) {
+    case "spreadsheet":
+      await saveSpreadsheetFile(filePath, request.content);
+      return;
+    case "document":
+      await saveEditableDocument(filePath, request.content);
+      return;
+    case "nbt":
+      await saveNbtFile(filePath, request.content);
+      return;
+    default:
+      throw new Error("Formato estruturado não suportado.");
+  }
+}
+
+async function saveSpreadsheetFile(filePath: string, content: string): Promise<void> {
+  const sheets = parseSpreadsheetText(content);
+  if (!sheets.length) throw new Error("A planilha precisa conter ao menos uma aba iniciada por '## Sheet:'.");
+  const workbook = XLSX.utils.book_new();
+  for (const sheetData of sheets) {
+    const sheet = XLSX.utils.aoa_to_sheet([]);
+    sheetData.rows.forEach((row, rowIndex) => row.forEach((value, columnIndex) => {
+      if (!value) return;
+      const address = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+      if (value.startsWith("=") && value.length > 1) {
+        sheet[address] = { t: "n", f: value.slice(1), v: 0 };
+      } else if (/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value)) {
+        sheet[address] = { t: "n", v: Number(value) };
+      } else if (/^(true|false)$/i.test(value)) {
+        sheet[address] = { t: "b", v: value.toLowerCase() === "true" };
+      } else {
+        sheet[address] = { t: "s", v: value };
+      }
+    }));
+    if (sheetData.rows.length && sheetData.rows.some(row => row.length)) {
+      const columns = Math.max(...sheetData.rows.map(row => row.length));
+      sheet["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: sheetData.rows.length - 1, c: Math.max(columns - 1, 0) } });
+    }
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetData.name.slice(0, 31) || "Planilha");
+  }
+  const extension = path.extname(filePath).toLowerCase();
+  const bookType = ({ ".xls": "biff8", ".xlsm": "xlsm", ".xlsb": "xlsb", ".ods": "ods", ".csv": "csv", ".tsv": "txt" } as Record<string, XLSX.BookType>)[extension] ?? "xlsx";
+  const output = XLSX.write(workbook, { type: "buffer", bookType, bookSST: true });
+  await fsp.writeFile(filePath, output);
+}
+
+function parseSpreadsheetText(content: string): Array<{ name: string; rows: string[][] }> {
+  const sheets: Array<{ name: string; rows: string[][] }> = [];
+  let active: { name: string; rows: string[][] } | undefined;
+  for (const line of content.replace(/\r\n?/g, "\n").split("\n")) {
+    const header = /^##\s+Sheet:\s*(.*)$/i.exec(line);
+    if (header) {
+      active = { name: header[1].trim() || `Planilha${sheets.length + 1}`, rows: [] };
+      sheets.push(active);
+    } else if (active) {
+      active.rows.push(line.split("\t"));
+    }
+  }
+  return sheets;
+}
+
+async function saveEditableDocument(filePath: string, content: string): Promise<void> {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".docx") {
+    await fsp.writeFile(filePath, await createDocx(content));
+    return;
+  }
+  if (extension === ".odt" || extension === ".odf") {
+    await fsp.writeFile(filePath, await createOdt(content));
+    return;
+  }
+  throw new Error("A edição estruturada requer um arquivo DOCX, ODT ou ODF.");
+}
+
+async function createDocx(content: string): Promise<Buffer> {
+  const zip = new JSZip();
+  const paragraphs = content.split(/\r\n?|\n/).map(line => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`).join("");
+  zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`);
+  return await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+}
+
+async function createOdt(content: string): Promise<Buffer> {
+  const zip = new JSZip();
+  const paragraphs = content.split(/\r\n?|\n/).map(line => `<text:p>${escapeXml(line) || " "}</text:p>`).join("");
+  zip.file("mimetype", "application/vnd.oasis.opendocument.text", { compression: "STORE" });
+  zip.file("content.xml", `<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2"><office:body><office:text>${paragraphs}</office:text></office:body></office:document-content>`);
+  zip.file("styles.xml", `<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.2"/>`);
+  zip.file("meta.xml", `<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.2"/>`);
+  zip.file("META-INF/manifest.xml", `<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/></manifest:manifest>`);
+  return await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[<>&"']/g, character => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "\"": "&quot;", "'": "&apos;" })[character] ?? character);
 }
 
 export async function writeFile(targetPath: string, content: string, encoding: TextEncoding = "utf8"): Promise<void> {
