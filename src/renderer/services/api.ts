@@ -1047,7 +1047,7 @@ async function applyFallbackTemplate(fs: FsApi, request: TemplateApplyRequest): 
 function browserAppInfo(): AppInfo {
   return {
     name: "NPSharp",
-    version: "26.8.18",
+    version: "26.8.19",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,

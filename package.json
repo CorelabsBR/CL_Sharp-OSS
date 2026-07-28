@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.18",
+  "version": "26.8.19",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -129,7 +129,7 @@
     },
     "portable": {
       "artifactName": "${productName}-Portable-${version}-${arch}.${ext}",
-      "requestExecutionLevel": "asInvoker",
+      "requestExecutionLevel": "user",
       "unpackDirName": "NPSharp"
     },
     "deb": {

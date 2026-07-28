@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.19 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Corrige a configuração Portable do electron-builder: usa `requestExecutionLevel: "user"`, valor aceito pelo schema do electron-builder 25.1.8.
+
 ## 26.8.18 - 2026-07-28
 
 Type: Feature
