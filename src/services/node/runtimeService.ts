@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { createHash } from "node:crypto";

@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 /** Idiomas oferecidos pela interface do NPSharp. */
 export const SUPPORTED_LOCALES = ["pt-BR", "en-US"] as const;
 

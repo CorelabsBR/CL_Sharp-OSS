@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 // The minimal editor API does not include Codicon styles. The Find widget uses
 // those glyphs for its controls (next/previous, replace and close).

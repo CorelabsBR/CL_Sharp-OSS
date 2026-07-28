@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { isSafeCustomShortcut, normalizeShortcut, shortcutFromEvent, type ShortcutBinding } from "../shortcuts/keybindings";
 import { shortcutConflicts } from "../shortcuts/shortcutRegistry";
 import { el } from "../utils/dom";

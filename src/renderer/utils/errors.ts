@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;

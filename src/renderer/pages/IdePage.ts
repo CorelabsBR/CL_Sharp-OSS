@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
 import type { AppLocale } from "../../shared/i18n";
 import { setUiLocale } from "../../shared/i18n";
@@ -2185,7 +2189,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   }
 private about(): void {
   alert(`NPSharp
-Versão 26.8.20
+Versão 26.8.22
 
 Desenvolvido pela CoreLabs.
 

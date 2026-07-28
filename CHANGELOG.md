@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 26.8.22 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Consolida as regras de `.gitignore` para dependências, caches, artefatos de build, ambientes locais e arquivos sensíveis, removendo `node_modules` do rastreamento do Git.
+
+## 26.8.21 - 2026-07-28
+
+Type: Refactor
+
+Description:
+- Configura ESLint com verificação obrigatória do cabeçalho de licença CorelabsBR e aplica o cabeçalho aos arquivos de código mantidos pelo projeto.
+
 ## 26.8.20 - 2026-07-28
 
 Type: Fix

@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 /** Content written only by NPSharp's explicit new-file flow. */
 export const GTA6_EASTER_EGG_FILE_NAME = "gta6.py";
 

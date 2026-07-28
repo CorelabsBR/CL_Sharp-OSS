@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { GitCommit, GitFileStatus, GitRepositoryStatus } from "../../shared/types";
 import { api, platform } from "../services/api";
 import { buttonIcon, el, fileIcon } from "../utils/dom";

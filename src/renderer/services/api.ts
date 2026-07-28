@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import type { PermissionState } from "@capacitor/core";
 import type {
@@ -1047,7 +1051,7 @@ async function applyFallbackTemplate(fs: FsApi, request: TemplateApplyRequest): 
 function browserAppInfo(): AppInfo {
   return {
     name: "NPSharp",
-    version: "26.8.20",
+    version: "26.8.22",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,

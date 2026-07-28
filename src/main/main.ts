@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";

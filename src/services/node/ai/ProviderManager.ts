@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { AIModel, AIProviderDescriptor, AIProviderId, AISettings } from "../../../shared/types";
 import type { AIProvider } from "./AIProvider";
 import { AISettingsService } from "./AISettingsService";

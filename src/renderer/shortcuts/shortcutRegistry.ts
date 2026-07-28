@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { CustomShortcutBinding } from "../../shared/types";
 import { isSafeCustomShortcut, normalizeShortcut, type ShortcutBinding, type ShortcutCategory, type ShortcutScope } from "./keybindings";
 

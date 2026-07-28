@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { EditorDiagnostic, FileOpenResult, SearchResult, TextEncoding } from "../../shared/types";
 import { COMPACT_MINIMAP_OPTIONS, configureMonaco, ensureLanguageSupport, languageForPath, monaco } from "../../editor/monacoSetup";
 import type { ShortcutBinding } from "../shortcuts/keybindings";

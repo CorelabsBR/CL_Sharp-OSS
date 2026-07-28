@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
 import { initialContentForNewNPSharpFile } from "../../core/easterEggs";
 import { api, platform } from "../services/api";

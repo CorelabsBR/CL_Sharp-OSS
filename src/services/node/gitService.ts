@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { GitCommit, GitFileStatus, GitOperationResult, GitRepositoryStatus, GitStatusKind } from "../../shared/types";

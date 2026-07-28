@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { AIChatRequest, AIContextItem, AIStreamEvent } from "../../../shared/types";
 import { AISettingsService } from "./AISettingsService";
 import { PromptBuilder } from "./PromptBuilder";
