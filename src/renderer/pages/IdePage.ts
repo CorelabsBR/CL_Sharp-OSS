@@ -2185,7 +2185,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   }
 private about(): void {
   alert(`NPSharp
-Versão 26.8.19
+Versão 26.8.20
 
 Desenvolvido pela CoreLabs.
 

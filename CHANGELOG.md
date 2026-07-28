@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.20 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Remove a validação de tag de entrada do workflow de release. O pipeline agora calcula `v<package.version>` e cria ou reutiliza essa tag somente ao publicar os artefatos aprovados.
+
 ## 26.8.19 - 2026-07-28
 
 Type: Fix

@@ -1,6 +1,6 @@
 {
   "name": "@npsharp/vscode-api",
-  "version": "26.8.19",
+  "version": "26.8.20",
   "private": true,
   "type": "module",
   "main": "index.ts"

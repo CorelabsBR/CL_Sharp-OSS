@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.19",
+  "version": "26.8.20",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
