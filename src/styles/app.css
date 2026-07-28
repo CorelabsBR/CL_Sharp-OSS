@@ -1887,6 +1887,12 @@ button {
 }
 
 .error-lens {
+  display: inline-block;
+  max-width: min(62vw, 900px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
   opacity: 0.9;
   font-style: italic;
 }
@@ -1937,7 +1943,7 @@ button {
 
 .error-lens-information,
 .error-lens-hint {
-  color: var(--muted);
+  color: #3794ff;
 }
 
 .status-bar {

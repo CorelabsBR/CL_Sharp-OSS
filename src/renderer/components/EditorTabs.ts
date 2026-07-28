@@ -117,6 +117,7 @@ export class EditorTabs {
       minimap: COMPACT_MINIMAP_OPTIONS,
       colorDecorators: false,
       glyphMargin: true,
+      overviewRulerLanes: 3,
       renderLineHighlight: "all",
       lineNumbers: "on",
       wordWrap: "off",
@@ -125,7 +126,13 @@ export class EditorTabs {
     });
     this.disposables.push(
       this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor()),
-      this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus())
+      this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus()),
+      monaco.editor.onDidChangeMarkers(changedModels => {
+        const model = this.editor.getModel();
+        if (model && changedModels.some(uri => uri.toString() === model.uri.toString())) {
+          this.renderErrorLens();
+        }
+      })
     );
     document.head.append(this.colorStyle);
     this.registerAIContextActions();
@@ -997,35 +1004,50 @@ export class EditorTabs {
   private renderErrorLens(): void {
     this.errorLensDecorations ??= this.editor.createDecorationsCollection();
     const tab = this.activeTab;
-    if (!tab?.path || !this.errorLensEnabled) {
+    if (!tab || !this.errorLensEnabled) {
       this.errorLensDecorations.clear();
       return;
     }
 
-    const decorations = this.diagnostics
-      .filter(item => sameFilePath(item.filePath, tab.path))
-      .map(item => ({
+    const diagnosticsByLine = new Map<number, monaco.editor.IMarker[]>();
+    for (const marker of monaco.editor.getModelMarkers({ resource: tab.model.uri })) {
+      const line = boundedLine(tab.model, marker.startLineNumber);
+      const markers = diagnosticsByLine.get(line) ?? [];
+      markers.push(marker);
+      diagnosticsByLine.set(line, markers);
+    }
+
+    const decorations = [...diagnosticsByLine.entries()].map(([line, markers]) => {
+      const severity = highestMarkerSeverity(markers);
+      const severityName = markerSeverityClass(severity);
+      const color = markerColor(severity);
+      const message = errorLensText(markers);
+      const markdown = errorLensMarkdown(markers, severity);
+      return {
         range: new monaco.Range(
-          boundedLine(tab.model, item.line),
-          tab.model.getLineMaxColumn(boundedLine(tab.model, item.line)),
-          boundedLine(tab.model, item.line),
-          tab.model.getLineMaxColumn(boundedLine(tab.model, item.line))
+          line,
+          tab.model.getLineMaxColumn(line),
+          line,
+          tab.model.getLineMaxColumn(line)
         ),
         options: {
           isWholeLine: true,
-          className: `error-lens-line error-lens-line-${severityClass(item.severity)}`,
-          linesDecorationsClassName: `error-lens-lines error-lens-lines-${severityClass(item.severity)}`,
-          glyphMarginClassName: `error-lens-glyph error-lens-glyph-${severityClass(item.severity)}`,
-          glyphMarginHoverMessage: { value: errorLensMarkdown(item) },
+          className: `error-lens-line error-lens-line-${severityName}`,
+          linesDecorationsClassName: `error-lens-lines error-lens-lines-${severityName}`,
+          glyphMarginClassName: `error-lens-glyph error-lens-glyph-${severityName}`,
+          glyphMarginHoverMessage: { value: markdown },
           after: {
-            content: `  ${errorLensText(item)}`,
-            inlineClassName: `error-lens error-lens-${severityClass(item.severity)}`,
+            content: `  ${message}`,
+            inlineClassName: `error-lens error-lens-${severityName}`,
             cursorStops: monaco.editor.InjectedTextCursorStops.None
           },
-          hoverMessage: { value: errorLensMarkdown(item) },
+          hoverMessage: { value: markdown },
+          overviewRuler: { color, position: monaco.editor.OverviewRulerLane.Right },
+          minimap: { color, position: monaco.editor.MinimapPosition.Inline },
           zIndex: 20
         }
-      }));
+      };
+    });
     this.errorLensDecorations.set(decorations);
   }
 
@@ -1217,16 +1239,46 @@ function boundedColumn(model: monaco.editor.ITextModel, line: number, column: nu
   return Math.min(Math.max(1, column), model.getLineMaxColumn(safeLine));
 }
 
-function severityClass(severity: EditorDiagnostic["severity"]): string {
-  return severity.toLowerCase();
+function markerSeverityClass(severity: monaco.MarkerSeverity): string {
+  switch (severity) {
+    case monaco.MarkerSeverity.Error:
+      return "error";
+    case monaco.MarkerSeverity.Warning:
+      return "warning";
+    case monaco.MarkerSeverity.Info:
+      return "information";
+    default:
+      return "hint";
+  }
 }
 
-function errorLensText(diagnostic: EditorDiagnostic): string {
-  return diagnostic.source ? `${diagnostic.message} (${diagnostic.source})` : diagnostic.message;
+function highestMarkerSeverity(markers: monaco.editor.IMarker[]): monaco.MarkerSeverity {
+  return markers.reduce((highest, marker) => Math.max(highest, marker.severity), monaco.MarkerSeverity.Hint);
 }
 
-function errorLensMarkdown(diagnostic: EditorDiagnostic): string {
-  return `**${diagnostic.severity}** ${errorLensText(diagnostic)}`;
+function markerColor(severity: monaco.MarkerSeverity): string {
+  switch (severity) {
+    case monaco.MarkerSeverity.Error:
+      return "#f14c4c";
+    case monaco.MarkerSeverity.Warning:
+      return "#cca700";
+    case monaco.MarkerSeverity.Info:
+      return "#3794ff";
+    default:
+      return "#8c8c8c";
+  }
+}
+
+function errorLensText(markers: monaco.editor.IMarker[]): string {
+  return markers.map(marker => {
+    const message = marker.message.replace(/\s+/g, " ").trim();
+    return marker.source ? `${message} (${marker.source})` : message;
+  }).join("  •  ");
+}
+
+function errorLensMarkdown(markers: monaco.editor.IMarker[], severity: monaco.MarkerSeverity): string {
+  const label = markerSeverityClass(severity).toUpperCase();
+  return `**${label}**\n\n${markers.map(marker => `- ${marker.message}`).join("\n")}`;
 }
 
 function findBrandRanges(model: monaco.editor.ITextModel, terms: string[]): monaco.Range[] {

@@ -6,6 +6,7 @@ import type { AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnos
 import type { AppLocale } from "../../shared/i18n";
 import { setUiLocale } from "../../shared/i18n";
 import { BUILD_CONFIG } from "../../shared/buildConfig";
+import { PortugolInterpreter } from "../../core/portugol/interpreter";
 import { ArduinoPanel } from "../components/ArduinoPanel";
 import { AIChatPanel } from "../components/AIChatPanel";
 import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
@@ -1588,6 +1589,11 @@ export class IdePage {
       await this.terminal.ensureTerminal();
       this.terminal.appendTerminalOutput(`[Run] Arquivo detectado: ${basename(filePath)}`);
 
+      if (isPortugolFile(filePath)) {
+        await this.runPortugolFile(this.editor.getCurrentText());
+        return;
+      }
+
       if (/\.html?$/i.test(filePath)) {
         if (platform.canUseLiveServer && this.explorer.workspace) {
           const result = await api.liveServer.open({ workspace: this.explorer.workspace, filePath });
@@ -1615,6 +1621,21 @@ export class IdePage {
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha na execução");
     }
+  }
+
+  private async runPortugolFile(source: string): Promise<void> {
+    let failed = false;
+    const interpreter = new PortugolInterpreter();
+    await interpreter.executeWithOutputAsync(
+      source,
+      () => this.terminal.requestProgramInput("Entrada do Portugol"),
+      line => {
+        if (line.includes("[ERRO]")) failed = true;
+        this.terminal.appendTerminalOutput(`[PORTUGOL] ${line}`);
+      }
+    );
+    this.terminal.appendTerminalOutput("[Run] Execução finalizada");
+    this.updateStatus(failed ? "Falha na execução Portugol" : "Execução Portugol concluída");
   }
 
   private async installCurrentPythonDependencies(): Promise<void> {
@@ -2234,6 +2255,10 @@ function projectNameFromInput(value: string): string {
 
 function problemSeverityLabel(severity: EditorDiagnostic["severity"]): string {
   return ({ ERROR: "Erro", WARNING: "Aviso", INFORMATION: "Informação", HINT: "Dica" } as const)[severity];
+}
+
+function isPortugolFile(filePath: string): boolean {
+  return [".gol", ".por", ".portugol", ".alg"].includes(extname(filePath).toLowerCase());
 }
 
 function isProjectRunFile(filePath: string): boolean {

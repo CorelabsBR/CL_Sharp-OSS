@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 26.8.31 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Atualiza o `compileSdk` e as Build Tools Android para API 36, compatibilizando o aplicativo com `androidx.activity 1.11.0` e `androidx.core 1.17.0` durante a validação AAR do Gradle.
+
+## 26.8.30 - 2026-07-28
+
+Type: Feature
+
+Description:
+- A execução de Portugol agora pausa em `leia(...)`, ativa a entrada do terminal e continua somente depois que o usuário confirma o valor com Enter.
+
+## 26.8.29 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Faz o Error Lens acompanhar todos os marcadores do Monaco, incluindo diagnósticos nativos da linguagem, e exibir as mensagens consolidadas diretamente na linha afetada.
+- Adiciona marcadores de severidade ao minimapa e à régua de visão geral, mantendo os erros visíveis mesmo em arquivos grandes.
+
 ## 26.8.28 - 2026-07-28
 
 Type: Fix

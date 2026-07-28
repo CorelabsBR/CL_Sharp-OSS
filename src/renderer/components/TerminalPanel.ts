@@ -43,6 +43,7 @@ export class TerminalPanel {
   private terminalCounter = 0;
   private enabled = true;
   private creatingTerminal?: Promise<void>;
+  private pendingProgramInput?: (value: string) => void;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
 
@@ -68,6 +69,7 @@ export class TerminalPanel {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.completeProgramInput("");
     for (const dispose of this.disposers.splice(0)) {
       dispose();
     }
@@ -197,6 +199,19 @@ export class TerminalPanel {
     });
   }
 
+  async requestProgramInput(prompt = "Entrada do programa"): Promise<string> {
+    await this.ensureTerminal();
+    if (this.disposed) return "";
+    this.completeProgramInput("");
+    return await new Promise<string>(resolve => {
+      this.pendingProgramInput = resolve;
+      this.mode = "terminal";
+      this.input.placeholder = `${prompt} — digite e pressione Enter`;
+      this.render();
+      this.input.focus();
+    });
+  }
+
   async runCommand(command: string): Promise<void> {
     await this.ensureTerminal();
     this.mode = "terminal";
@@ -276,8 +291,15 @@ export class TerminalPanel {
     this.input.addEventListener("keydown", event => {
       const session = this.activeSession();
       if (event.key === "Enter") {
+        event.preventDefault();
         const command = this.input.value;
         this.input.value = "";
+        if (this.pendingProgramInput) {
+          if (session) session.output = trimScrollback(`${session.output}${command}\n`);
+          this.completeProgramInput(command);
+          this.render();
+          return;
+        }
         void this.runCommand(command);
       } else if (event.key === "ArrowUp" && session) {
         event.preventDefault();
@@ -406,6 +428,7 @@ export class TerminalPanel {
     const index = this.sessions.findIndex(item => item.id === this.activeId);
     if (index < 0) return;
     const [session] = this.sessions.splice(index, 1);
+    this.completeProgramInput("");
     if (!session.localOnly) {
       try {
         await api.terminal.close(session.id);
@@ -450,6 +473,12 @@ export class TerminalPanel {
     this.updateStatus("Terminal indisponivel neste ambiente");
   }
 
+  private completeProgramInput(value: string): void {
+    const resolve = this.pendingProgramInput;
+    this.pendingProgramInput = undefined;
+    resolve?.(value);
+  }
+
   private render(): void {
     if (this.disposed) return;
     this.tabs.replaceChildren();
@@ -472,7 +501,9 @@ export class TerminalPanel {
     this.tabs.hidden = this.mode !== "terminal";
     this.input.hidden = this.mode !== "terminal";
     this.input.disabled = this.mode !== "terminal" || !session;
-    this.input.placeholder = session?.running || session?.localOnly ? "Comando" : "Processo encerrado";
+    this.input.placeholder = this.pendingProgramInput
+      ? "Entrada do programa — digite e pressione Enter"
+      : session?.running || session?.localOnly ? "Comando" : "Processo encerrado";
     this.shellSelect.hidden = this.mode !== "terminal";
     this.debugOutput.hidden = this.mode !== "debug";
     this.debugInput.hidden = this.mode !== "debug";

@@ -3,8 +3,8 @@
   "application": {
     "packageName": "NPSharp",
     "displayName": "NPSharp",
-    "version": "26.8.28",
-    "versionCode": 260828,
+    "version": "26.8.31",
+    "versionCode": 260831,
     "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",
@@ -148,9 +148,9 @@
   "android": {
     "namespace": "br.com.corelabs.npsharp",
     "minSdkVersion": 23,
-    "compileSdkVersion": 35,
+    "compileSdkVersion": 36,
     "targetSdkVersion": 35,
-    "buildToolsVersion": "35.0.0",
+    "buildToolsVersion": "36.0.0",
     "gradlePluginVersion": "8.13.2",
     "gradleDistributionVersion": "8.14.3",
     "googleServicesPluginVersion": "4.5.0",

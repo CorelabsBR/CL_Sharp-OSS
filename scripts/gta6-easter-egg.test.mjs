@@ -111,3 +111,29 @@ test("10. Arquivos .gol existentes continuam intactos e não são sobrescritos",
     assert.equal(await readFile(file, "utf8"), "conteúdo do usuário");
   });
 });
+
+test("11. leia aguarda a entrada assíncrona antes de continuar a execução Portugol", async () => {
+  const source = `algoritmo "Entrada"
+var
+  idade: inteiro
+inicio
+  leia(idade)
+  escreval(idade)
+fimalgoritmo`;
+  const output = [];
+  let deliverInput;
+  let finished = false;
+  const interpreter = new PortugolInterpreter();
+  const run = interpreter.executeWithOutputAsync(
+    source,
+    () => new Promise(resolve => { deliverInput = resolve; }),
+    line => output.push(line)
+  ).then(() => { finished = true; });
+
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(finished, false);
+  assert.equal(typeof deliverInput, "function");
+  deliverInput("42");
+  await run;
+  assert.deepEqual(output, ["42"]);
+});

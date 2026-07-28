@@ -5,6 +5,7 @@
 import { PortugolLexer, Token, TokenType } from "./lexer";
 
 export type PortugolInputProvider = () => string;
+export type PortugolAsyncInputProvider = () => Promise<string>;
 export type PortugolOutputHandler = (line: string) => void;
 
 export class PortugolInterpreter {
@@ -12,6 +13,7 @@ export class PortugolInterpreter {
   private tokens: Token[] = [];
   private current = 0;
   private inputProvider?: PortugolInputProvider;
+  private asyncInputProvider?: PortugolAsyncInputProvider;
   private outputHandler: PortugolOutputHandler = () => undefined;
 
   setInputProvider(provider?: PortugolInputProvider): void {
@@ -25,6 +27,16 @@ export class PortugolInterpreter {
   executeWithOutput(source: string, output: PortugolOutputHandler): void {
     this.setOutputHandler(output);
     this.execute(source);
+  }
+
+  async executeWithOutputAsync(source: string, inputProvider: PortugolAsyncInputProvider, output: PortugolOutputHandler): Promise<void> {
+    this.setOutputHandler(output);
+    this.asyncInputProvider = inputProvider;
+    try {
+      await this.executeAsync(source);
+    } finally {
+      this.asyncInputProvider = undefined;
+    }
   }
 
   executeCollecting(source: string): string[] {
@@ -50,6 +62,35 @@ export class PortugolInterpreter {
 
       while (!this.check(TokenType.FIMALGORITMO) && !this.isAtEnd()) {
         this.executeStatement();
+      }
+
+      this.consume(TokenType.FIMALGORITMO, "Esperado 'fimalgoritmo'.");
+    } catch (error) {
+      if (error instanceof Error) {
+        this.outputHandler(`[ERRO] ${error.message}`);
+      } else {
+        this.outputHandler(`[ERRO INTERNO] ${String(error)}`);
+      }
+    }
+  }
+
+  async executeAsync(source: string): Promise<void> {
+    try {
+      this.variables.clear();
+      this.tokens = new PortugolLexer(source).scanTokens();
+      this.current = 0;
+
+      this.consumeUntil(TokenType.VAR, TokenType.INICIO);
+
+      if (this.match(TokenType.VAR)) {
+        this.parseVarBlock();
+      }
+
+      this.consume(TokenType.INICIO, "Esperado 'inicio'.");
+      this.consumeLineEnd();
+
+      while (!this.check(TokenType.FIMALGORITMO) && !this.isAtEnd()) {
+        await this.executeStatementAsync();
       }
 
       this.consume(TokenType.FIMALGORITMO, "Esperado 'fimalgoritmo'.");
@@ -148,6 +189,55 @@ export class PortugolInterpreter {
     throw this.error(this.peek(), `Comando inválido: ${this.peek().lexeme}`);
   }
 
+  private async executeStatementAsync(): Promise<void> {
+    if (this.match(TokenType.NEWLINE)) return;
+
+    if (this.match(TokenType.ESCREVA) || this.match(TokenType.ESCREVAL)) {
+      this.executeWrite();
+      this.consumeLineEnd();
+      return;
+    }
+
+    if (this.match(TokenType.SE)) {
+      await this.executeIfAsync();
+      return;
+    }
+
+    if (this.match(TokenType.ENQUANTO)) {
+      await this.executeWhileAsync();
+      return;
+    }
+
+    if (this.check(TokenType.IDENTIFIER)) {
+      this.executeAssignment();
+      this.consumeLineEnd();
+      return;
+    }
+
+    if (this.match(TokenType.LEIA)) {
+      await this.executeReadAsync();
+      this.consumeLineEnd();
+      return;
+    }
+
+    if (this.match(TokenType.LIMPATELA)) {
+      this.outputHandler("\n\n\n\n\n");
+      this.consumeLineEnd();
+      return;
+    }
+
+    if (
+      this.check(TokenType.FIMALGORITMO) ||
+      this.check(TokenType.FIMSE) ||
+      this.check(TokenType.SENAO) ||
+      this.check(TokenType.FIMENQUANTO)
+    ) {
+      return;
+    }
+
+    throw this.error(this.peek(), `Comando inválido: ${this.peek().lexeme}`);
+  }
+
   private executeAssignment(): void {
     const name = this.consume(TokenType.IDENTIFIER, "Esperado nome da variável.");
     const varName = this.normalizeName(name.lexeme);
@@ -191,13 +281,21 @@ export class PortugolInterpreter {
       return;
     }
 
-    const raw = this.inputProvider();
-    let converted: unknown = raw;
-    const numeric = raw.includes(".") ? Number.parseFloat(raw) : Number.parseInt(raw, 10);
-    if (!Number.isNaN(numeric)) {
-      converted = numeric;
+    this.variables.set(varName, this.convertInput(this.inputProvider()));
+  }
+
+  private async executeReadAsync(): Promise<void> {
+    this.consume(TokenType.LEFT_PAREN, "Esperado '('.");
+    const name = this.consume(TokenType.IDENTIFIER, "Esperado nome da variável no leia.");
+    this.consume(TokenType.RIGHT_PAREN, "Esperado ')'.");
+
+    const varName = this.normalizeName(name.lexeme);
+    if (!this.variables.has(varName)) {
+      throw this.error(name, `Variável não declarada: ${name.lexeme}`);
     }
-    this.variables.set(varName, converted);
+
+    const raw = this.asyncInputProvider ? await this.asyncInputProvider() : "";
+    this.variables.set(varName, this.convertInput(raw));
   }
 
   private executeIf(): void {
@@ -237,6 +335,43 @@ export class PortugolInterpreter {
     this.consumeLineEnd();
   }
 
+  private async executeIfAsync(): Promise<void> {
+    const condition = this.toBoolean(this.evaluateExpression());
+    this.consume(TokenType.ENTAO, "Esperado 'entao'.");
+    this.consumeLineEnd();
+
+    if (condition) {
+      await this.executeUntilAsync(TokenType.SENAO, TokenType.FIMSE);
+      if (this.match(TokenType.SENAO)) {
+        this.skipUntil(TokenType.FIMSE);
+      }
+      this.consume(TokenType.FIMSE, "Esperado 'fimse'.");
+      this.consumeLineEnd();
+      return;
+    }
+
+    this.skipUntil(TokenType.SENAO, TokenType.FIMSE);
+    if (this.match(TokenType.SENAO)) {
+      if (!this.check(TokenType.NEWLINE) && !this.check(TokenType.FIMSE)) {
+        if (!this.toBoolean(this.evaluateExpression())) {
+          this.skipUntil(TokenType.FIMSE);
+          this.consume(TokenType.FIMSE, "Esperado 'fimse'.");
+          this.consumeLineEnd();
+          return;
+        }
+        if (this.check(TokenType.ENTAO)) {
+          this.advance();
+        }
+      }
+
+      this.consumeLineEnd();
+      await this.executeUntilAsync(TokenType.FIMSE);
+    }
+
+    this.consume(TokenType.FIMSE, "Esperado 'fimse'.");
+    this.consumeLineEnd();
+  }
+
   private executeWhile(): void {
     const conditionStart = this.current;
 
@@ -266,9 +401,44 @@ export class PortugolInterpreter {
     }
   }
 
+  private async executeWhileAsync(): Promise<void> {
+    const conditionStart = this.current;
+
+    while (true) {
+      this.current = conditionStart;
+      const condition = this.toBoolean(this.evaluateExpression());
+      this.consume(TokenType.FACA, "Esperado 'faca'.");
+      this.consumeLineEnd();
+
+      const bodyStart = this.current;
+
+      if (!condition) {
+        this.skipUntil(TokenType.FIMENQUANTO);
+        this.consume(TokenType.FIMENQUANTO, "Esperado 'fimenquanto'.");
+        this.consumeLineEnd();
+        return;
+      }
+
+      await this.executeUntilAsync(TokenType.FIMENQUANTO);
+      this.consume(TokenType.FIMENQUANTO, "Esperado 'fimenquanto'.");
+      this.consumeLineEnd();
+      this.current = conditionStart;
+
+      if (bodyStart === this.current) {
+        throw this.error(this.peek(), "Loop inválido.");
+      }
+    }
+  }
+
   private executeUntil(...stopTypes: TokenType[]): void {
     while (!this.isAtEnd() && !this.checkAny(...stopTypes)) {
       this.executeStatement();
+    }
+  }
+
+  private async executeUntilAsync(...stopTypes: TokenType[]): Promise<void> {
+    while (!this.isAtEnd() && !this.checkAny(...stopTypes)) {
+      await this.executeStatementAsync();
     }
   }
 
@@ -442,6 +612,11 @@ export class PortugolInterpreter {
 
   private normalizeNumber(value: number): number {
     return value === Math.round(value) ? Math.trunc(value) : value;
+  }
+
+  private convertInput(raw: string): unknown {
+    const numeric = raw.includes(".") ? Number.parseFloat(raw) : Number.parseInt(raw, 10);
+    return Number.isNaN(numeric) ? raw : numeric;
   }
 
   private normalizeName(name: string): string {
