@@ -17,8 +17,6 @@ concurrency:
 env:
   NODE_VERSION: "22"
   JAVA_VERSION: "21"
-  ANDROID_PLATFORM: "android-35"
-  ANDROID_BUILD_TOOLS: "35.0.0"
 
 jobs:
   verify:
@@ -66,9 +64,9 @@ jobs:
       - name: Validate Windows artifacts
         shell: bash
         run: |
-          test -n "$(find release -maxdepth 1 -name 'NPSharp-Setup-*-x64.exe' -print -quit)"
-          test -n "$(find release -maxdepth 1 -name 'NPSharp-Portable-*-x64.exe' -print -quit)"
-          test -n "$(find release -maxdepth 1 -name 'NPSharp-Portable-Fast-*-x64.zip' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*-Setup-*-x64.exe' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*-Portable-*-x64.exe' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*-Portable-Fast-*-x64.zip' -print -quit)"
           test -f release/latest.yml
       - name: Generate Windows checksums
         shell: bash
@@ -133,11 +131,20 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      - name: Resolve Android SDK versions from config
+        id: android_config
+        shell: bash
+        run: |
+          platform="$(node -e 'process.stdout.write(`android-${require("./config.json").android.compileSdkVersion}`)')"
+          build_tools="$(node -e 'process.stdout.write(require("./config.json").android.buildToolsVersion)')"
+          printf 'platform=%s\n' "$platform" >> "$GITHUB_OUTPUT"
+          printf 'build_tools=%s\n' "$build_tools" >> "$GITHUB_OUTPUT"
+
       - name: Install Android SDK packages
         shell: bash
         run: |
           sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${ANDROID_BUILD_TOOLS}"
+          sdkmanager "platform-tools" "platforms;${{ steps.android_config.outputs.platform }}" "build-tools;${{ steps.android_config.outputs.build_tools }}"
 
       - run: npm ci
       - run: npm run build:renderer
@@ -172,10 +179,16 @@ jobs:
         with:
           path: release-assets
 
-      - name: Resolve release tag from package version
+      - name: Resolve release metadata from config
         id: release_tag
         shell: bash
-        run: echo "value=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          version="$(node -e 'process.stdout.write(require("./config.json").application.version)')"
+          repository="$(node -e 'const repo = require("./config.json").application.repository; process.stdout.write(`${repo.owner}/${repo.name}`)')"
+          title="$(node -e 'process.stdout.write(require("./config.json").application.displayName)')"
+          printf 'value=v%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'repository=%s\n' "$repository" >> "$GITHUB_OUTPUT"
+          printf 'title=%s\n' "$title" >> "$GITHUB_OUTPUT"
 
       - name: Create or update the release and tag
         shell: bash
@@ -183,17 +196,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           release_tag="${{ steps.release_tag.outputs.value }}"
+          repository="${{ steps.release_tag.outputs.repository }}"
+          release_title="${{ steps.release_tag.outputs.title }}"
           mapfile -t assets < <(find release-assets -type f | sort)
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No updater artifacts were generated."
             exit 1
           fi
-          if gh release view "${release_tag}" --repo "CoreLabsBR/CL_NPSharp" >/dev/null 2>&1; then
-            gh release upload "${release_tag}" "${assets[@]}" --repo "CoreLabsBR/CL_NPSharp" --clobber
+          if gh release view "${release_tag}" --repo "${repository}" >/dev/null 2>&1; then
+            gh release upload "${release_tag}" "${assets[@]}" --repo "${repository}" --clobber
           else
             gh release create "${release_tag}" "${assets[@]}" \
-              --repo "CoreLabsBR/CL_NPSharp" \
+              --repo "${repository}" \
               --target "${GITHUB_SHA}" \
-              --title "NPSharp ${release_tag}" \
+              --title "${release_title} ${release_tag}" \
               --generate-notes
           fi

@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.22",
+  "version": "26.8.25",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -12,25 +12,26 @@
   },
   "license": "SEE LICENSE IN ../NPSharp/LICENSE.txt",
   "scripts": {
+    "config:sync": "node scripts/sync-project-config.mjs",
     "clean": "node scripts/clean.mjs",
-    "dev": "node scripts/dev.mjs",
-    "dev:renderer": "vite",
-    "build:renderer": "vite build",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "dev": "npm run config:sync && node scripts/dev.mjs",
+    "dev:renderer": "npm run config:sync && vite",
+    "build:renderer": "npm run config:sync && vite build",
+    "build:electron": "npm run config:sync && tsc -p tsconfig.electron.json",
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
-    "lint": "eslint .",
+    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "lint": "npm run config:sync && eslint .",
     "test": "npm run test:easter-egg && npm run test:updater",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
     "test:updater": "npm run build:electron && node dist-electron/services/node/updateSemver.test.js && node dist-electron/services/node/updateService.test.js && node dist-electron/services/node/updateIpc.test.js",
     "build": "node scripts/build.mjs",
-    "build:mobile": "npm run typecheck && npm run build:renderer",
+    "build:mobile": "npm run config:sync && npm run typecheck && npm run build:renderer",
     "package": "node scripts/build.mjs",
     "package:linux": "node scripts/build.mjs linux",
     "package:win": "node scripts/build.mjs win",
     "package:portable-fast": "node scripts/build.mjs portable-fast",
-    "mobile:init": "npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem && npx cap init NPSharp br.com.corelabs.npsharp --web-dir=dist && npx cap add android",
-    "cap:sync": "npm run build:mobile && npx cap sync android",
+    "mobile:init": "node scripts/mobile-init.mjs",
+    "cap:sync": "npm run config:sync && npm run build:mobile && npx cap sync android",
     "android": "npm run cap:sync && npx cap run android",
     "android:open": "npm run cap:sync && npx cap open android",
     "mobile:sync": "npm run cap:sync",
@@ -41,22 +42,22 @@
     "@capacitor/filesystem": "^8.1.2",
     "electron-updater": "6.8.9",
     "extract-zip": "^2.0.1",
-    "monaco-editor": "^0.52.2",
+    "monaco-editor": "^0.56.0",
     "sql.js": "^1.14.1",
-    "ssh2": "^1.16.0"
+    "ssh2": "^1.17.0"
   },
   "devDependencies": {
     "@capacitor/android": "^8.4.2",
     "@capacitor/cli": "^8.4.2",
-    "@types/node": "^22.10.2",
-    "@types/ssh2": "^1.15.4",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
-    "eslint": "^9.39.1",
-    "globals": "^16.5.0",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.50.0",
-    "vite": "^6.0.3"
+    "@types/node": "^26.1.2",
+    "@types/ssh2": "^1.15.5",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.8.0",
+    "globals": "^17.8.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vite": "^8.1.5"
   },
   "build": {
     "appId": "br.com.corelabs.npsharp",
@@ -168,6 +169,6 @@
     ]
   },
   "optionalDependencies": {
-    "node-pty": "1.0.0"
+    "node-pty": "1.1.0"
   }
 }

@@ -45,6 +45,7 @@ import {
 } from "../services/node/gitService";
 import { openLiveServer, stopAllLiveServers } from "../services/node/liveServerService";
 import { configureNpsharpDataRoot, npsharpHome } from "../services/node/paths";
+import { BUILD_CONFIG } from "../shared/buildConfig";
 import { detectPortableMode } from "../services/node/portableMode";
 import { normalizeCwd, runShell } from "../services/node/processService";
 import { resourcePath, resourcesRoot } from "../services/node/resourcePaths";
@@ -197,7 +198,7 @@ app.whenReady().then(async () => {
     }
   });
 }).catch(error => {
-  dialog.showErrorBox("NPSharp failed to start", error instanceof Error ? error.message : String(error));
+  dialog.showErrorBox(`${BUILD_CONFIG.displayName} failed to start`, error instanceof Error ? error.message : String(error));
   app.quit();
 });
 
@@ -224,7 +225,7 @@ async function createMainWindow(): Promise<void> {
     minWidth: 800,
     minHeight: 520,
     frame: false,
-    title: "NPSharp",
+    title: BUILD_CONFIG.displayName,
     icon: resolveWindowIcon(),
     show: false,
     webPreferences: {

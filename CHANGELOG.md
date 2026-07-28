@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 26.8.25 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Corrige a leitura de `config.json` no workflow de release para evitar aspas aninhadas inválidas no Bash e publicar os metadados centralizados corretamente.
+
+## 26.8.24 - 2026-07-28
+
+Type: Refactor
+
+Description:
+- Adiciona `config.json` como fonte única de verdade para identidade do aplicativo, versões, dependências, empacotamento Electron, Capacitor, Android e metadados de release.
+- Sincroniza automaticamente os manifestos e configurações derivadas antes dos comandos de desenvolvimento e compilação.
+
+## 26.8.23 - 2026-07-28
+
+Type: Refactor
+
+Description:
+- Atualiza as dependências npm diretas, as bibliotecas Android, o Android Gradle Plugin e o Google Services Plugin.
+- Adapta a integração do Monaco Editor à estrutura de módulos da versão atual e usa o perfil ProGuard otimizado suportado pelas versões atuais do AGP.
+- Mantém TypeScript 5.9.3 e AGP 8.13.2 como as versões mais recentes compatíveis com `typescript-eslint` e Capacitor 8, respectivamente.
+
 ## 26.8.22 - 2026-07-28
 
 Type: Fix

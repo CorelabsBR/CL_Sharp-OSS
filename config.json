@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "application": {
+    "packageName": "NPSharp",
+    "displayName": "NPSharp",
+    "version": "26.8.25",
+    "versionCode": 260825,
+    "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
+    "author": "CoreLabs",
+    "copyrightOwner": "CoreLabs",
+    "license": "SEE LICENSE IN ../NPSharp/LICENSE.txt",
+    "homepage": "https://github.com/CoreLabsBR/CL_NPSharp",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/CoreLabsBR/CL_NPSharp.git",
+      "owner": "CoreLabsBR",
+      "name": "CL_NPSharp"
+    },
+    "applicationId": "br.com.corelabs.npsharp",
+    "protocol": "npsharp",
+    "dataDirectoryName": ".npsharp",
+    "mobileDataDirectoryName": "NPSharp"
+  },
+  "npm": {
+    "main": "dist-electron/main/main.js",
+    "type": "commonjs",
+    "dependencies": {
+      "@capacitor/core": "^8.4.2",
+      "@capacitor/filesystem": "^8.1.2",
+      "electron-updater": "6.8.9",
+      "extract-zip": "^2.0.1",
+      "monaco-editor": "^0.56.0",
+      "sql.js": "^1.14.1",
+      "ssh2": "^1.17.0"
+    },
+    "devDependencies": {
+      "@capacitor/android": "^8.4.2",
+      "@capacitor/cli": "^8.4.2",
+      "@types/node": "^26.1.2",
+      "@types/ssh2": "^1.15.5",
+      "electron": "^43.2.0",
+      "electron-builder": "^26.15.3",
+      "eslint": "^10.8.0",
+      "globals": "^17.8.0",
+      "typescript": "^5.9.3",
+      "typescript-eslint": "^8.65.0",
+      "vite": "^8.1.5"
+    },
+    "optionalDependencies": {
+      "node-pty": "1.1.0"
+    }
+  },
+  "electronBuilder": {
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": ["**/*"]
+      }
+    ],
+    "npmRebuild": true,
+    "nativeRebuilder": "parallel",
+    "asar": true,
+    "compression": "normal",
+    "asarUnpack": [
+      "node_modules/node-pty/**/*",
+      "node_modules/cpu-features/**/*"
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "icon.png",
+      "category": "Development",
+      "maintainer": "CoreLabs",
+      "synopsis": "NPSharp IDE",
+      "description": "NPSharp is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor.",
+      "desktop": {
+        "Name": "NPSharp",
+        "Comment": "Code, run and manage projects with NPSharp",
+        "Categories": "Development;IDE;",
+        "StartupWMClass": "NPSharp"
+      }
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "icon.ico"
+    },
+    "mac": {
+      "icon": "icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NPSharp",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}-${arch}.${ext}",
+      "requestExecutionLevel": "user",
+      "unpackDirName": "NPSharp"
+    },
+    "deb": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "afterInstall": "build/linux-after-install.sh",
+      "fpm": ["--deb-no-default-config-files"],
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "libasound2",
+        "libgbm1",
+        "libdrm2",
+        "libxkbcommon0",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "CoreLabsBR",
+        "repo": "CL_NPSharp",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "mobile": {
+    "webDirectory": "dist",
+    "androidScheme": "https"
+  },
+  "android": {
+    "namespace": "br.com.corelabs.npsharp",
+    "minSdkVersion": 23,
+    "compileSdkVersion": 35,
+    "targetSdkVersion": 35,
+    "buildToolsVersion": "35.0.0",
+    "gradlePluginVersion": "8.13.2",
+    "gradleDistributionVersion": "8.14.3",
+    "googleServicesPluginVersion": "4.5.0",
+    "dependencies": {
+      "androidxActivityVersion": "1.13.0",
+      "androidxAppCompatVersion": "1.7.1",
+      "androidxCoordinatorLayoutVersion": "1.3.0",
+      "androidxCoreVersion": "1.19.0",
+      "androidxFragmentVersion": "1.8.9",
+      "coreSplashScreenVersion": "1.2.0",
+      "androidxWebkitVersion": "1.16.0",
+      "junitVersion": "4.13.2",
+      "androidxJunitVersion": "1.3.0",
+      "androidxEspressoCoreVersion": "3.7.0",
+      "cordovaAndroidVersion": "14.0.1"
+    }
+  }
+}

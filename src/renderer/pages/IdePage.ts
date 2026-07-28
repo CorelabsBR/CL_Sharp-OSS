@@ -5,6 +5,7 @@
 import type { AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
 import type { AppLocale } from "../../shared/i18n";
 import { setUiLocale } from "../../shared/i18n";
+import { BUILD_CONFIG } from "../../shared/buildConfig";
 import { ArduinoPanel } from "../components/ArduinoPanel";
 import { AIChatPanel } from "../components/AIChatPanel";
 import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
@@ -231,7 +232,7 @@ export class IdePage {
 
   private buildTitleBar(): void {
     const logo = el("div", { className: "title-logo" });
-    logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } }), el("span", { text: "NPSharp" }));
+    logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: BUILD_CONFIG.displayName } }), el("span", { text: BUILD_CONFIG.displayName }));
     const menus = el("div", { className: "title-menus" });
     const openWorkspaceLabel = platform.isMobile ? "Abrir workspace mobile" : "Abrir pasta";
     menus.append(
@@ -2174,7 +2175,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   private commandLabel(): string {
     return this.explorer.workspace
       ? `Pesquisar em ${basename(this.explorer.workspace)}`
-      : "NPSharp"
+      : BUILD_CONFIG.displayName
   }
 
   private persist(): void {
@@ -2188,18 +2189,18 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
     void api.settings.saveSession(this.session);
   }
 private about(): void {
-  alert(`NPSharp
-Versão 26.8.22
+  alert(`${BUILD_CONFIG.displayName}
+Versão ${BUILD_CONFIG.version}
 
-Desenvolvido pela CoreLabs.
+Desenvolvido pela ${BUILD_CONFIG.author}.
 
 Código sem distrações.
 
-O NPSharp é uma IDE rápida, moderna e centrada em desenvolvedores, criada para oferecer uma experiência de programação limpa e eficiente. Combinando o poder do Monaco Editor com Electron, entrega um ambiente familiar com temas personalizados, ferramentas integradas, controle de código-fonte, terminal e um fluxo de trabalho para desenvolvimento de software real.
+O ${BUILD_CONFIG.displayName} é uma IDE rápida, moderna e centrada em desenvolvedores, criada para oferecer uma experiência de programação limpa e eficiente. Combinando o poder do Monaco Editor com Electron, entrega um ambiente familiar com temas personalizados, ferramentas integradas, controle de código-fonte, terminal e um fluxo de trabalho para desenvolvimento de software real.
 
 Feito por desenvolvedores, para desenvolvedores.
 
-© ${new Date().getFullYear()} CoreLabs. Todos os direitos reservados.`);
+© ${new Date().getFullYear()} ${BUILD_CONFIG.copyrightOwner}. Todos os direitos reservados.`);
 }
 
   private renderFatalError(error: unknown): void {

@@ -2,18 +2,18 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import * as monaco from "monaco-editor/editor";
 // The minimal editor API does not include Codicon styles. The Find widget uses
 // those glyphs for its controls (next/previous, replace and close).
-import "monaco-editor/esm/vs/base/browser/ui/codicons/codiconStyles.js";
+import "monaco-editor/features/codicon/register.js";
 // editor.api does not register the Find contribution; import it explicitly so
 // Ctrl+F/Cmd+F and the title-bar command share Monaco's real Find widget.
-import "monaco-editor/esm/vs/editor/contrib/find/browser/findController.js";
-import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
-import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
-import htmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
-import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
+import "monaco-editor/features/find/register.js";
+import editorWorker from "monaco-editor/editor/editor.worker.js?worker";
+import jsonWorker from "monaco-editor/language/json/json.worker.js?worker";
+import cssWorker from "monaco-editor/language/css/css.worker.js?worker";
+import htmlWorker from "monaco-editor/language/html/html.worker.js?worker";
+import tsWorker from "monaco-editor/language/typescript/ts.worker.js?worker";
 
 self.MonacoEnvironment = {
   getWorker(_workerId: string, label: string) {
@@ -29,31 +29,31 @@ let configured = false;
 const loadedLanguages = new Set<string>();
 
 const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
-  bat: () => import("monaco-editor/esm/vs/basic-languages/bat/bat.contribution.js"),
-  cpp: () => import("monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js"),
-  c: () => import("monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js"),
-  csharp: () => import("monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution.js"),
-  css: () => import("monaco-editor/esm/vs/basic-languages/css/css.contribution.js"),
-  scss: () => import("monaco-editor/esm/vs/basic-languages/scss/scss.contribution.js"),
-  go: () => import("monaco-editor/esm/vs/basic-languages/go/go.contribution.js"),
-  html: () => import("monaco-editor/esm/vs/basic-languages/html/html.contribution.js"),
-  ini: () => import("monaco-editor/esm/vs/basic-languages/ini/ini.contribution.js"),
-  java: () => import("monaco-editor/esm/vs/basic-languages/java/java.contribution.js"),
-  javascript: () => import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"),
-  kotlin: () => import("monaco-editor/esm/vs/basic-languages/kotlin/kotlin.contribution.js"),
-  lua: () => import("monaco-editor/esm/vs/basic-languages/lua/lua.contribution.js"),
-  markdown: () => import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"),
-  php: () => import("monaco-editor/esm/vs/basic-languages/php/php.contribution.js"),
-  powershell: () => import("monaco-editor/esm/vs/basic-languages/powershell/powershell.contribution.js"),
-  python: () => import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js"),
-  ruby: () => import("monaco-editor/esm/vs/basic-languages/ruby/ruby.contribution.js"),
-  rust: () => import("monaco-editor/esm/vs/basic-languages/rust/rust.contribution.js"),
-  shell: () => import("monaco-editor/esm/vs/basic-languages/shell/shell.contribution.js"),
-  sql: () => import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"),
-  typescript: () => import("monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js"),
-  xml: () => import("monaco-editor/esm/vs/basic-languages/xml/xml.contribution.js"),
-  yaml: () => import("monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js"),
-  json: () => import("monaco-editor/esm/vs/language/json/monaco.contribution.js")
+  bat: () => import("monaco-editor/languages/definitions/bat/register.js"),
+  cpp: () => import("monaco-editor/languages/definitions/cpp/register.js"),
+  c: () => import("monaco-editor/languages/definitions/cpp/register.js"),
+  csharp: () => import("monaco-editor/languages/definitions/csharp/register.js"),
+  css: () => import("monaco-editor/languages/definitions/css/register.js"),
+  scss: () => import("monaco-editor/languages/definitions/scss/register.js"),
+  go: () => import("monaco-editor/languages/definitions/go/register.js"),
+  html: () => import("monaco-editor/languages/definitions/html/register.js"),
+  ini: () => import("monaco-editor/languages/definitions/ini/register.js"),
+  java: () => import("monaco-editor/languages/definitions/java/register.js"),
+  javascript: () => import("monaco-editor/languages/definitions/javascript/register.js"),
+  kotlin: () => import("monaco-editor/languages/definitions/kotlin/register.js"),
+  lua: () => import("monaco-editor/languages/definitions/lua/register.js"),
+  markdown: () => import("monaco-editor/languages/definitions/markdown/register.js"),
+  php: () => import("monaco-editor/languages/definitions/php/register.js"),
+  powershell: () => import("monaco-editor/languages/definitions/powershell/register.js"),
+  python: () => import("monaco-editor/languages/definitions/python/register.js"),
+  ruby: () => import("monaco-editor/languages/definitions/ruby/register.js"),
+  rust: () => import("monaco-editor/languages/definitions/rust/register.js"),
+  shell: () => import("monaco-editor/languages/definitions/shell/register.js"),
+  sql: () => import("monaco-editor/languages/definitions/sql/register.js"),
+  typescript: () => import("monaco-editor/languages/definitions/typescript/register.js"),
+  xml: () => import("monaco-editor/languages/definitions/xml/register.js"),
+  yaml: () => import("monaco-editor/languages/definitions/yaml/register.js"),
+  json: () => import("monaco-editor/languages/features/json/register.js")
 };
 
 export async function ensureLanguageSupport(language: string): Promise<void> {

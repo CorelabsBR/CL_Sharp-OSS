@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import os from "node:os";
 import path from "node:path";
+import { BUILD_CONFIG } from "../../shared/buildConfig";
 
 let dataRootOverride: string | undefined;
 
@@ -12,7 +13,7 @@ export function configureNpsharpDataRoot(root?: string): void {
 }
 
 export function npsharpHome(): string {
-  return dataRootOverride ?? path.join(os.homedir(), ".npsharp");
+  return dataRootOverride ?? path.join(os.homedir(), BUILD_CONFIG.dataDirectoryName);
 }
 
 export function npsharpConfigDir(): string {

@@ -3,6 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import { Capacitor } from "@capacitor/core";
+import { BUILD_CONFIG } from "../../shared/buildConfig";
 import type { NpsharpApi } from "../../shared/types";
 
 export type PlatformKind = "electron" | "capacitor" | "web";
@@ -19,7 +20,7 @@ export interface PlatformInfo {
   canUseLiveServer: boolean;
 }
 
-export const MOBILE_ROOT = "NPSharp";
+export const MOBILE_ROOT = BUILD_CONFIG.mobileDataDirectoryName;
 export const MOBILE_WORKSPACES_ROOT = `${MOBILE_ROOT}/workspaces`;
 export const DEFAULT_MOBILE_WORKSPACE = `${MOBILE_WORKSPACES_ROOT}/Main`;
 
