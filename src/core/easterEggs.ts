@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 /** Content written only by NPSharp's explicit new-file flow. */
 export const GTA6_EASTER_EGG_FILE_NAME = "gta6.py";
+export const PORTUGOL_FILE_EXTENSION = ".gol";
 
 export const GTA6_EASTER_EGG_CONTENT = `game = "GTA 6"
 code_difficulty = "senior"
@@ -21,7 +22,20 @@ if hackers:
 print("GTA 6 implementado antes da Rockstar.")
 `;
 
+/** Executável pelo interpretador Portugol integrado e usado somente em novos arquivos .gol. */
+export const PORTUGOL_EXAMPLE_CONTENT = `algoritmo "Olá, Portugol"
+
+var
+  mensagem: literal
+
+inicio
+  mensagem <- "Olá, Portugol!"
+  escreval(mensagem)
+fimalgoritmo
+`;
+
 /** Deliberately called only while NPSharp is creating a brand-new file. */
 export function initialContentForNewNPSharpFile(name: string): string {
-  return name === GTA6_EASTER_EGG_FILE_NAME ? GTA6_EASTER_EGG_CONTENT : "";
+  if (name === GTA6_EASTER_EGG_FILE_NAME) return GTA6_EASTER_EGG_CONTENT;
+  return name.trim().toLowerCase().endsWith(PORTUGOL_FILE_EXTENSION) ? PORTUGOL_EXAMPLE_CONTENT : "";
 }

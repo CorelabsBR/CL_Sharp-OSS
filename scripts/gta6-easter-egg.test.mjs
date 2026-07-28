@@ -10,8 +10,9 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { GTA6_EASTER_EGG_CONTENT, initialContentForNewNPSharpFile } = require("../dist-electron/core/easterEggs.js");
+const { GTA6_EASTER_EGG_CONTENT, PORTUGOL_EXAMPLE_CONTENT, initialContentForNewNPSharpFile } = require("../dist-electron/core/easterEggs.js");
 const { createNewFile } = require("../dist-electron/services/node/fileSystemService.js");
+const { PortugolInterpreter } = require("../dist-electron/core/portugol/interpreter.js");
 
 async function withWorkspace(run) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "npsharp-gta6-"));
@@ -91,5 +92,22 @@ test("8. Criar gta6.py quando já existe falha sem sobrescrever", async () => {
     await writeFile(file, "não sobrescreva");
     await assert.rejects(() => createFromNPSharp(workspace, "gta6.py"), { code: "EEXIST" });
     assert.equal(await readFile(file, "utf8"), "não sobrescreva");
+  });
+});
+
+test("9. Criar um arquivo .gol pelo NPSharp inclui um exemplo Portugol executável", async () => {
+  await withWorkspace(async workspace => {
+    const file = await createFromNPSharp(workspace, "ola.gol");
+    assert.equal(await readFile(file, "utf8"), PORTUGOL_EXAMPLE_CONTENT);
+    assert.deepEqual(new PortugolInterpreter().executeCollecting(PORTUGOL_EXAMPLE_CONTENT), ["Olá, Portugol!"]);
+  });
+});
+
+test("10. Arquivos .gol existentes continuam intactos e não são sobrescritos", async () => {
+  await withWorkspace(async workspace => {
+    const file = path.join(workspace, "existente.gol");
+    await writeFile(file, "conteúdo do usuário");
+    await assert.rejects(() => createFromNPSharp(workspace, "existente.gol"), { code: "EEXIST" });
+    assert.equal(await readFile(file, "utf8"), "conteúdo do usuário");
   });
 });

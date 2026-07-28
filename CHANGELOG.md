@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.27 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Novos arquivos `.gol` criados pelo Explorer recebem um exemplo Portugol pronto para executar, sem alterar arquivos existentes ou criados fora do NPSharp.
+
 ## 26.8.26 - 2026-07-28
 
 Type: Fix
