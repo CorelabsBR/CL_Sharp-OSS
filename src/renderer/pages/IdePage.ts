@@ -1,4 +1,6 @@
-import type { AppSettings, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
+import type { AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
+import type { AppLocale } from "../../shared/i18n";
+import { setUiLocale } from "../../shared/i18n";
 import { ArduinoPanel } from "../components/ArduinoPanel";
 import { AIChatPanel } from "../components/AIChatPanel";
 import { CommandCenter, type CommandCenterAction, type CommandCenterShortcut } from "../components/CommandCenter";
@@ -18,7 +20,7 @@ import { useGlobalShortcuts, type GlobalShortcutController } from "../shortcuts/
 import { TerminalPanel } from "../components/TerminalPanel";
 import { api, DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform } from "../services/api";
 import { applyTheme, listThemes } from "../services/themes";
-import { buttonIcon, closeContextMenus, contextMenu, el, icon, installContextMenuDismiss } from "../utils/dom";
+import { buttonIcon, closeContextMenus, contextMenu, el, icon, installContextMenuDismiss, localizeElementTree } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
 import { cssUrl, DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, dirname, extname, fileUri, isSubPath, joinPath, relativePath } from "../utils/path";
@@ -55,7 +57,7 @@ export class IdePage {
   private readonly titleBar = el("header", { className: "title-bar" });
   private readonly activityBar = el("nav", { className: "activity-bar" });
   private readonly sideBar = el("aside", { className: "side-bar" });
-  private readonly sideTitle = el("div", { className: "side-title", text: "EXPLORER" });
+  private readonly sideTitle = el("div", { className: "side-title", text: "EXPLORADOR" });
   private readonly sideContent = el("div", { className: "side-content" });
   private readonly workbench = el("section", { className: "workbench" });
   private readonly editorStack = el("section", { className: "editor-stack" });
@@ -68,7 +70,7 @@ export class IdePage {
   private readonly statusEncoding = el("button", { className: "status-item status-encoding", text: "UTF-8" });
   private readonly statusPosition = el("span", { className: "status-meta", text: "Ln 1, Col 1" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
-  private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: "Pesquisar arquivos por nome ou caminho", "aria-label": "Pesquisa rápida de arquivos" } });
+  private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: "Pesquisar...", "aria-label": "Pesquisa rápida de arquivos" } });
   private readonly commandCenter = new CommandCenter(workspace => void this.openRecentWorkspace(workspace));
   private readonly editor = new EditorTabs(text => this.updateStatus(text));
   private readonly explorer = new FileExplorer(
@@ -96,7 +98,12 @@ export class IdePage {
     createNewFile: (code, language) => this.editor.newTab(code, extensionForAILanguage(language))
   }, text => this.updateStatus(text));
   private readonly languageRuntimes = new LanguageRuntimesDialog(text => this.updateStatus(text));
-  private readonly runtime = new RuntimePanel(() => this.runCurrentFile(), text => this.updateStatus(text), () => void this.showLanguageRuntimes());
+  private readonly runtime = new RuntimePanel(
+    () => this.runCurrentFile(),
+    () => this.installCurrentPythonDependencies(),
+    text => this.updateStatus(text),
+    () => void this.showLanguageRuntimes()
+  );
   private readonly extensions = new ExtensionManagerPanel(text => this.updateStatus(text));
   private readonly remote = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text));
   private readonly arduino = new ArduinoPanel(() => this.explorer.workspace, file => this.editor.openFile(file), text => this.updateStatus(text));
@@ -125,6 +132,7 @@ export class IdePage {
   private liveServerActive = false;
   private pendingChord: string | undefined;
   private pendingChordTimer?: number;
+  private updateButton?: HTMLButtonElement;
   private statusGitRequest = 0;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
@@ -161,25 +169,45 @@ export class IdePage {
     this.element.dataset.platform = platform.kind;
     this.settings = await api.settings.load();
     if (this.disposed) return;
-    const appInfo = await api.appInfo();
-    if (this.disposed) return;
-    this.appPlatform = appInfo.platform;
-    this.appInfoPath = appInfo.npsharpHome;
+    setUiLocale(this.settings.language);
     this.terminal.setEnabled(this.settings.terminalEnabled);
     this.terminal.setShell(this.terminalShell());
-    this.session = await api.settings.loadSession();
-    if (this.disposed) return;
-    const theme = await applyTheme(this.settings);
-    if (this.disposed) return;
-    this.editor.applyTheme(theme);
-    this.applyWallpaper();
     this.editor.applySettings(this.settings);
     this.wireEvents();
     this.build();
+    localizeElementTree(this.element);
     this.applyLayoutSettings();
     this.updateCommandCenter();
     this.registerCommands();
-    await this.restoreSession();
+    void api.startup.mark("renderer-rendered");
+
+    requestAnimationFrame(() => {
+      if (this.disposed) return;
+      void api.startup.mark("editor-interactive");
+      void api.startup.ready();
+    });
+    void this.restoreStartupState();
+  }
+
+  /** Restaura recursos persistidos depois que o editor já pode receber entrada. */
+  private async restoreStartupState(): Promise<void> {
+    try {
+      const [appInfo, session, theme] = await Promise.all([
+        api.appInfo(),
+        api.settings.loadSession(),
+        applyTheme(this.settings)
+      ]);
+      if (this.disposed) return;
+      this.appPlatform = appInfo.platform;
+      this.appInfoPath = appInfo.npsharpHome;
+      this.session = session;
+      this.editor.applyTheme(theme);
+      this.applyWallpaper();
+      this.bindUpdater();
+      await this.restoreSession();
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Falha ao restaurar a sessão");
+    }
   }
 
   private build(): void {
@@ -259,8 +287,9 @@ export class IdePage {
         ["Alternar painel", "Ctrl+J", () => this.toggleTerminal()]
       ]),
       menuButton("Executar", [
-        ["Executar arquivo atual", "F5", () => void this.runCurrentFile()],
+        ["Depurar arquivo atual", "F5", () => void this.runCurrentFile(true)],
         ["Executar sem depuração", "Ctrl+F5", () => void this.runWithoutDebug()],
+        ["Baixar imports Python e preparar .venv", "", () => void this.installCurrentPythonDependencies()],
         ["Compilar projeto", "Ctrl+Shift+B", () => void this.buildProject()],
         ["Arduino", "", () => this.showPanel("arduino")],
         ["Caminhos dos runtimes", "", () => void this.showLanguageRuntimes()]
@@ -279,6 +308,7 @@ export class IdePage {
       menuButton("Preferências", [
         ["Paleta de comandos", "Ctrl+Shift+P", () => this.palette.showCommands()],
         ["Configurações", "Ctrl+,", () => this.showSettings()],
+        ["Verificar atualizações", "", () => void this.checkForUpdates()],
         ["Configurar runtimes de linguagem", "", () => void this.showLanguageRuntimes()],
         ["Tema de cores", "", event => void this.showThemePicker(event.shiftKey)],
         ["Papel de parede", "", () => void this.chooseWallpaper()],
@@ -292,8 +322,21 @@ export class IdePage {
     nav.append(
       buttonIcon("arrow-left", "Voltar para o arquivo anterior", () => this.editor.navigateBack()),
       buttonIcon("arrow-right", "Avançar para o próximo arquivo", () => this.editor.navigateForward()),
-      buttonIcon("play", "Executar arquivo atual", () => void this.runCurrentFile())
+      buttonIcon("play", "Executar arquivo atual", () => void this.runCurrentFile()),
+      // el("button", {
+      //   className: "title-run-dependencies",
+      //   text: "Baixar imports Python (.venv)",
+      //   title: "Cria ou reutiliza o .venv do projeto e instala os imports do arquivo Python atual"
+      // })
     );
+    this.updateButton = el("button", {
+      className: "title-update-action",
+      text: "",
+      attrs: { hidden: "", "aria-live": "polite" }
+    });
+    this.updateButton.addEventListener("click", () => void this.handleUpdateButton());
+    nav.append(this.updateButton);
+    nav.querySelector<HTMLButtonElement>(".title-run-dependencies")?.addEventListener("click", () => void this.installCurrentPythonDependencies());
     const windowButtons = el("div", { className: "window-buttons" });
     if (platform.isDesktop) {
       windowButtons.append(
@@ -343,7 +386,7 @@ export class IdePage {
       this.showPanel("source");
       void this.refreshStatusGit();
     });
-    const run = el("button", { className: "status-item", text: "Run" });
+    const run = el("button", { className: "status-item", text: "Executar" });
     run.addEventListener("click", () => void this.runCurrentFile());
     const terminal = el("button", { className: "status-item", text: "Terminal" });
     terminal.addEventListener("click", () => this.toggleTerminal());
@@ -403,88 +446,91 @@ export class IdePage {
       () => window.removeEventListener("beforeunload", this.dispose),
       () => window.removeEventListener("pagehide", this.dispose)
     );
-    const events = window as typeof window & { npsharpEvents?: { onCommand(callback: (command: string) => void): () => void } };
+    const events = window as typeof window & { npsharpEvents?: { onCommand(callback: (command: string) => void): () => void; onOpenFile(callback: (filePath: string) => void): () => void } };
     const disposeCommandListener = events.npsharpEvents?.onCommand(command => this.handleCommand(command));
     if (disposeCommandListener) this.disposers.push(disposeCommandListener);
+    const disposeOpenFileListener = events.npsharpEvents?.onOpenFile(filePath => void this.editor.openFile(filePath));
+    if (disposeOpenFileListener) this.disposers.push(disposeOpenFileListener);
   }
 
   private registerCommands(): void {
     const commands: CommandAction[] = [
-      { label: "File: New File", shortcut: "Ctrl+N", run: () => this.editor.newTab() },
-      { label: "File: Open File", shortcut: "Ctrl+O", run: () => this.editor.openFileFromDialog() },
-      { label: "File: Open Folder", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
-      { label: "File: Save", shortcut: "Ctrl+S", run: () => this.editor.saveCurrentFile() },
-      { label: "File: Save As", shortcut: "Ctrl+Shift+S", run: () => this.editor.saveCurrentFileAs() },
-      { label: "File: Save All", run: () => this.editor.saveAll() },
-      { label: "File: Close Editor", shortcut: "Ctrl+W", run: () => this.editor.closeCurrentTab() },
-      { label: "File: Close All Editors", shortcut: "Ctrl+Shift+W", run: () => this.editor.closeAllTabs() },
-      { label: "Editor: Go to Line", shortcut: "Ctrl+G", run: () => this.editor.goToLine() },
-      { label: "Editor: Add Line Comment", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
-      { label: "Editor: Remove Line Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.removeLineComment() },
+      { label: "Arquivo: Novo arquivo", shortcut: "Ctrl+N", run: () => this.editor.newTab() },
+      { label: "Arquivo: Abrir arquivo", shortcut: "Ctrl+O", run: () => this.editor.openFileFromDialog() },
+      { label: "Arquivo: Abrir pasta", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
+      { label: "Arquivo: Salvar", shortcut: "Ctrl+S", run: () => this.editor.saveCurrentFile() },
+      { label: "Arquivo: Salvar como", shortcut: "Ctrl+Shift+S", run: () => this.editor.saveCurrentFileAs() },
+      { label: "Arquivo: Salvar tudo", run: () => this.editor.saveAll() },
+      { label: "Arquivo: Fechar editor", shortcut: "Ctrl+W", run: () => this.editor.closeCurrentTab() },
+      { label: "Arquivo: Fechar todos os editores", shortcut: "Ctrl+Shift+W", run: () => this.editor.closeAllTabs() },
+      { label: "Editor: Ir para a linha", shortcut: "Ctrl+G", run: () => this.editor.goToLine() },
+      { label: "Editor: Adicionar comentário de linha", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
+      { label: "Editor: Remover comentário de linha", shortcut: "Ctrl+Shift+/", run: () => this.editor.removeLineComment() },
       // { label: "Editor: Toggle Block Comment", shortcut: "Ctrl+Shift+/", run: () => this.editor.toggleBlockComment() },
-      { label: "Editor: Format Document", shortcut: "Shift+Alt+F", run: () => this.editor.formatDocument() },
-      { label: "Editor: Toggle Word Wrap", shortcut: "Alt+Z", run: () => this.toggleEditorWordWrap() },
-      { label: "View: Explorer", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
-      { label: "View: Search", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
-      { label: "View: Source Control", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
-      { label: "View: Run and Debug", shortcut: "Ctrl+Shift+D", run: () => this.showPanel("run") },
-      { label: "View: Extensions", shortcut: "Ctrl+Shift+X", run: () => this.showPanel("extensions") },
-      { label: "View: Arduino", run: () => this.showPanel("arduino") },
-      { label: "AI: Open Chat", shortcut: "Ctrl+Alt+I", keywords: "copilot chat assistant", run: () => this.openAIChat() },
-      { label: "AI: New Conversation", run: () => { this.openAIChat(); return this.aiChat.newConversation(); } },
-      { label: "AI: Clear Conversation", run: () => this.aiChat.clearConversation() },
-      { label: "AI: Change Provider", run: () => this.aiChat.changeProvider() },
-      { label: "AI: Change Model", run: () => this.aiChat.changeModel() },
-      { label: "AI: Explain Selection", run: () => this.runAIAction("explain") },
-      { label: "AI: Refactor Selection", run: () => this.runAIAction("refactor") },
-      { label: "AI: Optimize Selection", run: () => this.runAIAction("optimize") },
-      { label: "AI: Generate Documentation", run: () => this.runAIAction("docs") },
-      { label: "AI: Generate Unit Tests", run: () => this.runAIAction("tests") },
-      { label: "AI: Fix Errors", run: () => this.runAIAction("fix") },
-      { label: "AI: Commit Message", run: () => this.runAIAction("commit") },
-      { label: "AI: Rename Symbols with AI", run: () => this.runAIAction("rename") },
-      { label: "View: Problems", shortcut: "F8", run: () => this.showPanel("problems") },
-      { label: "Terminal: Toggle Terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
-      { label: "Terminal: New Terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
-      { label: "Terminal: Output", run: () => this.terminal.showOutputPanel() },
-      { label: "Terminal: Debug Console", run: () => this.terminal.showDebugConsole() },
-      { label: "Run: Run Current File", shortcut: "F5", run: () => this.runCurrentFile() },
-      { label: "Run: Build Project", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
-      { label: "Preferences: Settings", shortcut: "Ctrl+,", run: () => this.showSettings() },
-      { id: "npsharp.configureLanguageRuntimes", label: "Configure Language Runtimes", keywords: "runtimes path executables", run: () => this.showLanguageRuntimes() },
-      { label: "Extensions: Install from VSIX", keywords: "vsix local extension install", run: () => this.installExtensionFromVsix() },
-      { label: "Extensions: Reload", keywords: "reload extension manager", run: () => this.reloadExtensionsCommand() },
-      { label: "Extensions: Enable", keywords: "enable extension manager", run: () => this.toggleExtensionCommand(true) },
-      { label: "Extensions: Disable", keywords: "disable extension manager", run: () => this.toggleExtensionCommand(false) },
-      { label: "Extensions: Show Installed", keywords: "installed extension manager", run: () => this.showInstalledExtensions() },
-      { label: "Preferences: Color Theme", run: () => this.showThemePicker() },
-      { label: "Preferences: Wallpaper", run: () => this.chooseWallpaper() },
-      { label: "Preferences: Clear Wallpaper", run: () => this.clearWallpaper() },
-      { label: "Preferences: ErrorLens Toggle", run: () => this.toggleErrorLens() },
-      { label: "Notes: Show Notes", run: () => this.openNotes() },
-      { label: "Search: Find", shortcut: "Ctrl+F", run: () => this.editor.find() },
-      { label: "Search: Replace", shortcut: "Ctrl+H", run: () => this.editor.replace() },
-      { label: "Search: Find in Workspace", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
-      { label: "Editor: Comment Line", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
-      { label: "Editor: Add Line Comment", shortcut: "Ctrl+K Ctrl+C", run: () => this.editor.addLineComment() },
+      { label: "Editor: Formatar documento", shortcut: "Shift+Alt+F", run: () => this.editor.formatDocument() },
+      { label: "Editor: Alternar quebra automática", shortcut: "Alt+Z", run: () => this.toggleEditorWordWrap() },
+      { label: "Exibir: Explorador", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
+      { label: "Exibir: Pesquisar", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
+      { label: "Exibir: Controle de código-fonte", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
+      { label: "Exibir: Executar e depurar", shortcut: "Ctrl+Shift+D", run: () => this.showPanel("run") },
+      { label: "Exibir: Extensões", shortcut: "Ctrl+Shift+X", run: () => this.showPanel("extensions") },
+      { label: "Exibir: Arduino", run: () => this.showPanel("arduino") },
+      { label: "IA: Abrir conversa", shortcut: "Ctrl+Alt+I", keywords: "copilot conversa assistente", run: () => this.openAIChat() },
+      { label: "IA: Nova conversa", run: () => { this.openAIChat(); return this.aiChat.newConversation(); } },
+      { label: "IA: Limpar conversa", run: () => this.aiChat.clearConversation() },
+      { label: "IA: Alterar provedor", run: () => this.aiChat.changeProvider() },
+      { label: "IA: Alterar modelo", run: () => this.aiChat.changeModel() },
+      { label: "IA: Explicar seleção", run: () => this.runAIAction("explain") },
+      { label: "IA: Refatorar seleção", run: () => this.runAIAction("refactor") },
+      { label: "IA: Otimizar seleção", run: () => this.runAIAction("optimize") },
+      { label: "IA: Gerar documentação", run: () => this.runAIAction("docs") },
+      { label: "IA: Gerar testes unitários", run: () => this.runAIAction("tests") },
+      { label: "IA: Corrigir erros", run: () => this.runAIAction("fix") },
+      { label: "IA: Mensagem de commit", run: () => this.runAIAction("commit") },
+      { label: "IA: Renomear símbolos", run: () => this.runAIAction("rename") },
+      { label: "Exibir: Problemas", shortcut: "F8", run: () => this.showPanel("problems") },
+      { label: "Terminal: Alternar terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
+      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Saída", run: () => this.terminal.showOutputPanel() },
+      { label: "Terminal: Console de depuração", run: () => this.terminal.showDebugConsole() },
+      { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
+      { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
+      { label: "NPSharp: Verificar atualizações", keywords: "atualização versão baixar", run: () => this.checkForUpdates() },
+      { label: "Preferências: Configurações", shortcut: "Ctrl+,", run: () => this.showSettings() },
+      { id: "npsharp.configureLanguageRuntimes", label: "Configurar runtimes de linguagem", keywords: "runtimes caminho executáveis", run: () => this.showLanguageRuntimes() },
+      { label: "Extensões: Instalar de VSIX", keywords: "vsix extensão local instalar", run: () => this.installExtensionFromVsix() },
+      { label: "Extensões: Recarregar", keywords: "recarregar gerenciador de extensões", run: () => this.reloadExtensionsCommand() },
+      { label: "Extensões: Ativar", keywords: "ativar gerenciador de extensões", run: () => this.toggleExtensionCommand(true) },
+      { label: "Extensões: Desativar", keywords: "desativar gerenciador de extensões", run: () => this.toggleExtensionCommand(false) },
+      { label: "Extensões: Mostrar instaladas", keywords: "instaladas gerenciador de extensões", run: () => this.showInstalledExtensions() },
+      { label: "Preferências: Tema de cores", run: () => this.showThemePicker() },
+      { label: "Preferências: Papel de parede", run: () => this.chooseWallpaper() },
+      { label: "Preferências: Remover papel de parede", run: () => this.clearWallpaper() },
+      { label: "Preferências: Alternar ErrorLens", run: () => this.toggleErrorLens() },
+      { label: "Notas: Mostrar notas", run: () => this.openNotes() },
+      { label: "Pesquisar: Localizar", shortcut: "Ctrl+F", run: () => this.editor.find() },
+      { label: "Pesquisar: Substituir", shortcut: "Ctrl+H", run: () => this.editor.replace() },
+      { label: "Pesquisar: Localizar no workspace", shortcut: "Ctrl+Shift+F", run: () => this.showPanel("search") },
+      { label: "Editor: Comentar linha", shortcut: "Ctrl+/", run: () => this.editor.addLineComment() },
+      { label: "Editor: Adicionar comentário de linha", shortcut: "Ctrl+K Ctrl+C", run: () => this.editor.addLineComment() },
       // { label: "Editor: Remove Line Comment", shortcut: "Ctrl+K Ctrl+U", run: () => this.editor.removeLineComment() },
       // { label: "Editor: Toggle Block Comment", shortcut: "Shift+Alt+A", run: () => this.editor.toggleBlockComment() },
 
-      { label: "View: Command Palette", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
-      { label: "View: Quick Open", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
-      { label: "View: Explorer", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
-      { label: "View: Source Control", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
-      { label: "View: Extensions", shortcut: "Ctrl+Shift+X", run: () => this.showPanel("extensions") },
-      { label: "View: Problems", shortcut: "Ctrl+Shift+M", run: () => this.showPanel("problems") },
-      { label: "View: Toggle Sidebar", shortcut: "Ctrl+B", run: () => this.toggleSidebar() },
-      { label: "Terminal: Toggle Terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
-      { label: "Terminal: New Terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
-      { label: "Terminal: Clear", shortcut: "Ctrl+Alt+K", run: () => this.terminal.clearCurrentTerminal() },
-      { label: "Run: Run Current File", shortcut: "F5", run: () => this.runCurrentFile() },
-      { label: "Run: Build Project", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
-      { label: "NPSharp: Notes", shortcut: "Ctrl+Alt+N", run: () => this.openNotes() },
-      { label: "NPSharp: Command Center", shortcut: "Ctrl+Alt+C", run: () => this.updateStatus("Command Center") },
-      { label: "NPSharp: Theme Picker", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
+      { label: "Exibir: Paleta de comandos", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
+      { label: "Exibir: Abertura rápida", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
+      { label: "Exibir: Explorador", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
+      { label: "Exibir: Controle de código-fonte", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
+      { label: "Exibir: Extensões", shortcut: "Ctrl+Shift+X", run: () => this.showPanel("extensions") },
+      { label: "Exibir: Problemas", shortcut: "Ctrl+Shift+M", run: () => this.showPanel("problems") },
+      { label: "Exibir: Alternar barra lateral", shortcut: "Ctrl+B", run: () => this.toggleSidebar() },
+      { label: "Terminal: Alternar terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
+      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Limpar", shortcut: "Ctrl+Alt+K", run: () => this.terminal.clearCurrentTerminal() },
+      { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
+      { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
+      { label: "NPSharp: Notas", shortcut: "Ctrl+Alt+N", run: () => this.openNotes() },
+      { label: "NPSharp: Central de comandos", shortcut: "Ctrl+Alt+C", run: () => this.updateStatus("Central de comandos") },
+      { label: "NPSharp: Seletor de temas", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
     ];
     this.palette.setCommands(commands);
     this.refreshShortcuts();
@@ -555,7 +601,7 @@ export class IdePage {
       "view.explorer": () => this.showPanel("explorer"),
       "view.sourceControl": () => this.showPanel("source"),
       "view.extensions": () => this.showPanel("extensions"),
-      "run.debug": () => this.runCurrentFile(),
+      "run.debug": () => this.runCurrentFile(true),
       "run.withoutDebug": () => this.runWithoutDebug(),
       "run.build": () => this.buildProject(),
       "npsharp.notes": () => this.openNotes(),
@@ -613,7 +659,7 @@ export class IdePage {
 
   private async restoreSession(): Promise<void> {
     try {
-      if (this.session.workspace && await api.fs.exists(this.session.workspace)) {
+      if (this.settings.restoreWorkspaceOnStartup && this.session.workspace && await api.fs.exists(this.session.workspace)) {
         if (this.disposed) return;
         await this.explorer.openFolder(this.session.workspace);
       }
@@ -673,7 +719,7 @@ export class IdePage {
   private openGlobalReplace(): void {
     this.showPanel("search");
     this.search.focusReplace();
-    this.updateStatus("Replace global aberto");
+    this.updateStatus("Substituição global aberta");
   }
 
   private showKeyboardShortcuts(): void {
@@ -686,18 +732,18 @@ export class IdePage {
   private openCommandCenter(): void {
     this.commandCenterForced = true;
     this.updateCommandCenter();
-    this.updateStatus("Command Center aberto");
+    this.updateStatus("Central de comandos aberta");
   }
 
   private showOutput(): void {
     this.setTerminalVisible(true);
     this.terminal.showOutputPanel();
-    this.updateStatus("Output aberto");
+    this.updateStatus("Saída aberta");
   }
 
   private async showLanguageRuntimes(): Promise<void> {
     await this.languageRuntimes.show();
-    this.updateStatus("Configure Language Runtimes");
+    this.updateStatus("Configurar runtimes de linguagem");
   }
 
   private async installExtensionFromVsix(): Promise<void> {
@@ -709,7 +755,7 @@ export class IdePage {
     this.showPanel("extensions");
     await this.extensions.refresh();
     this.extensions.focusSearch();
-    this.updateStatus("Installed extensions");
+    this.updateStatus("Extensões instaladas");
   }
 
   private async reloadExtensionsCommand(): Promise<void> {
@@ -719,8 +765,8 @@ export class IdePage {
       await this.extensions.reload();
       return;
     }
-    this.palette.showPicker("Reload extension", [
-      { label: "Extensions: Reload All", hint: `${installed.length} installed`, run: async () => { await this.extensions.reload(); } },
+    this.palette.showPicker("Recarregar extensão", [
+      { label: "Extensões: Recarregar todas", hint: `${installed.length} instaladas`, run: async () => { await this.extensions.reload(); } },
       ...installed.map(extension => ({
         label: extension.displayName,
         hint: extension.id,
@@ -735,17 +781,17 @@ export class IdePage {
     const installed = await api.extensions.list();
     const candidates = installed.filter(extension => extension.enabled !== enabled);
     if (!candidates.length) {
-      this.updateStatus(enabled ? "No disabled extensions" : "No enabled extensions");
+      this.updateStatus(enabled ? "Não há extensões desativadas" : "Não há extensões ativadas");
       return;
     }
-    this.palette.showPicker(enabled ? "Enable extension" : "Disable extension", candidates.map(extension => ({
+    this.palette.showPicker(enabled ? "Ativar extensão" : "Desativar extensão", candidates.map(extension => ({
       label: extension.displayName,
       hint: extension.id,
       keywords: extension.description,
       run: async () => {
         await (enabled ? api.extensions.enable(extension.id) : api.extensions.disable(extension.id));
         await this.extensions.refresh();
-        this.updateStatus(`${enabled ? "Enabled" : "Disabled"} ${extension.displayName}`);
+        this.updateStatus(`${enabled ? "Ativada" : "Desativada"}: ${extension.displayName}`);
       }
     })));
   }
@@ -761,7 +807,7 @@ export class IdePage {
     }
     if (this.keyboardShortcuts.visible) {
       this.keyboardShortcuts.close();
-      this.updateStatus("Keyboard Shortcuts fechado");
+      this.updateStatus("Atalhos de teclado fechados");
       return;
     }
     if (document.querySelector(".palette-overlay")) {
@@ -826,7 +872,7 @@ export class IdePage {
   }
 
   private settingsActivityButton(): HTMLButtonElement {
-    const button = el("button", { className: "activity-button", title: "Manage", children: [icon("settings-gear", "Manage")] });
+    const button = el("button", { className: "activity-button", title: "Gerenciar", children: [icon("settings-gear", "Gerenciar")] });
     button.addEventListener("click", event => {
       event.stopPropagation();
       this.showSettingsMenu(button);
@@ -857,13 +903,13 @@ export class IdePage {
       return row;
     };
 
-    addRow("Command Palette...", "Ctrl+Shift+P", () => this.palette.showCommands());
-    addRow("Settings", "Ctrl+,", () => this.showSettings());
-    addRow("Configure Language Runtimes", "", () => void this.showLanguageRuntimes());
-    addRow("Extensions", "Ctrl+Shift+X", () => this.showPanel("extensions"));
-    addRow("Keyboard Shortcuts", "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
-    addRow("Snippets", "", () => this.updateStatus("Snippets"));
-    addRow("Tasks", "", () => this.updateStatus("Tasks"));
+    addRow("Paleta de comandos...", "Ctrl+Shift+P", () => this.palette.showCommands());
+    addRow("Configurações", "Ctrl+,", () => this.showSettings());
+    addRow("Configurar runtimes de linguagem", "", () => void this.showLanguageRuntimes());
+    addRow("Extensões", "Ctrl+Shift+X", () => this.showPanel("extensions"));
+    addRow("Atalhos de teclado", "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
+    addRow("Trechos", "", () => this.updateStatus("Trechos"));
+    addRow("Tarefas", "", () => this.updateStatus("Tarefas"));
     addSeparator();
 
     const appearance = el("div", { className: "manage-submenu" });
@@ -883,15 +929,15 @@ export class IdePage {
       });
       appearance.append(row);
     };
-    addAppearanceRow("Color Theme...", "Escolher", event => void this.showThemePicker(event.shiftKey));
+    addAppearanceRow("Tema de cores...", "Escolher", event => void this.showThemePicker(event.shiftKey));
     addAppearanceRow("Wallpaper...", "Escolher", () => void this.chooseWallpaper());
-    addAppearanceRow("Clear Wallpaper", "", () => void this.clearWallpaper());
+    addAppearanceRow("Remover papel de parede", "", () => void this.clearWallpaper());
     menu.append(appearance);
 
-    addRow(this.settings.errorLensEnabled ? "Disable ErrorLens" : "Enable ErrorLens", "", () => this.toggleErrorLens());
+    addRow(this.settings.errorLensEnabled ? "Desativar ErrorLens" : "Ativar ErrorLens", "", () => this.toggleErrorLens());
     addSeparator();
-    addRow("Backup and Sync Settings...", "", () => this.updateStatus("Backup and Sync Settings"));
-    addRow("Download Update (1)");
+    addRow("Backup e sincronização de configurações...", "", () => this.updateStatus("Backup e sincronização de configurações"));
+    addRow("Baixar atualização (1)");
 
     document.body.append(menu);
     close = installContextMenuDismiss(menu);
@@ -912,15 +958,18 @@ export class IdePage {
 
     const search = el("input", {
       className: "settings-search panel-input",
-      attrs: { placeholder: "Search settings", value: this.settingsQuery }
+      attrs: { placeholder: "Pesquisar configurações", value: this.settingsQuery }
     });
     const layout = el("div", { className: "settings-view" });
     const categories = el("div", { className: "settings-categories" });
     const page = el("div", { className: "settings-page" });
     const categoryNames: SettingsCategory[] = ["Appearance", "Editor", "Terminal", "Diagnostics", "Build", "Workbench"];
+    const categoryLabels: Record<SettingsCategory, string> = {
+      Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho"
+    };
 
     for (const category of categoryNames) {
-      const button = el("button", { className: `settings-category ${category === this.settingsCategory ? "active" : ""}`, text: category });
+      const button = el("button", { className: `settings-category ${category === this.settingsCategory ? "active" : ""}`, text: categoryLabels[category] });
       button.addEventListener("click", () => {
         this.settingsCategory = category;
         this.settingsQuery = "";
@@ -937,7 +986,7 @@ export class IdePage {
     layout.append(categories, page);
     panel.append(search, layout, settingsFooter(
       () => void this.resetSettings(),
-      () => this.updateStatus("Settings saved")
+      () => this.updateStatus("Configurações salvas")
     ));
     await this.renderSettingsPage(page);
   }
@@ -946,18 +995,18 @@ export class IdePage {
     try {
       const themes = await listThemes();
       const visibleThemes = themes.filter(theme => includeSpecial || !theme.special);
-      this.palette.showPicker("Select Color Theme", visibleThemes.map(theme => {
+      this.palette.showPicker("Selecionar tema de cores", visibleThemes.map(theme => {
         const active = theme.id === this.settings.theme || theme.name === this.settings.theme;
         return {
           label: theme.name,
-          hint: active ? "Current" : theme.special ? "Special" : theme.uiTheme === "vs" ? "Light" : "Dark",
+          hint: active ? "Atual" : theme.special ? "Especial" : theme.uiTheme === "vs" ? "Claro" : "Escuro",
           active,
           swatch: theme.colors["--accent"],
           run: () => this.updateSettings({ ...this.settings, theme: theme.id })
         };
       }));
     } catch (error) {
-      reportError(error, text => this.updateStatus(text), "Theme picker failed");
+      reportError(error, text => this.updateStatus(text), "Falha no seletor de temas");
     }
   }
 
@@ -969,10 +1018,10 @@ export class IdePage {
     const themeOptions = regularThemes.map(theme => ({ value: theme.id, label: theme.name }));
 
     if (query) {
-      page.append(el("h2", { className: "settings-page-title", text: "Search results" }));
+      page.append(el("h2", { className: "settings-page-title", text: "Resultados da pesquisa" }));
       const beforeCount = page.childElementCount;
       this.appendSearchSetting(page, query, "theme appearance color", () =>
-        settingSelect("Theme", "UI theme.", this.settings.theme, themeOptions, value => void this.updateSettings({ ...this.settings, theme: value }))
+        settingSelect("Tema", "Tema visual da interface.", this.settings.theme, themeOptions, value => void this.updateSettings({ ...this.settings, theme: value }))
       );
       this.appendSearchSetting(page, query, "font editor family", () =>
         settingSelect("Fonte do editor", "Fonte usada no editor.", this.settings.editorFontFamily, editorFontOptions(this.settings.editorFontFamily), value => void this.updateSettings({ ...this.settings, editorFontFamily: value }))
@@ -984,30 +1033,32 @@ export class IdePage {
         settingSelect("Tamanho do tab", "Largura de cada tabulação no editor.", String(this.settings.editorTabSize), EDITOR_TAB_SIZE_OPTIONS, value => void this.updateSettings({ ...this.settings, editorTabSize: Number(value) }))
       );
       this.appendSearchSetting(page, query, "brand special custom pink highlight editor", () =>
-        settingText("Special Brand Name", "Custom pink brand highlight.", this.settings.brandSpecialName, value => void this.updateSettings({ ...this.settings, brandSpecialName: value.trim() }))
+        settingText("Nome especial da marca", "Destaque personalizado da marca em rosa.", this.settings.brandSpecialName, value => void this.updateSettings({ ...this.settings, brandSpecialName: value.trim() }))
       );
       this.appendSearchSetting(page, query, "word wrap editor", () =>
-        settingToggle("Word Wrap", "Wrap long lines.", this.settings.editorWordWrap, value => void this.updateSettings({ ...this.settings, editorWordWrap: value }))
+        settingToggle("Quebra automática", "Quebra linhas longas.", this.settings.editorWordWrap, value => void this.updateSettings({ ...this.settings, editorWordWrap: value }))
       );
       this.appendSearchSetting(page, query, "terminal shell", () =>
-        settingToggle("Terminal Enabled", "Enable integrated terminal.", this.settings.terminalEnabled, value => void this.updateSettings({ ...this.settings, terminalEnabled: value }))
+        settingToggle("Terminal ativado", "Ativa o terminal integrado.", this.settings.terminalEnabled, value => void this.updateSettings({ ...this.settings, terminalEnabled: value }))
       );
       this.appendSearchSetting(page, query, "diagnostics errorlens errors warnings inline", () =>
-        settingToggle("ErrorLens Enabled", "Show diagnostics inline.", this.settings.errorLensEnabled, value => void this.updateSettings({ ...this.settings, errorLensEnabled: value }))
+        settingToggle("ErrorLens ativado", "Mostra diagnósticos na linha.", this.settings.errorLensEnabled, value => void this.updateSettings({ ...this.settings, errorLensEnabled: value }))
       );
       this.appendSearchSetting(page, query, "compile save diagnostics", () =>
-        settingToggle("Compile On Save", "Compile Java on save.", this.settings.compileOnSave, value => void this.updateSettings({ ...this.settings, compileOnSave: value }))
+        settingToggle("Compilar ao salvar", "Compila Java ao salvar.", this.settings.compileOnSave, value => void this.updateSettings({ ...this.settings, compileOnSave: value }))
       );
       this.appendSearchSetting(page, query, "build command maven", () =>
-        settingText("Build Command", "Build command.", this.settings.buildCommand, value => void this.updateSettings({ ...this.settings, buildCommand: value.trim() || "mvn -q -DskipTests compile" }))
+        settingText("Comando de compilação", "Comando usado para compilar.", this.settings.buildCommand, value => void this.updateSettings({ ...this.settings, buildCommand: value.trim() || "mvn -q -DskipTests compile" }))
       );
-      if (page.childElementCount === beforeCount) page.append(el("div", { className: "muted-row", text: "No settings found." }));
+      if (page.childElementCount === beforeCount) page.append(el("div", { className: "muted-row", text: "Nenhuma configuração encontrada." }));
       return;
     }
 
-    page.append(el("h2", { className: "settings-page-title", text: this.settingsCategory }));
+    page.append(el("h2", { className: "settings-page-title", text: ({ Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho" } as Record<SettingsCategory, string>)[this.settingsCategory] }));
 
     if (this.settingsCategory === "Appearance") {
+      const languages = await api.i18n.availableLanguages();
+      page.append(settingSelect("Idioma", "Escolha o idioma da interface. A aplicação será recarregada.", this.settings.language, languages.map(language => ({ value: language.code, label: language.label })), value => void this.setLanguage(value as AppLocale)));
       const themeList = el("div", { className: "settings-list" });
       for (const theme of regularThemes) {
         const active = theme.id === this.settings.theme || theme.name === this.settings.theme;
@@ -1025,12 +1076,12 @@ export class IdePage {
         { value: "minimal", label: "Monocromático" }
       ], value => void this.updateSettings({ ...this.settings, iconTheme: value })));
       page.append(settingText("Cor dos ícones", "Cor CSS usada pelo tema de ícones monocromático, por exemplo #c5c5c5.", this.settings.iconColor, value => void this.updateSettings({ ...this.settings, iconColor: value.trim() })));
-      page.append(settingText("Wallpaper Path", "Background image path.", this.settings.wallpaperPath, value => void this.updateSettings({ ...this.settings, wallpaperPath: value.trim() })));
-      page.append(settingNumber("Wallpaper Opacity", "Wallpaper opacity.", this.settings.wallpaperOpacity, 0, 1, 0.05, value => void this.updateSettings({ ...this.settings, wallpaperOpacity: value })));
+      page.append(settingText("Caminho do papel de parede", "Caminho da imagem de fundo.", this.settings.wallpaperPath, value => void this.updateSettings({ ...this.settings, wallpaperPath: value.trim() })));
+      page.append(settingNumber("Opacidade do papel de parede", "Opacidade da imagem de fundo.", this.settings.wallpaperOpacity, 0, 1, 0.05, value => void this.updateSettings({ ...this.settings, wallpaperOpacity: value })));
       const actions = el("div", { className: "settings-inline-actions" });
-      const choose = el("button", { className: "wide-action", text: "Choose Wallpaper" });
+      const choose = el("button", { className: "wide-action", text: "Escolher papel de parede" });
       choose.addEventListener("click", () => void this.chooseWallpaper());
-      const clear = el("button", { className: "wide-action", text: "Clear Wallpaper" });
+      const clear = el("button", { className: "wide-action", text: "Remover papel de parede" });
       clear.addEventListener("click", () => void this.clearWallpaper());
       actions.append(choose, clear);
       page.append(actions);
@@ -1041,46 +1092,47 @@ export class IdePage {
       page.append(settingSelect("Fonte", "Fonte usada no editor.", this.settings.editorFontFamily, editorFontOptions(this.settings.editorFontFamily), value => void this.updateSettings({ ...this.settings, editorFontFamily: value })));
       page.append(settingSelect("Tamanho da fonte", "Tamanho usado no editor.", String(this.settings.editorFontSize), EDITOR_FONT_SIZE_OPTIONS, value => void this.updateSettings({ ...this.settings, editorFontSize: Number(value) })));
       page.append(settingSelect("Tamanho do tab", "Largura de cada tabulação no editor.", String(this.settings.editorTabSize), EDITOR_TAB_SIZE_OPTIONS, value => void this.updateSettings({ ...this.settings, editorTabSize: Number(value) })));
-      page.append(settingToggle("Word Wrap", "Wrap long lines.", this.settings.editorWordWrap, value => void this.updateSettings({ ...this.settings, editorWordWrap: value })));
-      page.append(settingToggle("Line Numbers", "Show line numbers.", this.settings.editorLineNumbers, value => void this.updateSettings({ ...this.settings, editorLineNumbers: value })));
-      page.append(settingToggle("Auto Save", "Save automatically.", this.settings.editorAutoSave, value => void this.updateSettings({ ...this.settings, editorAutoSave: value })));
-      page.append(settingToggle("Format On Save", "Format when saving.", this.settings.editorFormatOnSave, value => void this.updateSettings({ ...this.settings, editorFormatOnSave: value })));
-      page.append(settingText("Special Brand Name", "Custom pink brand highlight.", this.settings.brandSpecialName, value => void this.updateSettings({ ...this.settings, brandSpecialName: value.trim() })));
+      page.append(settingToggle("Quebra automática", "Quebra linhas longas.", this.settings.editorWordWrap, value => void this.updateSettings({ ...this.settings, editorWordWrap: value })));
+      page.append(settingToggle("Números de linha", "Mostra os números das linhas.", this.settings.editorLineNumbers, value => void this.updateSettings({ ...this.settings, editorLineNumbers: value })));
+      page.append(settingToggle("Salvar automaticamente", "Salva automaticamente.", this.settings.editorAutoSave, value => void this.updateSettings({ ...this.settings, editorAutoSave: value })));
+      page.append(settingToggle("Formatar ao salvar", "Formata ao salvar.", this.settings.editorFormatOnSave, value => void this.updateSettings({ ...this.settings, editorFormatOnSave: value })));
+      page.append(settingText("Nome especial da marca", "Destaque personalizado da marca em rosa.", this.settings.brandSpecialName, value => void this.updateSettings({ ...this.settings, brandSpecialName: value.trim() })));
       return;
     }
 
     if (this.settingsCategory === "Terminal") {
       const shellOptions = await this.terminalShellOptionsForSettings();
-      page.append(settingToggle("Terminal Enabled", "Enable integrated terminal.", this.settings.terminalEnabled, value => void this.updateSettings({ ...this.settings, terminalEnabled: value })));
+      page.append(settingToggle("Terminal ativado", "Ativa o terminal integrado.", this.settings.terminalEnabled, value => void this.updateSettings({ ...this.settings, terminalEnabled: value })));
       if (this.appPlatform === "win32" && shellOptions.length) {
-        page.append(settingSelect("Windows Shell", "Default shell on Windows.", this.settings.terminalShellWindows, shellOptions, value => void this.updateSettings({ ...this.settings, terminalShellWindows: value })));
+        page.append(settingSelect("Shell do Windows", "Shell padrão no Windows.", this.settings.terminalShellWindows, shellOptions, value => void this.updateSettings({ ...this.settings, terminalShellWindows: value })));
       } else if (this.appPlatform !== "win32" && shellOptions.length) {
-        page.append(settingSelect("Linux/macOS Shell", "Default shell on Linux and macOS.", this.settings.terminalShellLinux, shellOptions, value => void this.updateSettings({ ...this.settings, terminalShellLinux: value })));
+        page.append(settingSelect("Shell do Linux/macOS", "Shell padrão no Linux e macOS.", this.settings.terminalShellLinux, shellOptions, value => void this.updateSettings({ ...this.settings, terminalShellLinux: value })));
       } else {
-        page.append(settingText("Linux/macOS Shell", "Default shell on Linux and macOS.", this.settings.terminalShellLinux, value => void this.updateSettings({ ...this.settings, terminalShellLinux: value.trim() || "/bin/bash" })));
-        page.append(settingText("Windows Shell", "Default shell on Windows.", this.settings.terminalShellWindows, value => void this.updateSettings({ ...this.settings, terminalShellWindows: value.trim() || "powershell.exe" })));
+        page.append(settingText("Shell do Linux/macOS", "Shell padrão no Linux e macOS.", this.settings.terminalShellLinux, value => void this.updateSettings({ ...this.settings, terminalShellLinux: value.trim() || "/bin/bash" })));
+        page.append(settingText("Shell do Windows", "Shell padrão no Windows.", this.settings.terminalShellWindows, value => void this.updateSettings({ ...this.settings, terminalShellWindows: value.trim() || "powershell.exe" })));
       }
-      page.append(settingText("Initial Directory", "Terminal initial directory.", this.settings.terminalInitialDirectory, value => void this.updateSettings({ ...this.settings, terminalInitialDirectory: value.trim() })));
+      page.append(settingText("Diretório inicial", "Diretório inicial do terminal.", this.settings.terminalInitialDirectory, value => void this.updateSettings({ ...this.settings, terminalInitialDirectory: value.trim() })));
       return;
     }
 
     if (this.settingsCategory === "Diagnostics") {
-      page.append(settingToggle("Diagnostics Enabled", "Enable diagnostics.", this.settings.diagnosticsEnabled, value => void this.updateSettings({ ...this.settings, diagnosticsEnabled: value })));
-      page.append(settingToggle("ErrorLens Enabled", "Show diagnostics inline in the editor.", this.settings.errorLensEnabled, value => void this.updateSettings({ ...this.settings, errorLensEnabled: value })));
-      page.append(settingToggle("Compile On Save", "Compile Java when saving.", this.settings.compileOnSave, value => void this.updateSettings({ ...this.settings, compileOnSave: value })));
-      page.append(settingToggle("Problems Auto Open", "Open Problems when diagnostics fail.", this.settings.problemsAutoOpen, value => void this.updateSettings({ ...this.settings, problemsAutoOpen: value })));
+      page.append(settingToggle("Diagnósticos ativados", "Ativa diagnósticos.", this.settings.diagnosticsEnabled, value => void this.updateSettings({ ...this.settings, diagnosticsEnabled: value })));
+      page.append(settingToggle("ErrorLens ativado", "Mostra diagnósticos na linha no editor.", this.settings.errorLensEnabled, value => void this.updateSettings({ ...this.settings, errorLensEnabled: value })));
+      page.append(settingToggle("Compilar ao salvar", "Compila Java ao salvar.", this.settings.compileOnSave, value => void this.updateSettings({ ...this.settings, compileOnSave: value })));
+      page.append(settingToggle("Abrir problemas automaticamente", "Abre Problemas quando os diagnósticos falham.", this.settings.problemsAutoOpen, value => void this.updateSettings({ ...this.settings, problemsAutoOpen: value })));
       return;
     }
 
     if (this.settingsCategory === "Build") {
-      page.append(settingText("Build Command", "Command used to build the project.", this.settings.buildCommand, value => void this.updateSettings({ ...this.settings, buildCommand: value.trim() || "mvn -q -DskipTests compile" })));
-      page.append(settingToggle("Skip Tests", "Skip tests during build.", this.settings.buildSkipTests, value => void this.updateSettings({ ...this.settings, buildSkipTests: value })));
+      page.append(settingText("Comando de compilação", "Comando usado para compilar o projeto.", this.settings.buildCommand, value => void this.updateSettings({ ...this.settings, buildCommand: value.trim() || "mvn -q -DskipTests compile" })));
+      page.append(settingToggle("Pular testes", "Pula testes durante a compilação.", this.settings.buildSkipTests, value => void this.updateSettings({ ...this.settings, buildSkipTests: value })));
       return;
     }
 
-    page.append(settingToggle("Status Bar Visible", "Show the bottom status bar.", this.settings.statusBarVisible, value => void this.updateSettings({ ...this.settings, statusBarVisible: value })));
-    page.append(settingToggle("Activity Bar Visible", "Show the activity bar.", this.settings.activityBarVisible, value => void this.updateSettings({ ...this.settings, activityBarVisible: value })));
-    page.append(settingToggle("Side Bar Visible", "Show the side panel.", this.settings.sideBarVisible, value => void this.updateSettings({ ...this.settings, sideBarVisible: value })));
+    page.append(settingToggle("Barra de status visível", "Mostra a barra de status inferior.", this.settings.statusBarVisible, value => void this.updateSettings({ ...this.settings, statusBarVisible: value })));
+    page.append(settingToggle("Barra de atividades visível", "Mostra a barra de atividades.", this.settings.activityBarVisible, value => void this.updateSettings({ ...this.settings, activityBarVisible: value })));
+    page.append(settingToggle("Barra lateral visível", "Mostra o painel lateral.", this.settings.sideBarVisible, value => void this.updateSettings({ ...this.settings, sideBarVisible: value })));
+    page.append(settingToggle("Restaurar último workspace ao iniciar", "Reabre automaticamente o workspace que estava aberto ao fechar o NPSharp.", this.settings.restoreWorkspaceOnStartup, value => void this.updateSettings({ ...this.settings, restoreWorkspaceOnStartup: value })));
     page.append(settingToggle("Confirmar exclusão", "Pede confirmação antes de excluir arquivos e pastas no Explorer.", this.settings.confirmDelete, value => void this.updateSettings({ ...this.settings, confirmDelete: value })));
   }
 
@@ -1094,8 +1146,18 @@ export class IdePage {
 
   private async updateSettings(settings: AppSettings): Promise<void> {
     this.settings = await api.settings.save(settings);
-    this.refreshShortcuts();
+    if (!this.settings.restoreWorkspaceOnStartup) {
+      this.session.workspace = undefined;
+      this.session.openFiles = [];
+      this.session.activeFile = undefined;
+      await api.settings.saveSession(this.session);
+    }
     await this.applySettingsEffects();
+  }
+
+  private async setLanguage(language: AppLocale): Promise<void> {
+    await api.i18n.setLanguage(language);
+    window.location.reload();
   }
 
   private async terminalShellOptionsForSettings(): Promise<Array<{ value: string; label: string }>> {
@@ -1112,8 +1174,9 @@ export class IdePage {
 
   private async resetSettings(): Promise<void> {
     this.settings = await api.settings.reset();
+    this.refreshShortcuts();
     await this.applySettingsEffects();
-    this.updateStatus("Settings reset");
+    this.updateStatus("Configurações redefinidas");
   }
 
   private async clearWallpaper(): Promise<void> {
@@ -1171,7 +1234,7 @@ export class IdePage {
         await this.updateSettings({ ...this.settings, wallpaperPath: result.paths[0] });
       }
     } catch (error) {
-      reportError(error, text => this.updateStatus(text), "Choose wallpaper failed");
+      reportError(error, text => this.updateStatus(text), "Falha ao escolher papel de parede");
     }
   }
 
@@ -1330,7 +1393,49 @@ export class IdePage {
 
   private async runWithoutDebug(): Promise<void> {
     this.updateStatus("Run sem debug iniciado");
-    await this.runCurrentFile();
+    await this.runCurrentFile(false);
+  }
+
+  private bindUpdater(): void {
+    this.disposers.push(api.update.onStatus(status => this.renderUpdateStatus(status)));
+    void api.update.status().then(status => this.renderUpdateStatus(status)).catch(() => undefined);
+  }
+
+  private renderUpdateStatus(status: AppUpdateStatus): void {
+    if (this.disposed) return;
+    const button = this.updateButton;
+    if (!button) return;
+    const visible = status.state === "available" || status.state === "downloading" || status.state === "downloaded";
+    button.hidden = !visible;
+    button.disabled = status.state === "downloading";
+    button.title = status.message;
+    if (status.state === "available") button.textContent = `Atualizar NPSharp para v${status.version}`;
+    else if (status.state === "downloading") button.textContent = `Baixando atualização: ${status.percent ?? 0}%`;
+    else if (status.state === "downloaded") button.textContent = "Reiniciar e instalar";
+    else button.textContent = "";
+    if (status.state !== "idle" && status.state !== "unsupported") this.updateStatus(status.message);
+  }
+
+  private async checkForUpdates(): Promise<void> {
+    try {
+      const status = await api.update.check();
+      this.renderUpdateStatus(status);
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Falha ao verificar atualizações");
+    }
+  }
+
+  private async handleUpdateButton(): Promise<void> {
+    try {
+      const status = await api.update.status();
+      if (status.state === "downloaded") {
+        await api.update.install();
+        return;
+      }
+      if (status.state === "available") this.renderUpdateStatus(await api.update.download());
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Falha ao atualizar o NPSharp");
+    }
   }
 
   private async openProjectHealth(): Promise<void> {
@@ -1445,20 +1550,22 @@ export class IdePage {
   }
 
   private applyWallpaper(): void {
-    if (!this.settings?.wallpaperPath) {
+    const wallpaperPath = this.settings?.wallpaperPath.trim();
+    if (!wallpaperPath) {
       this.wallpaper.style.backgroundImage = "";
       return;
     }
-    if (!platform.isDesktop && !/^(blob:|data:|https?:)/i.test(this.settings.wallpaperPath)) {
+    if (!platform.isDesktop && !/^(blob:|data:|https?:)/i.test(wallpaperPath)) {
       this.wallpaper.style.backgroundImage = "";
       return;
     }
-    const wallpaper = platform.isDesktop ? fileUri(this.settings.wallpaperPath) : this.settings.wallpaperPath;
+    const wallpaper = platform.isDesktop ? fileUri(wallpaperPath) : wallpaperPath;
     this.wallpaper.style.backgroundImage = cssUrl(wallpaper);
-    this.wallpaper.style.opacity = String(this.settings.wallpaperOpacity);
+    const opacity = Number(this.settings.wallpaperOpacity);
+    this.wallpaper.style.opacity = String(Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 0.18);
   }
 
-  private async runCurrentFile(): Promise<void> {
+  private async runCurrentFile(debug = false): Promise<void> {
     try {
       const activeFile = this.editor.getCurrentFile();
       if (!activeFile && this.explorer.workspace && await this.runWorkspace()) return;
@@ -1484,24 +1591,52 @@ export class IdePage {
           this.updateStatus(result.success ? "Live Server aberto" : "Live Server falhou");
         } else {
           this.showHtmlPreview(basename(filePath), this.editor.getCurrentText());
-          this.terminal.appendTerminalOutput("Preview HTML aberto sem iniciar servidor Node.");
-          this.updateStatus("Preview HTML aberto");
+          this.terminal.appendTerminalOutput("Prévia HTML aberta sem iniciar servidor Node.");
+          this.updateStatus("Prévia HTML aberta");
         }
         return;
       }
 
       if (!platform.canUseNodeBackend) {
-        const result = await api.runtime.runFile({ filePath, content: this.editor.getCurrentText() });
+        const result = await api.runtime.runFile({ filePath, content: this.editor.getCurrentText(), workspace: this.explorer.workspace, debug });
         this.terminal.appendTerminalOutput(result.output);
         this.updateStatus("Runtime local indisponivel neste ambiente");
         return;
       }
 
-      const result = await api.runtime.runFile({ filePath, content: this.editor.getCurrentText() });
+      const result = await api.runtime.runFile({ filePath, content: this.editor.getCurrentText(), workspace: this.explorer.workspace, debug });
       this.terminal.appendTerminalOutput(result.output);
-      this.updateStatus(result.code === 0 ? "Run completed" : "Run failed");
+      this.updateStatus(result.code === 0 ? "Execução concluída" : "Falha na execução");
     } catch (error) {
-      reportError(error, text => this.updateStatus(text), "Run failed");
+      reportError(error, text => this.updateStatus(text), "Falha na execução");
+    }
+  }
+
+  private async installCurrentPythonDependencies(): Promise<void> {
+    try {
+      const activeFile = this.editor.getCurrentFile();
+      if (!activeFile) {
+        this.updateStatus("Abra um arquivo Python para baixar seus imports");
+        return;
+      }
+      if (!/\.py$/i.test(activeFile)) {
+        this.updateStatus("O download automático de imports está disponível para arquivos Python (.py)");
+        return;
+      }
+      await this.editor.saveCurrentFile();
+      this.showTerminal(true);
+      this.terminal.showTerminal();
+      await this.terminal.ensureTerminal();
+      this.terminal.appendTerminalOutput(`[Python] Preparando .venv e dependências: ${basename(activeFile)}`);
+      const result = await api.runtime.installDependencies({
+        filePath: activeFile,
+        content: this.editor.getCurrentText(),
+        workspace: this.explorer.workspace
+      });
+      this.terminal.appendTerminalOutput(result.output);
+      this.updateStatus(result.code === 0 ? "Dependências Python preparadas no .venv" : "Falha ao preparar dependências Python");
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Falha ao baixar imports Python");
     }
   }
 
@@ -1631,16 +1766,16 @@ export class IdePage {
       { id: "new-file", label: "Novo arquivo", detail: "Criar um arquivo sem sair do hub.", iconName: "new-file", run: () => this.editor.newTab() },
       { id: "new-project", label: "Novo projeto", detail: platform.isMobile ? "Criar workspace em Documents/NPSharp/workspaces." : "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
       { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? "Executar git clone em uma pasta escolhida." : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
-      { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir Output", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponivel neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
-      { id: "arduino", label: "Arduino", detail: platform.canUseNodeBackend ? "Boards, portas, compile e upload via Arduino CLI." : "Modo limitado para sketches Arduino.", iconName: "circuit-board", run: () => this.showPanel("arduino") },
-      { id: "extensions", label: "Extensions", detail: "Install local VSIX packages and manage installed extensions.", iconName: "extensions-large", run: () => this.showPanel("extensions") },
-      { id: "language-runtimes", label: "Language Runtimes", detail: "Configure executable paths outside general Settings.", iconName: "server-environment", run: () => void this.showLanguageRuntimes() },
-      { id: "notes", label: "Abrir Notes", detail: platform.isMobile ? "Abrir ou criar Documents/NPSharp/notes.nps.md." : "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
-      { id: "theme-lab", label: "Abrir Theme Lab", detail: "Abrir o seletor de temas incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
+      { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir saída", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponível neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
+      { id: "arduino", label: "Arduino", detail: platform.canUseNodeBackend ? "Placas, portas, compilação e envio via Arduino CLI." : "Modo limitado para sketches Arduino.", iconName: "circuit-board", run: () => this.showPanel("arduino") },
+      { id: "extensions", label: "Extensões", detail: "Instalar pacotes VSIX locais e gerenciar extensões instaladas.", iconName: "extensions-large", run: () => this.showPanel("extensions") },
+      { id: "language-runtimes", label: "Runtimes de linguagem", detail: "Configurar caminhos de executáveis fora das configurações gerais.", iconName: "server-environment", run: () => void this.showLanguageRuntimes() },
+      { id: "notes", label: "Abrir notas", detail: platform.isMobile ? "Abrir ou criar Documents/NPSharp/notes.nps.md." : "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
+      { id: "theme-lab", label: "Abrir laboratório de temas", detail: "Abrir o seletor de temas, incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
-      { id: "keyboard-shortcuts", label: "Keyboard Shortcuts", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
-      { id: "run", label: "Rodar projeto", detail: hasRunnableTarget ? (platform.canUseNodeBackend ? "Executar o arquivo/projeto atual." : "Preview HTML ou fallback de runtime.") : "Abra um arquivo primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
-      { id: "git-status", label: "Source Control", detail: platform.canUseGit ? (hasProject ? "Abrir Source Control do workspace." : "Abra um workspace primeiro.") : "Abrir Source Control em modo limitado.", iconName: "source-control", disabled: platform.canUseGit && !hasProject, run: () => this.showPanel("source") }
+      { id: "keyboard-shortcuts", label: "Atalhos de teclado", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
+      { id: "run", label: "Executar projeto", detail: hasRunnableTarget ? (platform.canUseNodeBackend ? "Executar o arquivo/projeto atual." : "Prévia HTML ou alternativa de runtime.") : "Abra um arquivo primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
+      { id: "git-status", label: "Controle de código-fonte", detail: platform.canUseGit ? (hasProject ? "Abrir o controle de código-fonte do workspace." : "Abra um workspace primeiro.") : "Abrir o controle de código-fonte em modo limitado.", iconName: "source-control", disabled: platform.canUseGit && !hasProject, run: () => this.showPanel("source") }
     ];
   }
 
@@ -1683,8 +1818,8 @@ export class IdePage {
     if (!platform.canUseTerminal) {
       this.terminal.showOutputPanel();
       this.terminal.appendOutput(platform.isMobile
-        ? "Terminal real Node nao esta disponivel no mobile. Output/Command Log ativo."
-        : "Terminal real nao esta disponivel no modo web. Output/Command Log ativo.");
+        ? "O terminal Node real não está disponível no mobile. Saída e registro de comandos ativos."
+        : "O terminal real não está disponível no modo web. Saída e registro de comandos ativos.");
     } else if (focus) {
       this.terminal.focusCurrentTerminal();
     }
@@ -1699,7 +1834,7 @@ export class IdePage {
 
   private closeTerminalPanel(): void {
     this.setTerminalVisible(false);
-    this.updateStatus("Terminal hidden");
+    this.updateStatus("Terminal oculto");
   }
 
   private setTerminalVisible(visible: boolean, persist = true): void {
@@ -1711,7 +1846,7 @@ export class IdePage {
 
   private toggleSidebar(): void {
     this.sideBar.hidden = !this.sideBar.hidden;
-    this.updateStatus(this.sideBar.hidden ? "Sidebar hidden" : panelTitle(this.activePanel));
+    this.updateStatus(this.sideBar.hidden ? "Barra lateral oculta" : panelTitle(this.activePanel));
   }
 
   private terminalCwd(): string {
@@ -1886,7 +2021,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       return;
 
     case "F5":
-      run(() => this.runCurrentFile());
+      run(() => this.runCurrentFile(true));
       return;
 
     case "Ctrl+Alt+N":
@@ -1949,6 +2084,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "view:terminal": () => this.toggleTerminal(),
       "view:output": () => this.showOutput(),
       "view:extensions": () => this.showPanel("extensions"),
+      "update:check": () => void this.checkForUpdates(),
       "ai:openChat": () => this.openAIChat(),
       "ai:newConversation": () => { this.openAIChat(); void this.aiChat.newConversation(); },
       "extensions:installVsix": () => void this.installExtensionFromVsix(),
@@ -1965,7 +2101,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "terminal:clear": () => this.terminal.clearCurrentTerminal(),
       "terminal:kill": () => this.terminal.killCurrentTerminal(),
       "terminal:close": () => this.terminal.closeCurrentTerminal(),
-      "tools:run": () => void this.runCurrentFile(),
+      "tools:run": () => void this.runCurrentFile(true),
       "tools:runWithoutDebug": () => void this.runWithoutDebug(),
       "tools:build": () => void this.buildProject(),
       "git:pull": () => void this.source.runOnFirstRepo(["pull"]),
@@ -2034,12 +2170,12 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   private commandLabel(): string {
     return this.explorer.workspace
       ? `Pesquisar em ${basename(this.explorer.workspace)}`
-      : "Pesquisar arquivos por nome ou caminho";
+      : "NPSharp"
   }
 
   private persist(): void {
     if (this.disposed) return;
-    this.session.workspace = this.explorer.workspace;
+    this.session.workspace = this.settings.restoreWorkspaceOnStartup ? this.explorer.workspace : undefined;
     if (this.explorer.workspace) this.rememberWorkspace(this.explorer.workspace);
     this.session.openFiles = this.editor.getOpenFiles();
     this.session.activeFile = this.editor.getCurrentFile();
@@ -2049,17 +2185,17 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   }
 private about(): void {
   alert(`NPSharp
-Versão 26.8.6
+Versão 26.8.18
 
-Developed by CoreLabs.
+Desenvolvido pela CoreLabs.
 
-Code without distractions.
+Código sem distrações.
 
-NPSharp is a fast, modern and developer-first IDE created to provide a clean and efficient coding experience. Combining the power of Monaco Editor with Electron, it delivers a familiar environment enhanced with custom themes, integrated tools, source control, terminal support and a workflow built for real-world software development.
+O NPSharp é uma IDE rápida, moderna e centrada em desenvolvedores, criada para oferecer uma experiência de programação limpa e eficiente. Combinando o poder do Monaco Editor com Electron, entrega um ambiente familiar com temas personalizados, ferramentas integradas, controle de código-fonte, terminal e um fluxo de trabalho para desenvolvimento de software real.
 
-Designed by developers, for developers.
+Feito por desenvolvedores, para desenvolvedores.
 
-© ${new Date().getFullYear()} CoreLabs. All rights reserved.`);
+© ${new Date().getFullYear()} CoreLabs. Todos os direitos reservados.`);
 }
 
   private renderFatalError(error: unknown): void {
@@ -2069,7 +2205,7 @@ Designed by developers, for developers.
         className: "fatal-screen",
         children: [
           el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } }),
-          el("h1", { text: "NPSharp failed to start" }),
+          el("h1", { text: "Não foi possível iniciar o NPSharp" }),
           el("pre", { text: errorMessage(error) })
         ]
       })
@@ -2132,16 +2268,16 @@ function titleIcon(iconName: string, title: string, action: () => void, extraCla
 
 function panelTitle(panel: PanelId): string {
   const titles: Record<PanelId, string> = {
-    explorer: "EXPLORER",
-    search: "SEARCH",
-    source: "SOURCE CONTROL",
-    run: "RUN AND DEBUG",
-    extensions: "EXTENSIONS",
-    remote: "REMOTE HOST",
+    explorer: "EXPLORADOR",
+    search: "PESQUISAR",
+    source: "CONTROLE DE CÓDIGO-FONTE",
+    run: "EXECUTAR E DEPURAR",
+    extensions: "EXTENSÕES",
+    remote: "HOST REMOTO",
     arduino: "ARDUINO",
-    ai: "AI CHAT",
-    settings: "SETTINGS",
-    problems: "PROBLEMS"
+    ai: "CONVERSA COM IA",
+    settings: "CONFIGURAÇÕES",
+    problems: "PROBLEMAS"
   };
   return titles[panel];
 }
@@ -2169,9 +2305,9 @@ function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
   const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/NPSharp/settings.json" : "~/.npsharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
-  const save = el("button", { className: "wide-action", text: "Save" });
+  const save = el("button", { className: "wide-action", text: "Salvar" });
   save.addEventListener("click", onSave);
-  const reset = el("button", { className: "wide-action", text: "Reset" });
+  const reset = el("button", { className: "wide-action", text: "Redefinir" });
   reset.addEventListener("click", onReset);
   footer.append(path, spacer, save, reset);
   return footer;

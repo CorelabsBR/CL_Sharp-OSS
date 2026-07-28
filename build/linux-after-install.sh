@@ -2,7 +2,7 @@
 set -e
 
 app_dir="/opt/NPSharp"
-executable="npsharp-electron"
+executable="npsharp"
 binary="$app_dir/$executable"
 sandbox="$app_dir/chrome-sandbox"
 crashpad="$app_dir/chrome_crashpad_handler"

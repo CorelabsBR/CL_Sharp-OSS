@@ -9,6 +9,8 @@ import type {
   LanguageRuntimeConfig,
   LanguageRuntimeState,
   LanguageRuntimeValidation,
+  RuntimeDependencyInstallRequest,
+  RuntimeDependencyInstallResult,
   RuntimeRunRequest,
   RuntimeRunResult
 } from "../../shared/types";
@@ -17,10 +19,41 @@ import { LANGUAGE_RUNTIMES, languageFromFileName } from "../../core/runtime/lang
 import { commandExists, runProcess } from "./processService";
 import { languageRuntimesPath, runtimeRegistryPath, toolBinDir } from "./paths";
 
-const CONFIGURABLE_LANGUAGE_IDS = ["c", "cpp", "csharp", "java", "node", "python", "go", "rust", "php", "lua", "kotlin", "dart"] as const;
+const CONFIGURABLE_LANGUAGE_IDS = LANGUAGE_RUNTIMES
+  .filter(language => language.id !== "git" && language.id !== "portugol")
+  .map(language => language.id);
 const CONFIGURABLE_LANGUAGE_SET = new Set<string>(CONFIGURABLE_LANGUAGE_IDS);
 
 type RuntimeConfigFile = Record<string, Partial<LanguageRuntimeConfig>>;
+
+const PYTHON_STANDARD_LIBRARY = new Set([
+  "__future__", "__main__", "abc", "argparse", "array", "ast", "asyncio", "base64", "binascii", "bisect", "builtins",
+  "calendar", "cmath", "collections", "concurrent", "contextlib", "copy", "csv", "ctypes", "dataclasses", "datetime", "decimal",
+  "difflib", "dis", "email", "encodings", "enum", "errno", "faulthandler", "filecmp", "fileinput", "fnmatch", "fractions",
+  "functools", "gc", "getopt", "getpass", "gettext", "glob", "graphlib", "gzip", "hashlib", "heapq", "hmac", "html", "http",
+  "imaplib", "importlib", "inspect", "io", "ipaddress", "itertools", "json", "keyword", "linecache", "locale", "logging", "lzma",
+  "mailbox", "marshal", "math", "mimetypes", "mmap", "multiprocessing", "numbers", "operator", "optparse", "os", "pathlib", "pdb",
+  "pickle", "pkgutil", "platform", "plistlib", "poplib", "posixpath", "pprint", "profile", "pstats", "pty", "py_compile", "pyclbr",
+  "pydoc", "queue", "quopri", "random", "re", "readline", "reprlib", "resource", "rlcompleter", "runpy", "sched", "secrets",
+  "select", "selectors", "shelve", "shlex", "shutil", "signal", "site", "smtplib", "socket", "socketserver", "sqlite3", "ssl",
+  "stat", "statistics", "string", "stringprep", "struct", "subprocess", "sys", "sysconfig", "tabnanny", "tarfile", "tempfile",
+  "termios", "textwrap", "threading", "time", "timeit", "tkinter", "token", "tokenize", "tomllib", "trace", "traceback",
+  "tracemalloc", "tty", "turtle", "types", "typing", "unicodedata", "unittest", "urllib", "uuid", "venv", "warnings", "wave",
+  "weakref", "webbrowser", "wsgiref", "xml", "xmlrpc", "zipapp", "zipfile", "zipimport", "zlib", "zoneinfo"
+]);
+
+const PYTHON_PACKAGE_ALIASES: Record<string, string> = {
+  "PIL": "Pillow",
+  "bs4": "beautifulsoup4",
+  "cv2": "opencv-python",
+  "dotenv": "python-dotenv",
+  "sklearn": "scikit-learn",
+  "yaml": "PyYAML",
+  "serial": "pyserial",
+  "dateutil": "python-dateutil",
+  "Crypto": "pycryptodome",
+  "jwt": "PyJWT"
+};
 
 export async function listRuntimes(): Promise<InstalledRuntime[]> {
   return discoverRuntimes(false);
@@ -89,45 +122,153 @@ export async function validateRuntime(languageId: string, executablePath?: strin
   };
 }
 
+/**
+ * Creates a project-local Python environment and installs the dependencies requested by the active source file.
+ * The action is deliberately explicit in the UI, so package downloads never happen during an ordinary Run.
+ */
+export async function installRuntimeDependencies(request: RuntimeDependencyInstallRequest): Promise<RuntimeDependencyInstallResult> {
+  const language = languageFromFileName(path.basename(request.filePath));
+  if (language?.id !== "python") {
+    return {
+      output: "[ERRO] O download automático de imports está disponível somente para arquivos Python (.py).",
+      code: 1,
+      packages: []
+    };
+  }
+
+  const source = request.content ?? await fs.readFile(request.filePath, "utf8");
+  const runtimes = await discoverRuntimes(true);
+  const runtime = runtimes.find(item => item.language.id === "python");
+  if (!runtime) {
+    return {
+      language: language.displayName,
+      output: "[ERRO] Runtime Python não encontrado. Configure Python em Configurar runtimes de linguagem.",
+      code: 127,
+      packages: []
+    };
+  }
+
+  const projectRoot = await findPythonProjectRoot(path.dirname(request.filePath), request.workspace);
+  const environmentPath = path.join(projectRoot, ".venv");
+  const environmentPython = pythonVenvExecutable(environmentPath);
+  const output: string[] = [`[Python] Projeto: ${projectRoot}`, `[Python] Ambiente local: ${environmentPath}`];
+  let failed = false;
+
+  if (!await executableExists(environmentPython)) {
+    const create = await runProcess(runtime.executablePath, ["-m", "venv", environmentPath], { cwd: projectRoot, timeoutMs: 120000 });
+    output.push(formatRunOutput("Python venv", [runtime.executablePath, "-m", "venv", environmentPath], create.output || "Ambiente criado.", create.code));
+    if ((create.code ?? 1) !== 0 || !await executableExists(environmentPython)) {
+      return {
+        language: language.displayName,
+        output: output.join("\n\n"),
+        code: create.code ?? 1,
+        environmentPath,
+        packages: []
+      };
+    }
+  } else {
+    output.push("[Python] Usando o .venv já existente.");
+  }
+
+  const requirements = path.join(projectRoot, "requirements.txt");
+  if (await fileExists(requirements)) {
+    const installRequirements = await runProcess(
+      environmentPython,
+      ["-m", "pip", "install", "--disable-pip-version-check", "-r", requirements],
+      { cwd: projectRoot, timeoutMs: 300000 }
+    );
+    output.push(formatRunOutput("Python requirements", [environmentPython, "-m", "pip", "install", "-r", requirements], installRequirements.output, installRequirements.code));
+    failed ||= (installRequirements.code ?? 1) !== 0;
+  }
+
+  const packages = await pythonPackagesFromImports(source, projectRoot, path.dirname(request.filePath));
+  if (!packages.length) {
+    output.push("[Python] Nenhum import externo adicional foi detectado.");
+  }
+  for (const packageName of packages) {
+    const install = await runProcess(
+      environmentPython,
+      ["-m", "pip", "install", "--disable-pip-version-check", packageName],
+      { cwd: projectRoot, timeoutMs: 300000 }
+    );
+    output.push(formatRunOutput("Python pip", [environmentPython, "-m", "pip", "install", packageName], install.output, install.code));
+    failed ||= (install.code ?? 1) !== 0;
+  }
+
+  output.push(failed
+    ? "[Python] O .venv foi preservado; corrija os pacotes que falharam e tente novamente."
+    : "[Python] Dependências preparadas no .venv. A próxima execução usará este ambiente.");
+  return {
+    language: language.displayName,
+    output: output.join("\n\n").trim(),
+    code: failed ? 1 : 0,
+    environmentPath,
+    packages
+  };
+}
+
 export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunResult> {
   const language = languageFromFileName(path.basename(request.filePath));
   if (!language || language.id === "git") {
     return { output: `[ERRO] Linguagem nao reconhecida para ${path.basename(request.filePath)}`, code: 1 };
   }
 
+  const debugWarning = request.debug
+    ? `[AVISO] O depurador integrado para ${language.displayName} nao esta disponivel. Executando sem depuracao.`
+    : undefined;
+  const complete = (result: RuntimeRunResult): RuntimeRunResult => debugWarning
+    ? { ...result, output: `${debugWarning}\n${result.output}`.trim() }
+    : result;
+
   const source = request.content ?? await fs.readFile(request.filePath, "utf8");
   if (language.id === "portugol") {
     const output: string[] = [];
     const interpreter = new PortugolInterpreter();
     interpreter.executeWithOutput(source, line => output.push(`[PORTUGOL] ${line}`));
-    return {
+    return complete({
       language: language.displayName,
-      output: [`[DEBUG] Runtime Portugol selecionado`, ...output, "[DEBUG] Execucao finalizada"].join("\n"),
+      output: [`[Run] Runtime Portugol selecionado`, ...output, "[Run] Execucao finalizada"].join("\n"),
       code: output.some(line => line.includes("[ERRO]")) ? 1 : 0
-    };
+    });
   }
 
   const runtimes = await discoverRuntimes(true);
   const runtime = runtimes.find(item => item.language.id === language.id);
 
+  if (language.id === "python") {
+    return complete(await runPythonFile(language.displayName, request.filePath, runtime, request.workspace));
+  }
+
   if (language.id === "node") {
-    return runNodeLikeFile(language.displayName, request.filePath, runtime);
+    return complete(await runNodeLikeFile(language.displayName, request.filePath, runtime));
   }
 
   if (language.id === "java") {
-    return runJavaSource(language.displayName, request.filePath, source, runtime);
+    return complete(await runJavaSource(language.displayName, request.filePath, source, runtime));
   }
 
   if (language.id === "rust") {
-    return runRustFile(language.displayName, request.filePath, runtime);
+    return complete(await runRustFile(language.displayName, request.filePath, runtime));
+  }
+
+  if (language.id === "c" || language.id === "cpp") {
+    return complete(await runNativeSource(language.displayName, request.filePath, runtime));
+  }
+
+  if (language.id === "csharp") {
+    return complete(await runCSharpSource(language.displayName, request.filePath, runtime));
+  }
+
+  if (language.id === "kotlin") {
+    return complete(await runKotlinSource(language.displayName, request.filePath, runtime));
   }
 
   if (!runtime) {
-    return {
+    return complete({
       language: language.displayName,
       output: `[ERRO] Runtime nao encontrado: ${language.displayName}. Use Configure Language Runtimes para definir ou detectar o executavel.`,
       code: 127
-    };
+    });
   }
 
   const command = buildRunCommand(language.id, runtime.executablePath, request.filePath);
@@ -137,11 +278,11 @@ export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunRes
     env: { NPSHARP_RUNTIME_HOME: runtime.rootPath, PATH: `${toolBinDir()}${path.delimiter}${process.env.PATH ?? ""}` }
   });
 
-  return {
+  return complete({
     language: language.displayName,
     output: formatRunOutput(language.displayName, command, result.output, result.code),
     code: result.code ?? 1
-  };
+  });
 }
 
 async function resolveRuntimeStates(
@@ -371,6 +512,115 @@ function requireConfigurableLanguage(languageId: string): LanguageRuntime {
   return language;
 }
 
+async function runPythonFile(displayName: string, filePath: string, runtime?: InstalledRuntime, workspace?: string): Promise<RuntimeRunResult> {
+  if (!runtime) {
+    return {
+      language: displayName,
+      output: "[ERRO] Runtime Python não encontrado. Configure o caminho em Configurar runtimes de linguagem.",
+      code: 127
+    };
+  }
+
+  const projectRoot = await findPythonProjectRoot(path.dirname(filePath), workspace);
+  const environmentPython = pythonVenvExecutable(path.join(projectRoot, ".venv"));
+  const python = await executableExists(environmentPython) ? environmentPython : runtime.executablePath;
+  const command = [python, filePath];
+  const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  const environment = python === environmentPython
+    ? `[Python] Ambiente: ${path.join(projectRoot, ".venv")}`
+    : "[Python] Ambiente: interpretador configurado (nenhum .venv do projeto foi encontrado).";
+  return {
+    language: displayName,
+    output: `${environment}\n${formatRunOutput(displayName, command, result.output, result.code)}`,
+    code: result.code ?? 1
+  };
+}
+
+function pythonVenvExecutable(environmentPath: string): string {
+  return process.platform === "win32"
+    ? path.join(environmentPath, "Scripts", "python.exe")
+    : path.join(environmentPath, "bin", "python");
+}
+
+async function findPythonProjectRoot(startDir: string, workspace?: string): Promise<string> {
+  if (workspace && isPathInside(startDir, workspace)) return path.resolve(workspace);
+
+  const fallback = path.resolve(startDir);
+  let current = path.resolve(startDir);
+  while (true) {
+    if (await hasAnyFile(current, ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg"])) return current;
+    const parent = path.dirname(current);
+    if (parent === current) return fallback;
+    current = parent;
+  }
+}
+
+function isPathInside(child: string, parent: string): boolean {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== "..");
+}
+
+async function hasAnyFile(directory: string, names: string[]): Promise<boolean> {
+  for (const name of names) {
+    if (await fileExists(path.join(directory, name))) return true;
+  }
+  return false;
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function executableExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath, process.platform === "win32" ? fsConstants.F_OK : fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function pythonPackagesFromImports(source: string, projectRoot: string, sourceDirectory: string): Promise<string[]> {
+  const modules = new Set<string>();
+  for (const line of source.split(/\r?\n/)) {
+    const stripped = line.replace(/#.*/, "").trim();
+    if (!stripped) continue;
+    const importMatch = stripped.match(/^import\s+(.+)$/);
+    if (importMatch) {
+      for (const item of importMatch[1].split(",")) {
+        const moduleName = item.trim().split(/\s+as\s+/i)[0]?.trim();
+        const topLevel = moduleName?.split(".")[0];
+        if (topLevel) modules.add(topLevel);
+      }
+      continue;
+    }
+    const fromMatch = stripped.match(/^from\s+([\w.]+)\s+import\s+/);
+    const topLevel = fromMatch?.[1]?.split(".")[0];
+    if (topLevel) modules.add(topLevel);
+  }
+
+  const packages: string[] = [];
+  for (const moduleName of modules) {
+    if (PYTHON_STANDARD_LIBRARY.has(moduleName) || await isLocalPythonModule(moduleName, sourceDirectory, projectRoot)) continue;
+    packages.push(PYTHON_PACKAGE_ALIASES[moduleName] ?? moduleName);
+  }
+  return [...new Set(packages)].sort((left, right) => left.localeCompare(right));
+}
+
+async function isLocalPythonModule(moduleName: string, sourceDirectory: string, projectRoot: string): Promise<boolean> {
+  const directories = [...new Set([sourceDirectory, projectRoot])];
+  for (const directory of directories) {
+    if (await fileExists(path.join(directory, `${moduleName}.py`))) return true;
+    if (await fileExists(path.join(directory, moduleName, "__init__.py"))) return true;
+  }
+  return false;
+}
+
 async function runNodeLikeFile(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
   const extension = path.extname(filePath).toLowerCase();
   let command: string[] | undefined;
@@ -493,6 +743,96 @@ async function runRustFile(displayName: string, filePath: string, runtime?: Inst
   };
 }
 
+async function runNativeSource(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
+  if (!runtime) {
+    return { language: displayName, output: `[ERRO] Compilador ${displayName} nao encontrado. Configure-o em Configure Language Runtimes.`, code: 127 };
+  }
+
+  const buildDir = path.join(os.tmpdir(), "npsharp-native", createHash("sha1").update(filePath).digest("hex"));
+  await fs.rm(buildDir, { recursive: true, force: true });
+  await fs.mkdir(buildDir, { recursive: true });
+  const binary = path.join(buildDir, process.platform === "win32" ? "program.exe" : "program");
+  const compileCommand = [runtime.executablePath, filePath, "-o", binary];
+  const compile = await runProcess(compileCommand[0], compileCommand.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  if ((compile.code ?? 1) !== 0) {
+    return {
+      language: displayName,
+      output: formatRunOutput(`${displayName} compile`, compileCommand, compile.output, compile.code),
+      code: compile.code ?? 1
+    };
+  }
+
+  const command = [binary];
+  const result = await runProcess(command[0], [], { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  return {
+    language: displayName,
+    output: `${formatRunOutput(`${displayName} compile`, compileCommand, compile.output || "Compilacao concluida.", compile.code)}\n\n${formatRunOutput(displayName, command, result.output, result.code)}`.trim(),
+    code: result.code ?? 1
+  };
+}
+
+async function runCSharpSource(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
+  const dotnet = runtime?.executablePath ?? await commandExists("dotnet");
+  if (!dotnet) {
+    return { language: displayName, output: "[ERRO] Runtime .NET nao encontrado. Configure dotnet em Configure Language Runtimes.", code: 127 };
+  }
+
+  const project = await findProjectFile(path.dirname(filePath), ".csproj");
+  let generatedProject: string | undefined;
+  if (!project) {
+    const buildDir = path.join(os.tmpdir(), "npsharp-csharp", createHash("sha1").update(filePath).digest("hex"));
+    await fs.rm(buildDir, { recursive: true, force: true });
+    await fs.mkdir(buildDir, { recursive: true });
+    generatedProject = path.join(buildDir, "NPSharpRun.csproj");
+    await fs.writeFile(generatedProject, createCSharpProject(filePath, await dotnetTargetFramework(dotnet)), "utf8");
+  }
+  const command = [dotnet, "run", "--project", project ?? generatedProject!];
+  const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  return {
+    language: displayName,
+    output: formatRunOutput(displayName, command, result.output, result.code),
+    code: result.code ?? 1
+  };
+}
+
+async function runKotlinSource(displayName: string, filePath: string, runtime?: InstalledRuntime): Promise<RuntimeRunResult> {
+  const extension = path.extname(filePath).toLowerCase();
+  const configured = runtime?.executablePath;
+  const kotlinc = configured && path.basename(configured).toLowerCase().startsWith("kotlinc")
+    ? configured
+    : await siblingExecutable(configured ?? "", "kotlinc") ?? await commandExists("kotlinc");
+
+  if (extension === ".kts" && !kotlinc && configured) {
+    const command = [configured, filePath];
+    const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+    return { language: displayName, output: formatRunOutput(displayName, command, result.output, result.code), code: result.code ?? 1 };
+  }
+  if (!kotlinc) {
+    return { language: displayName, output: "[ERRO] Compilador Kotlin (kotlinc) nao encontrado. Configure-o em Configure Language Runtimes.", code: 127 };
+  }
+
+  const java = await commandExists("java");
+  if (!java) {
+    return { language: displayName, output: "[ERRO] Runtime Java nao encontrado para executar Kotlin.", code: 127 };
+  }
+  const buildDir = path.join(os.tmpdir(), "npsharp-kotlin", createHash("sha1").update(filePath).digest("hex"));
+  await fs.rm(buildDir, { recursive: true, force: true });
+  await fs.mkdir(buildDir, { recursive: true });
+  const jar = path.join(buildDir, "program.jar");
+  const compileCommand = [kotlinc, filePath, "-include-runtime", "-d", jar];
+  const compile = await runProcess(compileCommand[0], compileCommand.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  if ((compile.code ?? 1) !== 0) {
+    return { language: displayName, output: formatRunOutput(`${displayName} compile`, compileCommand, compile.output, compile.code), code: compile.code ?? 1 };
+  }
+  const command = [java, "-jar", jar];
+  const result = await runProcess(command[0], command.slice(1), { cwd: path.dirname(filePath), timeoutMs: 120000 });
+  return {
+    language: displayName,
+    output: `${formatRunOutput(`${displayName} compile`, compileCommand, compile.output || "Compilacao concluida.", compile.code)}\n\n${formatRunOutput(displayName, command, result.output, result.code)}`.trim(),
+    code: result.code ?? 1
+  };
+}
+
 function buildRunCommand(languageId: string, executable: string, filePath: string): string[] {
   switch (languageId) {
     case "powershell":
@@ -528,6 +868,47 @@ async function findUp(startDir: string, fileName: string): Promise<string | unde
   }
 }
 
+async function findProjectFile(startDir: string, extension: string): Promise<string | undefined> {
+  let current = path.resolve(startDir);
+  while (true) {
+    try {
+      const entries = await fs.readdir(current, { withFileTypes: true });
+      const project = entries.find(entry => entry.isFile() && entry.name.toLowerCase().endsWith(extension));
+      if (project) return path.join(current, project.name);
+    } catch {
+      // A directory that cannot be inspected cannot contain a usable project file.
+    }
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
+async function dotnetTargetFramework(dotnet: string): Promise<string> {
+  const result = await runProcess(dotnet, ["--list-sdks"], { timeoutMs: 5000 });
+  const versions = [...result.output.matchAll(/^(\d+)\.(\d+)\.\d+/gm)];
+  const latest = versions.at(-1);
+  return latest ? `net${latest[1]}.${latest[2]}` : "net8.0";
+}
+
+function createCSharpProject(sourcePath: string, targetFramework: string): string {
+  const includePath = sourcePath.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  return [
+    '<Project Sdk="Microsoft.NET.Sdk">',
+    "  <PropertyGroup>",
+    "    <OutputType>Exe</OutputType>",
+    `    <TargetFramework>${targetFramework}</TargetFramework>`,
+    "    <ImplicitUsings>enable</ImplicitUsings>",
+    "    <Nullable>enable</Nullable>",
+    "  </PropertyGroup>",
+    "  <ItemGroup>",
+    `    <Compile Include="${includePath}" Link="Program.cs" />`,
+    "  </ItemGroup>",
+    "</Project>",
+    ""
+  ].join("\n");
+}
+
 async function siblingExecutable(executable: string, siblingName: string): Promise<string | undefined> {
   const extension = process.platform === "win32" ? ".exe" : "";
   const sibling = path.join(path.dirname(executable), `${siblingName}${extension}`);
@@ -541,10 +922,10 @@ async function siblingExecutable(executable: string, siblingName: string): Promi
 
 function formatRunOutput(displayName: string, command: string[], output: string, code: number | null): string {
   return [
-    `[DEBUG] Runtime selecionado: ${displayName}`,
-    `[DEBUG] Comando: ${formatCommand(command)}`,
+    `[Run] Runtime selecionado: ${displayName}`,
+    `[Run] Comando: ${formatCommand(command)}`,
     output,
-    `[DEBUG] Processo finalizado com codigo ${code ?? 1}`
+    `[Run] Processo finalizado com codigo ${code ?? 1}`
   ].filter(Boolean).join("\n").trim();
 }
 

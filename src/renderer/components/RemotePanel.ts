@@ -48,8 +48,8 @@ export class RemotePanel {
       button.addEventListener("contextmenu", event => {
         event.preventDefault();
         contextMenu([
-          { label: "Connect", action: () => void this.connect(host) },
-          { label: "Test", action: () => void this.testHost(host) },
+          { label: "Conectar", action: () => void this.connect(host) },
+          { label: "Testar", action: () => void this.testHost(host) },
           { label: "Editar", action: () => void this.editHost(host) },
           { label: "Excluir", danger: true, action: () => void this.deleteHost(host) }
         ], event.clientX, event.clientY);

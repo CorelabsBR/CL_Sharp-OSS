@@ -1,3 +1,5 @@
+import type { AppLocale } from "./i18n";
+
 export interface AppInfo {
   name: string;
   version: string;
@@ -5,6 +7,15 @@ export interface AppInfo {
   userDataPath: string;
   appPath: string;
   npsharpHome: string;
+}
+
+export type UpdateState = "idle" | "checking" | "current" | "available" | "downloading" | "downloaded" | "error" | "unsupported";
+
+export interface AppUpdateStatus {
+  state: UpdateState;
+  version?: string;
+  percent?: number;
+  message: string;
 }
 
 export interface DialogFileResult {
@@ -53,7 +64,7 @@ export interface FileReadResult {
   encoding: TextEncoding;
 }
 
-export type FileEditorKind = "text" | "image" | "binary" | "media" | "pdf" | "archive" | "nbt";
+export type FileEditorKind = "text" | "image" | "binary" | "media" | "pdf" | "archive" | "nbt" | "document" | "database" | "design" | "game";
 
 export interface FileOpenResult {
   path: string;
@@ -90,6 +101,7 @@ export interface CustomShortcutBinding {
 }
 
 export interface AppSettings {
+  language: AppLocale;
   theme: string;
   iconTheme: string;
   iconColor: string;
@@ -116,6 +128,7 @@ export interface AppSettings {
   statusBarVisible: boolean;
   activityBarVisible: boolean;
   sideBarVisible: boolean;
+  restoreWorkspaceOnStartup: boolean;
   confirmDelete: boolean;
   binaryFileTypesIgnored: string[];
   keyboardShortcuts: CustomShortcutBinding[];
@@ -350,12 +363,28 @@ export interface ExtensionRegistry {
 export interface RuntimeRunRequest {
   filePath: string;
   content?: string;
+  /** Workspace used to resolve project-local runtimes such as Python .venv. */
+  workspace?: string;
+  /** Requests a debug session when an integrated debugger is available. */
+  debug?: boolean;
 }
 
 export interface RuntimeRunResult {
   language?: string;
   output: string;
   code: number;
+}
+
+export interface RuntimeDependencyInstallRequest {
+  filePath: string;
+  content?: string;
+  /** Workspace where the project-local .venv must be created. */
+  workspace?: string;
+}
+
+export interface RuntimeDependencyInstallResult extends RuntimeRunResult {
+  environmentPath?: string;
+  packages: string[];
 }
 
 export interface ArduinoCliInfo {
@@ -595,6 +624,17 @@ export interface AIConversationUpdate {
 
 export interface NpsharpApi {
   appInfo(): Promise<AppInfo>;
+  startup: {
+    mark(stage: "renderer-rendered" | "editor-interactive"): Promise<void>;
+    ready(): Promise<void>;
+  };
+  update: {
+    status(): Promise<AppUpdateStatus>;
+    check(): Promise<AppUpdateStatus>;
+    download(): Promise<AppUpdateStatus>;
+    install(): Promise<void>;
+    onStatus(callback: (status: AppUpdateStatus) => void): () => void;
+  };
   window: WindowControlsApi;
   dialog: {
     openFile(): Promise<DialogFileResult>;
@@ -609,6 +649,11 @@ export interface NpsharpApi {
     reset(): Promise<AppSettings>;
     loadSession(): Promise<PersistedSession>;
     saveSession(session: PersistedSession): Promise<void>;
+  };
+  i18n: {
+    getLanguage(): Promise<AppLocale>;
+    setLanguage(language: AppLocale): Promise<AppLocale>;
+    availableLanguages(): Promise<Array<{ code: AppLocale; label: string }>>;
   };
   ai: {
     providers(): Promise<AIProviderDescriptor[]>;
@@ -679,6 +724,7 @@ export interface NpsharpApi {
     autoDetect(languageId: string): Promise<LanguageRuntimeState[]>;
     validate(languageId: string, executablePath?: string): Promise<LanguageRuntimeValidation>;
     runFile(request: RuntimeRunRequest): Promise<RuntimeRunResult>;
+    installDependencies(request: RuntimeDependencyInstallRequest): Promise<RuntimeDependencyInstallResult>;
   };
   extensions: {
     list(): Promise<InstalledExtension[]>;

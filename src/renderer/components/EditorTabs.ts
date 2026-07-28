@@ -1,5 +1,5 @@
 import type { EditorDiagnostic, FileOpenResult, SearchResult, TextEncoding } from "../../shared/types";
-import { COMPACT_MINIMAP_OPTIONS, configureMonaco, languageForPath, monaco } from "../../editor/monacoSetup";
+import { COMPACT_MINIMAP_OPTIONS, configureMonaco, ensureLanguageSupport, languageForPath, monaco } from "../../editor/monacoSetup";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
 import { api } from "../services/api";
@@ -373,7 +373,9 @@ export class EditorTabs {
         return;
       }
       const content = file.content ?? "";
-      const model = this.createTextModel(content, languageForPath(filePath), monaco.Uri.file(filePath));
+      const language = languageForPath(filePath);
+      await ensureLanguageSupport(language);
+      const model = this.createTextModel(content, language, monaco.Uri.file(filePath));
       const tab: EditorTab = {
         id: filePath,
         title: basename(filePath),
@@ -439,7 +441,11 @@ export class EditorTabs {
       this.selectTab(existing.id);
       return;
     }
-    const model = this.createTextModel(content, languageForPath(title), monaco.Uri.parse(`npsharp:${encodeURIComponent(uri)}`));
+    const language = languageForPath(title);
+    const model = this.createTextModel(content, language, monaco.Uri.parse(`npsharp:${encodeURIComponent(uri)}`));
+    void ensureLanguageSupport(language).then(() => monaco.editor.setModelLanguage(model, language)).catch(error => {
+      console.warn(`[NPSharp editor] Não foi possível carregar o suporte para ${language}.`, error);
+    });
     const tab: EditorTab = {
       id: uri,
       title,

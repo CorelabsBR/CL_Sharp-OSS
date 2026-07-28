@@ -51,7 +51,7 @@ export class ContextCollector {
     }
     if (sources.has("selection")) {
       const selection = this.host.selection();
-      if (selection) items.push(item("selection", currentFile ? `Selection from ${basename(currentFile)}` : "Editor selection", selection, currentFile));
+      if (selection) items.push(item("selection", currentFile ? `Seleção de ${basename(currentFile)}` : "Seleção do editor", selection, currentFile));
     }
     if (sources.has("openEditors")) {
       for (const editor of this.host.openEditors()) {
@@ -60,14 +60,14 @@ export class ContextCollector {
     }
     const workspace = this.host.workspace();
     if (sources.has("workspaceTree") && workspace) {
-      items.push(item("workspaceTree", "Workspace tree", await this.workspaceTree(workspace), workspace));
+      items.push(item("workspaceTree", "Árvore do workspace", await this.workspaceTree(workspace), workspace));
     }
     if (sources.has("workspaceFiles") && workspace) {
       items.push(...await this.relevantWorkspaceFiles(workspace, prompt));
     }
     if (sources.has("terminal") || sources.has("buildOutput")) {
       const output = this.host.terminalOutput();
-      if (output) items.push(item(sources.has("buildOutput") ? "buildOutput" : "terminal", "Terminal / build output", output));
+      if (output) items.push(item(sources.has("buildOutput") ? "buildOutput" : "terminal", "Saída do terminal / compilação", output));
     }
     if (sources.has("gitDiff")) {
       const diff = await this.host.gitDiff();
@@ -76,7 +76,7 @@ export class ContextCollector {
     if (sources.has("diagnostics") || sources.has("problems")) {
       const diagnostics = this.host.diagnostics();
       if (diagnostics.length) {
-        items.push(item("diagnostics", "Diagnostics and problems", diagnostics.map(diagnostic =>
+        items.push(item("diagnostics", "Diagnósticos e problemas", diagnostics.map(diagnostic =>
           `${diagnostic.severity} ${diagnostic.filePath}:${diagnostic.line}:${diagnostic.column} ${diagnostic.message} (${diagnostic.source})`
         ).join("\n")));
       }
@@ -195,4 +195,3 @@ function languageFromPath(path: string): string {
 function isTextFile(name: string): boolean {
   return !/\.(?:png|jpe?g|gif|webp|ico|pdf|zip|gz|tar|7z|exe|dll|so|dylib|woff2?|ttf|mp[34]|mov|avi|class|jar)$/iu.test(name);
 }
-

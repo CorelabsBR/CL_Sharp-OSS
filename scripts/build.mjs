@@ -30,4 +30,6 @@ await run(npm, ["run", "build:electron"]);
 const args = [];
 if (target === "linux") args.push("--linux");
 if (target === "win") args.push("--win");
+if (target === "portable-fast") args.push("--win", "dir", "--x64");
 await run(builder, args, { USE_HARD_LINKS: "false" });
+if (target === "portable-fast") await run(process.execPath, [path.join(root, "scripts", "package-portable-fast.mjs")]);

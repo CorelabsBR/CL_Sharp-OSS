@@ -8,6 +8,7 @@ import type {
   AIProviderId,
   AISaveSettingsRequest,
   AIStreamEvent,
+  AppUpdateStatus,
   AppSettings,
   ArduinoCliRequest,
   ArduinoCompileRequest,
@@ -28,6 +29,7 @@ import type {
   RemoteListRequest,
   ReplaceAllRequest,
   RuntimeRunRequest,
+  RuntimeDependencyInstallRequest,
   SaveFileRequest,
   SearchQuery,
   TemplateApplyRequest,
@@ -40,6 +42,8 @@ import type {
   WorkspacePathRequest,
   WorkspaceRenameRequest
 } from "../shared/types";
+import type { AppLocale } from "../shared/i18n";
+import { UPDATE_IPC } from "../shared/updateIpc";
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   try {
@@ -50,8 +54,34 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   }
 }
 
+function isUpdateStatus(value: unknown): value is AppUpdateStatus {
+  if (!value || typeof value !== "object") return false;
+  const status = value as Partial<AppUpdateStatus>;
+  return ["idle", "checking", "current", "available", "downloading", "downloaded", "error", "unsupported"].includes(status.state ?? "")
+    && typeof status.message === "string"
+    && (status.version === undefined || typeof status.version === "string")
+    && (status.percent === undefined || typeof status.percent === "number");
+}
+
 const api: NpsharpApi = {
   appInfo: () => invoke("app:info"),
+  startup: {
+    mark: stage => invoke("startup:mark", stage),
+    ready: () => invoke("startup:ready")
+  },
+  update: {
+    status: () => invoke(UPDATE_IPC.status),
+    check: () => invoke(UPDATE_IPC.check),
+    download: () => invoke(UPDATE_IPC.download),
+    install: () => invoke(UPDATE_IPC.install),
+    onStatus: (callback: (status: AppUpdateStatus) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: unknown) => {
+        if (isUpdateStatus(status)) callback(status);
+      };
+      ipcRenderer.on(UPDATE_IPC.status, listener);
+      return () => ipcRenderer.removeListener(UPDATE_IPC.status, listener);
+    }
+  },
   window: {
     minimize: () => invoke("window:minimize"),
     maximize: () => invoke("window:maximize"),
@@ -71,6 +101,11 @@ const api: NpsharpApi = {
     reset: () => invoke("settings:reset"),
     loadSession: () => invoke("settings:loadSession"),
     saveSession: (session: PersistedSession) => invoke("settings:saveSession", session)
+  },
+  i18n: {
+    getLanguage: () => invoke("i18n:getLanguage"),
+    setLanguage: (language: AppLocale) => invoke("i18n:setLanguage", language),
+    availableLanguages: () => invoke("i18n:availableLanguages")
   },
   ai: {
     providers: () => invoke("ai:providers"),
@@ -168,7 +203,8 @@ const api: NpsharpApi = {
     updateConfig: (languageId: string, config: LanguageRuntimeConfig) => invoke("runtime:updateConfig", languageId, config),
     autoDetect: (languageId: string) => invoke("runtime:autoDetect", languageId),
     validate: (languageId: string, executablePath?: string) => invoke("runtime:validate", languageId, executablePath),
-    runFile: (request: RuntimeRunRequest) => invoke("runtime:runFile", request)
+    runFile: (request: RuntimeRunRequest) => invoke("runtime:runFile", request),
+    installDependencies: (request: RuntimeDependencyInstallRequest) => invoke("runtime:installDependencies", request)
   },
   extensions: {
     list: () => invoke("extensions:list"),
@@ -240,5 +276,10 @@ contextBridge.exposeInMainWorld("npsharpEvents", {
     const listener = (_event: Electron.IpcRendererEvent, command: string) => callback(command);
     ipcRenderer.on("command", listener);
     return () => ipcRenderer.removeListener("command", listener);
+  },
+  onOpenFile(callback: (filePath: string) => void): () => void {
+    const listener = (_event: Electron.IpcRendererEvent, filePath: string) => callback(filePath);
+    ipcRenderer.on("open-file", listener);
+    return () => ipcRenderer.removeListener("open-file", listener);
   }
 });

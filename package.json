@@ -1,14 +1,14 @@
 {
   "name": "NPSharp",
-  "version": "26.8.6",
+  "version": "26.8.18",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
   "author": "CoreLabs",
-  "homepage": "https://github.com/girellidev/npsharp",
+  "homepage": "https://github.com/CoreLabsBR/CL_NPSharp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/girellidev/npsharp.git"
+    "url": "https://github.com/CoreLabsBR/CL_NPSharp.git"
   },
   "license": "SEE LICENSE IN ../NPSharp/LICENSE.txt",
   "scripts": {
@@ -19,12 +19,15 @@
     "build:electron": "tsc -p tsconfig.electron.json",
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "test": "npm run test:easter-egg && npm run test:updater",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
+    "test:updater": "npm run build:electron && node dist-electron/services/node/updateSemver.test.js && node dist-electron/services/node/updateService.test.js && node dist-electron/services/node/updateIpc.test.js",
     "build": "node scripts/build.mjs",
     "build:mobile": "npm run typecheck && npm run build:renderer",
     "package": "node scripts/build.mjs",
     "package:linux": "node scripts/build.mjs linux",
     "package:win": "node scripts/build.mjs win",
+    "package:portable-fast": "node scripts/build.mjs portable-fast",
     "mobile:init": "npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem && npx cap init NPSharp br.com.corelabs.npsharp --web-dir=dist && npx cap add android",
     "cap:sync": "npm run build:mobile && npx cap sync android",
     "android": "npm run cap:sync && npx cap run android",
@@ -35,8 +38,10 @@
   "dependencies": {
     "@capacitor/core": "^8.4.2",
     "@capacitor/filesystem": "^8.1.2",
+    "electron-updater": "6.8.9",
     "extract-zip": "^2.0.1",
     "monaco-editor": "^0.52.2",
+    "sql.js": "^1.14.1",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {
@@ -73,6 +78,8 @@
     ],
     "npmRebuild": true,
     "nativeRebuilder": "parallel",
+    "asar": true,
+    "compression": "normal",
     "asarUnpack": [
       "node_modules/node-pty/**/*",
       "node_modules/cpu-features/**/*"
@@ -108,6 +115,23 @@
     "appImage": {
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
+    "nsis": {
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NPSharp",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}-${arch}.${ext}",
+      "requestExecutionLevel": "asInvoker",
+      "unpackDirName": "NPSharp"
+    },
     "deb": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "afterInstall": "build/linux-after-install.sh",
@@ -129,7 +153,15 @@
         "libuuid1",
         "libsecret-1-0"
       ]
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "CoreLabsBR",
+        "repo": "CL_NPSharp",
+        "releaseType": "release"
+      }
+    ]
   },
   "optionalDependencies": {
     "node-pty": "1.0.0"

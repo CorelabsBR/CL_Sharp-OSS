@@ -241,15 +241,15 @@ export class TerminalPanel {
     );
     void this.loadShellOptions();
 
-    const problemsTab = el("button", { className: "panel-tab", text: "PROBLEMS", attrs: { "data-mode": "problems" } });
+    const problemsTab = el("button", { className: "panel-tab", text: "PROBLEMAS", attrs: { "data-mode": "problems" } });
     problemsTab.addEventListener("click", () => this.showProblemsPanel());
-    const outputTab = el("button", { className: "panel-tab", text: "OUTPUT", attrs: { "data-mode": "output" } });
+    const outputTab = el("button", { className: "panel-tab", text: "SAÍDA", attrs: { "data-mode": "output" } });
     outputTab.addEventListener("click", () => this.showOutputPanel());
-    const debugTab = el("button", { className: "panel-tab", text: "DEBUG CONSOLE", attrs: { "data-mode": "debug" } });
+    const debugTab = el("button", { className: "panel-tab", text: "CONSOLE DE DEPURAÇÃO", attrs: { "data-mode": "debug" } });
     debugTab.addEventListener("click", () => this.showDebugConsole());
     const terminalTab = el("button", { className: "panel-tab active", text: "TERMINAL", attrs: { "data-mode": "terminal" } });
     terminalTab.addEventListener("click", () => this.showTerminal());
-    const portsTab = el("button", { className: "panel-tab", text: "PORTS", attrs: { "data-mode": "ports" } });
+    const portsTab = el("button", { className: "panel-tab", text: "PORTAS", attrs: { "data-mode": "ports" } });
     portsTab.addEventListener("click", () => this.showPortsPanel());
     const gitTab = el("button", { className: "panel-tab", text: "GIT", attrs: { "data-mode": "git" } });
     gitTab.addEventListener("click", () => this.showGitPanel());
@@ -537,8 +537,8 @@ function resolveCwd(current: string, target: string): string {
 
 function terminalUnavailableMessage(): string {
   return platform.isMobile
-    ? "Terminal real Node nao esta disponivel no mobile. Use este painel como Output/Command Log."
-    : "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
+    ? "O terminal Node real não está disponível no mobile. Use este painel como saída e registro de comandos."
+    : "O terminal real não está disponível no modo web. Use este painel como saída e registro de comandos.";
 }
 
 function normalizeTerminalData(data: string): { text: string; clear: boolean } {

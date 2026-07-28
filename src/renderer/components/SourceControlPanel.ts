@@ -87,7 +87,7 @@ export class SourceControlPanel {
       if (event.key === "Enter") void this.commitAll();
     });
     const allowEmptyRow = el("label", { className: "check-row" });
-    allowEmptyRow.append(this.allowEmpty, el("span", { text: "Allow empty commit" }));
+    allowEmptyRow.append(this.allowEmpty, el("span", { text: "Permitir commit vazio" }));
     this.element.append(toolbar, this.summary, this.commitInput, allowEmptyRow, this.list);
     this.applyCapabilityState();
   }
@@ -108,7 +108,7 @@ export class SourceControlPanel {
         buttonIcon("history", "History", () => void this.showHistory(repo))
       );
       repoBlock.append(header);
-      if (repo.clean) repoBlock.append(el("div", { className: "muted-row", text: "Working tree clean" }));
+      if (repo.clean) repoBlock.append(el("div", { className: "muted-row", text: "Árvore de trabalho limpa" }));
       for (const file of repo.files) repoBlock.append(this.fileRow(repo, file));
       this.list.append(repoBlock);
     }

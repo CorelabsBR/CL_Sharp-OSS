@@ -1,4 +1,5 @@
 import { cssUrl, resourceUrl } from "./assets";
+import { uiText } from "../../shared/i18n";
 
 const contextMenuCleanup = Symbol("contextMenuCleanup");
 
@@ -17,16 +18,30 @@ export interface ElementOptions {
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, options: ElementOptions = {}): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (options.className) node.className = options.className;
-  if (options.text !== undefined) node.textContent = options.text;
-  if (options.title) node.title = options.title;
+  if (options.text !== undefined) node.textContent = uiText(options.text);
+  if (options.title) node.title = uiText(options.title);
   for (const [key, value] of Object.entries(options.attrs ?? {})) {
-    node.setAttribute(key, value);
+    node.setAttribute(key, key === "placeholder" || key === "title" || key === "aria-label" ? uiText(value) : value);
   }
   for (const child of options.children ?? []) {
     if (child == null) continue;
-    node.append(typeof child === "string" ? document.createTextNode(child) : child);
+    node.append(typeof child === "string" ? document.createTextNode(uiText(child)) : child);
   }
   return node;
+}
+
+/** Traduz os elementos criados antes que a preferência assíncrona seja carregada. */
+export function localizeElementTree(root: ParentNode): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  for (const node of nodes) node.data = uiText(node.data);
+  root.querySelectorAll<HTMLElement>("[title], [placeholder], [aria-label]").forEach(node => {
+    for (const name of ["title", "placeholder", "aria-label"]) {
+      const value = node.getAttribute(name);
+      if (value) node.setAttribute(name, uiText(value));
+    }
+  });
 }
 
 export function icon(name: string, title = name): HTMLElement {

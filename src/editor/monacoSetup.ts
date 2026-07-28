@@ -5,30 +5,6 @@ import "monaco-editor/esm/vs/base/browser/ui/codicons/codiconStyles.js";
 // editor.api does not register the Find contribution; import it explicitly so
 // Ctrl+F/Cmd+F and the title-bar command share Monaco's real Find widget.
 import "monaco-editor/esm/vs/editor/contrib/find/browser/findController.js";
-import "monaco-editor/esm/vs/basic-languages/bat/bat.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/css/css.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/go/go.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/html/html.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/ini/ini.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/java/java.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/kotlin/kotlin.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/lua/lua.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/php/php.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/powershell/powershell.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/python/python.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/ruby/ruby.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/rust/rust.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/scss/scss.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/shell/shell.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/xml/xml.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js";
-import "monaco-editor/esm/vs/language/json/monaco.contribution.js";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -46,6 +22,47 @@ self.MonacoEnvironment = {
 };
 
 let configured = false;
+const loadedLanguages = new Set<string>();
+
+const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
+  bat: () => import("monaco-editor/esm/vs/basic-languages/bat/bat.contribution.js"),
+  cpp: () => import("monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js"),
+  c: () => import("monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution.js"),
+  csharp: () => import("monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution.js"),
+  css: () => import("monaco-editor/esm/vs/basic-languages/css/css.contribution.js"),
+  scss: () => import("monaco-editor/esm/vs/basic-languages/scss/scss.contribution.js"),
+  go: () => import("monaco-editor/esm/vs/basic-languages/go/go.contribution.js"),
+  html: () => import("monaco-editor/esm/vs/basic-languages/html/html.contribution.js"),
+  ini: () => import("monaco-editor/esm/vs/basic-languages/ini/ini.contribution.js"),
+  java: () => import("monaco-editor/esm/vs/basic-languages/java/java.contribution.js"),
+  javascript: () => import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"),
+  kotlin: () => import("monaco-editor/esm/vs/basic-languages/kotlin/kotlin.contribution.js"),
+  lua: () => import("monaco-editor/esm/vs/basic-languages/lua/lua.contribution.js"),
+  markdown: () => import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"),
+  php: () => import("monaco-editor/esm/vs/basic-languages/php/php.contribution.js"),
+  powershell: () => import("monaco-editor/esm/vs/basic-languages/powershell/powershell.contribution.js"),
+  python: () => import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js"),
+  ruby: () => import("monaco-editor/esm/vs/basic-languages/ruby/ruby.contribution.js"),
+  rust: () => import("monaco-editor/esm/vs/basic-languages/rust/rust.contribution.js"),
+  shell: () => import("monaco-editor/esm/vs/basic-languages/shell/shell.contribution.js"),
+  sql: () => import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"),
+  typescript: () => import("monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js"),
+  xml: () => import("monaco-editor/esm/vs/basic-languages/xml/xml.contribution.js"),
+  yaml: () => import("monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js"),
+  json: () => import("monaco-editor/esm/vs/language/json/monaco.contribution.js")
+};
+
+export async function ensureLanguageSupport(language: string): Promise<void> {
+  const loader = LANGUAGE_LOADERS[language];
+  if (!loader || loadedLanguages.has(language)) return;
+  loadedLanguages.add(language);
+  try {
+    await loader();
+  } catch (error) {
+    loadedLanguages.delete(language);
+    throw error;
+  }
+}
 
 export function configureMonaco(): typeof monaco {
   if (configured) return monaco;

@@ -91,12 +91,12 @@ export class MarkdownRenderer {
     const toolbar = el("div", { className: "ai-code-toolbar" });
     toolbar.append(el("span", { text: language }));
     const actions: Array<[string, () => void]> = [
-      ["Copy", () => void this.codeActions.copy(code)],
+      ["Copiar", () => void this.codeActions.copy(code)],
       ["Insert Below", () => this.codeActions.insertBelow(code)],
       ["Replace Selection", () => this.codeActions.replaceSelection(code)],
       ["Replace File", () => this.codeActions.replaceFile(code)],
-      ["Create New File", () => this.codeActions.createNewFile(code, language)],
-      ["Save As Snippet", () => void this.codeActions.saveAsSnippet(code, language)]
+      ["Criar novo arquivo", () => this.codeActions.createNewFile(code, language)],
+      ["Salvar como trecho", () => void this.codeActions.saveAsSnippet(code, language)]
     ];
     for (const [label, run] of actions) {
       const button = el("button", { className: "ai-code-action", text: label });

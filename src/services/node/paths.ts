@@ -1,8 +1,14 @@
 import os from "node:os";
 import path from "node:path";
 
+let dataRootOverride: string | undefined;
+
+export function configureNpsharpDataRoot(root?: string): void {
+  dataRootOverride = root ? path.resolve(root) : undefined;
+}
+
 export function npsharpHome(): string {
-  return path.join(os.homedir(), ".npsharp");
+  return dataRootOverride ?? path.join(os.homedir(), ".npsharp");
 }
 
 export function npsharpConfigDir(): string {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";
 import {
@@ -40,13 +40,15 @@ import {
   unstage
 } from "../services/node/gitService";
 import { openLiveServer, stopAllLiveServers } from "../services/node/liveServerService";
-import { npsharpHome } from "../services/node/paths";
+import { configureNpsharpDataRoot, npsharpHome } from "../services/node/paths";
+import { detectPortableMode } from "../services/node/portableMode";
 import { normalizeCwd, runShell } from "../services/node/processService";
 import { resourcePath, resourcesRoot } from "../services/node/resourcePaths";
 import {
   autoDetectRuntime,
   configureRuntime,
   discoverRuntimes,
+  installRuntimeDependencies,
   listRuntimeConfigStates,
   listRuntimes,
   runFile,
@@ -57,6 +59,10 @@ import { replaceAll, searchWorkspace } from "../services/node/searchService";
 import { loadSession, loadSettings, resetSettings, saveSession, saveSettings } from "../services/node/settingsService";
 import { applyTemplate } from "../services/node/templateService";
 import { runJavaDiagnostics } from "../services/node/diagnosticsService";
+import { createElectronUpdateService, type UpdateService } from "../services/node/updateService";
+import { StartupProfiler, type StartupStage } from "../services/node/startupProfiler";
+import { UPDATE_IPC } from "../shared/updateIpc";
+import { DEFAULT_LOCALE, LOCALE_LABELS, normalizeLocale, SUPPORTED_LOCALES, t, type AppLocale } from "../shared/i18n";
 import { AIService } from "../services/node/ai/AIService";
 import { AISettingsService } from "../services/node/ai/AISettingsService";
 import { ConversationManager } from "../services/node/ai/ConversationManager";
@@ -105,7 +111,9 @@ import type {
   RemoteHostConfig,
   RemoteListRequest,
   ReplaceAllRequest,
+  AppUpdateStatus,
   RuntimeRunRequest,
+  RuntimeDependencyInstallRequest,
   SaveFileRequest,
   SearchQuery,
   TemplateApplyRequest,
@@ -120,6 +128,18 @@ let mainWindow: BrowserWindow | undefined;
 let shuttingDown = false;
 let runtimeResourcesClosed = false;
 let aiStreamingController: StreamingController | undefined;
+let updateService: UpdateService | undefined;
+const startupProfiler = new StartupProfiler();
+let startupReady = false;
+let rendererReady = false;
+const portableMode = detectPortableMode();
+
+if (portableMode.enabled && portableMode.directory) {
+  const portableData = path.join(portableMode.directory, "data");
+  configureNpsharpDataRoot(portableData);
+  app.setPath("userData", portableData);
+  app.setPath("sessionData", path.join(portableData, "chromium"));
+}
 
 interface WorkspaceWatcherRegistration {
   readonly dispose: () => void;
@@ -134,6 +154,7 @@ interface TerminalRegistration {
 
 const workspaceWatchers = new Map<string, WorkspaceWatcherRegistration>();
 const terminalRegistrations = new Map<WebContents, TerminalRegistration>();
+let applicationLocale: AppLocale = DEFAULT_LOCALE;
 
 installProcessLifecycleHandlers();
 
@@ -143,19 +164,28 @@ if (!gotLock) {
 }
 
 if (!process.env.VITE_DEV_SERVER_URL) {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, argv) => {
     if (shuttingDown) return;
     const window = currentMainWindow();
     if (!window) return;
     if (window.isMinimized()) window.restore();
     window.focus();
+    void openFilesFromArguments(argv);
   });
 }
 
 app.whenReady().then(async () => {
+  startupProfiler.mark("T1-electron-ready");
   registerIpcHandlers();
   createApplicationMenu();
   await createMainWindow();
+  void openFilesFromArguments(process.argv);
+
+  // A preferência de idioma não deve atrasar a primeira janela. A tela de
+  // configurações continua sendo a fonte de verdade e atualiza o menu depois.
+  void loadSettings().then(settings => applyApplicationLocale(settings.language)).catch(error => {
+    console.warn("[NPSharp startup] Não foi possível carregar o idioma inicial.", error);
+  });
 
   app.on("activate", async () => {
     if (!shuttingDown && BrowserWindow.getAllWindows().length === 0) {
@@ -203,9 +233,13 @@ async function createMainWindow(): Promise<void> {
   });
   const webContents = window.webContents;
   mainWindow = window;
+  startupProfiler.mark("T2-window-created");
 
   window.once("ready-to-show", () => {
-    if (!window.isDestroyed()) window.show();
+    if (!window.isDestroyed()) {
+      startupProfiler.mark("T3-window-visible");
+      window.show();
+    }
   });
   webContents.once("destroyed", () => {
     closeWorkspaceWatchersForSender(webContents, false);
@@ -214,6 +248,7 @@ async function createMainWindow(): Promise<void> {
   window.once("closed", () => {
     closeWorkspaceWatchersForSender(webContents, false);
     closeTerminalsForSender(webContents, false);
+    rendererReady = false;
     if (mainWindow === window) mainWindow = undefined;
   });
 
@@ -254,7 +289,7 @@ async function loadDevServer(window: BrowserWindow, url: string): Promise<void> 
 }
 
 function createApplicationMenu(): void {
-  const template: Electron.MenuItemConstructorOptions[] = [
+  const template: MenuItemConstructorOptions[] = [
     {
       label: "Arquivo",
       submenu: [
@@ -351,19 +386,79 @@ function createApplicationMenu(): void {
       submenu: [
         { label: "Paleta de comandos", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
         { label: "Central de comandos", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
+        { label: "Verificar atualizações", click: () => sendCommand("update:check") },
         { label: "Instalar extensão de VSIX", click: () => sendCommand("extensions:installVsix") },
         { label: "Sobre o NPSharp", click: () => sendCommand("help:about") }
       ]
     }
   ];
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(localizeApplicationMenu(template)));
+}
+
+function localizeApplicationMenu(items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
+  return items.map(item => ({
+    ...item,
+    ...(item.label ? { label: t(applicationLocale, item.label) } : {}),
+    ...(Array.isArray(item.submenu) ? { submenu: localizeApplicationMenu(item.submenu) } : {})
+  }));
 }
 
 function sendCommand(command: string): void {
   if (shuttingDown) return;
   const contents = currentMainWindow()?.webContents;
   if (isUsableWebContents(contents)) contents.send("command", command);
+}
+
+function initializeAutoUpdater(): void {
+  if (updateService) return;
+  updateService = createElectronUpdateService({
+    currentVersion: app.getVersion(),
+    isPackaged: app.isPackaged,
+    platform: process.platform,
+    appImagePath: process.env.APPIMAGE,
+    isPortable: portableMode.enabled,
+    logger: console
+  });
+  updateService.onStatus(status => sendUpdateStatus(status));
+  if (!shuttingDown) void updateService.checkForUpdates();
+}
+
+function sendUpdateStatus(status: AppUpdateStatus): void {
+  const contents = currentMainWindow()?.webContents;
+  if (isUsableWebContents(contents)) contents.send(UPDATE_IPC.status, status);
+}
+
+const pendingOpenFiles = new Set<string>();
+
+async function openFilesFromArguments(argv: readonly string[]): Promise<void> {
+  for (const argument of argv) {
+    if (!isCandidateOpenFile(argument)) continue;
+    try {
+      const target = path.resolve(argument);
+      const stats = await fs.stat(target);
+      if (stats.isFile()) pendingOpenFiles.add(target);
+    } catch {
+      // Argumentos não existentes nunca são encaminhados ao renderer.
+    }
+  }
+  const contents = currentMainWindow()?.webContents;
+  if (rendererReady && isUsableWebContents(contents)) await flushPendingOpenFiles(contents);
+}
+
+function isCandidateOpenFile(argument: string): boolean {
+  return typeof argument === "string"
+    && argument.length > 0
+    && !argument.startsWith("-")
+    && path.isAbsolute(argument)
+    && path.resolve(argument) !== path.resolve(process.execPath);
+}
+
+async function flushPendingOpenFiles(contents: WebContents | undefined): Promise<void> {
+  if (!isUsableWebContents(contents) || pendingOpenFiles.size === 0) return;
+  const files = [...pendingOpenFiles];
+  pendingOpenFiles.clear();
+  for (const file of files) sendToWebContents(contents, "open-file", file);
 }
 
 function registerIpcHandlers(): void {
@@ -382,6 +477,30 @@ function registerIpcHandlers(): void {
     appPath: app.getAppPath(),
     npsharpHome: npsharpHome()
   }));
+  ipcMain.handle("startup:mark", (_event, stage: "renderer-rendered" | "editor-interactive") => {
+    startupProfiler.mark(stage === "renderer-rendered" ? "T4-renderer-rendered" : "T5-editor-interactive");
+  });
+  ipcMain.handle("startup:ready", () => {
+    if (startupReady) {
+      rendererReady = true;
+      return flushPendingOpenFiles(currentMainWindow()?.webContents);
+    }
+    startupReady = true;
+    rendererReady = true;
+    startupProfiler.mark("T6-secondary-scheduled");
+    initializeAutoUpdater();
+    void flushPendingOpenFiles(currentMainWindow()?.webContents).catch(error => {
+      console.warn("[NPSharp startup] Não foi possível abrir os arquivos solicitados.", error);
+    });
+    void startupProfiler.writeReport(app.getPath("userData")).catch(error => {
+      console.warn("[NPSharp startup] Não foi possível gravar o perfil de inicialização.", error);
+    });
+  });
+
+  ipcMain.handle(UPDATE_IPC.status, () => updateService?.getStatus() ?? { state: "idle", message: "Atualizador iniciando…" });
+  ipcMain.handle(UPDATE_IPC.check, () => updateService?.checkForUpdates() ?? Promise.resolve({ state: "idle", message: "Atualizador iniciando…" }));
+  ipcMain.handle(UPDATE_IPC.download, () => updateService?.downloadUpdate() ?? Promise.resolve({ state: "idle", message: "Atualizador iniciando…" }));
+  ipcMain.handle(UPDATE_IPC.install, () => updateService?.installUpdate());
 
   ipcMain.handle("window:minimize", () => currentMainWindow()?.minimize());
   ipcMain.handle("window:maximize", () => {
@@ -433,10 +552,25 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle("settings:load", () => loadSettings());
-  ipcMain.handle("settings:save", (_event, settings) => saveSettings(settings));
-  ipcMain.handle("settings:reset", () => resetSettings());
+  ipcMain.handle("settings:save", async (_event, settings) => {
+    const saved = await saveSettings(settings);
+    applyApplicationLocale(saved.language);
+    return saved;
+  });
+  ipcMain.handle("settings:reset", async () => {
+    const settings = await resetSettings();
+    applyApplicationLocale(settings.language);
+    return settings;
+  });
   ipcMain.handle("settings:loadSession", () => loadSession());
   ipcMain.handle("settings:saveSession", (_event, session) => saveSession(session));
+  ipcMain.handle("i18n:getLanguage", () => applicationLocale);
+  ipcMain.handle("i18n:setLanguage", async (_event, language: unknown) => {
+    const settings = await saveSettings({ ...(await loadSettings()), language: normalizeLocale(language) });
+    applyApplicationLocale(settings.language);
+    return settings.language;
+  });
+  ipcMain.handle("i18n:availableLanguages", () => SUPPORTED_LOCALES.map(code => ({ code, label: LOCALE_LABELS[code] })));
 
   ipcMain.handle("ai:providers", () => providerManager.descriptors());
   ipcMain.handle("ai:listModels", async (_event, provider: AIProviderId) => {
@@ -573,6 +707,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("runtime:autoDetect", (_event, languageId: string) => autoDetectRuntime(languageId));
   ipcMain.handle("runtime:validate", (_event, languageId: string, executablePath?: string) => validateRuntime(languageId, executablePath));
   ipcMain.handle("runtime:runFile", (_event, request: RuntimeRunRequest) => runFile(request));
+  ipcMain.handle("runtime:installDependencies", (_event, request: RuntimeDependencyInstallRequest) => installRuntimeDependencies(request));
 
   ipcMain.handle("extensions:list", () => extensionManager.listInstalled());
   ipcMain.handle("extensions:searchOpenVsx", (_event, query: string) => extensionManager.searchOpenVsx(query));
@@ -608,6 +743,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle("remote:rename", (_event, request: RemoteFileRequest & { newPath: string }) => renameRemote(request));
   ipcMain.handle("remote:delete", (_event, request: RemoteFileRequest) => deleteRemote(request));
   ipcMain.handle("remote:execute", (_event, request: RemoteCommandRequest) => executeRemote(request));
+}
+
+function applyApplicationLocale(locale: AppLocale): void {
+  applicationLocale = normalizeLocale(locale);
+  createApplicationMenu();
 }
 
 async function resolveWorkspaceRoot(workspace: string): Promise<string> {

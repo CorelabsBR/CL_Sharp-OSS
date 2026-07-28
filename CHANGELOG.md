@@ -1,5 +1,102 @@
 # CHANGELOG
 
+## 26.8.18 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Adiciona a opção de restaurar o último workspace ao iniciar o NPSharp. Ao desativá-la, o workspace e os arquivos associados deixam de ser gravados para a próxima abertura.
+
+## 26.8.17 - 2026-07-28
+
+Type: Performance
+
+Description:
+- Adiciona perfil de startup por flag, adia restauração de sessão, tema, atualizador e carregamentos secundários até o editor estar interativo, e carrega contribuições de linguagem Monaco apenas quando o arquivo correspondente é aberto.
+- Adiciona modo Portable Fast em ZIP com dados locais previsíveis, reforça o encaminhamento seguro de arquivos para instância única e configura o Setup NSIS assistido com diretório escolhível e preservação de dados.
+
+## 26.8.16 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Define português do Brasil como idioma padrão e traduz os textos restantes da interface principal, terminal, paleta de comandos, configurações e painéis do NPSharp.
+- Adiciona internacionalização persistente por `AppSettings.language` e a API segura `i18n` (`getLanguage`, `setLanguage` e `availableLanguages`) para desktop, web e mobile; o menu nativo é reconstruído ao trocar de idioma.
+
+## 26.8.15 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Adiciona atualização automática profissional via GitHub Releases para o instalador NSIS do Windows e AppImage do Linux, com comparação SemVer, progresso real de download, prevenção de ações duplicadas, reinicialização controlada e IPC restrito entre main, preload e renderer.
+- Atualiza o workflow de release para publicar somente tags `v<package.version>` e anexar os metadados e artefatos verificados pelo `electron-updater`.
+
+## 26.8.14 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Adiciona à barra superior, ao lado de Executar, o botão textual `Baixar imports Python (.venv)` e a mesma ação no menu Executar, deixando explícito que ele prepara o ambiente local e instala as dependências do arquivo Python atual.
+
+## 26.8.13 - 2026-07-28
+
+Type: Feature
+
+Description:
+- Adiciona ao painel Executar e Depurar um botão para preparar as dependências do arquivo Python atual: cria ou reutiliza `.venv` no projeto, instala `requirements.txt` quando presente e baixa os pacotes correspondentes aos imports externos detectados.
+- A execução de arquivos Python passa a preferir automaticamente o interpretador do `.venv` preparado no projeto, sem instalar pacotes no ambiente global.
+
+## 26.8.12 - 2026-07-27
+
+Type: Feature
+
+Description:
+- Amplia o abridor universal com inspeção estruturada e somente leitura de DOCX, ODT, ODS, PPTX, Pages, Numbers, Keynote, SQLite, PSD, DWG, Blender, Publisher e savegames, incluindo texto, abas, fórmulas, notas, recursos incorporados, esquema de bancos e assinaturas de formatos binários.
+- Adiciona o leitor SQLite multiplataforma `sql.js`, exibindo esquema, amostras de registros e o resultado da verificação de integridade sem depender de software externo.
+
+## 26.8.11 - 2026-07-27
+
+Type: Fix
+
+Description:
+- Corrige a camada visual do papel de parede para mantê-la visível sobre a área de trabalho, sem bloquear a interação com o editor, menus ou barra de status.
+
+## 26.8.10 - 2026-07-27
+
+Type: Fix
+
+Description:
+- Corrige o Run para sempre executar o arquivo suportado mesmo quando a depuração integrada não está disponível; F5 avisa e continua sem depuração, enquanto Ctrl+F5 executa diretamente.
+- Inclui todos os runtimes suportados na autodetecção/configuração e executa efetivamente binários C/C++ após compilar, além de tratar Kotlin e projetos C# pelo runtime adequado.
+
+## 26.8.9 - 2026-07-27
+
+Type: Fix
+
+Description:
+- Impede a paleta de comandos de recriar a opção sob o mouse ao passar sobre ela, permitindo clicar e selecionar temas normalmente pelo Theme Lab e pelo menu Aparência.
+
+## 26.8.8 - 2026-07-27
+
+Type: Fix
+
+Description:
+- Remove a reconstrução desnecessária dos atalhos ao alterar configurações visuais; a atualização de atalhos agora ocorre somente ao criar, remover ou redefinir atalhos, permitindo selecionar temas normalmente em todos os seletores.
+
+## 26.8.7 - 2026-07-27
+
+Type: Fix
+
+Description:
+- Carrega o manifesto e os arquivos de tema diretamente do bundle do renderer, preservando o fallback externo e impedindo falhas de tema em ambientes Electron com recursos `file://`.
+
+## 26.8.6 - 2026-07-27
+
+Type: Feature
+
+Description:
+- Corrige a tela de atalhos para carregar todos os comandos registrados, permite adicionar e remover atalhos personalizados e os salva na configuração global do NPSharp.
+
 ## 26.8.5 - 2026-07-27
 
 Type: Feature

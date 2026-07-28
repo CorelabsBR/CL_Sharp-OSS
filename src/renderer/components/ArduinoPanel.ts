@@ -11,7 +11,7 @@ export class ArduinoPanel {
   private readonly summary = el("div", { className: "panel-summary", text: "Arduino" });
   private readonly form = el("div", { className: "arduino-form" });
   private readonly cliPath = el("input", { className: "panel-input", attrs: { placeholder: "arduino-cli" } });
-  private readonly sketchPath = el("input", { className: "panel-input", attrs: { placeholder: "Sketch path" } });
+  private readonly sketchPath = el("input", { className: "panel-input", attrs: { placeholder: "Caminho do sketch" } });
   private readonly boardSelect = el("select", { className: "panel-input" });
   private readonly portSelect = el("select", { className: "panel-input" });
   private readonly baudSelect = el("select", { className: "panel-input" });
@@ -68,7 +68,7 @@ export class ArduinoPanel {
     const toolbar = el("div", { className: "panel-toolbar" });
     toolbar.append(
       buttonIcon("refresh", "Detect Arduino CLI", () => void this.refresh()),
-      buttonIcon("add", "Create Sketch", () => void this.createSketch()),
+      buttonIcon("add", "Criar sketch", () => void this.createSketch()),
       buttonIcon("build", "Compile", () => void this.compile()),
       buttonIcon("cloud-upload", "Upload", () => void this.upload()),
       buttonIcon("radio-tower", "Serial Monitor", () => void this.monitor())
@@ -109,7 +109,7 @@ export class ArduinoPanel {
   }
 
   private renderSelects(): void {
-    this.boardSelect.replaceChildren(el("option", { text: "Select board", attrs: { value: "" } }));
+    this.boardSelect.replaceChildren(el("option", { text: "Selecione a placa", attrs: { value: "" } }));
     if (this.config.selectedBoardFqbn && !this.boards.some(board => board.fqbn === this.config.selectedBoardFqbn)) {
       this.boardSelect.append(el("option", {
         text: `Saved board (${this.config.selectedBoardFqbn})`,
@@ -124,7 +124,7 @@ export class ArduinoPanel {
     }
     this.boardSelect.value = this.config.selectedBoardFqbn ?? "";
 
-    this.portSelect.replaceChildren(el("option", { text: "Select port", attrs: { value: "" } }));
+    this.portSelect.replaceChildren(el("option", { text: "Selecione a porta", attrs: { value: "" } }));
     if (this.config.selectedPort && !this.ports.some(port => port.port === this.config.selectedPort)) {
       this.portSelect.append(el("option", {
         text: `Saved port (${this.config.selectedPort})`,

@@ -6,6 +6,7 @@ import type {
   AIStreamEvent,
   AppInfo,
   AppSettings,
+  AppUpdateStatus,
   ArduinoCliRequest,
   ArduinoCompileRequest,
   ArduinoConfig,
@@ -41,6 +42,7 @@ import type {
   ReplaceAllRequest,
   ReplaceAllResult,
   RuntimeRunRequest,
+  RuntimeDependencyInstallRequest,
   RuntimeRunResult,
   SaveFileRequest,
   SaveFileResult,
@@ -60,6 +62,7 @@ import type {
   WorkspaceRenameRequest
 } from "../../shared/types";
 import { LANGUAGE_RUNTIMES } from "../../core/runtime/languages";
+import { DEFAULT_LOCALE, LOCALE_LABELS, normalizeLocale, SUPPORTED_LOCALES } from "../../shared/i18n";
 import { basename, dirname, extname, joinPath, relativePath } from "../utils/path";
 import { DEFAULT_MOBILE_WORKSPACE, getDesktopApi, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform, type PlatformInfo } from "./platform";
 
@@ -103,6 +106,7 @@ const AI_SETTINGS_STORAGE_KEY = "npsharp:ai-settings";
 const AI_CONVERSATIONS_STORAGE_KEY = "npsharp:ai-conversations";
 
 const DEFAULT_SETTINGS: AppSettings = {
+  language: DEFAULT_LOCALE,
   theme: "np-dark",
   iconTheme: "default",
   iconColor: "",
@@ -129,6 +133,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   statusBarVisible: true,
   activityBarVisible: true,
   sideBarVisible: true,
+  restoreWorkspaceOnStartup: true,
   confirmDelete: true,
   binaryFileTypesIgnored: [],
   keyboardShortcuts: []
@@ -143,13 +148,17 @@ const DEFAULT_SESSION: PersistedSession = {
 const NOTES_TEMPLATE = "# NPSharp Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n";
 const MOBILE_GIT_MESSAGE = "Git nativo ainda nao esta disponivel no mobile.";
 const WEB_GIT_MESSAGE = "Git local nao esta disponivel neste modo web.";
-const MOBILE_TERMINAL_MESSAGE = "Terminal real Node nao esta disponivel no mobile. Use este painel como Output/Command Log.";
-const WEB_TERMINAL_MESSAGE = "Terminal real nao esta disponivel no modo web. Use este painel como Output/Command Log.";
+const MOBILE_TERMINAL_MESSAGE = "O terminal Node real não está disponível no mobile. Use este painel como saída e registro de comandos.";
+const WEB_TERMINAL_MESSAGE = "O terminal real não está disponível no modo web. Use este painel como saída e registro de comandos.";
 const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use este painel para manter configuracao e sketches; compile/upload dependem do desktop.";
 const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
 const MOBILE_STORAGE_DENIED_MESSAGE = "Acesso ao armazenamento negado. Permita o acesso ao armazenamento para usar arquivos em Documents/NPSharp.";
 const SEARCH_IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "dist-electron", "release", ".git", "build", ".cache"]);
 const CONFIGURABLE_LANGUAGE_IDS = ["c", "cpp", "csharp", "java", "node", "python", "go", "rust", "php", "lua", "kotlin", "dart"];
+const BROWSER_UPDATE_STATUS: AppUpdateStatus = {
+  state: "unsupported",
+  message: "Atualização automática está disponível somente no aplicativo desktop instalado."
+};
 
 class CapacitorSandboxFs implements FsApi {
   private rootReady?: Promise<void>;
@@ -527,7 +536,7 @@ function createBrowserApi(): NpsharpApi {
   };
 
   const saveSettings = async (settings: AppSettings): Promise<AppSettings> => {
-    const merged = { ...DEFAULT_SETTINGS, ...settings };
+    const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language) };
     await writeJsonFile(appDataFs, SETTINGS_PATH, merged);
     return merged;
   };
@@ -548,6 +557,17 @@ function createBrowserApi(): NpsharpApi {
 
   return {
     appInfo: async () => browserAppInfo(),
+    startup: {
+      mark: async () => undefined,
+      ready: async () => undefined
+    },
+    update: {
+      status: async () => BROWSER_UPDATE_STATUS,
+      check: async () => BROWSER_UPDATE_STATUS,
+      download: async () => BROWSER_UPDATE_STATUS,
+      install: async () => undefined,
+      onStatus: () => () => undefined
+    },
     window: {
       minimize: async () => undefined,
       maximize: async () => undefined,
@@ -568,6 +588,11 @@ function createBrowserApi(): NpsharpApi {
       loadSession,
       saveSession
     },
+    i18n: {
+      getLanguage: async () => (await loadSettings()).language,
+      setLanguage: async language => (await saveSettings({ ...(await loadSettings()), language: normalizeLocale(language) })).language,
+      availableLanguages: async () => SUPPORTED_LOCALES.map(code => ({ code, label: LOCALE_LABELS[code] }))
+    },
     ai: createAIFallbackApi(),
     fs,
     search: createSearchApi(fs),
@@ -584,7 +609,7 @@ function createBrowserApi(): NpsharpApi {
       shells: async (): Promise<TerminalShellOption[]> => [],
       create: async (request: TerminalCreateRequest): Promise<TerminalSessionInfo> => ({
         id: crypto.randomUUID(),
-        name: "Output",
+        name: "Saída",
         cwd: request.cwd,
         shell: request.shell ?? "unavailable",
         backend: "child_process",
@@ -605,7 +630,13 @@ function createBrowserApi(): NpsharpApi {
       updateConfig: (languageId, config) => saveBrowserRuntimeConfig(appDataFs, languageId, config),
       autoDetect: languageId => saveBrowserRuntimeConfig(appDataFs, languageId, { path: "", autoDetect: true }),
       validate: (languageId, executablePath) => validateBrowserRuntime(languageId, executablePath),
-      runFile: async request => runInBrowserSandbox(request)
+      runFile: async request => runInBrowserSandbox(request),
+      installDependencies: async (request: RuntimeDependencyInstallRequest) => ({
+        language: "Python",
+        output: `${platform.isMobile ? MOBILE_TERMINAL_MESSAGE : WEB_TERMINAL_MESSAGE}\nA instalação de dependências Python requer o backend desktop.`,
+        code: 1,
+        packages: []
+      })
     },
     extensions: createExtensionFallbackApi(),
     arduino: createArduinoFallbackApi(fs),
@@ -682,7 +713,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
       const timestamp = new Date().toISOString();
       const conversation: AIConversation = {
         id: crypto.randomUUID(),
-        title: "New conversation",
+        title: "Nova conversa",
         provider,
         model,
         createdAt: timestamp,
@@ -695,7 +726,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
     updateConversation: async update => {
       const items = loadConversations();
       const current = items.find(item => item.id === update.id);
-      if (!current) throw new Error("Conversation not found.");
+      if (!current) throw new Error("Conversa não encontrada.");
       const next: AIConversation = { ...current, ...update, updatedAt: new Date().toISOString() };
       saveConversations(items.map(item => item.id === next.id ? next : item));
       return next;
@@ -807,7 +838,7 @@ function createSearchApi(fs: FsApi): NpsharpApi["search"] {
 function createRemoteFallbackApi(fs: FsApi): RemoteApi {
   const unavailable = (): GitOperationResult => ({
     success: false,
-    output: "Remote Host depende do backend Node/Electron neste ambiente."
+    output: "Host remoto depende do backend Node/Electron neste ambiente."
   });
   return {
     loadHosts: () => readJsonFile<RemoteHostConfig[]>(fs, REMOTE_HOSTS_PATH, []),
@@ -973,7 +1004,7 @@ async function runInBrowserSandbox(request: RuntimeRunRequest): Promise<RuntimeR
   if (extension === ".html" || extension === ".htm") {
     return {
       language: "html",
-      output: "Preview HTML disponivel sem iniciar servidor Node.",
+      output: "Prévia HTML disponível sem iniciar servidor Node.",
       code: 0
     };
   }
@@ -994,7 +1025,7 @@ async function openHtmlPreviewUrl(fs: FsApi, request: LiveServerRequest): Promis
   const file = await fs.readFile(request.filePath);
   return {
     success: true,
-    output: "Preview HTML gerado sem servidor Node.",
+    output: "Prévia HTML gerada sem servidor Node.",
     url: `data:text/html;charset=utf-8,${encodeURIComponent(file.content)}`
   };
 }
@@ -1016,7 +1047,7 @@ async function applyFallbackTemplate(fs: FsApi, request: TemplateApplyRequest): 
 function browserAppInfo(): AppInfo {
   return {
     name: "NPSharp",
-    version: "26.8.6",
+    version: "26.8.18",
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,

@@ -1,8 +1,9 @@
 import { shell } from "electron";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, inflateRawSync } from "node:zlib";
 import type { FileOpenResult, FileReadResult, TextEncoding, WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
 
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -28,8 +29,40 @@ const BINARY_EXTENSIONS = new Set([".exe", ".dll", ".so", ".dylib", ".bin", ".da
 const MEDIA_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".oga", ".m4a", ".aac", ".flac", ".mp4", ".webm", ".ogv", ".mov", ".mkv"]);
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".jar", ".war", ".ear", ".apk", ".vsix"]);
 const NBT_EXTENSIONS = new Set([".nbt", ".schem", ".schematic"]);
+const DOCUMENT_CONTAINER_EXTENSIONS = new Set([".docx", ".odt", ".ods", ".pptx", ".pages", ".numbers", ".key"]);
+const IWORK_PACKAGE_EXTENSIONS = new Set([".pages", ".numbers", ".key"]);
+const SQLITE_EXTENSIONS = new Set([".sqlite", ".sqlite3", ".db", ".db3"]);
+const GAME_SAVE_EXTENSIONS = new Set([".sav", ".save", ".gam"]);
 const MAX_EMBEDDED_PREVIEW_BYTES = 32 * 1024 * 1024;
 const MAX_BINARY_PREVIEW_BYTES = 512 * 1024;
+const MAX_STRUCTURED_ENTRY_BYTES = 4 * 1024 * 1024;
+const optionalRequire = createRequire(__filename);
+
+interface SqlJsQueryResult {
+  columns: string[];
+  values: unknown[][];
+}
+
+interface SqlJsDatabase {
+  exec(sql: string): SqlJsQueryResult[];
+  close(): void;
+}
+
+interface SqlJsModule {
+  Database: new (data?: Uint8Array) => SqlJsDatabase;
+}
+
+type SqlJsInitializer = () => Promise<SqlJsModule>;
+
+interface ZipEntry {
+  name: string;
+  compression: number;
+  compressedSize: number;
+  uncompressedSize: number;
+  localHeaderOffset: number;
+}
+
+let sqlJsPromise: Promise<SqlJsModule> | undefined;
 
 export async function listDir(targetPath: string): Promise<WorkspaceEntry[]> {
   const directoryPath = normalizeFsPath(targetPath);
@@ -50,7 +83,7 @@ export async function listDir(targetPath: string): Promise<WorkspaceEntry[]> {
     result.push({
       path: fullPath,
       name: entry.name,
-      directory: entry.isDirectory(),
+      directory: entry.isDirectory() && !IWORK_PACKAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()),
       size: entry.isDirectory() ? 0 : stat.size,
       modifiedAt: stat.mtimeMs,
       hidden: entry.name.startsWith(".")
@@ -78,8 +111,13 @@ export async function readFile(targetPath: string): Promise<FileReadResult> {
 /** Resolves the editor from both the file signature/content and its extension. */
 export async function openFile(targetPath: string, forceText = false): Promise<FileOpenResult> {
   const filePath = normalizeFsPath(targetPath);
-  const buffer = await fsp.readFile(filePath);
   const extension = path.extname(filePath).toLowerCase();
+  const stat = await fsp.stat(filePath);
+  if (!forceText && stat.isDirectory() && IWORK_PACKAGE_EXTENSIONS.has(extension)) {
+    return inspectIworkDirectory(filePath);
+  }
+  if (stat.isDirectory()) throw new Error("O caminho selecionado é uma pasta, não um arquivo.");
+  const buffer = await fsp.readFile(filePath);
   const type = extension ? extension.slice(1).toUpperCase() : "Arquivo";
 
   if (!forceText && IMAGE_EXTENSIONS.has(extension) && isImageContent(extension, buffer)) {
@@ -99,6 +137,60 @@ export async function openFile(targetPath: string, forceText = false): Promise<F
 
   if (!forceText && MEDIA_EXTENSIONS.has(extension)) {
     return binaryPreview(filePath, buffer, type, "media", "Mídia", extension);
+  }
+
+  if (!forceText && DOCUMENT_CONTAINER_EXTENSIONS.has(extension) && isZipArchive(buffer)) {
+    const preview = inspectDocumentContainer(extension, buffer);
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      editor: "document",
+      size: buffer.byteLength,
+      type: preview.type,
+      content: preview.content,
+      previewSummary: preview.summary
+    };
+  }
+
+  if (!forceText && SQLITE_EXTENSIONS.has(extension) && isSqliteDatabase(buffer)) {
+    const preview = await inspectSqliteDatabase(buffer);
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      editor: "database",
+      size: buffer.byteLength,
+      type: "SQLite",
+      content: preview,
+      previewSummary: "Banco SQLite em modo somente leitura"
+    };
+  }
+
+  if (!forceText && extension === ".psd" && isPsd(buffer)) {
+    return structuredPreview(filePath, buffer, type, "design", inspectPsd(buffer), "Documento Photoshop em modo somente leitura");
+  }
+
+  if (!forceText && extension === ".blend" && isBlender(buffer)) {
+    return structuredPreview(filePath, buffer, type, "design", inspectBlender(buffer), "Projeto Blender em modo somente leitura");
+  }
+
+  if (!forceText && extension === ".dwg" && isDwg(buffer)) {
+    return structuredPreview(filePath, buffer, type, "design", inspectDwg(buffer), "Desenho AutoCAD em modo somente leitura");
+  }
+
+  if (!forceText && extension === ".pub" && isOleCompoundDocument(buffer)) {
+    return structuredPreview(filePath, buffer, type, "design", inspectPublisher(buffer), "Documento Microsoft Publisher em modo somente leitura");
+  }
+
+  if (!forceText && GAME_SAVE_EXTENSIONS.has(extension)) {
+    const nbt = tryParseNbt(buffer);
+    return structuredPreview(
+      filePath,
+      buffer,
+      type,
+      "game",
+      nbt ?? inspectGameSave(buffer),
+      nbt ? "Savegame NBT em modo somente leitura" : "Savegame reconhecido em modo somente leitura"
+    );
   }
 
   if (!forceText && (NBT_EXTENSIONS.has(extension) || extension === ".dat")) {
@@ -153,6 +245,25 @@ export async function openFile(targetPath: string, forceText = false): Promise<F
   };
 }
 
+function structuredPreview(
+  filePath: string,
+  buffer: Buffer,
+  type: string,
+  editor: "document" | "database" | "design" | "game",
+  content: string,
+  previewSummary: string
+): FileOpenResult {
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    editor,
+    size: buffer.byteLength,
+    type,
+    content,
+    previewSummary
+  };
+}
+
 function binaryPreview(filePath: string, buffer: Buffer, type: string, editor: "binary" | "media" | "pdf", summary: string, extension: string): FileOpenResult {
   const previewTruncated = buffer.byteLength > MAX_BINARY_PREVIEW_BYTES;
   const result: FileOpenResult = {
@@ -193,22 +304,300 @@ function isZipArchive(buffer: Buffer): boolean {
 }
 
 function inspectZip(buffer: Buffer): string {
+  const entries = zipEntries(buffer);
+  if (!entries) return "Arquivo ZIP reconhecido, mas o índice central não pôde ser lido.";
+  const names = entries.slice(0, 1000).map(entry => entry.name);
+  const suffix = entries.length > names.length ? `\n… e mais ${entries.length - names.length} entradas.` : "";
+  return `${entries.length} entrada(s)\n\n${names.join("\n")}${suffix}`;
+}
+
+function inspectDocumentContainer(extension: string, buffer: Buffer): { type: string; summary: string; content: string } {
+  const entries = zipEntries(buffer);
+  if (!entries) return { type: extension.slice(1).toUpperCase(), summary: "Contêiner reconhecido, mas não foi possível ler o índice.", content: inspectZip(buffer) };
+
+  switch (extension) {
+    case ".docx": return inspectDocx(buffer, entries);
+    case ".odt": return inspectOdt(buffer, entries);
+    case ".ods": return inspectOds(buffer, entries);
+    case ".pptx": return inspectPptx(buffer, entries);
+    case ".pages": case ".numbers": case ".key": return inspectIwork(extension, buffer, entries);
+    default: return { type: extension.slice(1).toUpperCase(), summary: "Documento compactado em modo somente leitura", content: inspectZip(buffer) };
+  }
+}
+
+function inspectDocx(buffer: Buffer, entries: ZipEntry[]): { type: string; summary: string; content: string } {
+  const body = zipText(buffer, entries, "word/document.xml");
+  const headers = entries.filter(entry => /^word\/(?:header|footer)\d+\.xml$/i.test(entry.name));
+  const notes = entries.filter(entry => /^word\/(?:footnotes|endnotes|comments)\.xml$/i.test(entry.name));
+  const media = entries.filter(entry => /^word\/media\//i.test(entry.name));
+  const sections = [
+    ["Documento", xmlToText(body)],
+    ...headers.map(entry => [`Cabeçalho/Rodapé: ${entry.name.split("/").pop()}`, xmlToText(zipText(buffer, entries, entry.name))]),
+    ...notes.map(entry => [`Notas: ${entry.name.split("/").pop()}`, xmlToText(zipText(buffer, entries, entry.name))])
+  ].filter((section): section is [string, string] => Boolean(section[1]));
+  return {
+    type: "Word DOCX",
+    summary: `${headers.length} cabeçalho(s)/rodapé(s), ${notes.length} arquivo(s) de notas/comentários e ${media.length} imagem(ns)/mídia(s).`,
+    content: formatStructuredSections(sections, `Elementos no pacote: ${entries.length}\nImagens e mídia: ${media.map(entry => entry.name).join(", ") || "nenhuma"}`)
+  };
+}
+
+function inspectOdt(buffer: Buffer, entries: ZipEntry[]): { type: string; summary: string; content: string } {
+  const content = zipText(buffer, entries, "content.xml");
+  const styles = zipText(buffer, entries, "styles.xml");
+  const images = entries.filter(entry => /^Pictures\//i.test(entry.name));
+  const notes = countMatches(content, /<text:note\b/gi);
+  const headers = countMatches(styles, /<style:header\b|<style:footer\b/gi);
+  return {
+    type: "OpenDocument Text (ODT)",
+    summary: `${headers} cabeçalho(s)/rodapé(s), ${notes} nota(s) e ${images.length} imagem(ns).`,
+    content: formatStructuredSections([["Conteúdo", xmlToText(content)]], `Imagens: ${images.map(entry => entry.name).join(", ") || "nenhuma"}`)
+  };
+}
+
+function inspectOds(buffer: Buffer, entries: ZipEntry[]): { type: string; summary: string; content: string } {
+  const content = zipText(buffer, entries, "content.xml");
+  const sheets = [...content.matchAll(/<table:table\b[^>]*table:name="([^"]+)"/gi)].map(match => decodeXml(match[1]));
+  const formulas = countMatches(content, /table:formula=/gi);
+  const formulaSamples = [...content.matchAll(/table:formula="([^"]+)"/gi)].slice(0, 50).map(match => decodeXml(match[1]));
+  const charts = entries.filter(entry => /(?:^|\/)Object(?:Replacements)?\//i.test(entry.name) || /chart/i.test(entry.name));
+  return {
+    type: "OpenDocument Spreadsheet (ODS)",
+    summary: `${sheets.length} aba(s), ${formulas} fórmula(s) e ${charts.length} recurso(s) de gráfico/objeto.`,
+    content: formatStructuredSections([["Planilha", xmlToText(content)]], `Abas: ${sheets.join(", ") || "não identificadas"}\nFórmulas encontradas: ${formulas}\nAmostra de fórmulas: ${formulaSamples.join(" | ") || "nenhuma"}\nGráficos/objetos: ${charts.map(entry => entry.name).join(", ") || "nenhum"}`)
+  };
+}
+
+function inspectPptx(buffer: Buffer, entries: ZipEntry[]): { type: string; summary: string; content: string } {
+  const slides = entries
+    .filter(entry => /^ppt\/slides\/slide\d+\.xml$/i.test(entry.name))
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }));
+  const notes = entries.filter(entry => /^ppt\/notesSlides\/notesSlide\d+\.xml$/i.test(entry.name));
+  const embeds = entries.filter(entry => /^ppt\/(?:embeddings|media)\//i.test(entry.name));
+  const animations = slides.reduce((total, entry) => total + countMatches(zipText(buffer, entries, entry.name), /<p:timing\b/gi), 0);
+  const sections: Array<[string, string]> = slides.map((entry, index) => [`Slide ${index + 1}`, xmlToText(zipText(buffer, entries, entry.name))]);
+  return {
+    type: "PowerPoint PPTX",
+    summary: `${slides.length} slide(s), ${animations} sequência(s) de animação, ${notes.length} nota(s) e ${embeds.length} objeto(s)/mídia(s) incorporado(s).`,
+    content: formatStructuredSections(sections, `Notas: ${notes.map(entry => entry.name).join(", ") || "nenhuma"}\nObjetos e mídia: ${embeds.map(entry => entry.name).join(", ") || "nenhum"}`)
+  };
+}
+
+function inspectIwork(extension: string, buffer: Buffer, entries: ZipEntry[]): { type: string; summary: string; content: string } {
+  const names = { ".pages": "Apple Pages", ".numbers": "Apple Numbers", ".key": "Apple Keynote" } as Record<string, string>;
+  const previews = entries.filter(entry => /^QuickLook\/Preview\.(?:pdf|jpg|jpeg|png)$/i.test(entry.name));
+  const indexFiles = entries.filter(entry => /(?:^|\/)Index\/.*\.iwa$/i.test(entry.name));
+  const media = entries.filter(entry => /(?:^|\/)(?:Data|Metadata|QuickLook)\//i.test(entry.name));
+  return {
+    type: names[extension],
+    summary: `${indexFiles.length} índice(s) iWork, ${previews.length} prévia(s) QuickLook e ${media.length} recurso(s) interno(s).`,
+    content: `${names[extension]} é um pacote iWork. A estrutura abaixo foi preservada e inspecionada em modo somente leitura.\n\nPrévias disponíveis: ${previews.map(entry => entry.name).join(", ") || "nenhuma"}\n\n${inspectZip(buffer)}`
+  };
+}
+
+async function inspectIworkDirectory(filePath: string): Promise<FileOpenResult> {
+  const entries = await listPackageEntries(filePath);
+  const extension = path.extname(filePath).toLowerCase();
+  const names = { ".pages": "Apple Pages", ".numbers": "Apple Numbers", ".key": "Apple Keynote" } as Record<string, string>;
+  const previews = entries.filter(entry => /^QuickLook\/Preview\.(?:pdf|jpg|jpeg|png)$/i.test(entry));
+  const indexFiles = entries.filter(entry => /(?:^|\/)Index\/.*\.iwa$/i.test(entry));
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    editor: "document",
+    size: 0,
+    type: names[extension],
+    previewSummary: `Pacote iWork com ${entries.length} recurso(s), ${indexFiles.length} índice(s) e ${previews.length} prévia(s).`,
+    content: `${names[extension]} foi aberto como pacote iWork em modo somente leitura.\n\nPrévias disponíveis: ${previews.join(", ") || "nenhuma"}\n\n${entries.join("\n") || "Pacote vazio."}`
+  };
+}
+
+async function listPackageEntries(root: string, relative = "", output: string[] = []): Promise<string[]> {
+  if (output.length >= 2_000) return output;
+  const entries = await fsp.readdir(path.join(root, relative), { withFileTypes: true });
+  for (const entry of entries) {
+    const next = path.join(relative, entry.name);
+    if (entry.isDirectory()) await listPackageEntries(root, next, output);
+    else output.push(next.replace(/\\/g, "/"));
+    if (output.length >= 2_000) break;
+  }
+  return output;
+}
+
+function zipEntries(buffer: Buffer): ZipEntry[] | undefined {
   const signature = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
   const offset = buffer.lastIndexOf(signature);
-  if (offset < 0 || offset + 22 > buffer.length) return "Arquivo ZIP reconhecido, mas o índice central não pôde ser lido.";
-  const entries = buffer.readUInt16LE(offset + 10);
+  if (offset < 0 || offset + 22 > buffer.length) return undefined;
+  const count = buffer.readUInt16LE(offset + 10);
   let cursor = buffer.readUInt32LE(offset + 16);
-  const names: string[] = [];
-  for (let index = 0; index < Math.min(entries, 1000); index++) {
-    if (cursor + 46 > buffer.length || buffer.readUInt32LE(cursor) !== 0x02014b50) break;
+  const entries: ZipEntry[] = [];
+  for (let index = 0; index < count; index++) {
+    if (cursor + 46 > buffer.length || buffer.readUInt32LE(cursor) !== 0x02014b50) return undefined;
+    const compression = buffer.readUInt16LE(cursor + 10);
+    const compressedSize = buffer.readUInt32LE(cursor + 20);
+    const uncompressedSize = buffer.readUInt32LE(cursor + 24);
     const nameLength = buffer.readUInt16LE(cursor + 28);
     const extraLength = buffer.readUInt16LE(cursor + 30);
     const commentLength = buffer.readUInt16LE(cursor + 32);
-    names.push(buffer.subarray(cursor + 46, cursor + 46 + nameLength).toString("utf8"));
+    const localHeaderOffset = buffer.readUInt32LE(cursor + 42);
+    if (cursor + 46 + nameLength > buffer.length) return undefined;
+    entries.push({ name: buffer.subarray(cursor + 46, cursor + 46 + nameLength).toString("utf8"), compression, compressedSize, uncompressedSize, localHeaderOffset });
     cursor += 46 + nameLength + extraLength + commentLength;
   }
-  const suffix = entries > names.length ? `\n… e mais ${entries - names.length} entradas.` : "";
-  return `${entries} entrada(s)\n\n${names.join("\n")}${suffix}`;
+  return entries;
+}
+
+function zipText(buffer: Buffer, entries: ZipEntry[], name: string): string {
+  const entry = entries.find(item => item.name === name);
+  if (!entry || entry.uncompressedSize > MAX_STRUCTURED_ENTRY_BYTES) return "";
+  const offset = entry.localHeaderOffset;
+  if (offset + 30 > buffer.length || buffer.readUInt32LE(offset) !== 0x04034b50) return "";
+  const nameLength = buffer.readUInt16LE(offset + 26);
+  const extraLength = buffer.readUInt16LE(offset + 28);
+  const start = offset + 30 + nameLength + extraLength;
+  const end = start + entry.compressedSize;
+  if (end > buffer.length) return "";
+  try {
+    const payload = buffer.subarray(start, end);
+    const plain = entry.compression === 0 ? payload : entry.compression === 8 ? inflateRawSync(payload) : undefined;
+    return plain?.subarray(0, MAX_STRUCTURED_ENTRY_BYTES).toString("utf8") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function xmlToText(xml: string): string {
+  if (!xml) return "";
+  return decodeXml(xml
+    .replace(/<(?:w:p|text:p|text:h|p:sp|p:graphicFrame|table:table-row)\b[^>]*>/gi, "\n")
+    .replace(/<w:tc\b[^>]*>/gi, " | ")
+    .replace(/<table:table-cell\b[^>]*>/gi, " | ")
+    .replace(/<(?:w:br|text:line-break)\b[^>]*\/?\s*>/gi, "\n")
+    .replace(/<w:tab\b[^>]*\/?\s*>/gi, "\t")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\r/g, "")
+    .replace(/\n[ \t]*\n+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim());
+}
+
+function decodeXml(value: string): string {
+  return value.replace(/&(?:amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, entity => {
+    const named: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'" };
+    if (named[entity.toLowerCase()]) return named[entity.toLowerCase()];
+    const hex = /^&#x([\da-f]+);$/i.exec(entity);
+    const decimal = /^&#(\d+);$/i.exec(entity);
+    return String.fromCodePoint(Number.parseInt(hex?.[1] ?? decimal?.[1] ?? "0", hex ? 16 : 10));
+  });
+}
+
+function countMatches(value: string, pattern: RegExp): number { return [...value.matchAll(pattern)].length; }
+
+function formatStructuredSections(sections: Array<[string, string]>, trailer: string): string {
+  const body = sections.filter(([, content]) => content).map(([title, content]) => `## ${title}\n\n${content}`).join("\n\n");
+  return [body, trailer].filter(Boolean).join("\n\n").trim() || "Não foi possível extrair texto legível deste documento.";
+}
+
+function isSqliteDatabase(buffer: Buffer): boolean {
+  return buffer.subarray(0, 16).toString("ascii") === "SQLite format 3\u0000";
+}
+
+async function inspectSqliteDatabase(buffer: Buffer): Promise<string> {
+  try {
+    const SQL = await loadSqlJs();
+    const database = new SQL.Database(buffer);
+    try {
+      const header = `SQLite 3\nPágina: ${buffer.readUInt16BE(16) || 65536} bytes\nTamanho: ${buffer.byteLength.toLocaleString("pt-BR")} bytes`;
+      const schema = database.exec("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index', 'trigger') ORDER BY type, name");
+      const rows = schema[0]?.values ?? [];
+      const tables = rows.filter(row => row[0] === "table" && typeof row[1] === "string" && !String(row[1]).startsWith("sqlite_"));
+      const sections = [header, "## Esquema", ...rows.map(row => `${row[0]} ${row[1]}${row[3] ? `\n${row[3]}` : ""}`)];
+      for (const table of tables.slice(0, 40)) {
+        const name = String(table[1]);
+        const escaped = name.replace(/"/g, "\"\"");
+        const result = database.exec(`SELECT * FROM "${escaped}" LIMIT 50`)[0];
+        if (!result) continue;
+        const lines = [result.columns.join(" | "), ...result.values.map(row => row.map(value => formatSqliteValue(value)).join(" | "))];
+        sections.push(`## ${name}`, lines.join("\n"));
+      }
+      const integrity = database.exec("PRAGMA integrity_check")[0]?.values[0]?.[0];
+      sections.push(`Integridade: ${integrity ?? "não verificada"}`);
+      return sections.join("\n\n");
+    } finally {
+      database.close();
+    }
+  } catch (error) {
+    return `SQLite reconhecido, mas não foi possível abrir sua estrutura com segurança.\n\n${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+function formatSqliteValue(value: unknown): string {
+  if (value === null) return "NULL";
+  if (value instanceof Uint8Array) return `<BLOB ${value.byteLength} bytes>`;
+  const text = String(value).replace(/[\r\n]+/g, " ");
+  return text.length > 500 ? `${text.slice(0, 497)}…` : text;
+}
+
+function loadSqlJs(): Promise<SqlJsModule> {
+  if (!sqlJsPromise) {
+    const initialize = optionalRequire("sql.js/dist/sql-asm.js") as SqlJsInitializer;
+    sqlJsPromise = initialize();
+  }
+  return sqlJsPromise;
+}
+
+function isPsd(buffer: Buffer): boolean { return buffer.subarray(0, 4).toString("ascii") === "8BPS" && buffer.length >= 30; }
+
+function inspectPsd(buffer: Buffer): string {
+  const channels = buffer.readUInt16BE(12);
+  const height = buffer.readUInt32BE(14);
+  const width = buffer.readUInt32BE(18);
+  const depth = buffer.readUInt16BE(22);
+  const modes: Record<number, string> = { 0: "Bitmap", 1: "Grayscale", 2: "Indexed", 3: "RGB", 4: "CMYK", 7: "Multichannel", 8: "Duotone", 9: "Lab" };
+  let layerCount = "não identificado";
+  try {
+    let offset = 26;
+    offset += 4 + buffer.readUInt32BE(offset);
+    offset += 4 + buffer.readUInt32BE(offset);
+    const layerInfoLength = buffer.readUInt32BE(offset); offset += 4;
+    if (layerInfoLength >= 2 && offset + 2 <= buffer.length) layerCount = String(Math.abs(buffer.readInt16BE(offset)));
+  } catch {
+    // The header is still useful even if a truncated PSD has no layer section.
+  }
+  return `Adobe Photoshop PSD\nDimensões: ${width} × ${height}px\nCanais: ${channels}\nProfundidade: ${depth} bits\nModo de cor: ${modes[buffer.readUInt16BE(24)] ?? "desconhecido"}\nCamadas: ${layerCount}`;
+}
+
+function isBlender(buffer: Buffer): boolean { return buffer.subarray(0, 7).toString("ascii") === "BLENDER"; }
+
+function inspectBlender(buffer: Buffer): string {
+  const pointerSize = buffer.subarray(7, 8).toString("ascii") === "-" ? "64 bits" : "32 bits";
+  const endianness = buffer.subarray(8, 9).toString("ascii") === "v" ? "little-endian" : "big-endian";
+  const version = buffer.subarray(9, 12).toString("ascii");
+  return `Projeto Blender\nVersão do arquivo: ${version || "desconhecida"}\nPonteiros: ${pointerSize}\nOrdem de bytes: ${endianness}\n\nA estrutura de cenas, objetos, malhas e recursos é preservada no arquivo original; a edição requer o Blender para manter compatibilidade total.`;
+}
+
+function isDwg(buffer: Buffer): boolean { return /^AC\d{4}$/.test(buffer.subarray(0, 6).toString("ascii")); }
+
+function inspectDwg(buffer: Buffer): string {
+  const version = buffer.subarray(0, 6).toString("ascii");
+  const versions: Record<string, string> = { AC1015: "AutoCAD 2000", AC1018: "AutoCAD 2004", AC1021: "AutoCAD 2007", AC1024: "AutoCAD 2010", AC1027: "AutoCAD 2013", AC1032: "AutoCAD 2018" };
+  return `Desenho AutoCAD DWG\nAssinatura: ${version}\nVersão: ${versions[version] ?? "versão DWG reconhecida"}\n\nA geometria e os objetos permanecem intactos; a edição e a renderização completas exigem um motor CAD compatível com esta versão.`;
+}
+
+function isOleCompoundDocument(buffer: Buffer): boolean {
+  return buffer.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+}
+
+function inspectPublisher(buffer: Buffer): string {
+  const printable = buffer.subarray(0, Math.min(buffer.length, MAX_BINARY_PREVIEW_BYTES)).toString("utf16le").match(/[\p{L}\p{N}][\p{L}\p{N} ._\-/]{3,}/gu) ?? [];
+  const names = [...new Set(printable)].slice(0, 100);
+  return `Microsoft Publisher PUB\nContêiner: OLE Compound Document\nTamanho: ${buffer.byteLength.toLocaleString("pt-BR")} bytes\n\nStreams/metadados identificáveis:\n${names.join("\n") || "Nenhum nome de stream legível encontrado."}\n\nO formato PUB é proprietário; o NPSharp o abre de forma segura para inspeção e preserva todos os recursos originais.`;
+}
+
+function inspectGameSave(buffer: Buffer): string {
+  const signature = buffer.subarray(0, Math.min(buffer.length, 16)).toString("ascii").replace(/[^\x20-\x7e]/g, ".");
+  const kind = buffer.subarray(0, 4).toString("ascii") === "GVAS" ? "Unreal Engine SaveGame" : buffer.subarray(0, 7).toString("ascii") === "UnityFS" ? "Unity asset/save container" : "Formato de savegame não identificado";
+  return `${kind}\nAssinatura: ${signature || "vazia"}\nTamanho: ${buffer.byteLength.toLocaleString("pt-BR")} bytes\n\nO arquivo foi aberto em modo somente leitura para evitar corromper o progresso. A prévia hexadecimal contém os bytes originais disponíveis.`;
 }
 
 function tryParseNbt(input: Buffer): string | undefined {

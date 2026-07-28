@@ -37,6 +37,14 @@ interface VSCodeThemeFile {
   tokenColors?: TokenColor[];
 }
 
+const BUNDLED_THEME_ASSETS = import.meta.glob("../../../resources/themes/*.json", {
+  eager: true,
+  query: "?raw",
+  import: "default"
+}) as Record<string, string>;
+
+const themeFileCache = new Map<string, Promise<VSCodeThemeFile | undefined>>();
+
 export interface ThemeSummary {
   id: string;
   name: string;
@@ -106,6 +114,9 @@ const BUILT_IN_FALLBACKS: ThemeSummary[] = [
 ];
 
 export async function listThemes(): Promise<ThemeSummary[]> {
+  const bundledManifest = bundledThemeAsset("package.json");
+  if (bundledManifest) return themesFromManifest(bundledManifest, "bundle");
+
   const manifestUrl = resourceUrl("themes/package.json");
   const response = await fetch(manifestUrl).catch(error => {
     console.warn(`[NPSharp assets] Failed to load theme manifest: ${manifestUrl}`, error);
@@ -116,16 +127,7 @@ export async function listThemes(): Promise<ThemeSummary[]> {
     return BUILT_IN_FALLBACKS;
   }
 
-  try {
-    const pack = JSON.parse(await response.text()) as ThemePackage;
-    const themes: ThemeSummary[] = [...BUILT_IN_FALLBACKS];
-    themes.push(...manifestEntriesToThemes(pack.contributes?.themes ?? [], false));
-    themes.push(...manifestEntriesToThemes(pack.contributes?.specialThemes ?? [], true));
-    return hydrateThemeSwatches(themes);
-  } catch (error) {
-    console.warn(`[NPSharp assets] Failed to parse theme manifest: ${manifestUrl}`, error);
-    return BUILT_IN_FALLBACKS;
-  }
+  return themesFromManifest(await response.text(), manifestUrl);
 }
 
 export async function applyTheme(settings: AppSettings): Promise<ThemeSummary> {
@@ -195,15 +197,63 @@ function findTheme(themes: ThemeSummary[], configuredTheme: string): ThemeSummar
 }
 
 async function loadVSCodeTheme(url: string): Promise<VSCodeThemeFile | undefined> {
+  const cached = themeFileCache.get(url);
+  if (cached) return cached;
+  const loaded = loadThemeFile(url);
+  themeFileCache.set(url, loaded);
+  return loaded;
+}
+
+async function loadThemeFile(url: string): Promise<VSCodeThemeFile | undefined> {
+  const bundled = bundledThemeAssetFromUrl(url);
+  if (bundled) return parseThemeFile(bundled, url);
   try {
     const response = await fetch(url);
     if (!response.ok) {
       console.warn(`[NPSharp assets] Theme file returned ${response.status}: ${url}`);
       return undefined;
     }
-    return JSON.parse(stripJsonc(await response.text())) as VSCodeThemeFile;
+    return parseThemeFile(await response.text(), url);
   } catch (error) {
     console.warn(`[NPSharp assets] Failed to load theme file: ${url}`, error);
+    return undefined;
+  }
+}
+
+async function themesFromManifest(source: string, sourceName: string): Promise<ThemeSummary[]> {
+  try {
+    const pack = JSON.parse(stripJsonc(source)) as ThemePackage;
+    const themes: ThemeSummary[] = [...BUILT_IN_FALLBACKS];
+    themes.push(...manifestEntriesToThemes(pack.contributes?.themes ?? [], false));
+    themes.push(...manifestEntriesToThemes(pack.contributes?.specialThemes ?? [], true));
+    return hydrateThemeSwatches(themes);
+  } catch (error) {
+    console.warn(`[NPSharp assets] Failed to parse theme manifest: ${sourceName}`, error);
+    return BUILT_IN_FALLBACKS;
+  }
+}
+
+function parseThemeFile(source: string, sourceName: string): VSCodeThemeFile | undefined {
+  try {
+    return JSON.parse(stripJsonc(source)) as VSCodeThemeFile;
+  } catch (error) {
+    console.warn(`[NPSharp assets] Failed to parse theme file: ${sourceName}`, error);
+    return undefined;
+  }
+}
+
+function bundledThemeAsset(fileName: string): string | undefined {
+  const suffix = `/themes/${fileName.replace(/^\.\//, "")}`;
+  return Object.entries(BUNDLED_THEME_ASSETS).find(([path]) => path.replace(/\\/g, "/").endsWith(suffix))?.[1];
+}
+
+function bundledThemeAssetFromUrl(url: string): string | undefined {
+  try {
+    const path = new URL(url).pathname;
+    const marker = "/themes/";
+    const index = path.lastIndexOf(marker);
+    return index < 0 ? undefined : bundledThemeAsset(decodeURIComponent(path.slice(index + marker.length)));
+  } catch {
     return undefined;
   }
 }

@@ -125,6 +125,12 @@ export class CommandPalette {
     overlay.append(box);
     document.body.append(overlay);
 
+    const updateSelectedRow = () => {
+      for (const row of list.querySelectorAll<HTMLElement>(".palette-row")) {
+        row.classList.toggle("active", Number(row.dataset.index) === selectedIndex);
+      }
+    };
+
     const render = () => {
       const query = input.value.replace(/^>/, "").trim().toLowerCase();
       filteredItems = items
@@ -134,6 +140,7 @@ export class CommandPalette {
       list.replaceChildren();
       filteredItems.forEach((item, index) => {
         const row = el("button", { className: `palette-row ${index === selectedIndex ? "active" : ""} ${item.active ? "selected" : ""}`.trim() });
+        row.dataset.index = String(index);
         const label = el("span", { className: "palette-label" });
         label.append(el("span", { className: "palette-check", text: item.active ? "✓" : "" }));
         if (item.swatch) {
@@ -145,7 +152,7 @@ export class CommandPalette {
         row.append(label, el("span", { className: "menu-shortcut", text: item.hint ?? "" }));
         row.addEventListener("mouseenter", () => {
           selectedIndex = index;
-          render();
+          updateSelectedRow();
         });
         row.addEventListener("click", () => {
           overlay.remove();

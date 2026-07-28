@@ -1,7 +1,7 @@
 import type { FileOpenResult } from "../../shared/types";
 import { el } from "../utils/dom";
 
-/** Read-only inspector for binary, media, PDF, archive and NBT files. */
+/** Read-only inspector for binary, structured documents, databases and media files. */
 export class UniversalFileViewer {
   readonly element = el("section", { className: "universal-file-viewer" });
   private readonly meta = el("div", { className: "universal-file-meta" });
@@ -56,7 +56,17 @@ export class UniversalFileViewer {
 }
 
 function viewerTitle(file: FileOpenResult): string {
-  return ({ binary: "Inspetor binário", nbt: "Visualizador NBT", archive: "Conteúdo do arquivo compactado", media: "Reprodutor de mídia", pdf: "Visualizador PDF" } as Partial<Record<FileOpenResult["editor"], string>>)[file.editor] ?? "Visualizador";
+  return ({
+    binary: "Inspetor binário",
+    nbt: "Visualizador NBT",
+    archive: "Conteúdo do arquivo compactado",
+    media: "Reprodutor de mídia",
+    pdf: "Visualizador PDF",
+    document: "Visualizador de documento estruturado",
+    database: "Visualizador de banco de dados",
+    design: "Visualizador de projeto gráfico/CAD",
+    game: "Visualizador de savegame"
+  } as Partial<Record<FileOpenResult["editor"], string>>)[file.editor] ?? "Visualizador";
 }
 
 function formatHex(data: string | undefined, truncated: boolean | undefined): string {

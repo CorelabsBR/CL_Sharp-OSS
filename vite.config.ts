@@ -23,6 +23,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          const language = id.match(/monaco-editor[/\\]esm[/\\]vs[/\\]basic-languages[/\\]([^/\\]+)/)?.[1];
+          if (language) return `monaco-language-${language}`;
+          if (id.includes("node_modules/monaco-editor/esm/vs/language/json")) return "monaco-language-json";
           if (id.includes("node_modules/monaco-editor")) return "monaco";
           if (id.includes("node_modules/@capacitor")) return "capacitor";
           if (id.includes("node_modules")) return "vendor";

@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AppSettings, PersistedSession } from "../../shared/types";
+import { DEFAULT_LOCALE, normalizeLocale } from "../../shared/i18n";
 import { npsharpHome, recentFilesPath, settingsPath } from "./paths";
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: DEFAULT_LOCALE,
   theme: "np-dark",
   iconTheme: "default",
   iconColor: "",
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   statusBarVisible: true,
   activityBarVisible: true,
   sideBarVisible: true,
+  restoreWorkspaceOnStartup: true,
   confirmDelete: true,
   binaryFileTypesIgnored: [],
   keyboardShortcuts: []
@@ -42,21 +45,20 @@ export async function loadSettings(): Promise<AppSettings> {
   try {
     const raw = await fs.readFile(file, "utf8");
     if (!raw.trim()) {
-      await saveSettings(DEFAULT_SETTINGS);
       return { ...DEFAULT_SETTINGS };
     }
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } as AppSettings;
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return { ...DEFAULT_SETTINGS, ...parsed, language: normalizeLocale(parsed.language) } as AppSettings;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       console.warn(`[NPSharp settings] Failed to load settings from ${file}; defaults will be used.`, error);
     }
-    await saveSettings(DEFAULT_SETTINGS);
     return { ...DEFAULT_SETTINGS };
   }
 }
 
 export async function saveSettings(settings: AppSettings): Promise<AppSettings> {
-  const merged = { ...DEFAULT_SETTINGS, ...settings };
+  const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language) };
   await fs.mkdir(npsharpHome(), { recursive: true });
   await fs.writeFile(settingsPath(), JSON.stringify(merged, null, 2) + "\n", "utf8");
   return merged;

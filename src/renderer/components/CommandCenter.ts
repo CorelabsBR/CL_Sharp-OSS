@@ -43,7 +43,7 @@ export class CommandCenter {
     const shell = el("div", { className: "command-center-shell" });
     const header = el("header", { className: "command-center-header" });
     header.append(
-      el("span", { className: "command-center-kicker", text: "COMMAND CENTER" }),
+      el("span", { className: "command-center-kicker", text: "CENTRAL DE COMANDOS" }),
       el("h1", { text: "NPSharp" }),
       el("p", { text: "Abra, rode e organize seu workspace sem sair do editor." })
     );

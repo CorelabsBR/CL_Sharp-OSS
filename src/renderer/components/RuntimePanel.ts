@@ -5,17 +5,19 @@ import { reportError } from "../utils/errors";
 
 export class RuntimePanel {
   readonly element = el("div", { className: "panel runtime-panel" });
-  private readonly summary = el("div", { className: "panel-summary", text: "Runtimes" });
+  private readonly summary = el("div", { className: "panel-summary", text: "Ambientes de execução" });
   private readonly list = el("div", { className: "runtime-list" });
 
   constructor(
     private readonly runCurrentFile: () => Promise<void>,
+    private readonly installDependencies: () => Promise<void>,
     private readonly updateStatus: (text: string) => void,
     private readonly configureLanguageRuntimes: () => void
   ) {
     const toolbar = el("div", { className: "panel-toolbar" });
     toolbar.append(
       buttonIcon("play", "Executar arquivo atual", () => void this.runCurrentFile()),
+      buttonIcon("cloud-download", "Baixar imports do arquivo Python no .venv do projeto", () => void this.installDependencies()),
       buttonIcon("refresh", "Detectar runtimes", () => void this.refresh(true))
     );
     this.element.append(toolbar, this.summary, this.list);
