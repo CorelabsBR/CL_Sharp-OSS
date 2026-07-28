@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.26 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Remove a chave `linux.desktop` descontinuada do electron-builder 26 para permitir a geração dos pacotes Linux.
+
 ## 26.8.25 - 2026-07-28
 
 Type: Fix

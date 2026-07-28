@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.25",
+  "version": "26.8.26",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -98,13 +98,7 @@
       "category": "Development",
       "maintainer": "CoreLabs",
       "synopsis": "NPSharp IDE",
-      "description": "NPSharp is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor.",
-      "desktop": {
-        "Name": "NPSharp",
-        "Comment": "Code, run and manage projects with NPSharp",
-        "Categories": "Development;IDE;",
-        "StartupWMClass": "NPSharp"
-      }
+      "description": "NPSharp is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor."
     },
     "win": {
       "target": [
