@@ -65,6 +65,7 @@ export class CommandPalette {
   showQuickOpen(initialQuery = ""): void {
     this.show(initialQuery, this.quickOpenItems(), "Pesquisar arquivos por nome ou caminho");
   }
+  //só pra botar o workflow funcionar
 
   showPicker(placeholder: string, items: PaletteItem[]): void {
     this.show("", items, placeholder);
