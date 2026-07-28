@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.32 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Eleva o `minSdk` Android para API 24, requisito do `cordova-android 14` usado pelos plugins Capacitor, corrigindo a mesclagem de manifestos sem ignorar a incompatibilidade em tempo de execução.
+
 ## 26.8.31 - 2026-07-28
 
 Type: Fix
