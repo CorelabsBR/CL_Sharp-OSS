@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.28 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Alinha as bibliotecas AndroidX às versões compatíveis com Capacitor 8, Android Gradle Plugin 8.13 e `compileSdk 35`, corrigindo a validação de metadados AAR no build Android.
+
 ## 26.8.27 - 2026-07-28
 
 Type: Feature
