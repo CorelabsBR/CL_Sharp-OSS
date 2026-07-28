@@ -19,10 +19,17 @@ const executable = process.platform === "win32"
 
 try {
   await fs.access(path.join(source, `${productName}.exe`));
+} catch {
+  throw new Error("O diretório release/win-unpacked não foi encontrado. Gere primeiro o alvo Windows dir do electron-builder.");
+}
+
+try {
   await fs.access(executable);
 } catch {
-  throw new Error("O diretório release/win-unpacked ou o compactador 7-Zip não foi encontrado. Gere primeiro o alvo Windows dir do electron-builder.");
+  throw new Error("O compactador 7-Zip não foi encontrado. Execute npm ci para instalar a dependência 7zip-bin.");
 }
+
+if (process.platform !== "win32") await fs.chmod(executable, 0o755);
 
 await fs.writeFile(path.join(source, "portable.json"), `${JSON.stringify({ format: `${productName} Portable Fast`, version: packageJson.version }, null, 2)}\n`, "utf8");
 await fs.rm(output, { force: true });

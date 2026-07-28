@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.33 - 2026-07-28
+
+Type: Fix
+
+Description:
+- Declara o `7zip-bin` como dependência direta do empacotamento Portable Fast, garantindo que o compactador esteja disponível em instalações limpas do CI Windows e Linux.
+
 ## 26.8.32 - 2026-07-28
 
 Type: Fix
