@@ -386,7 +386,7 @@ export class EditorTabs {
       const content = file.content ?? "";
       const language = file.editableStructuredKind === "nbt" ? "json" : languageForPath(filePath);
       await ensureLanguageSupport(language);
-      const model = this.createTextModel(content, language, monaco.Uri.file(filePath));
+      const model = this.createTextModel(content, language, filePath.startsWith("npsharp-remote://") ? monaco.Uri.parse(filePath) : monaco.Uri.file(filePath));
       const tab: EditorTab = {
         id: filePath,
         title: basename(filePath),

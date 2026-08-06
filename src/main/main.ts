@@ -97,6 +97,7 @@ import {
   touchRemote,
   writeRemoteFile
 } from "../services/node/remoteService";
+import { RemoteHostConnectionManager } from "../services/node/remote/RemoteHostConnectionManager";
 import type {
   AIChatRequest,
   AIConversationUpdate,
@@ -136,6 +137,7 @@ let shuttingDown = false;
 let runtimeResourcesClosed = false;
 let aiStreamingController: StreamingController | undefined;
 let updateService: UpdateService | undefined;
+let remoteHostManager: RemoteHostConnectionManager | undefined;
 const startupProfiler = new StartupProfiler();
 let startupReady = false;
 let rendererReady = false;
@@ -475,6 +477,11 @@ function registerIpcHandlers(): void {
   const providerManager = new ProviderManager(aiSettings);
   aiStreamingController = new StreamingController();
   const aiService = new AIService(providerManager, aiSettings, aiStreamingController);
+  const serverDist = app.isPackaged ? path.join(process.resourcesPath, "npsharp-server", "dist") : path.join(app.getAppPath(), "npsharp-server", "dist");
+  remoteHostManager = new RemoteHostConnectionManager(serverDist, (channel, value) => {
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(channel, value);
+  });
+  const remoteEtags = new Map<string, string>();
 
   ipcMain.handle("app:info", () => ({
     name: app.getName(),
@@ -598,20 +605,34 @@ function registerIpcHandlers(): void {
     aiStreamingController?.cancel(requestId);
   });
 
-  ipcMain.handle("fs:listDir", (_event, targetPath: string) => listDir(targetPath));
-  ipcMain.handle("fs:readFile", (_event, targetPath: string) => readFile(targetPath));
-  ipcMain.handle("fs:openFile", (_event, targetPath: string, forceText = false) => openFile(targetPath, forceText));
-  ipcMain.handle("fs:writeFile", (_event, targetPath: string, content: string, encoding) => writeFile(targetPath, content, encoding));
+  ipcMain.handle("fs:listDir", async (_event, targetPath: string) => {
+    const remote = remoteHostManager!.resolveUri(targetPath); if (!remote) return listDir(targetPath);
+    const entries = await remoteHostManager!.request<Array<{ path: string; name: string; type: string; size: number; mtimeMs: number }>>(remote.sessionId, "fs.readDir", { path: remote.path });
+    const prefix = targetPath.slice(0, targetPath.length - remote.path.length);
+    return entries.map(entry => ({ path: `${prefix}${entry.path}`, name: entry.name, directory: entry.type === "directory", size: entry.size, modifiedAt: entry.mtimeMs, hidden: entry.name.startsWith(".") }));
+  });
+  ipcMain.handle("fs:readFile", async (_event, targetPath: string) => {
+    const remote = remoteHostManager!.resolveUri(targetPath); if (!remote) return readFile(targetPath);
+    const file = await remoteHostManager!.request<{ content: string; etag: string; size: number }>(remote.sessionId, "fs.readFile", { path: remote.path }); remoteEtags.set(targetPath, file.etag);
+    return { path: targetPath, name: path.posix.basename(remote.path), content: file.content, lineEnding: file.content.includes("\r\n") ? "\r\n" : "\n", encoding: "utf8", remoteMetadata: { mtimeMs: 0, size: file.size, etag: file.etag } };
+  });
+  ipcMain.handle("fs:openFile", async (_event, targetPath: string, forceText = false) => {
+    const remote = remoteHostManager!.resolveUri(targetPath); if (!remote) return openFile(targetPath, forceText);
+    const file = await remoteHostManager!.request<{ content: string; etag: string; size: number }>(remote.sessionId, "fs.readFile", { path: remote.path }); remoteEtags.set(targetPath, file.etag);
+    return { path: targetPath, name: path.posix.basename(remote.path), editor: "text", size: file.size, type: path.posix.extname(remote.path).slice(1).toUpperCase() || "Arquivo", content: file.content, lineEnding: file.content.includes("\r\n") ? "\r\n" : "\n", encoding: "utf8" };
+  });
+  ipcMain.handle("fs:writeFile", async (_event, targetPath: string, content: string, encoding) => { const remote = remoteHostManager!.resolveUri(targetPath); if (!remote) return writeFile(targetPath, content, encoding); await remoteHostManager!.request(remote.sessionId, "fs.writeFile", { path: remote.path, content, etag: remoteEtags.get(targetPath) }); const refreshed = await remoteHostManager!.request<{ etag: string }>(remote.sessionId, "fs.readFile", { path: remote.path }); remoteEtags.set(targetPath, refreshed.etag); });
   ipcMain.handle("fs:saveStructuredFile", (_event, request) => saveStructuredFile(request));
   ipcMain.handle("office:status", () => officeSuiteStatus());
   ipcMain.handle("office:open", (_event, targetPath: string) => openInOfficeSuite(targetPath));
-  ipcMain.handle("fs:createFile", (_event, targetPath: string) => createFile(targetPath));
-  ipcMain.handle("fs:createFolder", (_event, targetPath: string) => createFolder(targetPath));
-  ipcMain.handle("fs:rename", (_event, oldPath: string, newPath: string) => renamePath(oldPath, newPath));
-  ipcMain.handle("fs:delete", (_event, targetPath: string) => deletePath(targetPath));
+  ipcMain.handle("fs:createFile", (_event, targetPath: string) => { const remote = remoteHostManager!.resolveUri(targetPath); return remote ? remoteHostManager!.request(remote.sessionId, "fs.createFile", { path: remote.path }) : createFile(targetPath); });
+  ipcMain.handle("fs:createFolder", (_event, targetPath: string) => { const remote = remoteHostManager!.resolveUri(targetPath); return remote ? remoteHostManager!.request(remote.sessionId, "fs.createDirectory", { path: remote.path }) : createFolder(targetPath); });
+  ipcMain.handle("fs:rename", (_event, oldPath: string, newPath: string) => { const oldRemote = remoteHostManager!.resolveUri(oldPath); const nextRemote = remoteHostManager!.resolveUri(newPath); return oldRemote && nextRemote ? remoteHostManager!.request(oldRemote.sessionId, "fs.rename", { oldPath: oldRemote.path, newPath: nextRemote.path }) : renamePath(oldPath, newPath); });
+  ipcMain.handle("fs:delete", (_event, targetPath: string) => { const remote = remoteHostManager!.resolveUri(targetPath); return remote ? remoteHostManager!.request(remote.sessionId, "fs.delete", { path: remote.path, recursive: true }) : deletePath(targetPath); });
   ipcMain.handle("fs:reveal", (_event, targetPath: string) => revealPath(targetPath));
-  ipcMain.handle("fs:exists", (_event, targetPath: string) => exists(targetPath));
+  ipcMain.handle("fs:exists", (_event, targetPath: string) => { const remote = remoteHostManager!.resolveUri(targetPath); return remote ? remoteHostManager!.request(remote.sessionId, "fs.exists", { path: remote.path }) : exists(targetPath); });
   ipcMain.handle("fs:workspace:createFile", async (_event, request: WorkspaceCreateFileRequest) => {
+    const remote = remoteHostManager!.resolveUri(request.path); if (remote) { await remoteHostManager!.request(remote.sessionId, "fs.createFile", { path: remote.path }); if (request.initialContent) await remoteHostManager!.request(remote.sessionId, "fs.writeFile", { path: remote.path, content: request.initialContent }); return; }
     const targetPath = await resolveWorkspaceTarget(request.workspace, request.path);
     if (await exists(targetPath)) throw new Error("Já existe um item com esse nome nesta pasta.");
     try {
@@ -622,11 +643,13 @@ function registerIpcHandlers(): void {
     }
   });
   ipcMain.handle("fs:workspace:createFolder", async (_event, request: WorkspacePathRequest) => {
+    const remote = remoteHostManager!.resolveUri(request.path); if (remote) { await remoteHostManager!.request(remote.sessionId, "fs.createDirectory", { path: remote.path }); return; }
     const targetPath = await resolveWorkspaceTarget(request.workspace, request.path);
     if (await exists(targetPath)) throw new Error("Já existe um item com esse nome nesta pasta.");
     await createFolder(targetPath);
   });
   ipcMain.handle("fs:workspace:rename", async (_event, request: WorkspaceRenameRequest) => {
+    const remote = remoteHostManager!.resolveUri(request.path); const nextRemote = remoteHostManager!.resolveUri(request.newPath); if (remote && nextRemote) { await remoteHostManager!.request(remote.sessionId, "fs.rename", { oldPath: remote.path, newPath: nextRemote.path }); return; }
     const sourcePath = await resolveWorkspaceTarget(request.workspace, request.path, false);
     const targetPath = await resolveWorkspaceTarget(request.workspace, request.newPath);
     if (sameResolvedPath(sourcePath, targetPath)) return;
@@ -634,6 +657,7 @@ function registerIpcHandlers(): void {
     await renamePath(sourcePath, targetPath);
   });
   ipcMain.handle("fs:workspace:delete", async (_event, request: WorkspacePathRequest) => {
+    const remote = remoteHostManager!.resolveUri(request.path); if (remote) { const root = remoteHostManager!.resolveUri(request.workspace); if (root?.path === remote.path) throw new Error("A pasta raiz do workspace não pode ser excluída."); await remoteHostManager!.request(remote.sessionId, "fs.delete", { path: remote.path, recursive: true }); return; }
     const workspace = await resolveWorkspaceRoot(request.workspace);
     const targetPath = await resolveWorkspaceTarget(workspace, request.path, false);
     if (sameResolvedPath(workspace, targetPath)) throw new Error("A pasta raiz do workspace não pode ser excluída.");
@@ -641,6 +665,7 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle("fs:watch:start", (event, watchId: string, targetPath: string) => {
     disposeWorkspaceWatcher(watchId);
+    if (remoteHostManager!.resolveUri(targetPath)) return;
     const sender = event.sender;
     if (shuttingDown || !isUsableWebContents(sender)) return;
     const dispose = watchWorkspace(
@@ -753,6 +778,16 @@ function registerIpcHandlers(): void {
   ipcMain.handle("remote:rename", (_event, request: RemoteFileRequest & { newPath: string }) => renameRemote(request));
   ipcMain.handle("remote:delete", (_event, request: RemoteFileRequest) => deleteRemote(request));
   ipcMain.handle("remote:execute", (_event, request: RemoteCommandRequest) => executeRemote(request));
+  ipcMain.handle("remote:connect", (_event, hostId: string, password?: string) => remoteHostManager!.connect(hostId, password));
+  ipcMain.handle("remote:disconnect", (_event, sessionId: string) => remoteHostManager!.disconnect(sessionId));
+  ipcMain.handle("remote:reconnect", (_event, sessionId: string) => remoteHostManager!.reconnect(sessionId));
+  ipcMain.handle("remote:getStatus", () => remoteHostManager!.getStatus());
+  ipcMain.handle("remote:listSessions", () => remoteHostManager!.listSessions());
+  ipcMain.handle("remote:openFolder", (_event, sessionId: string, remotePath: string) => remoteHostManager!.openFolder(sessionId, remotePath));
+  ipcMain.handle("remote:sendRpc", (_event, sessionId: string, method: string, params: unknown) => remoteHostManager!.request(sessionId, method, params));
+  ipcMain.handle("remote:getLogs", () => remoteHostManager!.getLogs());
+  ipcMain.handle("remote:cancel", () => remoteHostManager!.cancel());
+  ipcMain.handle("remote:uninstallServer", (_event, sessionId: string) => remoteHostManager!.uninstall(sessionId));
 }
 
 function applyApplicationLocale(locale: AppLocale): void {
@@ -844,6 +879,7 @@ function cleanupRuntimeResources(): void {
   aiStreamingController?.cancelAll();
   closeRegisteredTerminals();
   closeWorkspaceWatchers();
+  void remoteHostManager?.disconnectAll().catch(error => console.warn("[NPSharp remote] Failed to close remote sessions.", error));
   void stopAllLiveServers().catch(error => {
     console.warn("[NPSharp lifecycle] Failed to stop live servers during shutdown.", error);
   });

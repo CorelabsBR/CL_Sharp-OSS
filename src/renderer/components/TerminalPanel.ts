@@ -18,7 +18,8 @@ interface TerminalSession {
   history: string[];
   historyIndex: number;
   shell: string;
-  backend: "node-pty" | "child_process" | "android-shell" | "local";
+  backend: "node-pty" | "child_process" | "android-shell" | "local" | "remote";
+  remoteSessionId?: string;
   running: boolean;
   localOnly: boolean;
 }
@@ -50,7 +51,8 @@ export class TerminalPanel {
   constructor(
     private readonly cwdSupplier: () => string,
     private readonly updateStatus: (text: string) => void,
-    private readonly closePanel: () => void
+    private readonly closePanel: () => void,
+    private readonly remoteSupplier?: () => { sessionId: string; hostName: string; cwd: string; shell?: string } | undefined
   ) {
     this.build();
   }
@@ -245,7 +247,8 @@ export class TerminalPanel {
     }
 
     try {
-      await api.terminal.write(session.id, `${command}\n`);
+      if (session.backend === "remote" && session.remoteSessionId) await api.remote.sendRpc(session.remoteSessionId, "terminal.write", { id: session.id, data: `${command}\n` });
+      else await api.terminal.write(session.id, `${command}\n`);
     } catch (error) {
       const message = reportError(error, this.updateStatus, "Falha no comando do terminal");
       session.output = trimScrollback(`${session.output}${message}\n`);
@@ -256,7 +259,12 @@ export class TerminalPanel {
   private build(): void {
     this.disposers.push(
       api.terminal.onData(event => this.handleTerminalData(event)),
-      api.terminal.onExit(event => this.handleTerminalExit(event))
+      api.terminal.onExit(event => this.handleTerminalExit(event)),
+      api.remote.onEvent(value => {
+        const payload = value.payload as { id?: string; data?: string; exitCode?: number; signal?: string };
+        if (value.event === "terminal.data" && payload.id && payload.data !== undefined) this.handleTerminalData({ id: payload.id, data: payload.data });
+        if (value.event === "terminal.exit" && payload.id) this.handleTerminalExit({ id: payload.id, code: payload.exitCode ?? null, signal: payload.signal });
+      })
     );
     void this.loadShellOptions();
 
@@ -348,6 +356,7 @@ export class TerminalPanel {
     const cwd = this.cwdSupplier();
     const name = `Terminal ${++this.terminalCounter}`;
     const shell = this.selectedShell();
+    const remote = this.remoteSupplier?.();
 
     if (!this.enabled || !platform.canUseTerminal) {
       const session = this.localSession(name, cwd, shell, this.enabled ? terminalUnavailableMessage() : "Terminal desativado nas configuracoes.");
@@ -359,6 +368,11 @@ export class TerminalPanel {
     }
 
     try {
+      if (remote) {
+        const info = await api.remote.sendRpc<{ id: string; pid: number; shell: string }>(remote.sessionId, "terminal.create", { cwd: remote.cwd, shell: remote.shell, cols: this.terminalCols(), rows: 30 });
+        this.sessions.push({ id: info.id, name: `${this.shellLabel(info.shell)} — ${remote.hostName}`, cwd: remote.cwd, output: "", history: [], historyIndex: -1, shell: info.shell, backend: "remote", remoteSessionId: remote.sessionId, running: true, localOnly: false });
+        this.activeId = info.id; this.mode = "terminal"; this.updateStatus(`Terminal remoto aberto em ${remote.hostName}`); this.render(); return;
+      }
       const info = await api.terminal.create({ cwd, shell, name, cols: this.terminalCols(), rows: 30 });
       if (this.disposed) {
         void api.terminal.close(info.id).catch(() => undefined);
@@ -416,7 +430,8 @@ export class TerminalPanel {
       return;
     }
     try {
-      await api.terminal.kill(session.id);
+      if (session.backend === "remote" && session.remoteSessionId) await api.remote.sendRpc(session.remoteSessionId, "terminal.kill", { id: session.id });
+      else await api.terminal.kill(session.id);
       session.output = trimScrollback(`${session.output}\n[terminal] Encerrando processo...\n`);
       this.updateStatus("Processo do terminal encerrado");
     } catch (error) {
@@ -433,7 +448,8 @@ export class TerminalPanel {
     this.completeProgramInput("");
     if (!session.localOnly) {
       try {
-        await api.terminal.close(session.id);
+        if (session.backend === "remote" && session.remoteSessionId) await api.remote.sendRpc(session.remoteSessionId, "terminal.kill", { id: session.id });
+        else await api.terminal.close(session.id);
       } catch (error) {
         reportError(error, this.updateStatus, "Falha ao fechar o terminal");
       }

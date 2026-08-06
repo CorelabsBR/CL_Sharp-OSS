@@ -1090,7 +1090,19 @@ function createRemoteFallbackApi(fs: FsApi): RemoteApi {
     touch: async (_request: RemoteFileRequest) => undefined,
     rename: async (_request: RemoteFileRequest & { newPath: string }) => undefined,
     delete: async (_request: RemoteFileRequest) => undefined,
-    execute: async (_request: RemoteCommandRequest) => unavailable()
+    execute: async (_request: RemoteCommandRequest) => unavailable(),
+    connect: async () => { throw new Error(unavailable().output); },
+    disconnect: async () => undefined,
+    reconnect: async () => { throw new Error(unavailable().output); },
+    getStatus: async () => ({ status: "disconnected", message: unavailable().output }),
+    listSessions: async () => [],
+    openFolder: async () => { throw new Error(unavailable().output); },
+    sendRpc: async () => { throw new Error(unavailable().output); },
+    getLogs: async () => [],
+    cancel: async () => undefined,
+    uninstallServer: async () => undefined,
+    onStatusChanged: () => () => undefined,
+    onEvent: () => () => undefined
   };
 }
 

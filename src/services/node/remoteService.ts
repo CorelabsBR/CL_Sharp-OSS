@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 import { Client, type ConnectConfig, type SFTPWrapper } from "ssh2";
 import type {
   FileReadResult,
@@ -19,7 +20,8 @@ import { remoteHostsPath } from "./paths";
 export async function loadHosts(): Promise<RemoteHostConfig[]> {
   try {
     const raw = await fs.readFile(remoteHostsPath(), "utf8");
-    return JSON.parse(raw) as RemoteHostConfig[];
+    const hosts = JSON.parse(raw) as RemoteHostConfig[];
+    return hosts.map(host => ({ ...host, id: host.id || crypto.createHash("sha256").update(`${host.username}@${host.host}:${host.port}`).digest("hex").slice(0, 16) }));
   } catch {
     return [];
   }
@@ -27,7 +29,13 @@ export async function loadHosts(): Promise<RemoteHostConfig[]> {
 
 export async function saveHosts(hosts: RemoteHostConfig[]): Promise<void> {
   await fs.mkdir(path.dirname(remoteHostsPath()), { recursive: true });
-  await fs.writeFile(remoteHostsPath(), JSON.stringify(hosts ?? [], null, 2) + "\n", "utf8");
+  const safeHosts = (hosts ?? []).map(host => {
+    const clean = { ...host } as RemoteHostConfig & { password?: string };
+    delete clean.password;
+    clean.id ||= crypto.randomUUID();
+    return clean;
+  });
+  await fs.writeFile(remoteHostsPath(), JSON.stringify(safeHosts, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
 }
 
 export async function testRemote(request: RemoteCommandRequest): Promise<GitOperationResult> {
@@ -80,12 +88,16 @@ export async function readRemoteFile(request: RemoteFileRequest): Promise<FileRe
         return;
       }
       const content = Buffer.isBuffer(data) ? data.toString("utf8") : String(data);
-      resolve({
-        path: request.path,
-        name: path.posix.basename(request.path),
-        content,
-        lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
-        encoding: "utf8"
+      sftp.stat(request.path, (statError, stats) => {
+        if (statError) { reject(new Error(remoteFailure("obter metadados", statError))); return; }
+        resolve({
+          path: request.path,
+          name: path.posix.basename(request.path),
+          content,
+          lineEnding: content.includes("\r\n") ? "\r\n" : "\n",
+          encoding: "utf8",
+          remoteMetadata: { mtimeMs: stats.mtime * 1000, size: stats.size, etag: etag(Buffer.from(data)) }
+        });
       });
     });
   }));
@@ -93,9 +105,16 @@ export async function readRemoteFile(request: RemoteFileRequest): Promise<FileRe
 
 export async function writeRemoteFile(request: RemoteFileRequest): Promise<void> {
   await withSftp(request.config, request.password, sftp => new Promise<void>((resolve, reject) => {
-    sftp.writeFile(request.path, Buffer.from(request.content ?? "", "utf8"), error => {
-      if (error) reject(new Error(remoteFailure("salvar", error)));
-      else resolve();
+    sftp.readFile(request.path, (readError, current) => {
+      if (readError && request.etag) { reject(new Error(remoteFailure("verificar arquivo", readError))); return; }
+      if (request.etag && !request.overwrite && etag(Buffer.from(current ?? "")) !== request.etag) {
+        reject(new Error("REMOTE_FILE_MODIFIED: o arquivo foi alterado no servidor."));
+        return;
+      }
+      sftp.writeFile(request.path, Buffer.from(request.content ?? "", "utf8"), error => {
+        if (error) reject(new Error(remoteFailure("salvar", error)));
+        else resolve();
+      });
     });
   }));
 }
@@ -151,11 +170,26 @@ async function withClient<T>(config: RemoteHostConfig, password: string | undefi
 
 async function connect(config: RemoteHostConfig, password: string | undefined): Promise<Client> {
   const client = new Client();
+  let hostKeyFailure: string | undefined;
   const options: ConnectConfig = {
     host: config.host,
     port: config.port || 22,
     username: config.username,
-    readyTimeout: 15000
+    readyTimeout: config.connectTimeout ?? 15000,
+    keepaliveInterval: config.keepAliveInterval ?? 10000,
+    keepaliveCountMax: 3,
+    hostHash: "sha256",
+    hostVerifier: (fingerprint: string) => {
+      if (!config.hostKeyFingerprint) {
+        hostKeyFailure = `REMOTE_HOST_KEY_UNKNOWN:${fingerprint}`;
+        return false;
+      }
+      if (config.hostKeyFingerprint !== fingerprint) {
+        hostKeyFailure = `REMOTE_HOST_KEY_CHANGED:${fingerprint}`;
+        return false;
+      }
+      return true;
+    }
   };
 
   if (config.authMethod === "password") {
@@ -168,7 +202,7 @@ async function connect(config: RemoteHostConfig, password: string | undefined): 
 
   return new Promise((resolve, reject) => {
     client.once("ready", () => resolve(client));
-    client.once("error", error => reject(new Error(remoteFailure("conectar", error))));
+    client.once("error", error => reject(new Error(hostKeyFailure ?? remoteFailure("conectar", error))));
     client.connect(options);
   });
 }
@@ -258,6 +292,8 @@ function remoteFailure(action: string, error: unknown): string {
 function friendly(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
+  if (message.includes("REMOTE_HOST_KEY_UNKNOWN:")) return `Chave do host ainda não confiável. Fingerprint ${message.split("REMOTE_HOST_KEY_UNKNOWN:")[1]}`;
+  if (message.includes("REMOTE_HOST_KEY_CHANGED:")) return "REMOTE_HOST_KEY_CHANGED: a chave SSH do host mudou; conexão bloqueada.";
   if (lower.includes("all configured authentication methods failed") || lower.includes("auth")) {
     return "Autenticacao recusada. Confira usuario, senha ou chave privada.";
   }
@@ -277,4 +313,8 @@ function friendly(error: unknown): string {
     return "Caminho remoto invalido ou inexistente.";
   }
   return message || "Operacao remota nao concluida.";
+}
+
+function etag(content: Buffer): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
 }

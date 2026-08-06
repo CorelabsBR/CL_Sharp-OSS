@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 26.8.39 - 2026-08-06
+
+Type: Feature
+
+Description:
+- Completa o fluxo `Remote Host: Connect` com SSH persistente, validação de host key, detecção de plataforma, instalação SFTP versionada e verificada por SHA-256, bootstrap estruturado, túnel local e RPC WebSocket autenticado.
+- Integra workspaces `npsharp-remote://` ao Explorer e Monaco, incluindo operações de arquivos, proteção por `etag`, watchers agrupados, terminal remoto PTY e execução remota pelo Run Button.
+- Adiciona estados e logs de conexão, rollback, cancelamento, reconexão, limpeza no encerramento, comandos da Command Palette e testes do protocolo e proteção de caminhos.
+- Corrige o artefato remoto para incluir seu `package.json` ESM; instalações incompletas anteriores são detectadas e reinstaladas automaticamente em vez de falharem aguardando o bootstrap.
+
+## 26.8.38 - 2026-08-06
+
+Type: Feature
+
+Description:
+- Introduz a base tipada do NPSharp Remote Host: estados de conexão, protocolo RPC validado, códigos de erro e abstração de filesystem local/remoto com URI `npsharp-remote://`.
+- Protege conexões SSH com verificação obrigatória de fingerprint, keepalive e timeouts configuráveis, sem aceitar silenciosamente chaves desconhecidas ou alteradas.
+- Adiciona armazenamento de credenciais criptografado pelo `safeStorage`, IDs persistentes de hosts e arquivos de configuração com permissões restritas.
+- Detecta conflitos de edição por `etag` antes de salvar arquivos remotos e retorna `REMOTE_FILE_MODIFIED` em vez de sobrescrever alterações externas.
+- Inclui um NPSharp Server compilável e empacotado, autenticado por token e limitado a `127.0.0.1`, com RPC funcional para sistema, workspace, filesystem e processos, limite de mensagens e restrição a raízes autorizadas.
+
 ## 26.8.37 - 2026-07-28
 
 Type: Feature

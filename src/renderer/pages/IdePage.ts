@@ -87,7 +87,7 @@ export class IdePage {
   );
   private readonly search = new SearchPanel(result => void this.editor.openSearchResult(result), text => this.updateStatus(text));
   private readonly source = new SourceControlPanel((title, uri, content) => this.editor.openVirtualFile(title, uri, content), text => this.updateStatus(text));
-  private readonly terminal = new TerminalPanel(() => this.terminalCwd(), text => this.updateStatus(text), () => this.closeTerminalPanel());
+  private readonly terminal = new TerminalPanel(() => this.terminalCwd(), text => this.updateStatus(text), () => this.closeTerminalPanel(), () => this.remote.connection());
   private readonly aiChat = new AIChatPanel({
     workspace: () => this.explorer.workspace,
     currentFile: () => this.editor.getCurrentFile(),
@@ -111,7 +111,7 @@ export class IdePage {
     () => void this.showLanguageRuntimes()
   );
   private readonly extensions = new ExtensionManagerPanel(text => this.updateStatus(text));
-  private readonly remote = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text));
+  private readonly remote = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text), (uri, name, location) => this.explorer.openFolder(uri, name, location));
   private readonly arduino = new ArduinoPanel(() => this.explorer.workspace, file => this.editor.openFile(file), text => this.updateStatus(text));
   private readonly palette = new CommandPalette();
   private readonly keyboardShortcuts = new KeyboardShortcutsModal(text => this.updateStatus(text));
@@ -447,12 +447,18 @@ export class IdePage {
     window.addEventListener("unhandledrejection", handleUnhandledRejection);
     window.addEventListener("beforeunload", this.dispose, { once: true });
     window.addEventListener("pagehide", this.dispose, { once: true });
+    const disposeRemoteStatus = api.remote.onStatusChanged(state => {
+      this.updateStatus(state.status === "connected" ? `NPSharp Remote: ${state.message.replace(/^Conectado a |\.$/g, "")}` : state.message);
+      if (state.status === "connected") document.title = `[${state.message.replace(/^Conectado a |\.$/g, "")}] ${this.session.workspaceName ?? "Remote"} — NPSharp`;
+      else if (state.status === "disconnected") document.title = "NPSharp";
+    });
     this.disposers.push(
       () => window.removeEventListener("keydown", this.handleShortcut, true),
       () => window.removeEventListener("error", handleError),
       () => window.removeEventListener("unhandledrejection", handleUnhandledRejection),
       () => window.removeEventListener("beforeunload", this.dispose),
-      () => window.removeEventListener("pagehide", this.dispose)
+      () => window.removeEventListener("pagehide", this.dispose),
+      disposeRemoteStatus
     );
     const events = window as typeof window & { npsharpEvents?: { onCommand(callback: (command: string) => void): () => void; onOpenFile(callback: (filePath: string) => void): () => void } };
     const disposeCommandListener = events.npsharpEvents?.onCommand(command => this.handleCommand(command));
@@ -466,6 +472,17 @@ export class IdePage {
       { label: "Arquivo: Novo arquivo", shortcut: "Ctrl+N", run: () => this.editor.newTab() },
       { label: "Arquivo: Abrir arquivo", shortcut: "Ctrl+O", run: () => this.editor.openFileFromDialog() },
       { label: "Arquivo: Abrir pasta", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
+      { label: "Remote Host: Connect", run: () => this.remote.connectSavedHost() },
+      { label: "Remote Host: Disconnect", run: () => this.remote.disconnect() },
+      { label: "Remote Host: Reconnect", run: () => this.remote.reconnect() },
+      { label: "Remote Host: Open Remote Folder", run: () => this.remote.openRemoteFolder() },
+      { label: "Remote Host: Show Connection Log", run: () => this.remote.showLogs() },
+      { label: "Remote Host: Add New Host", run: () => this.remote.addNewHost() },
+      { label: "Remote Host: Edit Host", run: () => this.remote.editSelectedHost() },
+      { label: "Remote Host: Remove Host", run: () => this.remote.removeSelectedHost() },
+      { label: "Remote Host: Install NPSharp Server", run: () => this.remote.connectSavedHost() },
+      { label: "Remote Host: Kill Remote Server", run: () => this.remote.disconnect() },
+      { label: "Remote Host: Uninstall NPSharp Server", run: () => this.remote.uninstallServer() },
       { label: "Arquivo: Salvar", shortcut: "Ctrl+S", run: () => this.editor.saveCurrentFile() },
       { label: "Arquivo: Salvar como", shortcut: "Ctrl+Shift+S", run: () => this.editor.saveCurrentFileAs() },
       { label: "Arquivo: Salvar tudo", run: () => this.editor.saveAll() },
@@ -1594,6 +1611,14 @@ export class IdePage {
       await this.terminal.ensureTerminal();
       this.terminal.appendTerminalOutput(`[Run] Arquivo detectado: ${basename(filePath)}`);
 
+      if (filePath.startsWith("npsharp-remote://")) {
+        const command = remoteRunCommand(decodeURIComponent(new URL(filePath).pathname));
+        if (!command) throw new Error(`Execução remota não configurada para ${basename(filePath)}.`);
+        await this.terminal.runCommand(command);
+        this.updateStatus("Execução iniciada no host remoto");
+        return;
+      }
+
       if (isPortugolFile(filePath)) {
         await this.runPortugolFile(this.editor.getCurrentText());
         return;
@@ -2392,6 +2417,17 @@ function settingRow(label: string, description: string, control: HTMLElement): H
 function clampNumber(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
+}
+function remoteRunCommand(filePath: string): string | undefined {
+  const file = `'${filePath.replace(/'/g, `'"'"'`)}'`;
+  if (/\.m?js$/i.test(filePath)) return `node ${file}`;
+  if (/\.tsx?$/i.test(filePath)) return `npx tsx ${file}`;
+  if (/\.py$/i.test(filePath)) return `python3 ${file}`;
+  if (/\.java$/i.test(filePath)) return `java ${file}`;
+  if (/\.go$/i.test(filePath)) return `go run ${file}`;
+  if (/\.rs$/i.test(filePath)) return `rustc ${file} -o /tmp/npsharp-run && /tmp/npsharp-run`;
+  if (/\.(?:sh|bash)$/i.test(filePath)) return `/bin/sh ${file}`;
+  return undefined;
 }
 function shortcutFromEvent(event: KeyboardEvent): string {
   const parts: string[] = [];

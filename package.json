@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.37",
+  "version": "26.8.39",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -18,10 +18,12 @@
     "dev:renderer": "npm run config:sync && vite",
     "build:renderer": "npm run config:sync && vite build",
     "build:electron": "npm run config:sync && tsc -p tsconfig.electron.json",
+    "build:server": "tsc -p npsharp-server/tsconfig.json",
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
-    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p npsharp-server/tsconfig.json",
     "lint": "npm run config:sync && eslint .",
-    "test": "npm run test:easter-egg && npm run test:updater",
+    "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote",
+    "test:remote": "npm run build:electron && npm run build:server && node dist-electron/services/node/remote/remoteProtocol.test.js && node --test npsharp-server/dist/security/PathGuard.test.js",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
     "test:updater": "npm run build:electron && node dist-electron/services/node/updateSemver.test.js && node dist-electron/services/node/updateService.test.js && node dist-electron/services/node/updateIpc.test.js",
     "build": "node scripts/build.mjs",
@@ -40,6 +42,7 @@
   "dependencies": {
     "@capacitor/core": "^8.4.2",
     "@capacitor/filesystem": "^8.1.2",
+    "discord-rpc": "^4.0.1",
     "electron-updater": "6.8.9",
     "extract-zip": "^2.0.1",
     "jszip": "^3.10.1",
@@ -47,6 +50,7 @@
     "monaco-editor": "^0.56.0",
     "sql.js": "^1.14.1",
     "ssh2": "^1.17.0",
+    "ws": "8.18.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -54,6 +58,7 @@
     "@capacitor/cli": "^8.4.2",
     "@types/node": "^26.1.2",
     "@types/ssh2": "^1.15.5",
+    "@types/ws": "8.18.1",
     "7zip-bin": "^5.2.0",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
@@ -77,6 +82,14 @@
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "npsharp-server",
+        "to": "npsharp-server",
+        "filter": [
+          "dist/**/*",
+          "package.json"
+        ]
+      },
       {
         "from": "resources",
         "to": "resources",

@@ -3,6 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import type { AppLocale } from "./i18n";
+import type { RemoteConnectionState, RemoteLogEntry, RemoteSessionSummary } from "./remote/types";
 
 export interface AppInfo {
   name: string;
@@ -74,6 +75,7 @@ export interface FileReadResult {
   content: string;
   lineEnding: "\n" | "\r\n";
   encoding: TextEncoding;
+  remoteMetadata?: { mtimeMs: number; size: number; etag: string };
 }
 
 export type FileEditorKind = "text" | "image" | "binary" | "media" | "pdf" | "archive" | "nbt" | "document" | "database" | "design" | "game";
@@ -502,6 +504,7 @@ export interface TemplateApplyRequest {
 }
 
 export interface RemoteHostConfig {
+  id?: string;
   name: string;
   host: string;
   port: number;
@@ -509,6 +512,9 @@ export interface RemoteHostConfig {
   authMethod: "agent" | "key" | "password";
   privateKeyPath: string;
   defaultPath: string;
+  hostKeyFingerprint?: string;
+  connectTimeout?: number;
+  keepAliveInterval?: number;
 }
 
 export interface RemoteCommandRequest {
@@ -528,6 +534,8 @@ export interface RemoteFileRequest {
   password?: string;
   path: string;
   content?: string;
+  etag?: string;
+  overwrite?: boolean;
 }
 
 export interface WindowControlsApi {
@@ -793,6 +801,18 @@ export interface NpsharpApi {
     rename(request: RemoteFileRequest & { newPath: string }): Promise<void>;
     delete(request: RemoteFileRequest): Promise<void>;
     execute(request: RemoteCommandRequest): Promise<GitOperationResult>;
+    connect(hostId: string, password?: string): Promise<RemoteSessionSummary>;
+    disconnect(sessionId: string): Promise<void>;
+    reconnect(sessionId: string): Promise<RemoteSessionSummary>;
+    getStatus(): Promise<RemoteConnectionState>;
+    listSessions(): Promise<RemoteSessionSummary[]>;
+    openFolder(sessionId: string, path: string): Promise<string>;
+    sendRpc<T>(sessionId: string, method: string, params: unknown): Promise<T>;
+    getLogs(): Promise<RemoteLogEntry[]>;
+    cancel(): Promise<void>;
+    uninstallServer(sessionId: string): Promise<void>;
+    onStatusChanged(listener: (state: RemoteConnectionState) => void): () => void;
+    onEvent(listener: (event: { sessionId: string; event: string; payload: unknown }) => void): () => void;
   };
 }
 

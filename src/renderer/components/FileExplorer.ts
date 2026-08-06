@@ -56,6 +56,9 @@ export class FileExplorer {
     private readonly setConfirmDelete: (value: boolean) => Promise<void>
   ) {
     this.build();
+    api.remote.onEvent(value => {
+      if (this.root?.startsWith("npsharp-remote://") && value.event.startsWith("fs.")) this.handleWorkspaceChange({ root: this.root, eventType: "change", path: this.root });
+    });
   }
 
 

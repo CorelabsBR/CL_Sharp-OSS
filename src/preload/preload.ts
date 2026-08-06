@@ -48,6 +48,7 @@ import type {
 } from "../shared/types";
 import type { AppLocale } from "../shared/i18n";
 import { UPDATE_IPC } from "../shared/updateIpc";
+import type { RemoteConnectionState } from "../shared/remote/types";
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   try {
@@ -254,7 +255,27 @@ const api: NpsharpApi = {
     touch: (request: RemoteFileRequest) => invoke("remote:touch", request),
     rename: (request: RemoteFileRequest & { newPath: string }) => invoke("remote:rename", request),
     delete: (request: RemoteFileRequest) => invoke("remote:delete", request),
-    execute: (request: RemoteCommandRequest) => invoke("remote:execute", request)
+    execute: (request: RemoteCommandRequest) => invoke("remote:execute", request),
+    connect: (hostId: string, password?: string) => invoke("remote:connect", hostId, password),
+    disconnect: (sessionId: string) => invoke("remote:disconnect", sessionId),
+    reconnect: (sessionId: string) => invoke("remote:reconnect", sessionId),
+    getStatus: () => invoke("remote:getStatus"),
+    listSessions: () => invoke("remote:listSessions"),
+    openFolder: (sessionId: string, remotePath: string) => invoke("remote:openFolder", sessionId, remotePath),
+    sendRpc: <T>(sessionId: string, method: string, params: unknown) => invoke<T>("remote:sendRpc", sessionId, method, params),
+    getLogs: () => invoke("remote:getLogs"),
+    cancel: () => invoke("remote:cancel"),
+    uninstallServer: (sessionId: string) => invoke("remote:uninstallServer", sessionId),
+    onStatusChanged: (callback: (state: RemoteConnectionState) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: RemoteConnectionState) => callback(state);
+      ipcRenderer.on("remote:statusChanged", listener);
+      return () => ipcRenderer.removeListener("remote:statusChanged", listener);
+    },
+    onEvent: (callback: (event: { sessionId: string; event: string; payload: unknown }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: { sessionId: string; event: string; payload: unknown }) => callback(value);
+      ipcRenderer.on("remote:event", listener);
+      return () => ipcRenderer.removeListener("remote:event", listener);
+    }
   }
 };
 

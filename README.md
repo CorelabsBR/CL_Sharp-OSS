@@ -2,7 +2,6 @@
 
 [![Feature Requests](https://img.shields.io/github/issues/girellidev/npsharp/feature-request.svg)](https://github.com/girellidev/npsharp/issues?q=is%3Aopen+is%3Aissue+label%3Aaprimoramento+sort%3Areactions-%2B1-desc)
 [![Bugs](https://img.shields.io/github/issues/girellidev/npsharp/bug.svg)](https://github.com/girellidev/npsharp/issues?q=is%3Aopen+is%3Aissue+label%3Abug)
-[![NPSharp Constructor](https://github.com/CorelabsBR/CL_NPSharp/actions/workflows/autochecker.yml/badge.svg)](https://github.com/CorelabsBR/CL_NPSharp/actions/workflows/autochecker.yml)
 
 O **NPSharp** é um editor de código aberto desenvolvido pela Corelabs, construído sobre o projeto **NPSharp FX** e focado em oferecer uma experiência moderna, rápida e totalmente controlada pelo desenvolvedor.
 
