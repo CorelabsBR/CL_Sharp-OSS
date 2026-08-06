@@ -91,7 +91,7 @@ export class ExtensionManager {
     const name = validateOpenVsxPart(extension.name, "nome");
     const version = validateOpenVsxPart(extension.version, "versão");
     const file = `${namespace}.${name}-${version}.vsix`;
-    const url = new URL(`/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/${encodeURIComponent(version)}/file/${encodeURIComponent(file)}`, OPEN_VSX_ORIGIN);
+    const url = validateOpenVsxDownloadUrl(extension.downloadUrl, namespace, name, version);
     const response = await fetch(url, { redirect: "follow" });
     if (!response.ok) throw new Error(`Não foi possível baixar a extensão da Open VSX (${response.status}).`);
     const length = Number(response.headers.get("content-length") ?? "0");
@@ -341,10 +341,13 @@ function parseOpenVsxExtension(value: unknown): OpenVsxExtension | undefined {
   const version = stringValue(value.version);
   if (!namespace || !name || !version) return undefined;
   const files = isRecord(value.files) ? value.files : undefined;
+  const downloadUrl = files ? stringValue(files.download) : "";
+  if (!downloadUrl) return undefined;
   return {
     namespace,
     name,
     version,
+    downloadUrl,
     displayName: stringValue(value.displayName) || name,
     description: stringValue(value.description),
     iconUrl: files ? stringValue(files.icon) || undefined : undefined,
@@ -355,6 +358,28 @@ function parseOpenVsxExtension(value: unknown): OpenVsxExtension | undefined {
 function validateOpenVsxPart(value: string, label: string): string {
   if (!/^[A-Za-z0-9._-]+$/.test(value)) throw new Error(`Identificador Open VSX inválido (${label}).`);
   return value;
+}
+
+function validateOpenVsxDownloadUrl(value: string, namespace: string, name: string, version: string): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("URL de download da Open VSX inválida.");
+  }
+
+  const segments = url.pathname.split("/").filter(Boolean).map(segment => decodeURIComponent(segment));
+  const fileSegment = segments.lastIndexOf("file");
+  const belongsToExtension = segments[0] === "api"
+    && segments[1] === namespace
+    && segments[2] === name
+    && fileSegment >= 4
+    && segments[fileSegment - 1] === version
+    && segments[fileSegment + 1]?.toLowerCase().endsWith(".vsix");
+  if (url.origin !== OPEN_VSX_ORIGIN || url.username || url.password || !belongsToExtension) {
+    throw new Error("URL de download da Open VSX inválida.");
+  }
+  return url;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

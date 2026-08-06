@@ -2,12 +2,14 @@
 
 ## 26.8.40 - 2026-08-06
 
-Type: Feature
+Type: Feature / Fix
 
 Description:
 - Adiciona integração nativa com Discord Rich Presence no processo principal, com contexto de arquivo, projeto, linguagem, execução, terminal e Remote Host.
 - Adiciona preferências de privacidade, imagens e Application ID configurável, sem publicar caminhos completos ou credenciais.
 - Adiciona debounce, deduplicação, reconexão progressiva, limpeza no encerramento, IPC seguro e testes do gerador de atividade.
+- Corrige o Remote Host no Electron substituindo diálogos `prompt()` não suportados por um modal interno para host, senha, pasta e operações remotas.
+- Corrige instalações da Open VSX que retornavam 404 usando a URL oficial de download informada pelo registro, com validação de origem e identidade da extensão.
 
 ## 26.8.39 - 2026-08-06
 

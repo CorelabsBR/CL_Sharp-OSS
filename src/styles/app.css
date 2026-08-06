@@ -2454,6 +2454,14 @@ button {
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
 }
 
+.runtime-config-dialog.input-dialog {
+  width: min(560px, calc(100vw - 32px));
+  height: auto;
+  min-height: 0;
+  padding: 18px;
+  gap: 16px;
+}
+
 .runtime-config-header,
 .runtime-config-toolbar {
   display: flex;

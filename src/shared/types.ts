@@ -407,6 +407,7 @@ export interface OpenVsxExtension {
   namespace: string;
   name: string;
   version: string;
+  downloadUrl: string;
   displayName: string;
   description: string;
   iconUrl?: string;

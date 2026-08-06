@@ -7,6 +7,7 @@ import { api } from "../services/api";
 import { buttonIcon, contextMenu, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { basename } from "../utils/path";
+import { showInputDialog } from "../utils/inputDialog";
 
 export class RemotePanel {
   readonly element = el("div", { className: "panel remote-panel" });
@@ -36,7 +37,8 @@ export class RemotePanel {
 
   async connectSavedHost(): Promise<void> {
     await this.refresh();
-    const selected = prompt("Remote Host: Connect\n\n" + this.hosts.map(host => host.name || host.host).join("\n"), this.hosts[0]?.name ?? "");
+    if (!this.hosts.length) { this.updateStatus("Nenhum Remote Host configurado"); return; }
+    const selected = await showInputDialog(`Remote Host: Connect — ${this.hosts.map(host => host.name || host.host).join(", ")}`, this.hosts[0]?.name ?? "");
     const host = this.hosts.find(item => selected === item.name || selected === item.host);
     if (!host) { this.updateStatus("Host remoto não encontrado"); return; }
     await this.connect(host);
@@ -44,7 +46,7 @@ export class RemotePanel {
 
   async disconnect(): Promise<void> { if (!this.sessionId) return; await api.remote.disconnect(this.sessionId); this.sessionId = undefined; this.watcherId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
   async reconnect(): Promise<void> { if (!this.sessionId) return; const session = await api.remote.reconnect(this.sessionId); this.sessionId = session.id; await this.openRemoteFolder(); }
-  async openRemoteFolder(): Promise<void> { if (!this.sessionId || !this.active) return; const selected = prompt("Caminho da pasta remota", this.currentPath); if (!selected) return; this.currentPath = selected; const uri = await api.remote.openFolder(this.sessionId, selected); await this.openWorkspace?.(uri, `${this.active.name} — ${basename(selected)}`, `${this.active.name}:${selected}`); await this.list(selected); }
+  async openRemoteFolder(): Promise<void> { if (!this.sessionId || !this.active) return; const selected = await showInputDialog("Caminho da pasta remota", this.currentPath); if (!selected) return; this.currentPath = selected; const uri = await api.remote.openFolder(this.sessionId, selected); await this.openWorkspace?.(uri, `${this.active.name} — ${basename(selected)}`, `${this.active.name}:${selected}`); await this.list(selected); }
   async showLogs(): Promise<void> { const logs = await api.remote.getLogs(); this.updateStatus(logs.slice(-20).map(entry => `${entry.timestamp} [${entry.scope}] ${entry.message}`).join("\n") || "Sem logs remotos"); }
   async addNewHost(): Promise<void> { await this.addHost(); }
   async editSelectedHost(): Promise<void> { const host = this.active ?? this.hosts[0]; if (host) await this.editHost(host); }
@@ -93,7 +95,7 @@ export class RemotePanel {
   }
 
   private async addHost(): Promise<void> {
-    const config = this.promptHost();
+    const config = await this.promptHost();
     if (!config) return;
     this.hosts.push(config);
     await api.remote.saveHosts(this.hosts);
@@ -101,7 +103,7 @@ export class RemotePanel {
   }
 
   private async editHost(host: RemoteHostConfig): Promise<void> {
-    const next = this.promptHost(host);
+    const next = await this.promptHost(host);
     if (!next) return;
     const index = this.hosts.indexOf(host);
     if (index >= 0) this.hosts[index] = next;
@@ -122,22 +124,22 @@ export class RemotePanel {
   }
 
   private async testHost(host: RemoteHostConfig): Promise<void> {
-    const password = host.authMethod === "password" ? prompt(`Password for ${host.username}@${host.host}`) ?? "" : undefined;
+    const password = host.authMethod === "password" ? await showInputDialog(`Senha para ${host.username}@${host.host}`, "", { password: true }) ?? "" : undefined;
     const result = await this.testAndTrust(host, password);
     this.updateStatus(result.output || (result.success ? "Host remoto conectado" : "Falha no teste do host remoto"));
   }
 
-  private promptHost(existing?: RemoteHostConfig): RemoteHostConfig | undefined {
-    const host = prompt("Host", existing?.host ?? "");
+  private async promptHost(existing?: RemoteHostConfig): Promise<RemoteHostConfig | undefined> {
+    const host = await showInputDialog("Host", existing?.host ?? "");
     if (!host?.trim()) return undefined;
-    const username = prompt("Username", existing?.username ?? "") ?? "";
+    const username = await showInputDialog("Username", existing?.username ?? "") ?? "";
     if (!username.trim()) return undefined;
-    const portText = prompt("Port", String(existing?.port ?? 22)) ?? "22";
-    const authInput = prompt("Auth method: password, key, agent", existing?.authMethod ?? "password") ?? "password";
+    const portText = await showInputDialog("Porta SSH", String(existing?.port ?? 22)) ?? "22";
+    const authInput = await showInputDialog("Autenticação: password, key ou agent", existing?.authMethod ?? "password") ?? "password";
     const authMethod = normalizeAuth(authInput);
-    const privateKeyPath = authMethod === "key" ? prompt("Caminho da chave privada", existing?.privateKeyPath ?? "") ?? "" : "";
-    const defaultPath = prompt("Caminho remoto padrão", existing?.defaultPath ?? ".") ?? ".";
-    const name = prompt("Name", existing?.name ?? `${username}@${host}`) ?? `${username}@${host}`;
+    const privateKeyPath = authMethod === "key" ? await showInputDialog("Caminho da chave privada", existing?.privateKeyPath ?? "") ?? "" : "";
+    const defaultPath = await showInputDialog("Caminho remoto padrão", existing?.defaultPath ?? ".") ?? ".";
+    const name = await showInputDialog("Nome do host", existing?.name ?? `${username}@${host}`) ?? `${username}@${host}`;
     return {
       name: name.trim() || `${username}@${host}`,
       host: host.trim(),
@@ -152,7 +154,7 @@ export class RemotePanel {
   private async connect(host: RemoteHostConfig): Promise<void> {
     this.active = host;
     if (host.authMethod === "password") {
-      this.password = prompt(`Password for ${host.username}@${host.host}`) ?? "";
+      this.password = await showInputDialog(`Senha para ${host.username}@${host.host}`, "", { password: true }) ?? "";
     }
     const tested = await this.testAndTrust(host, this.password || undefined);
     if (!tested.success) {
@@ -233,7 +235,7 @@ export class RemotePanel {
 
   private async touch(base: string): Promise<void> {
     if (!this.active || !this.sessionId) return;
-    const name = prompt("Nome do arquivo remoto", "sem-título");
+    const name = await showInputDialog("Nome do arquivo remoto", "sem-título");
     if (!name) return;
     await api.remote.sendRpc(this.sessionId, "fs.createFile", { path: joinRemote(base, name) });
     await this.list(this.currentPath);
@@ -241,7 +243,7 @@ export class RemotePanel {
 
   private async mkdir(base: string): Promise<void> {
     if (!this.active || !this.sessionId) return;
-    const name = prompt("Nome da pasta remota", "nova-pasta");
+    const name = await showInputDialog("Nome da pasta remota", "nova-pasta");
     if (!name) return;
     await api.remote.sendRpc(this.sessionId, "fs.createDirectory", { path: joinRemote(base, name) });
     await this.list(this.currentPath);
@@ -249,7 +251,7 @@ export class RemotePanel {
 
   private async rename(remotePath: string): Promise<void> {
     if (!this.active || !this.sessionId) return;
-    const name = prompt("Novo nome remoto", basename(remotePath));
+    const name = await showInputDialog("Novo nome remoto", basename(remotePath));
     if (!name) return;
     await api.remote.sendRpc(this.sessionId, "fs.rename", { oldPath: remotePath, newPath: joinRemote(parentRemote(remotePath), name) });
     await this.list(this.currentPath);
