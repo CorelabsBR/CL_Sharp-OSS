@@ -102,3 +102,4 @@ nbdist/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+.~lock.*#
