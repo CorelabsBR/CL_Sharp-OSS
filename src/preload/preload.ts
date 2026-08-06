@@ -107,6 +107,12 @@ const api: NpsharpApi = {
     loadSession: () => invoke("settings:loadSession"),
     saveSession: (session: PersistedSession) => invoke("settings:saveSession", session)
   },
+  discordPresence: {
+    updateContext: context => invoke("discord-presence:update-context", context),
+    reconnect: () => invoke("discord-presence:reconnect"),
+    clear: () => invoke("discord-presence:clear"),
+    status: () => invoke("discord-presence:status")
+  },
   i18n: {
     getLanguage: () => invoke("i18n:getLanguage"),
     setLanguage: (language: AppLocale) => invoke("i18n:setLanguage", language),

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 26.8.40 - 2026-08-06
+
+Type: Feature
+
+Description:
+- Adiciona integração nativa com Discord Rich Presence no processo principal, com contexto de arquivo, projeto, linguagem, execução, terminal e Remote Host.
+- Adiciona preferências de privacidade, imagens e Application ID configurável, sem publicar caminhos completos ou credenciais.
+- Adiciona debounce, deduplicação, reconexão progressiva, limpeza no encerramento, IPC seguro e testes do gerador de atividade.
+
 ## 26.8.39 - 2026-08-06
 
 Type: Feature

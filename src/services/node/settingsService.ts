@@ -39,7 +39,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   restoreWorkspaceOnStartup: true,
   confirmDelete: true,
   binaryFileTypesIgnored: [],
-  keyboardShortcuts: []
+  keyboardShortcuts: [],
+  discordRichPresence: {
+    enabled: true, applicationId: "", showFileName: true, showProjectName: true, showLanguage: true,
+    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "npsharp",
+    largeImageText: "NPSharp", localSmallImageKey: "local", remoteSmallImageKey: "remote",
+    localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host", buttons: []
+  }
 };
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -52,7 +58,7 @@ export async function loadSettings(): Promise<AppSettings> {
       return { ...DEFAULT_SETTINGS };
     }
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return { ...DEFAULT_SETTINGS, ...parsed, language: normalizeLocale(parsed.language) } as AppSettings;
+    return mergeSettings(parsed);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       console.warn(`[NPSharp settings] Failed to load settings from ${file}; defaults will be used.`, error);
@@ -62,7 +68,7 @@ export async function loadSettings(): Promise<AppSettings> {
 }
 
 export async function saveSettings(settings: AppSettings): Promise<AppSettings> {
-  const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language) };
+  const merged = mergeSettings(settings);
   await fs.mkdir(npsharpHome(), { recursive: true });
   await fs.writeFile(settingsPath(), JSON.stringify(merged, null, 2) + "\n", "utf8");
   return merged;
@@ -70,6 +76,10 @@ export async function saveSettings(settings: AppSettings): Promise<AppSettings> 
 
 export async function resetSettings(): Promise<AppSettings> {
   return saveSettings({ ...DEFAULT_SETTINGS });
+}
+
+function mergeSettings(settings: Partial<AppSettings>): AppSettings {
+  return { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language), discordRichPresence: { ...DEFAULT_SETTINGS.discordRichPresence, ...settings.discordRichPresence } };
 }
 // sabemos que me motivou. presente no commit f0655d6.
 

@@ -170,7 +170,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   restoreWorkspaceOnStartup: true,
   confirmDelete: true,
   binaryFileTypesIgnored: [],
-  keyboardShortcuts: []
+  keyboardShortcuts: [],
+  discordRichPresence: {
+    enabled: true, applicationId: "", showFileName: true, showProjectName: true, showLanguage: true,
+    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "npsharp",
+    largeImageText: "NPSharp", localSmallImageKey: "local", remoteSmallImageKey: "remote",
+    localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host", buttons: []
+  }
 };
 
 const DEFAULT_SESSION: PersistedSession = {
@@ -699,13 +705,13 @@ function createBrowserApi(): NpsharpApi {
 
   const loadSettings = async (): Promise<AppSettings> => {
     const saved = await readJsonFile<Partial<AppSettings>>(appDataFs, SETTINGS_PATH, {});
-    const settings = { ...DEFAULT_SETTINGS, ...saved };
+    const settings = { ...DEFAULT_SETTINGS, ...saved, discordRichPresence: { ...DEFAULT_SETTINGS.discordRichPresence, ...saved.discordRichPresence } };
     await writeJsonFile(appDataFs, SETTINGS_PATH, settings);
     return settings;
   };
 
   const saveSettings = async (settings: AppSettings): Promise<AppSettings> => {
-    const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language) };
+    const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language), discordRichPresence: { ...DEFAULT_SETTINGS.discordRichPresence, ...settings.discordRichPresence } };
     await writeJsonFile(appDataFs, SETTINGS_PATH, merged);
     return merged;
   };
@@ -758,6 +764,12 @@ function createBrowserApi(): NpsharpApi {
       reset: async () => saveSettings(DEFAULT_SETTINGS),
       loadSession,
       saveSession
+    },
+    discordPresence: {
+      updateContext: async () => undefined,
+      reconnect: async () => ({ status: "disabled", message: "Discord Rich Presence está disponível apenas no aplicativo desktop." }),
+      clear: async () => undefined,
+      status: async () => ({ status: "disabled", message: "Discord Rich Presence está disponível apenas no aplicativo desktop." })
     },
     i18n: {
       getLanguage: async () => (await loadSettings()).language,

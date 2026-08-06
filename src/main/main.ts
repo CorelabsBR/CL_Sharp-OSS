@@ -98,6 +98,7 @@ import {
   writeRemoteFile
 } from "../services/node/remoteService";
 import { RemoteHostConnectionManager } from "../services/node/remote/RemoteHostConnectionManager";
+import { DiscordRichPresenceManager } from "./discord/DiscordRichPresenceManager";
 import type {
   AIChatRequest,
   AIConversationUpdate,
@@ -120,6 +121,7 @@ import type {
   RemoteListRequest,
   ReplaceAllRequest,
   AppUpdateStatus,
+  DiscordPresenceContext,
   RuntimeRunRequest,
   RuntimeDependencyInstallRequest,
   SaveFileRequest,
@@ -138,6 +140,7 @@ let runtimeResourcesClosed = false;
 let aiStreamingController: StreamingController | undefined;
 let updateService: UpdateService | undefined;
 let remoteHostManager: RemoteHostConnectionManager | undefined;
+let discordPresenceManager: DiscordRichPresenceManager | undefined;
 const startupProfiler = new StartupProfiler();
 let startupReady = false;
 let rendererReady = false;
@@ -185,6 +188,7 @@ if (!process.env.VITE_DEV_SERVER_URL) {
 
 app.whenReady().then(async () => {
   startupProfiler.mark("T1-electron-ready");
+  discordPresenceManager = new DiscordRichPresenceManager();
   registerIpcHandlers();
   createApplicationMenu();
   await createMainWindow();
@@ -192,7 +196,7 @@ app.whenReady().then(async () => {
 
   // A preferência de idioma não deve atrasar a primeira janela. A tela de
   // configurações continua sendo a fonte de verdade e atualiza o menu depois.
-  void loadSettings().then(settings => applyApplicationLocale(settings.language)).catch(error => {
+  void loadSettings().then(async settings => { applyApplicationLocale(settings.language); await discordPresenceManager?.configure(settings.discordRichPresence); }).catch(error => {
     console.warn("[NPSharp startup] Não foi possível carregar o idioma inicial.", error);
   });
 
@@ -569,13 +573,19 @@ function registerIpcHandlers(): void {
   ipcMain.handle("settings:save", async (_event, settings) => {
     const saved = await saveSettings(settings);
     applyApplicationLocale(saved.language);
+    await discordPresenceManager?.configure(saved.discordRichPresence);
     return saved;
   });
   ipcMain.handle("settings:reset", async () => {
     const settings = await resetSettings();
     applyApplicationLocale(settings.language);
+    await discordPresenceManager?.configure(settings.discordRichPresence);
     return settings;
   });
+  ipcMain.handle("discord-presence:update-context", (_event, context: DiscordPresenceContext) => discordPresenceManager?.updateContext(normalizeDiscordContext(context)));
+  ipcMain.handle("discord-presence:reconnect", () => discordPresenceManager?.reconnect());
+  ipcMain.handle("discord-presence:clear", () => discordPresenceManager?.clear());
+  ipcMain.handle("discord-presence:status", () => discordPresenceManager?.getState() ?? { status: "disabled", message: "Discord Rich Presence indisponível." });
   ipcMain.handle("settings:loadSession", () => loadSession());
   ipcMain.handle("settings:saveSession", (_event, session) => saveSession(session));
   ipcMain.handle("i18n:getLanguage", () => applicationLocale);
@@ -880,9 +890,16 @@ function cleanupRuntimeResources(): void {
   closeRegisteredTerminals();
   closeWorkspaceWatchers();
   void remoteHostManager?.disconnectAll().catch(error => console.warn("[NPSharp remote] Failed to close remote sessions.", error));
+  void discordPresenceManager?.destroy().catch(error => console.warn("[NPSharp Discord] Failed to close Rich Presence.", error));
   void stopAllLiveServers().catch(error => {
     console.warn("[NPSharp lifecycle] Failed to stop live servers during shutdown.", error);
   });
+}
+
+function normalizeDiscordContext(value: DiscordPresenceContext): DiscordPresenceContext {
+  if (!value || typeof value !== "object") return {};
+  const text = (candidate: unknown) => typeof candidate === "string" ? candidate.slice(0, 2_048) : undefined;
+  return { filePath: text(value.filePath), language: text(value.language), workspacePath: text(value.workspacePath), workspaceName: text(value.workspaceName), remoteHost: text(value.remoteHost), remoteStatus: text(value.remoteStatus), running: typeof value.running === "boolean" ? value.running : undefined, terminalActive: typeof value.terminalActive === "boolean" ? value.terminalActive : undefined };
 }
 
 function closeWorkspaceWatchers(): void {

@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.39",
+  "version": "26.8.40",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -22,7 +22,8 @@
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
     "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p npsharp-server/tsconfig.json",
     "lint": "npm run config:sync && eslint .",
-    "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote",
+    "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote && npm run test:discord",
+    "test:discord": "npm run build:electron && node --test dist-electron/main/discord/DiscordRichPresenceBuilder.test.js",
     "test:remote": "npm run build:electron && npm run build:server && node dist-electron/services/node/remote/remoteProtocol.test.js && node --test npsharp-server/dist/security/PathGuard.test.js",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
     "test:updater": "npm run build:electron && node dist-electron/services/node/updateSemver.test.js && node dist-electron/services/node/updateService.test.js && node dist-electron/services/node/updateIpc.test.js",
@@ -42,8 +43,8 @@
   "dependencies": {
     "@capacitor/core": "^8.4.2",
     "@capacitor/filesystem": "^8.1.2",
-    "discord-rpc": "^4.0.1",
     "electron-updater": "6.8.9",
+    "discord-rpc": "4.0.1",
     "extract-zip": "^2.0.1",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",

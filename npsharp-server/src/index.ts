@@ -11,7 +11,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { WebSocketServer, type WebSocket } from "ws";
 import { PathGuard, coded } from "./security/PathGuard.js";
 
-const VERSION = "26.8.39";
+const VERSION = "26.8.40";
 const PROTOCOL_VERSION = 1;
 const token = crypto.randomBytes(32).toString("base64url");
 const tokenExpiresAt = Date.now() + 5 * 60_000;

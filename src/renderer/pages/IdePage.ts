@@ -33,7 +33,7 @@ import { basename, dirname, extname, fileUri, isSubPath, joinPath, relativePath 
 import type { CommandAction } from "../components/CommandPalette";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "extensions" | "remote" | "arduino" | "ai" | "settings" | "problems";
-type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench";
+type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench" | "Discord";
 type MenuAction = (event: MouseEvent) => void;
 
 const EDITOR_FONT_OPTIONS = [
@@ -417,6 +417,7 @@ export class IdePage {
       this.persist();
       void this.runDiagnostics();
       void this.refreshStatusGit(workspace);
+      void this.syncDiscordPresence();
     };
     this.editor.onTabsChanged = () => {
       this.palette.setQuickOpenFiles([...this.editor.getOpenFiles(), ...this.editor.getRecentFiles()]);
@@ -430,6 +431,7 @@ export class IdePage {
       this.persist();
       void this.runDiagnostics();
       void this.refreshStatusGit(undefined, file);
+      void this.syncDiscordPresence();
     };
     this.editor.onEditorStatus = status => this.updateEditorStatus(status);
     this.editor.onFileSaved = () => {
@@ -451,6 +453,8 @@ export class IdePage {
       this.updateStatus(state.status === "connected" ? `NPSharp Remote: ${state.message.replace(/^Conectado a |\.$/g, "")}` : state.message);
       if (state.status === "connected") document.title = `[${state.message.replace(/^Conectado a |\.$/g, "")}] ${this.session.workspaceName ?? "Remote"} — NPSharp`;
       else if (state.status === "disconnected") document.title = "NPSharp";
+      const remoteHost = state.status === "connected" ? state.message.replace(/^Conectado a |\.$/g, "") : undefined;
+      void api.discordPresence.updateContext({ remoteStatus: state.status, remoteHost });
     });
     this.disposers.push(
       () => window.removeEventListener("keydown", this.handleShortcut, true),
@@ -989,9 +993,9 @@ export class IdePage {
     const layout = el("div", { className: "settings-view" });
     const categories = el("div", { className: "settings-categories" });
     const page = el("div", { className: "settings-page" });
-    const categoryNames: SettingsCategory[] = ["Appearance", "Editor", "Terminal", "Diagnostics", "Build", "Workbench"];
+    const categoryNames: SettingsCategory[] = ["Appearance", "Editor", "Terminal", "Diagnostics", "Build", "Workbench", "Discord"];
     const categoryLabels: Record<SettingsCategory, string> = {
-      Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho"
+      Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho", Discord: "Discord Rich Presence"
     };
 
     for (const category of categoryNames) {
@@ -1080,7 +1084,7 @@ export class IdePage {
       return;
     }
 
-    page.append(el("h2", { className: "settings-page-title", text: ({ Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho" } as Record<SettingsCategory, string>)[this.settingsCategory] }));
+    page.append(el("h2", { className: "settings-page-title", text: ({ Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho", Discord: "Discord Rich Presence" } as Record<SettingsCategory, string>)[this.settingsCategory] }));
 
     if (this.settingsCategory === "Appearance") {
       const languages = await api.i18n.availableLanguages();
@@ -1152,6 +1156,32 @@ export class IdePage {
     if (this.settingsCategory === "Build") {
       page.append(settingText("Comando de compilação", "Comando usado para compilar o projeto.", this.settings.buildCommand, value => void this.updateSettings({ ...this.settings, buildCommand: value.trim() || "mvn -q -DskipTests compile" })));
       page.append(settingToggle("Pular testes", "Pula testes durante a compilação.", this.settings.buildSkipTests, value => void this.updateSettings({ ...this.settings, buildSkipTests: value })));
+      return;
+    }
+
+    if (this.settingsCategory === "Discord") {
+      const current = this.settings.discordRichPresence;
+      const update = (patch: Partial<typeof current>) => void this.updateSettings({ ...this.settings, discordRichPresence: { ...current, ...patch } });
+      page.append(settingToggle("Ativar Rich Presence", "Publica o contexto da IDE no Discord Desktop.", current.enabled, enabled => update({ enabled })));
+      page.append(settingText("Application ID", "ID da aplicação criada no Discord Developer Portal. Vazio mantém a integração inativa.", current.applicationId, applicationId => update({ applicationId: applicationId.trim() })));
+      page.append(settingToggle("Mostrar nome do arquivo", "Publica apenas o nome, nunca o caminho completo.", current.showFileName, showFileName => update({ showFileName })));
+      page.append(settingToggle("Mostrar projeto", "Publica o nome do workspace atual.", current.showProjectName, showProjectName => update({ showProjectName })));
+      page.append(settingToggle("Mostrar linguagem", "Publica a linguagem do arquivo ativo.", current.showLanguage, showLanguage => update({ showLanguage })));
+      page.append(settingToggle("Mostrar host remoto", "Publica o alias do Remote Host conectado.", current.showRemoteHost, showRemoteHost => update({ showRemoteHost })));
+      page.append(settingToggle("Mostrar tempo decorrido", "Exibe há quanto tempo o NPSharp está aberto.", current.showElapsedTime, showElapsedTime => update({ showElapsedTime })));
+      page.append(settingToggle("Mostrar tipo de workspace", "Identifica workspaces locais e remotos.", current.showWorkspaceType, showWorkspaceType => update({ showWorkspaceType })));
+      page.append(settingText("Imagem principal", "Asset key configurada no Discord Developer Portal.", current.largeImageKey, largeImageKey => update({ largeImageKey: largeImageKey.trim() })));
+      page.append(settingText("Texto da imagem principal", "Texto exibido ao passar o mouse sobre a imagem.", current.largeImageText, largeImageText => update({ largeImageText: largeImageText.trim() })));
+      const firstButton = current.buttons?.[0] ?? { label: "", url: "" };
+      page.append(settingText("Botão — rótulo", "Rótulo opcional do primeiro botão (máximo de dois no protocolo).", firstButton.label, label => update({ buttons: label.trim() || firstButton.url ? [{ ...firstButton, label: label.trim() }] : [] })));
+      page.append(settingText("Botão — URL HTTPS", "Somente URLs HTTPS válidas são publicadas.", firstButton.url, url => update({ buttons: firstButton.label || url.trim() ? [{ ...firstButton, url: url.trim() }] : [] })));
+      const actions = el("div", { className: "settings-inline-actions" });
+      const reconnect = el("button", { className: "wide-action", text: "Reconectar ao Discord" });
+      reconnect.addEventListener("click", () => void api.discordPresence.reconnect().then(state => this.updateStatus(state.message)));
+      const clear = el("button", { className: "wide-action", text: "Limpar atividade" });
+      clear.addEventListener("click", () => void api.discordPresence.clear().then(() => this.updateStatus("Atividade do Discord removida")));
+      actions.append(reconnect, clear); page.append(actions);
+      void api.discordPresence.status().then(state => page.append(el("div", { className: "muted-row", text: state.message })));
       return;
     }
 
@@ -1594,6 +1624,7 @@ export class IdePage {
   }
 
   private async runCurrentFile(debug = false): Promise<void> {
+    await api.discordPresence.updateContext({ running: true });
     try {
       const activeFile = this.editor.getCurrentFile();
       if (!activeFile && this.explorer.workspace && await this.runWorkspace()) return;
@@ -1650,7 +1681,15 @@ export class IdePage {
       this.updateStatus(result.code === 0 ? "Execução concluída" : "Falha na execução");
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha na execução");
+    } finally {
+      await api.discordPresence.updateContext({ running: false });
     }
+  }
+
+  private async syncDiscordPresence(): Promise<void> {
+    const filePath = this.editor.getCurrentFile();
+    const extension = filePath?.split(".").pop()?.toUpperCase();
+    await api.discordPresence.updateContext({ filePath, language: extension, workspacePath: this.explorer.workspace, workspaceName: this.session.workspaceName });
   }
 
   private async runPortugolFile(source: string): Promise<void> {

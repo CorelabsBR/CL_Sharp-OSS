@@ -122,6 +122,45 @@ export interface CustomShortcutBinding {
   key: string;
 }
 
+export interface DiscordPresenceButton {
+  label: string;
+  url: string;
+}
+
+export interface DiscordRichPresenceSettings {
+  enabled: boolean;
+  applicationId: string;
+  showFileName: boolean;
+  showProjectName: boolean;
+  showLanguage: boolean;
+  showRemoteHost: boolean;
+  showElapsedTime: boolean;
+  showWorkspaceType: boolean;
+  largeImageKey: string;
+  largeImageText: string;
+  localSmallImageKey?: string;
+  remoteSmallImageKey?: string;
+  localSmallImageText?: string;
+  remoteSmallImageText?: string;
+  buttons?: DiscordPresenceButton[];
+}
+
+export interface DiscordPresenceContext {
+  filePath?: string;
+  language?: string;
+  workspacePath?: string;
+  workspaceName?: string;
+  remoteHost?: string;
+  remoteStatus?: string;
+  running?: boolean;
+  terminalActive?: boolean;
+}
+
+export interface DiscordPresenceState {
+  status: "disabled" | "disconnected" | "connecting" | "connected" | "failed";
+  message: string;
+}
+
 export interface AppSettings {
   language: AppLocale;
   theme: string;
@@ -154,6 +193,7 @@ export interface AppSettings {
   confirmDelete: boolean;
   binaryFileTypesIgnored: string[];
   keyboardShortcuts: CustomShortcutBinding[];
+  discordRichPresence: DiscordRichPresenceSettings;
 }
 
 export interface PersistedSession {
@@ -679,6 +719,12 @@ export interface NpsharpApi {
     reset(): Promise<AppSettings>;
     loadSession(): Promise<PersistedSession>;
     saveSession(session: PersistedSession): Promise<void>;
+  };
+  discordPresence: {
+    updateContext(context: DiscordPresenceContext): Promise<void>;
+    reconnect(): Promise<DiscordPresenceState>;
+    clear(): Promise<void>;
+    status(): Promise<DiscordPresenceState>;
   };
   i18n: {
     getLanguage(): Promise<AppLocale>;

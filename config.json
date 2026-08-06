@@ -3,8 +3,8 @@
   "application": {
     "packageName": "NPSharp",
     "displayName": "NPSharp",
-    "version": "26.8.39",
-    "versionCode": 260839,
+    "version": "26.8.40",
+    "versionCode": 260840,
     "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",
@@ -28,6 +28,7 @@
       "@capacitor/core": "^8.4.2",
       "@capacitor/filesystem": "^8.1.2",
       "electron-updater": "6.8.9",
+      "discord-rpc": "4.0.1",
       "extract-zip": "^2.0.1",
       "jszip": "^3.10.1",
       "mammoth": "^1.12.0",
