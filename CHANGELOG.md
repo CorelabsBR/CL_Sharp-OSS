@@ -10,6 +10,7 @@ Description:
 - Adiciona debounce, deduplicação, reconexão progressiva, limpeza no encerramento, IPC seguro e testes do gerador de atividade.
 - Corrige o Remote Host no Electron substituindo diálogos `prompt()` não suportados por um modal interno para host, senha, pasta e operações remotas.
 - Corrige instalações da Open VSX que retornavam 404 usando a URL oficial de download informada pelo registro, com validação de origem e identidade da extensão.
+- Corrige a descoberta do executável Codex empacotado pela extensão no Linux e macOS e amplia a busca para instalações do VS Code, Insiders, VSCodium, Cursor e Windsurf.
 
 ## 26.8.39 - 2026-08-06
 

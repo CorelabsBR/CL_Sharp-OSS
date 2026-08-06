@@ -180,11 +180,12 @@ export class CodexAppServerProvider implements AIProvider {
   private request(method: string, params: JsonRecord): Promise<JsonRecord> {
     const child = this.process;
     if (!child?.stdin || child.killed) return Promise.reject(new Error("O Codex não está em execução."));
+    const input = child.stdin;
     const id = this.nextRequestId++;
     return new Promise<JsonRecord>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       try {
-        child.stdin.write(`${JSON.stringify({ method, id, params })}\n`);
+        input.write(`${JSON.stringify({ method, id, params })}\n`);
       } catch (error) {
         this.pending.delete(id);
         reject(asError(error));
@@ -351,22 +352,47 @@ async function findCodexExecutable(): Promise<string | undefined> {
   if (configured && await fileExists(configured)) return configured;
   const fromPath = await commandExists("codex");
   if (fromPath) return fromPath;
-  if (process.platform !== "win32") return undefined;
-  const extensionsRoot = path.join(os.homedir(), ".vscode", "extensions");
-  try {
-    const entries = await fs.readdir(extensionsRoot, { withFileTypes: true });
-    const folders = entries.filter(entry => entry.isDirectory() && entry.name.startsWith("openai.chatgpt-"))
-      .map(entry => entry.name)
-      .sort()
-      .reverse();
-    for (const folder of folders) {
-      const candidate = path.join(extensionsRoot, folder, "bin", "windows-x86_64", "codex.exe");
-      if (await fileExists(candidate)) return candidate;
+  const binary = codexBundledBinary();
+  if (!binary) return undefined;
+  for (const extensionsRoot of codexExtensionRoots()) {
+    try {
+      const entries = await fs.readdir(extensionsRoot, { withFileTypes: true });
+      const folders = entries.filter(entry => entry.isDirectory() && entry.name.startsWith("openai.chatgpt-"))
+        .map(entry => entry.name)
+        .sort()
+        .reverse();
+      for (const folder of folders) {
+        const candidate = path.join(extensionsRoot, folder, "bin", binary.directory, binary.name);
+        if (await fileExists(candidate)) return candidate;
+      }
+    } catch {
+      // Each editor is optional; keep looking in the remaining extension roots.
     }
-  } catch {
-    // VS Code is optional; callers receive an actionable error when Codex is absent.
   }
   return undefined;
+}
+
+function codexBundledBinary(): { directory: string; name: string } | undefined {
+  const architecture = process.arch === "x64" ? "x86_64" : process.arch === "arm64" ? "aarch64" : undefined;
+  if (!architecture) return undefined;
+  if (process.platform === "win32") return { directory: `windows-${architecture}`, name: "codex.exe" };
+  if (process.platform === "linux") return { directory: `linux-${architecture}`, name: "codex" };
+  if (process.platform === "darwin") return { directory: `darwin-${architecture}`, name: "codex" };
+  return undefined;
+}
+
+function codexExtensionRoots(): string[] {
+  const home = os.homedir();
+  const configured = process.env.VSCODE_EXTENSIONS?.trim();
+  return [...new Set([
+    configured,
+    path.join(home, ".vscode", "extensions"),
+    path.join(home, ".vscode-insiders", "extensions"),
+    path.join(home, ".vscode-oss", "extensions"),
+    path.join(home, ".vscodium", "extensions"),
+    path.join(home, ".cursor", "extensions"),
+    path.join(home, ".windsurf", "extensions")
+  ].filter((value): value is string => Boolean(value)))];
 }
 
 async function fileExists(target: string): Promise<boolean> {

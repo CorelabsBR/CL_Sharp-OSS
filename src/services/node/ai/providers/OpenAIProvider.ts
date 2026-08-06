@@ -12,10 +12,10 @@ export class OpenAIProvider implements AIProvider {
   constructor(id: "openai") {
     this.descriptor = {
       id,
-      displayName: id === "codex" ? "Codex" : "OpenAI",
+      displayName: "OpenAI",
       supportsStreaming: true,
       requiresApiKey: true,
-      defaultModel: id === "codex" ? "gpt-5.2-codex" : "gpt-5.6-terra"
+      defaultModel: "gpt-5.6-terra"
     };
   }
 
