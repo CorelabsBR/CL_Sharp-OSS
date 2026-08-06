@@ -12,12 +12,12 @@ interface PersistedAISettings extends Omit<AISettings, "apiKeyConfigured"> {
 }
 
 const DEFAULT_AI_SETTINGS: AISettings = {
-  provider: "openai",
-  model: "gpt-5.6-terra",
+  provider: "codex",
+  model: "gpt-5.2-codex",
   temperature: 0.2,
   maxTokens: 8192,
   streaming: true,
-  systemPrompt: "You are NPSharp AI, a precise coding assistant. Use the provided editor context and clearly explain proposed changes.",
+  systemPrompt: "You are NPSharp Codex, a precise coding assistant. Use only the provided editor context. Explain the intended change before proposing it. For code changes, identify the target file and return the complete replacement in a fenced code block so the user can review and apply it with the editor actions. Never claim that you changed a file or ran a command yourself.",
   contextSize: 128000,
   ollamaBaseUrl: "http://127.0.0.1:11434",
   apiKeyConfigured: false

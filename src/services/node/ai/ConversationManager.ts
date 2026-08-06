@@ -33,7 +33,7 @@ export class ConversationManager {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
-  async create(provider: AIProviderId = "openai", model = ""): Promise<AIConversation> {
+  async create(provider: AIProviderId = "codex", model = ""): Promise<AIConversation> {
     const timestamp = new Date().toISOString();
     const conversation: AIConversation = {
       id: randomUUID(),
