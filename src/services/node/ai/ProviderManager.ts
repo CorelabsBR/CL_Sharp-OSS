@@ -9,13 +9,15 @@ import { GeminiProvider } from "./providers/GeminiProvider";
 import { OllamaProvider } from "./providers/OllamaProvider";
 import { OpenAIProvider } from "./providers/OpenAIProvider";
 import { OpenRouterProvider } from "./providers/OpenRouterProvider";
+import { CodexAppServerProvider } from "./CodexAppServerProvider";
+import type { CodexChatGptLoginResult } from "../../../shared/types";
 
 export class ProviderManager {
   private readonly providers = new Map<AIProviderId, AIProvider>();
 
   constructor(private readonly settingsService: AISettingsService) {
     this.register(new OpenAIProvider("openai"));
-    this.register(new OpenAIProvider("codex"));
+    this.register(new CodexAppServerProvider());
     this.register(new GeminiProvider());
     this.register(new OpenRouterProvider());
     this.register(new OllamaProvider());
@@ -33,6 +35,12 @@ export class ProviderManager {
 
   async listModels(id: AIProviderId, settings: AISettings): Promise<AIModel[]> {
     return this.get(id).listModels(await this.settingsService.apiKey(id), settings);
+  }
+
+  async startCodexChatGptLogin(): Promise<{ authUrl: string; completed: Promise<CodexChatGptLoginResult> }> {
+    const provider = this.get("codex");
+    if (!(provider instanceof CodexAppServerProvider)) throw new Error("O provedor Codex não está disponível.");
+    return provider.startChatGptLogin();
   }
 
   register(provider: AIProvider): void {

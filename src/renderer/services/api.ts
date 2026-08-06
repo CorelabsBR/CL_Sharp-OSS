@@ -936,7 +936,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
   return {
     providers: async () => [
       { id: "openai", displayName: "OpenAI", supportsStreaming: true, requiresApiKey: true, defaultModel: "gpt-5.6-terra" },
-      { id: "codex", displayName: "Codex", supportsStreaming: true, requiresApiKey: true, defaultModel: "gpt-5.2-codex" },
+      { id: "codex", displayName: "Codex", supportsStreaming: true, requiresApiKey: false, defaultModel: "gpt-5.2-codex" },
       { id: "gemini", displayName: "Google Gemini", supportsStreaming: true, requiresApiKey: true, defaultModel: "gemini-2.5-flash" },
       { id: "openrouter", displayName: "OpenRouter", supportsStreaming: true, requiresApiKey: true, defaultModel: "openai/gpt-5.6-terra" },
       { id: "ollama", displayName: "Ollama (Local)", supportsStreaming: true, requiresApiKey: false, defaultModel: "qwen2.5-coder:7b" }
@@ -956,6 +956,9 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
       const settings: AISettings = { ...request, apiKeyConfigured: false };
       writeStorage(AI_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
       return settings;
+    },
+    loginWithChatGpt: async () => {
+      throw new Error("O login do ChatGPT para Codex está disponível apenas no aplicativo desktop.");
     },
     listConversations: async () => loadConversations().sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     createConversation: async (provider = loadAISettings().provider, model = loadAISettings().model) => {

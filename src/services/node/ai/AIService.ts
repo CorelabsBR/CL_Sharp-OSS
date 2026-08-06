@@ -29,7 +29,15 @@ export class AIService {
       const apiKey = await this.settingsService.apiKey(request.settings.provider);
       let buffered = "";
       let completion: AIStreamEvent | undefined;
-      for await (const event of provider.sendMessage({ requestId: request.requestId, messages, settings: request.settings, apiKey, signal })) {
+      for await (const event of provider.sendMessage({
+        requestId: request.requestId,
+        conversationId: request.conversationId,
+        messages,
+        settings: request.settings,
+        apiKey,
+        workspace: request.workspace,
+        signal
+      })) {
         if (event.type === "complete") {
           completion = event;
         } else if (!request.settings.streaming && event.type === "delta") {

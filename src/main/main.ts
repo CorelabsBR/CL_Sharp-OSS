@@ -2,7 +2,7 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions, type OpenDialogOptions, type SaveDialogOptions, type WebContents } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";
 import {
@@ -603,6 +603,11 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle("ai:settings:load", () => aiSettings.load());
   ipcMain.handle("ai:settings:save", (_event, settings: AISaveSettingsRequest) => aiSettings.save(settings));
+  ipcMain.handle("ai:loginWithChatGpt", async () => {
+    const login = await providerManager.startCodexChatGptLogin();
+    await shell.openExternal(login.authUrl);
+    return login.completed;
+  });
   ipcMain.handle("ai:conversations:list", () => conversations.list());
   ipcMain.handle("ai:conversations:create", (_event, provider?: AIProviderId, model?: string) => conversations.create(provider, model));
   ipcMain.handle("ai:conversations:update", (_event, update: AIConversationUpdate) => conversations.update(update));

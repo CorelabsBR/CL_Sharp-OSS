@@ -403,7 +403,8 @@ export class AIChatPanel {
       conversationId: this.current.id,
       messages: providerMessages,
       contexts,
-      settings: this.settings
+      settings: this.settings,
+      workspace: this.collector.workspace()
     }).catch(error => {
       if (!this.activeRequestId) return;
       this.handleStream({ requestId: this.activeRequestId, type: "error", message: error instanceof Error ? error.message : String(error) });
@@ -494,6 +495,8 @@ export class AIChatPanel {
     const systemPrompt = textareaField("Prompt do sistema", this.settings.systemPrompt);
     const ollamaUrl = textField("URL do Ollama", this.settings.ollamaBaseUrl);
     const keyStatus = el("div", { className: "ai-key-status", text: this.settings.apiKeyConfigured ? "Uma chave está armazenada com segurança para este provedor." : "Nenhuma chave de API está armazenada para este provedor." });
+    const chatGptLogin = el("button", { className: "primary", text: "Entrar com ChatGPT", attrs: { type: "button" } });
+    const chatGptStatus = el("div", { className: "ai-key-status", text: "Entre pela sua conta ChatGPT. Nenhuma chave de API será solicitada." });
     const clearKey = checkboxField("Limpar chave de API salva", false);
     const actions = el("div", { className: "ai-settings-actions" });
     const cancel = el("button", { text: "Cancelar", attrs: { type: "button" } });
@@ -501,7 +504,7 @@ export class AIChatPanel {
     actions.append(cancel, save);
     dialog.append(
       el("h2", { text: "Configurações de IA" }),
-      provider.row, key.row, keyStatus, model.row, temperature.row, maxTokens.row,
+      provider.row, chatGptLogin, chatGptStatus, key.row, keyStatus, model.row, temperature.row, maxTokens.row,
       contextSize.row, streaming.row, systemPrompt.row, ollamaUrl.row, clearKey.row, actions
     );
     overlay.append(dialog);
@@ -509,6 +512,29 @@ export class AIChatPanel {
     cancel.addEventListener("click", () => overlay.remove());
     overlay.addEventListener("click", event => {
       if (event.target === overlay) overlay.remove();
+    });
+    const updateAuthenticationFields = () => {
+      const isCodex = provider.input.value === "codex";
+      chatGptLogin.hidden = !isCodex;
+      chatGptStatus.hidden = !isCodex;
+      key.row.hidden = isCodex;
+      keyStatus.hidden = isCodex;
+      clearKey.row.hidden = isCodex;
+    };
+    chatGptLogin.addEventListener("click", () => {
+      chatGptLogin.disabled = true;
+      chatGptStatus.textContent = "Abrindo o navegador para entrar no ChatGPT…";
+      void api.ai.loginWithChatGpt().then(async result => {
+        if (!result.success) throw new Error(result.error ?? "Não foi possível concluir o login do ChatGPT.");
+        this.settings = await api.ai.saveSettings({ ...settingsRequest(this.settings!), provider: "codex", model: model.input.value });
+        this.renderProviders();
+        await this.renderModels();
+        chatGptStatus.textContent = `Conectado${result.email ? ` como ${result.email}` : ""}${result.planType ? ` (${result.planType})` : ""}.`;
+      }).catch(error => {
+        chatGptStatus.textContent = error instanceof Error ? error.message : String(error);
+      }).finally(() => {
+        chatGptLogin.disabled = false;
+      });
     });
     dialog.addEventListener("submit", event => {
       event.preventDefault();
@@ -534,8 +560,11 @@ export class AIChatPanel {
     provider.input.addEventListener("change", () => {
       const descriptor = this.providers.find(item => item.id === provider.input.value);
       if (descriptor) model.input.value = descriptor.defaultModel;
+      updateAuthenticationFields();
     });
-    key.input.focus();
+    updateAuthenticationFields();
+    if (provider.input.value === "codex") chatGptLogin.focus();
+    else key.input.focus();
   }
 
   private async renameConversation(): Promise<void> {

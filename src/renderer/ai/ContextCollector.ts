@@ -47,6 +47,10 @@ export class ContextCollector {
     return this.droppedFiles.map(item => item.label);
   }
 
+  workspace(): string | undefined {
+    return this.host.workspace();
+  }
+
   async collect(sources: ReadonlySet<AIContextSource>, prompt: string): Promise<AIContextItem[]> {
     const items: AIContextItem[] = [];
     const currentFile = this.host.currentFile();

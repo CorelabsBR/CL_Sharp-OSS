@@ -669,6 +669,16 @@ export interface AIChatRequest {
   messages: AIMessage[];
   contexts: AIContextItem[];
   settings: AISettings;
+  /** Workspace made available to a local Codex App Server session. */
+  workspace?: string;
+}
+
+/** Result returned after the local Codex App Server finishes a ChatGPT login. */
+export interface CodexChatGptLoginResult {
+  success: boolean;
+  email?: string;
+  planType?: string;
+  error?: string;
 }
 
 export type AIStreamEventType = "start" | "delta" | "complete" | "error" | "cancelled";
@@ -737,6 +747,7 @@ export interface NpsharpApi {
     listModels(provider: AIProviderId): Promise<AIModel[]>;
     loadSettings(): Promise<AISettings>;
     saveSettings(settings: AISaveSettingsRequest): Promise<AISettings>;
+    loginWithChatGpt(): Promise<CodexChatGptLoginResult>;
     listConversations(): Promise<AIConversation[]>;
     createConversation(provider?: AIProviderId, model?: string): Promise<AIConversation>;
     updateConversation(update: AIConversationUpdate): Promise<AIConversation>;

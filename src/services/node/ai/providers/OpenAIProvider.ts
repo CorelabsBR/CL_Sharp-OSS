@@ -9,7 +9,7 @@ import { asRecord, asRecords, checkedFetch, numberValue, readSse, stringValue } 
 export class OpenAIProvider implements AIProvider {
   readonly descriptor: AIProviderDescriptor;
 
-  constructor(id: "openai" | "codex") {
+  constructor(id: "openai") {
     this.descriptor = {
       id,
       displayName: id === "codex" ? "Codex" : "OpenAI",

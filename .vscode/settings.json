@@ -7,5 +7,8 @@
         " * Licenciado sob os termos da licença Proprietária CoreLabs.",
         " * Consulte o arquivo LICENSE na raiz do projeto para mais informações.",
         " */"
-    ]
+    ],
+    "files.readonlyInclude": {
+        "{**/.c4z/.extsrcs/*.PROTSYM.cbl,**/.c4z/.extsrcs/*.PROTSYM.listing}": true
+    }
 }

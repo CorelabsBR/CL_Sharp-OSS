@@ -12,9 +12,11 @@ import type {
 
 export interface AIProviderRequest {
   requestId: string;
+  conversationId: string;
   messages: AIMessage[];
   settings: AISettings;
   apiKey?: string;
+  workspace?: string;
   signal: AbortSignal;
 }
 

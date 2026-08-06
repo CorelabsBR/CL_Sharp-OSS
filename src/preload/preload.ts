@@ -123,6 +123,7 @@ const api: NpsharpApi = {
     listModels: (provider: AIProviderId) => invoke("ai:listModels", provider),
     loadSettings: () => invoke("ai:settings:load"),
     saveSettings: (settings: AISaveSettingsRequest) => invoke("ai:settings:save", settings),
+    loginWithChatGpt: () => invoke("ai:loginWithChatGpt"),
     listConversations: () => invoke("ai:conversations:list"),
     createConversation: (provider?: AIProviderId, model?: string) => invoke("ai:conversations:create", provider, model),
     updateConversation: (update: AIConversationUpdate) => invoke("ai:conversations:update", update),
