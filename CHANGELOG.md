@@ -18,6 +18,8 @@ Description:
 - Bloqueia caminhos e diálogos locais no Explorer enquanto uma sessão remota está ativa, redirecionando botões, atalhos, recentes e restauração para o seletor do host.
 - Permite navegar a árvore remota desde `/`, respeitando as permissões do usuário SSH, em vez de limitar o seletor somente ao diretório home.
 - Remove o carregamento antecipado do binário Electron pelo serviço de arquivos, permitindo executar testes Node no CI sem baixar o runtime gráfico desnecessariamente.
+- Corrige a seleção de shell por ambiente: cmd no Windows, `$SHELL` local (incluindo fish) e shell detectado no host remoto; no Linux sem `node-pty`, usa `/usr/bin/script` como PTY real em vez do fallback por pipes.
+- Evita carregar `node-pty` quando não existe binário nativo compatível, removendo o stack trace no Linux e selecionando diretamente o PTY fornecido por `/usr/bin/script`.
 
 ## 26.8.40 - 2026-08-06
 

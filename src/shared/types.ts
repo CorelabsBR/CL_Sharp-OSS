@@ -317,7 +317,7 @@ export interface TerminalRunResult {
   code: number | null;
 }
 
-export type TerminalBackend = "node-pty" | "child_process" | "android-shell";
+export type TerminalBackend = "node-pty" | "script" | "child_process" | "android-shell";
 
 export interface TerminalShellOption {
   id: string;

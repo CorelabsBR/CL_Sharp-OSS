@@ -18,7 +18,7 @@ interface TerminalSession {
   history: string[];
   historyIndex: number;
   shell: string;
-  backend: "node-pty" | "child_process" | "android-shell" | "local" | "remote";
+  backend: "node-pty" | "script" | "child_process" | "android-shell" | "local" | "remote";
   remoteSessionId?: string;
   running: boolean;
   localOnly: boolean;

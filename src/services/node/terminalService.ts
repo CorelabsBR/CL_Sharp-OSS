@@ -5,6 +5,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
+import fs from "node:fs";
 import { StringDecoder } from "node:string_decoder";
 import os from "node:os";
 import path from "node:path";
@@ -93,7 +94,9 @@ export function createTerminalSession(request: TerminalCreateRequest, callbacks:
   const pty = loadNodePty();
   const session = pty
     ? createPtySession(id, name, shell, args, cwd, cols, rows, pty, callbacks)
-    : createChildProcessSession(id, name, shell, args, cwd, callbacks);
+    : process.platform !== "win32" && fs.existsSync("/usr/bin/script")
+      ? createScriptSession(id, name, shell, cwd, callbacks)
+      : createChildProcessSession(id, name, shell, args, cwd, callbacks);
 
   sessions.set(id, session);
   return { ...session.info };
@@ -268,6 +271,16 @@ function createChildProcessSession(
   };
 }
 
+function createScriptSession(id: string, name: string, shell: string, cwd: string, callbacks: TerminalCallbacks): ManagedTerminal {
+  const child = spawn("/usr/bin/script", ["-qfec", shell, "/dev/null"], { cwd, env: { ...process.env, TERM: process.env.TERM || "xterm-256color" }, stdio: "pipe" });
+  const info = terminalInfo(id, name, cwd, shell, "script", child.pid);
+  let closed = false;
+  child.stdout.on("data", data => { if (!closed) callbacks.onData({ id, data: data.toString() }); });
+  child.stderr.on("data", data => { if (!closed) callbacks.onData({ id, data: data.toString() }); });
+  child.on("close", (code, signal) => { info.running = false; if (!closed) callbacks.onExit({ id, code, signal: signal ?? undefined }); });
+  return { info, write: data => { if (info.running) child.stdin.write(data); }, resize: (cols, rows) => { if (info.running) child.stdin.write(`stty cols ${Math.max(1, cols)} rows ${Math.max(1, rows)}\n`); }, kill: () => child.kill(), close: () => { closed = true; info.running = false; child.kill(); } };
+}
+
 function scheduleForceClose(callback: () => void): NodeJS.Timeout {
   const timer = setTimeout(callback, TERMINAL_FORCE_CLOSE_DELAY_MS);
   timer.unref?.();
@@ -313,15 +326,31 @@ function terminalInfo(id: string, name: string, cwd: string, shell: string, back
 
 function loadNodePty(): NodePtyModule | undefined {
   if (cachedPty !== undefined) return cachedPty ?? undefined;
+  if (!hasNodePtyBinary()) {
+    cachedPty = null;
+    return undefined;
+  }
   try {
     cachedPty = optionalRequire("node-pty") as NodePtyModule;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND") {
-      console.warn("[NPSharp terminal] node-pty could not be loaded.", error);
-    }
+    console.warn(`[NPSharp terminal] node-pty indisponível; usando backend PTY do sistema (${error instanceof Error ? error.message.split("\n")[0] : String(error)}).`);
     cachedPty = null;
   }
   return cachedPty ?? undefined;
+}
+
+function hasNodePtyBinary(): boolean {
+  try {
+    const root = path.dirname(optionalRequire.resolve("node-pty/package.json"));
+    const platformArch = `${process.platform}-${process.arch}`;
+    return [
+      path.join(root, "build", "Release", "pty.node"),
+      path.join(root, "build", "Debug", "pty.node"),
+      path.join(root, "prebuilds", platformArch, "pty.node")
+    ].some(candidate => fs.existsSync(candidate));
+  } catch {
+    return false;
+  }
 }
 
 async function resolveShell(names: string[]): Promise<string | undefined> {
@@ -335,8 +364,8 @@ async function resolveShell(names: string[]): Promise<string | undefined> {
 function shellCandidates(): ShellCandidate[] {
   if (process.platform === "win32") {
     return [
-      { id: "powershell", label: "PowerShell", names: ["pwsh", "powershell.exe", "powershell"] },
-      { id: "cmd", label: "cmd", names: ["cmd.exe", "cmd"] }
+      { id: "cmd", label: "cmd", names: ["cmd.exe", "cmd"] },
+      { id: "powershell", label: "PowerShell", names: ["pwsh", "powershell.exe", "powershell"] }
     ];
   }
   if (process.platform === "darwin") {
@@ -355,7 +384,7 @@ function shellCandidates(): ShellCandidate[] {
 
 function defaultShell(): string {
   if (process.platform === "win32") {
-    return process.env.ComSpec || "powershell.exe";
+    return process.env.ComSpec || "cmd.exe";
   }
   return process.env.SHELL || (process.platform === "darwin" ? "/bin/zsh" : "/bin/bash");
 }

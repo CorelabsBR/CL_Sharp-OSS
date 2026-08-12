@@ -22,6 +22,7 @@ export class RemotePanel {
   private connecting = false;
   private disposeStatus?: () => void;
   private watcherId?: string;
+  private remoteShell?: string;
 
   constructor(
     private readonly openVirtualFile: (title: string, uri: string, content: string, save: (content: string) => Promise<void>) => void,
@@ -45,7 +46,7 @@ export class RemotePanel {
     await this.connect(host);
   }
 
-  async disconnect(): Promise<void> { if (!this.sessionId) return; await api.remote.disconnect(this.sessionId); this.sessionId = undefined; this.watcherId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
+  async disconnect(): Promise<void> { if (!this.sessionId) return; await api.remote.disconnect(this.sessionId); this.sessionId = undefined; this.watcherId = undefined; this.remoteShell = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
   async reconnect(): Promise<void> { if (!this.sessionId) return; const session = await api.remote.reconnect(this.sessionId); this.sessionId = session.id; await this.openRemoteFolder(); }
   async openRemoteFolder(): Promise<void> { if (!this.sessionId || !this.active) return; const selected = await this.pickRemoteFolder(this.currentPath); if (!selected) return; await this.activateRemoteFolder(selected); }
   async showLogs(): Promise<void> { const logs = await api.remote.getLogs(); this.updateStatus(logs.slice(-20).map(entry => `${entry.timestamp} [${entry.scope}] ${entry.message}`).join("\n") || "Sem logs remotos"); }
@@ -55,7 +56,7 @@ export class RemotePanel {
   async uninstallServer(): Promise<void> { if (!this.sessionId || !confirm("Desinstalar esta versão do NPSharp Server no host remoto?")) return; await api.remote.uninstallServer(this.sessionId); this.sessionId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
 
   connection(): { sessionId: string; hostName: string; cwd: string; shell?: string } | undefined {
-    return this.sessionId && this.active ? { sessionId: this.sessionId, hostName: this.active.name || this.active.host, cwd: this.currentPath } : undefined;
+    return this.sessionId && this.active ? { sessionId: this.sessionId, hostName: this.active.name || this.active.host, cwd: this.currentPath, shell: this.remoteShell } : undefined;
   }
 
   private build(): void {
@@ -170,6 +171,7 @@ export class RemotePanel {
       }
       const session = await api.remote.connect(host.id!, this.password || undefined);
       this.sessionId = session.id;
+      this.remoteShell = session.platform.defaultShell;
       this.currentPath = host.defaultPath || session.platform.homeDirectory;
       this.renderHosts();
       const selected = await this.pickRemoteFolder(this.currentPath);

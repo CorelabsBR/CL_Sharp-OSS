@@ -1968,7 +1968,10 @@ export class IdePage {
   }
 
   private terminalShell(): string {
-    return this.appPlatform === "win32" ? this.settings.terminalShellWindows : this.settings.terminalShellLinux;
+    const configured = this.appPlatform === "win32" ? this.settings.terminalShellWindows : this.settings.terminalShellLinux;
+    if (this.appPlatform === "win32" && configured.toLowerCase() === "powershell.exe") return "";
+    if (this.appPlatform !== "win32" && configured === "/bin/bash") return "";
+    return configured;
   }
 
   private handleShortcut(event: KeyboardEvent): void {
