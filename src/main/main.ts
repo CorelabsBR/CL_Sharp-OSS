@@ -126,6 +126,7 @@ import type {
   RuntimeDependencyInstallRequest,
   SaveFileRequest,
   SearchQuery,
+  SearchResult,
   TemplateApplyRequest,
   TerminalCreateRequest,
   TerminalRunRequest,
@@ -493,7 +494,15 @@ function registerIpcHandlers(): void {
     platform: process.platform,
     userDataPath: app.getPath("userData"),
     appPath: app.getAppPath(),
-    npsharpHome: npsharpHome()
+    npsharpHome: npsharpHome(),
+    architecture: process.arch,
+    isPackaged: app.isPackaged,
+    runtime: {
+      electron: process.versions.electron,
+      chromium: process.versions.chrome,
+      node: process.versions.node,
+      v8: process.versions.v8
+    }
   }));
   ipcMain.handle("startup:mark", (_event, stage: "renderer-rendered" | "editor-interactive") => {
     startupProfiler.mark(stage === "renderer-rendered" ? "T4-renderer-rendered" : "T5-editor-interactive");
@@ -704,8 +713,8 @@ function registerIpcHandlers(): void {
     disposeWorkspaceWatcher(watchId);
   });
 
-  ipcMain.handle("search:workspace", (_event, query: SearchQuery) => searchWorkspace(query));
-  ipcMain.handle("search:replaceAll", (_event, request: ReplaceAllRequest) => replaceAll(request));
+  ipcMain.handle("search:workspace", async (_event, query: SearchQuery) => { const remote = remoteHostManager!.resolveUri(query.workspace); if (!remote) return searchWorkspace(query); const results = await remoteHostManager!.request<SearchResult[]>(remote.sessionId, "search.workspace", { ...query, workspace: remote.path }); const prefix = query.workspace.slice(0, query.workspace.length - remote.path.length); return results.map(result => ({ ...result, filePath: `${prefix}${result.filePath}` })); });
+  ipcMain.handle("search:replaceAll", (_event, request: ReplaceAllRequest) => { const remote = remoteHostManager!.resolveUri(request.workspace); return remote ? remoteHostManager!.request(remote.sessionId, "search.replaceAll", { ...request, workspace: remote.path }) : replaceAll(request); });
   ipcMain.handle("diagnostics:java", (_event, workspace: string, filePath?: string) => runJavaDiagnostics(workspace, filePath));
 
   ipcMain.handle("git:status", (_event, workspace: string) => readGitStatus(workspace));
@@ -759,14 +768,15 @@ function registerIpcHandlers(): void {
   ipcMain.handle("runtime:runFile", (_event, request: RuntimeRunRequest) => runFile(request));
   ipcMain.handle("runtime:installDependencies", (_event, request: RuntimeDependencyInstallRequest) => installRuntimeDependencies(request));
 
-  ipcMain.handle("extensions:list", () => extensionManager.listInstalled());
-  ipcMain.handle("extensions:searchOpenVsx", (_event, query: string) => extensionManager.searchOpenVsx(query));
-  ipcMain.handle("extensions:installOpenVsx", (_event, extension: OpenVsxExtension) => extensionManager.installOpenVsx(extension));
-  ipcMain.handle("extensions:installVsix", (_event, vsixPath: string) => extensionManager.installVsix(vsixPath));
-  ipcMain.handle("extensions:enable", (_event, id: string) => extensionManager.enable(id));
-  ipcMain.handle("extensions:disable", (_event, id: string) => extensionManager.disable(id));
-  ipcMain.handle("extensions:uninstall", (_event, id: string) => extensionManager.uninstall(id));
-  ipcMain.handle("extensions:reload", (_event, id?: string) => extensionManager.reload(id));
+  const remoteExtensionRequest = <T>(method: string, params: unknown): Promise<T> | undefined => { const sessionId = remoteHostManager!.activeSessionId(); return sessionId ? remoteHostManager!.request<T>(sessionId, method, params) : undefined; };
+  ipcMain.handle("extensions:list", () => remoteExtensionRequest("extensions.list", {}) ?? extensionManager.listInstalled());
+  ipcMain.handle("extensions:searchOpenVsx", (_event, query: string) => remoteExtensionRequest("extensions.searchOpenVsx", { query }) ?? extensionManager.searchOpenVsx(query));
+  ipcMain.handle("extensions:installOpenVsx", (_event, extension: OpenVsxExtension) => remoteExtensionRequest("extensions.installOpenVsx", { extension }) ?? extensionManager.installOpenVsx(extension));
+  ipcMain.handle("extensions:installVsix", (_event, vsixPath: string) => remoteExtensionRequest("extensions.installVsix", { path: vsixPath }) ?? extensionManager.installVsix(vsixPath));
+  ipcMain.handle("extensions:enable", (_event, id: string) => remoteExtensionRequest("extensions.enable", { id }) ?? extensionManager.enable(id));
+  ipcMain.handle("extensions:disable", (_event, id: string) => remoteExtensionRequest("extensions.disable", { id }) ?? extensionManager.disable(id));
+  ipcMain.handle("extensions:uninstall", (_event, id: string) => remoteExtensionRequest("extensions.uninstall", { id }) ?? extensionManager.uninstall(id));
+  ipcMain.handle("extensions:reload", (_event, id?: string) => remoteExtensionRequest("extensions.reload", { id }) ?? extensionManager.reload(id));
 
   ipcMain.handle("arduino:detect", (_event, request?: ArduinoCliRequest) => detectArduinoCli(request));
   ipcMain.handle("arduino:loadConfig", (_event, request: ArduinoConfigRequest) => loadArduinoConfig(request));

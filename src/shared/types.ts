@@ -12,6 +12,14 @@ export interface AppInfo {
   userDataPath: string;
   appPath: string;
   npsharpHome: string;
+  architecture: string;
+  isPackaged: boolean;
+  runtime: {
+    electron?: string;
+    chromium?: string;
+    node?: string;
+    v8?: string;
+  };
 }
 
 export type UpdateState = "idle" | "checking" | "current" | "available" | "downloading" | "downloaded" | "error" | "unsupported";

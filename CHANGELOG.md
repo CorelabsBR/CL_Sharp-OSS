@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 26.8.41 - 2026-08-12
+
+Type: Fix
+
+Description:
+- Corrige a instalação do NPSharp Server em hosts Linux removendo a transferência obrigatória de um `node-pty` nativo da máquina cliente e usando Node.js para verificar o checksum sem depender de `sha256sum`.
+- Permite a conexão quando o terminal PTY opcional não está disponível, preservando filesystem, workspace, processos e watchers, e inclui o log remoto no diagnóstico de falha de inicialização.
+- Adiciona teste ponta a ponta do bootstrap autenticado, conexão WebSocket e RPC de capabilities do servidor.
+- Corrige os runners desktop para compilar o artefato do NPSharp Server em cada job e torna os downloads do Electron resilientes com cache e tentativas limitadas.
+- Substitui todas as chamadas incompatíveis a `window.prompt` por diálogos internos assíncronos nos comandos de projeto, Git, Explorer, Arduino, IA e sandbox web/mobile.
+- Corrige instalações novas do NPSharp Server criando o diretório remoto `bin` antes de mover a versão instalada.
+- Redesenha a janela Sobre com identidade visual do NPSharp, informações de build e runtime, sistema, arquitetura, caminhos, licença, repositório e cópia de diagnóstico.
+- Alinha as capabilities RPC `process` e `watch` entre cliente e servidor remoto, preservando aliases antigos para compatibilidade.
+- Torna a sessão Remote Host o contexto ativo do Explorer, terminal, busca/substituição e extensões, executando essas operações e instalações Open VSX no host conectado em vez da máquina local.
+- Adiciona um seletor navegável de pasta remota após a conexão, com sugestões consultadas via RPC enquanto o caminho é digitado, navegação por teclado e confirmação explícita do workspace.
+- Bloqueia caminhos e diálogos locais no Explorer enquanto uma sessão remota está ativa, redirecionando botões, atalhos, recentes e restauração para o seletor do host.
+- Permite navegar a árvore remota desde `/`, respeitando as permissões do usuário SSH, em vez de limitar o seletor somente ao diretório home.
+
 ## 26.8.40 - 2026-08-06
 
 Type: Feature / Fix

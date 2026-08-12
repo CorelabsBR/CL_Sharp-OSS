@@ -6,6 +6,7 @@ import type { GitCommit, GitFileStatus, GitRepositoryStatus } from "../../shared
 import { api, platform } from "../services/api";
 import { buttonIcon, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
+import { showInputDialog } from "../utils/inputDialog";
 
 export class SourceControlPanel {
   readonly element = el("div", { className: "panel scm-panel" });
@@ -235,7 +236,7 @@ export class SourceControlPanel {
   }
 
   private async chooseBranch(repo: GitRepositoryStatus): Promise<void> {
-    const next = prompt(`Branch for ${repo.name}\nExisting: ${repo.branches.join(", ")}`, repo.branch);
+    const next = await showInputDialog(`Branch para ${repo.name}`, repo.branch, { placeholder: `Existentes: ${repo.branches.join(", ")}` });
     if (!next?.trim() || next.trim() === repo.branch) return;
     const branch = next.trim();
     const result = repo.branches.includes(branch)
@@ -252,7 +253,7 @@ export class SourceControlPanel {
       await this.showDiff(repo, file);
       return;
     }
-    const choice = prompt(`Resolve ${file.path}: current, incoming, manual`, "manual")?.trim().toLowerCase();
+    const choice = (await showInputDialog(`Resolver conflito em ${file.path}`, "manual", { placeholder: "current, incoming ou manual" }))?.trim().toLowerCase();
     if (!choice || choice === "manual") {
       await this.showDiff(repo, file);
       return;

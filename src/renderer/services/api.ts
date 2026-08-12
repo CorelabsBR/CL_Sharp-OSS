@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { showInputDialog } from "../utils/inputDialog";
 import type { PermissionState } from "@capacitor/core";
 import type {
   AIConversation,
@@ -1240,15 +1241,15 @@ function createArduinoFallbackApi(fs: FsApi): NpsharpApi["arduino"] {
 
 async function openSandboxWorkspace(fs: FsApi): Promise<DialogFileResult> {
   const label = platform.isMobile ? "Nome do workspace mobile" : "Nome do workspace";
-  const name = prompt(label, "Main");
-  if (name === null) return { canceled: true, paths: [] };
+  const name = await showInputDialog(label, "Main");
+  if (name === undefined) return { canceled: true, paths: [] };
   const workspace = joinPath(MOBILE_WORKSPACES_ROOT, sanitizeName(name || "Main"));
   await fs.createFolder(workspace);
   return { canceled: false, paths: [workspace] };
 }
 
 async function openSandboxFile(fs: FsApi): Promise<DialogFileResult> {
-  const target = prompt("Caminho do arquivo no workspace", joinPath(DEFAULT_MOBILE_WORKSPACE, "notes.nps.md"));
+  const target = await showInputDialog("Caminho do arquivo no workspace", joinPath(DEFAULT_MOBILE_WORKSPACE, "notes.nps.md"));
   if (!target?.trim()) return { canceled: true, paths: [] };
   const path = normalizeSandboxPath(target);
   return await fs.exists(path) ? { canceled: false, paths: [path] } : { canceled: true, paths: [] };
@@ -1256,7 +1257,7 @@ async function openSandboxFile(fs: FsApi): Promise<DialogFileResult> {
 
 async function saveSandboxFile(fs: FsApi, request: SaveFileRequest): Promise<SaveFileResult> {
   const suggested = request.path ?? request.suggestedName ?? "untitled.txt";
-  const target = request.path ?? prompt("Salvar como", joinPath(DEFAULT_MOBILE_WORKSPACE, basename(suggested)));
+  const target = request.path ?? await showInputDialog("Salvar como", joinPath(DEFAULT_MOBILE_WORKSPACE, basename(suggested)));
   if (!target?.trim()) return { canceled: true };
   const path = normalizeSandboxPath(target.includes("/") ? target : joinPath(DEFAULT_MOBILE_WORKSPACE, target));
   await fs.writeFile(path, request.content);
@@ -1315,7 +1316,10 @@ function browserAppInfo(): AppInfo {
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,
-    npsharpHome: MOBILE_ROOT
+    npsharpHome: MOBILE_ROOT,
+    architecture: "web",
+    isPackaged: platform.kind === "capacitor",
+    runtime: {}
   };
 }
 

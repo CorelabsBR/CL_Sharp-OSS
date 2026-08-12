@@ -17,6 +17,8 @@ concurrency:
 env:
   NODE_VERSION: "22"
   JAVA_VERSION: "21"
+  ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+  ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
 jobs:
   verify:
@@ -54,11 +56,31 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      - name: Restore Electron packaging cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-x64-
+
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
+      - run: npm run build:server
       - name: Build Windows Setup, Portable and Portable Fast
-        run: npx electron-builder --win nsis portable dir --x64 --publish never
+        shell: pwsh
+        run: |
+          $attempts = 3
+          for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+            npx electron-builder --win nsis portable dir --x64 --publish never
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -eq $attempts) { exit $LASTEXITCODE }
+            Write-Warning "electron-builder failed on attempt $attempt; retrying in 10 seconds."
+            Start-Sleep -Seconds 10
+          }
       - name: Create Portable Fast archive
         run: node scripts/package-portable-fast.mjs
       - name: Validate Windows artifacts
@@ -96,11 +118,33 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      - name: Restore Electron packaging cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-x64-
+
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
+      - run: npm run build:server
       - name: Build Linux artifacts and updater metadata
-        run: npx electron-builder --linux AppImage deb --x64 --publish never
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npx electron-builder --linux AppImage deb --x64 --publish never; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            echo "electron-builder failed on attempt $attempt; retrying in 10 seconds."
+            sleep 10
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: linux-updater-artifacts

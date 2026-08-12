@@ -2,7 +2,7 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import type { AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
+import type { AppInfo, AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
 import type { AppLocale } from "../../shared/i18n";
 import { setUiLocale } from "../../shared/i18n";
 import { BUILD_CONFIG } from "../../shared/buildConfig";
@@ -28,6 +28,7 @@ import { api, DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, pla
 import { applyTheme, listThemes } from "../services/themes";
 import { buttonIcon, closeContextMenus, contextMenu, el, icon, installContextMenuDismiss, localizeElementTree } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
+import { showInputDialog } from "../utils/inputDialog";
 import { cssUrl, DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, dirname, extname, fileUri, isSubPath, joinPath, relativePath } from "../utils/path";
 import type { CommandAction } from "../components/CommandPalette";
@@ -35,6 +36,16 @@ import type { CommandAction } from "../components/CommandPalette";
 type PanelId = "explorer" | "search" | "source" | "run" | "extensions" | "remote" | "arduino" | "ai" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench" | "Discord";
 type MenuAction = (event: MouseEvent) => void;
+
+function friendlyPlatform(value: string): string {
+  if (value === "win32") return "Windows";
+  if (value === "darwin") return "macOS";
+  if (value === "linux") return "Linux";
+  if (value === "android") return "Android";
+  if (value === "ios") return "iOS";
+  if (value === "web") return "Web";
+  return value || "Desconhecido";
+}
 
 const EDITOR_FONT_OPTIONS = [
   "JetBrains Mono",
@@ -79,11 +90,12 @@ export class IdePage {
   private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: "Pesquisar...", "aria-label": "Pesquisa rápida de arquivos" } });
   private readonly commandCenter = new CommandCenter(workspace => void this.openRecentWorkspace(workspace));
   private readonly editor = new EditorTabs(text => this.updateStatus(text));
-  private readonly explorer = new FileExplorer(
+  private readonly explorer: FileExplorer = new FileExplorer(
     file => void this.editor.openFile(file),
     text => this.updateStatus(text),
     () => this.settings.confirmDelete,
-    value => this.updateSettings({ ...this.settings, confirmDelete: value })
+    value => this.updateSettings({ ...this.settings, confirmDelete: value }),
+    (): Promise<void> => this.remote.openRemoteFolder()
   );
   private readonly search = new SearchPanel(result => void this.editor.openSearchResult(result), text => this.updateStatus(text));
   private readonly source = new SourceControlPanel((title, uri, content) => this.editor.openVirtualFile(title, uri, content), text => this.updateStatus(text));
@@ -111,7 +123,7 @@ export class IdePage {
     () => void this.showLanguageRuntimes()
   );
   private readonly extensions = new ExtensionManagerPanel(text => this.updateStatus(text));
-  private readonly remote = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text), (uri, name, location) => this.explorer.openFolder(uri, name, location));
+  private readonly remote: RemotePanel = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text), (uri, name, location) => this.explorer.openFolder(uri, name, location));
   private readonly arduino = new ArduinoPanel(() => this.explorer.workspace, file => this.editor.openFile(file), text => this.updateStatus(text));
   private readonly palette = new CommandPalette();
   private readonly keyboardShortcuts = new KeyboardShortcutsModal(text => this.updateStatus(text));
@@ -1297,9 +1309,9 @@ export class IdePage {
   }
 
   private async createProject(): Promise<void> {
-    const folderInput = prompt(platform.isDesktop ? "Nome da pasta do novo projeto" : "Nome da pasta do workspace mobile", platform.isDesktop ? "meu-projeto" : "Main");
+    const folderInput = await showInputDialog(platform.isDesktop ? "Nome da pasta do novo projeto" : "Nome da pasta do workspace mobile", platform.isDesktop ? "meu-projeto" : "Main");
     if (!folderInput?.trim()) return;
-    const repositoryInput = prompt("Nome do repositório", folderInput.trim());
+    const repositoryInput = await showInputDialog("Nome do repositório", folderInput.trim());
     if (!repositoryInput?.trim()) return;
     let folderName: string;
     let repositoryName: string;
@@ -1349,7 +1361,7 @@ export class IdePage {
   }
 
   private async cloneRepository(): Promise<void> {
-    const url = prompt("URL do repositorio Git");
+    const url = await showInputDialog("URL do repositório Git", "", { placeholder: "https://github.com/organização/repositório.git" });
     if (!url?.trim()) return;
     if (!platform.canUseGit) {
       this.showTerminal(false);
@@ -2279,20 +2291,66 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
     this.session.terminalVisible = !this.terminal.element.hidden;
     void api.settings.saveSession(this.session);
   }
-private about(): void {
-  alert(`${BUILD_CONFIG.displayName}
-Versão ${BUILD_CONFIG.version}
-
-Desenvolvido pela ${BUILD_CONFIG.author}.
-
-Código sem distrações.
-
-O ${BUILD_CONFIG.displayName} é uma IDE rápida, moderna e centrada em desenvolvedores, criada para oferecer uma experiência de programação limpa e eficiente. Combinando o poder do Monaco Editor com Electron, entrega um ambiente familiar com temas personalizados, ferramentas integradas, controle de código-fonte, terminal e um fluxo de trabalho para desenvolvimento de software real.
-
-Feito por desenvolvedores, para desenvolvedores.
-
-© ${new Date().getFullYear()} ${BUILD_CONFIG.copyrightOwner}. Todos os direitos reservados.`);
-}
+  private async about(): Promise<void> {
+    document.querySelector(".about-overlay")?.remove();
+    const info = await api.appInfo().catch((): AppInfo => ({
+      name: BUILD_CONFIG.displayName, version: BUILD_CONFIG.version, platform: "unknown", userDataPath: "—", appPath: "—", npsharpHome: "—",
+      architecture: "unknown", isPackaged: false, runtime: {}
+    }));
+    const overlay = el("div", { className: "runtime-config-overlay about-overlay", attrs: { tabindex: "-1" } });
+    const dialog = el("section", { className: "about-dialog", attrs: { role: "dialog", "aria-modal": "true", "aria-labelledby": "about-title" } });
+    const close = () => overlay.remove();
+    const logo = el("img", { className: "about-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "" } });
+    const identity = el("div", { className: "about-identity" });
+    identity.append(
+      el("span", { className: "about-kicker", text: "AMBIENTE DE DESENVOLVIMENTO" }),
+      el("h2", { text: BUILD_CONFIG.displayName, attrs: { id: "about-title" } }),
+      el("p", { text: "Código sem distrações. Ferramentas locais e remotas em um único workspace." }),
+      el("div", { className: "about-badges", children: [
+        el("span", { text: `v${info.version}` }),
+        el("span", { text: info.isPackaged ? "Instalado" : "Desenvolvimento" }),
+        el("span", { text: `${friendlyPlatform(info.platform)} · ${info.architecture}` })
+      ] })
+    );
+    const hero = el("header", { className: "about-hero", children: [logo, identity] });
+    const details = el("div", { className: "about-details" });
+    const addDetail = (label: string, value: string) => details.append(el("div", { className: "about-detail", children: [el("span", { text: label }), el("strong", { text: value || "—", attrs: { title: value || "—" } })] }));
+    addDetail("Aplicativo", `${info.name} ${info.version}`);
+    addDetail("Electron", info.runtime.electron ?? "Não aplicável");
+    addDetail("Chromium", info.runtime.chromium ?? navigator.userAgent);
+    addDetail("Node.js", info.runtime.node ?? "Não aplicável");
+    addDetail("V8", info.runtime.v8 ?? "Não informado");
+    addDetail("Sistema", `${friendlyPlatform(info.platform)} (${info.architecture})`);
+    addDetail("Application ID", BUILD_CONFIG.applicationId);
+    addDetail("Dados do NPSharp", info.npsharpHome);
+    const diagnostic = [
+      `${info.name} ${info.version} (${info.isPackaged ? "installed" : "development"})`,
+      `Platform: ${info.platform} ${info.architecture}`,
+      `Electron: ${info.runtime.electron ?? "n/a"}`,
+      `Chromium: ${info.runtime.chromium ?? "n/a"}`,
+      `Node.js: ${info.runtime.node ?? "n/a"}`,
+      `V8: ${info.runtime.v8 ?? "n/a"}`,
+      `App path: ${info.appPath}`,
+      `Data path: ${info.userDataPath}`,
+      `NPSharp home: ${info.npsharpHome}`
+    ].join("\n");
+    const footerCopy = el("div", { className: "about-footer-copy", children: [
+      el("strong", { text: `© ${new Date().getFullYear()} ${BUILD_CONFIG.copyrightOwner}` }),
+      el("span", { text: "Licenciado sob MIT · Feito por desenvolvedores, para desenvolvedores." })
+    ] });
+    const copy = el("button", { className: "wide-action", text: "Copiar diagnóstico" });
+    copy.addEventListener("click", () => void navigator.clipboard.writeText(diagnostic).then(() => { copy.textContent = "Copiado"; window.setTimeout(() => copy.textContent = "Copiar diagnóstico", 1600); }).catch(error => reportError(error, text => this.updateStatus(text), "Não foi possível copiar")));
+    const repository = el("button", { className: "wide-action", text: "Repositório" });
+    repository.addEventListener("click", () => window.open(BUILD_CONFIG.homepage, "_blank", "noopener,noreferrer"));
+    const done = el("button", { className: "primary", text: "Fechar" });
+    done.addEventListener("click", close);
+    const actions = el("div", { className: "about-actions", children: [copy, repository, done] });
+    dialog.append(hero, details, el("footer", { className: "about-footer", children: [footerCopy, actions] }));
+    overlay.append(dialog); document.body.append(overlay);
+    overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
+    overlay.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
+    done.focus();
+  }
 
   private renderFatalError(error: unknown): void {
     if (this.disposed) return;

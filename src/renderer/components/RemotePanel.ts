@@ -47,7 +47,7 @@ export class RemotePanel {
 
   async disconnect(): Promise<void> { if (!this.sessionId) return; await api.remote.disconnect(this.sessionId); this.sessionId = undefined; this.watcherId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
   async reconnect(): Promise<void> { if (!this.sessionId) return; const session = await api.remote.reconnect(this.sessionId); this.sessionId = session.id; await this.openRemoteFolder(); }
-  async openRemoteFolder(): Promise<void> { if (!this.sessionId || !this.active) return; const selected = await showInputDialog("Caminho da pasta remota", this.currentPath); if (!selected) return; this.currentPath = selected; const uri = await api.remote.openFolder(this.sessionId, selected); await this.openWorkspace?.(uri, `${this.active.name} — ${basename(selected)}`, `${this.active.name}:${selected}`); await this.list(selected); }
+  async openRemoteFolder(): Promise<void> { if (!this.sessionId || !this.active) return; const selected = await this.pickRemoteFolder(this.currentPath); if (!selected) return; await this.activateRemoteFolder(selected); }
   async showLogs(): Promise<void> { const logs = await api.remote.getLogs(); this.updateStatus(logs.slice(-20).map(entry => `${entry.timestamp} [${entry.scope}] ${entry.message}`).join("\n") || "Sem logs remotos"); }
   async addNewHost(): Promise<void> { await this.addHost(); }
   async editSelectedHost(): Promise<void> { const host = this.active ?? this.hosts[0]; if (host) await this.editHost(host); }
@@ -171,17 +171,54 @@ export class RemotePanel {
       const session = await api.remote.connect(host.id!, this.password || undefined);
       this.sessionId = session.id;
       this.currentPath = host.defaultPath || session.platform.homeDirectory;
-      const workspaceUri = await api.remote.openFolder(session.id, this.currentPath);
-      this.watcherId = (await api.remote.sendRpc<{ id: string }>(session.id, "fs.watch", { path: this.currentPath, recursive: true })).id;
-      await this.openWorkspace?.(workspaceUri, `${session.hostName} — ${basename(this.currentPath)}`, `${session.hostName}:${this.currentPath}`);
       this.renderHosts();
-      await this.list(this.currentPath);
+      const selected = await this.pickRemoteFolder(this.currentPath);
+      if (selected) await this.activateRemoteFolder(selected);
+      else this.updateStatus(`Conectado a ${session.hostName}; nenhuma pasta remota foi aberta.`);
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao conectar ao NPSharp Server");
     } finally {
       this.password = "";
       this.connecting = false;
     }
+  }
+
+  private async activateRemoteFolder(remotePath: string): Promise<void> {
+    if (!this.sessionId || !this.active) return;
+    if (this.watcherId) await api.remote.sendRpc(this.sessionId, "fs.unwatch", { id: this.watcherId }).catch(() => undefined);
+    this.currentPath = remotePath.replace(/\/$/, "") || "/";
+    const workspaceUri = await api.remote.openFolder(this.sessionId, this.currentPath);
+    this.watcherId = (await api.remote.sendRpc<{ id: string }>(this.sessionId, "fs.watch", { path: this.currentPath, recursive: true })).id;
+    const hostName = this.active.name || this.active.host;
+    await this.openWorkspace?.(workspaceUri, `${hostName} — ${basename(this.currentPath) || "/"}`, `${hostName}:${this.currentPath}`);
+    await this.list(this.currentPath);
+  }
+
+  private pickRemoteFolder(initialPath: string): Promise<string | undefined> {
+    return new Promise(resolve => {
+      if (!this.sessionId) { resolve(undefined); return; }
+      const sessionId = this.sessionId;
+      const overlay = el("div", { className: "runtime-config-overlay remote-folder-overlay", attrs: { tabindex: "-1" } });
+      const dialog = el("section", { className: "remote-folder-dialog", attrs: { role: "dialog", "aria-modal": "true", "aria-label": "Abrir pasta remota" } });
+      const title = el("div", { className: "remote-folder-title", children: [el("h2", { text: "Abrir pasta no host remoto" }), el("span", { text: this.active ? `${this.active.username}@${this.active.host}` : "Remote Host" })] });
+      const input = el("input", { className: "panel-input remote-folder-input", attrs: { value: `${initialPath.replace(/\/$/, "") || "/"}/`, placeholder: "/home/usuário/projeto", autocomplete: "off", spellcheck: "false" } });
+      const status = el("div", { className: "remote-folder-status", text: "Digite um caminho ou escolha uma pasta abaixo." });
+      const list = el("div", { className: "remote-folder-list" });
+      const cancel = el("button", { className: "wide-action", text: "Cancelar" });
+      const open = el("button", { className: "primary", text: "Abrir" });
+      const actions = el("div", { className: "remote-folder-actions", children: [cancel, open] });
+      let settled = false, generation = 0, selectedIndex = 0, entries: Array<{ path: string; name: string }> = [];
+      const finish = (value?: string) => { if (settled) return; settled = true; overlay.remove(); resolve(value); };
+      const select = (entry: { path: string }) => { input.value = `${entry.path.replace(/\/$/, "")}/`; selectedIndex = 0; void refresh(); };
+      const render = () => { list.replaceChildren(); entries.forEach((entry, index) => { const row = el("button", { className: `remote-folder-row ${index === selectedIndex ? "active" : ""}`, children: [fileIcon(entry.name, true), el("span", { text: entry.name }), el("small", { text: entry.path })] }); row.addEventListener("mouseenter", () => { selectedIndex = index; render(); }); row.addEventListener("click", () => select(entry)); row.addEventListener("dblclick", () => finish(entry.path)); list.append(row); }); };
+      const refresh = async () => { const currentGeneration = ++generation; const value = input.value.trim() || "/"; const slash = value.lastIndexOf("/"); const directory = value.endsWith("/") ? value : slash <= 0 ? "/" : value.slice(0, slash) || "/"; const prefix = value.endsWith("/") ? "" : value.slice(slash + 1).toLowerCase(); status.textContent = `Lendo ${directory}…`; try { const raw = await api.remote.sendRpc<Array<{ path: string; name: string; type: string }>>(sessionId, "fs.readDir", { path: directory }); if (settled || currentGeneration !== generation) return; entries = raw.filter(entry => entry.type === "directory" && entry.name.toLowerCase().startsWith(prefix)).map(entry => ({ path: entry.path, name: entry.name })).sort((a, b) => a.name.localeCompare(b.name)); selectedIndex = Math.min(selectedIndex, Math.max(0, entries.length - 1)); status.textContent = entries.length ? `${entries.length} pasta(s) em ${directory}` : `Nenhuma pasta corresponde a “${prefix}” em ${directory}`; render(); } catch (error) { if (settled || currentGeneration !== generation) return; entries = []; render(); status.textContent = error instanceof Error ? error.message : "Não foi possível acessar esse caminho."; } };
+      let timer: number | undefined;
+      input.addEventListener("input", () => { if (timer !== undefined) window.clearTimeout(timer); timer = window.setTimeout(() => void refresh(), 160); });
+      input.addEventListener("keydown", event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); if (entries.length) { selectedIndex = (selectedIndex + (event.key === "ArrowDown" ? 1 : -1) + entries.length) % entries.length; render(); list.querySelector<HTMLElement>(".active")?.scrollIntoView({ block: "nearest" }); } } else if (event.key === "Tab" && entries[selectedIndex]) { event.preventDefault(); select(entries[selectedIndex]); } else if (event.key === "Enter") { event.preventDefault(); if (entries[selectedIndex] && !input.value.endsWith("/")) select(entries[selectedIndex]); else finish(input.value.replace(/\/$/, "") || "/"); } });
+      cancel.addEventListener("click", () => finish()); open.addEventListener("click", () => finish(input.value.replace(/\/$/, "") || "/"));
+      overlay.addEventListener("click", event => { if (event.target === overlay) finish(); }); overlay.addEventListener("keydown", event => { if (event.key === "Escape") finish(); });
+      dialog.append(title, input, status, list, actions); overlay.append(dialog); document.body.append(overlay); input.focus(); input.select(); void refresh();
+    });
   }
 
   private async testAndTrust(host: RemoteHostConfig, password?: string) {

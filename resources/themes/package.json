@@ -108,6 +108,12 @@
         "label": "Graphite",
         "uiTheme": "vs-dark",
         "path": "./graphite.json"
+      },
+          {
+        "id": "operacional",
+        "label": "Operacional",
+        "uiTheme": "vs-dark",
+        "path": "./operacional.json"
       }
     ],
     "specialThemes": [

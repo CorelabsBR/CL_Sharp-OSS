@@ -6,6 +6,7 @@ import type { ArduinoBoard, ArduinoBoardPort, ArduinoConfig } from "../../shared
 import { api, platform } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
+import { showInputDialog } from "../utils/inputDialog";
 import { basename } from "../utils/path";
 
 const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400, 250000];
@@ -143,7 +144,7 @@ export class ArduinoPanel {
   }
 
   private async createSketch(): Promise<void> {
-    const name = prompt("Nome do sketch", "Blink");
+    const name = await showInputDialog("Nome do sketch", "Blink");
     if (!name?.trim()) return;
     try {
       const result = await api.arduino.createSketch({ workspace: this.workspaceSupplier(), name });

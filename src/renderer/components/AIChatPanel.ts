@@ -18,6 +18,7 @@ import { MarkdownRenderer } from "../ai/MarkdownRenderer";
 import { api } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
+import { showInputDialog } from "../utils/inputDialog";
 
 export interface AIChatEditorActions {
   insertBelow(code: string): void;
@@ -569,8 +570,8 @@ export class AIChatPanel {
 
   private async renameConversation(): Promise<void> {
     if (!this.current) return;
-    const title = prompt("Nome da conversa", this.current.title);
-    if (title === null) return;
+    const title = await showInputDialog("Nome da conversa", this.current.title);
+    if (title === undefined) return;
     this.current = await api.ai.updateConversation({ id: this.current.id, title });
     this.replaceConversation(this.current);
     this.renderHistory();

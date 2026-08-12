@@ -7,6 +7,7 @@ import { initialContentForNewNPSharpFile } from "../../core/easterEggs";
 import { api, platform } from "../services/api";
 import { buttonIcon, contextMenu, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
+import { showInputDialog } from "../utils/inputDialog";
 import { basename, dirname, isSubPath, joinPath, normalizePath, pathSeparator, relativePath, samePath } from "../utils/path";
 
 interface TreeNode {
@@ -46,6 +47,8 @@ export class FileExplorer {
   private createInput?: HTMLInputElement;
   private focusPendingCreateInput = false;
   private deleteDialog?: HTMLElement;
+  private remoteConnected = false;
+  private disposeRemoteStatus?: () => void;
 
   onWorkspaceChanged: (workspace?: string, name?: string, location?: string) => void = () => undefined;
 
@@ -53,9 +56,12 @@ export class FileExplorer {
     private readonly onFileOpen: (filePath: string) => void,
     private readonly updateStatus: (text: string) => void,
     private readonly shouldConfirmDelete: () => boolean,
-    private readonly setConfirmDelete: (value: boolean) => Promise<void>
+    private readonly setConfirmDelete: (value: boolean) => Promise<void>,
+    private readonly openRemoteFolder?: () => Promise<void>
   ) {
     this.build();
+    this.disposeRemoteStatus = api.remote.onStatusChanged(state => { this.remoteConnected = state.status === "connected"; });
+    void api.remote.getStatus().then(state => { this.remoteConnected = state.status === "connected"; });
     api.remote.onEvent(value => {
       if (this.root?.startsWith("npsharp-remote://") && value.event.startsWith("fs.")) this.handleWorkspaceChange({ root: this.root, eventType: "change", path: this.root });
     });
@@ -72,11 +78,16 @@ export class FileExplorer {
     this.cancelCreate();
     this.closeDeleteDialog();
     this.stopWatching();
+    this.disposeRemoteStatus?.();
     this.nodes.clear();
   }
 
   async openFolderFromDialog(): Promise<void> {
     if (this.disposed) return;
+    if (this.remoteConnected) {
+      await this.openRemoteFolder?.();
+      return;
+    }
     const result = await api.dialog.openFolder();
     if (this.disposed) return;
     if (!result.canceled && result.paths[0]) {
@@ -86,6 +97,11 @@ export class FileExplorer {
 
   async openFolder(folder: string, displayName?: string, location?: string): Promise<void> {
     if (this.disposed) return;
+    if (this.remoteConnected && !folder.startsWith("npsharp-remote://")) {
+      this.updateStatus("Uma sessão remota está ativa; escolha uma pasta no host remoto.");
+      await this.openRemoteFolder?.();
+      return;
+    }
     const normalizedFolder = normalizePath(folder);
     const previousRoot = this.root;
     const previousRootName = this.rootName;
@@ -489,7 +505,7 @@ export class FileExplorer {
   private async rename(filePath: string): Promise<void> {
     if (this.disposed) return;
     if (!this.root || samePath(filePath, this.root)) return;
-    const name = prompt("Novo nome", basename(filePath));
+    const name = await showInputDialog("Novo nome", basename(filePath));
     if (!name?.trim() || name === basename(filePath)) return;
     try {
       const target = this.workspaceTarget(dirname(filePath), name);

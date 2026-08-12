@@ -21,6 +21,7 @@ export class ExtensionManagerPanel {
   private marketplaceLoading = false;
   private marketplaceQuery = "";
   private searchTimer?: number;
+  private remoteHost?: string;
 
   constructor(private readonly updateStatus: (text: string) => void) {
     const toolbar = el("div", { className: "panel-toolbar extensions-toolbar" });
@@ -41,6 +42,8 @@ export class ExtensionManagerPanel {
       return [];
     }
     try {
+      const remote = await api.remote.getStatus();
+      this.remoteHost = remote.status === "connected" ? remote.message.replace(/^Conectado a |\.$/g, "") : undefined;
       this.installed = await api.extensions.list();
       this.render();
       return this.installed;
@@ -100,7 +103,7 @@ export class ExtensionManagerPanel {
       ].join(" ").toLowerCase().includes(query)
     );
 
-    this.summary.textContent = `${this.installed.length} extensão(ões) instalada(s) · Open VSX`;
+    this.summary.textContent = `${this.installed.length} extensão(ões) instalada(s) · ${this.remoteHost ? `Remoto: ${this.remoteHost}` : "Local"} · Open VSX`;
     this.list.replaceChildren();
 
     if (!visible.length) {
