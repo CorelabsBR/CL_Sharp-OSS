@@ -17,6 +17,7 @@ Description:
 - Adiciona um seletor navegável de pasta remota após a conexão, com sugestões consultadas via RPC enquanto o caminho é digitado, navegação por teclado e confirmação explícita do workspace.
 - Bloqueia caminhos e diálogos locais no Explorer enquanto uma sessão remota está ativa, redirecionando botões, atalhos, recentes e restauração para o seletor do host.
 - Permite navegar a árvore remota desde `/`, respeitando as permissões do usuário SSH, em vez de limitar o seletor somente ao diretório home.
+- Remove o carregamento antecipado do binário Electron pelo serviço de arquivos, permitindo executar testes Node no CI sem baixar o runtime gráfico desnecessariamente.
 
 ## 26.8.40 - 2026-08-06
 

@@ -2,7 +2,6 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import { shell } from "electron";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -1050,6 +1049,7 @@ export async function deletePath(targetPath: string): Promise<void> {
 }
 
 export async function revealPath(targetPath: string): Promise<void> {
+  const { shell } = optionalRequire("electron") as typeof import("electron");
   shell.showItemInFolder(normalizeFsPath(targetPath));
 }
 
