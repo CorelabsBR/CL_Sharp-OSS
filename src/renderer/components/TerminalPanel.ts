@@ -32,6 +32,8 @@ export class TerminalPanel {
   private readonly tabs = el("div", { className: "terminal-tabs" });
   private readonly output = el("pre", { className: "terminal-output" });
   private readonly input = el("input", { className: "terminal-input", attrs: { placeholder: "Comando" } });
+  private readonly inputPrompt = el("span", { className: "terminal-input-prompt", text: "❯" });
+  private readonly inputRow = el("div", { className: "terminal-input-row" });
   private readonly debugOutput = el("pre", { className: "terminal-output debug-output" });
   private readonly debugInput = el("input", { className: "terminal-input debug-input", attrs: { placeholder: "Entrada do programa..." } });
   private readonly auxOutput = el("pre", { className: "terminal-output aux-output" });
@@ -327,7 +329,8 @@ export class TerminalPanel {
       this.debugInput.value = "";
       this.render();
     });
-    this.element.append(this.header, this.tabs, this.output, this.debugOutput, this.auxOutput, this.input, this.debugInput);
+    this.inputRow.append(this.inputPrompt, this.input);
+    this.element.append(this.header, this.tabs, this.output, this.debugOutput, this.auxOutput, this.inputRow, this.debugInput);
     this.render();
   }
 
@@ -514,14 +517,16 @@ export class TerminalPanel {
       this.tabs.append(button);
     }
     const session = this.activeSession();
-    this.output.textContent = session?.output ?? "";
+    this.output.innerHTML = renderAnsi(session?.output ?? "");
     this.output.hidden = this.mode !== "terminal";
     this.tabs.hidden = this.mode !== "terminal";
     this.input.hidden = this.mode !== "terminal";
+    this.inputRow.hidden = this.mode !== "terminal";
     this.input.disabled = this.mode !== "terminal" || !session;
     this.input.placeholder = this.pendingProgramInput
       ? "Entrada do programa — digite e pressione Enter"
       : session?.running || session?.localOnly ? "Comando" : "Processo encerrado";
+    this.inputPrompt.textContent = session ? `${this.shellLabel(session.shell)} ❯` : "❯";
     this.shellSelect.hidden = this.mode !== "terminal";
     this.debugOutput.hidden = this.mode !== "debug";
     this.debugInput.hidden = this.mode !== "debug";
@@ -598,10 +603,54 @@ function normalizeTerminalData(data: string): { text: string; clear: boolean } {
   const clear = /\x1bc|\x1B\[[0-?]*[ -/]*[HJ]/.test(data);
   const text = data
     .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
-    .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
+    .replace(/\x1B\[(?![0-9;]*m)[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1B[@-Z\\-_]/g, "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "");
   return { text, clear };
+}
+
+function renderAnsi(value: string): string {
+  const colors = ["#111827", "#ff6b6b", "#8bd450", "#f5c451", "#66aaff", "#d98cff", "#5de4c7", "#e6edf3"];
+  const bright = ["#6b7280", "#ff8e8e", "#b4f07b", "#ffe083", "#8fbcff", "#e9adff", "#8ff3df", "#ffffff"];
+  let foreground = "", bold = false, dim = false, italic = false, underline = false, inverse = false;
+  let result = "", last = 0;
+  const pattern = /\x1B\[([0-9;]*)m/g;
+  const style = () => {
+    const declarations = [];
+    if (foreground) declarations.push(`color:${foreground}`);
+    if (bold) declarations.push("font-weight:700");
+    if (dim) declarations.push("opacity:.72");
+    if (italic) declarations.push("font-style:italic");
+    if (underline) declarations.push("text-decoration:underline");
+    if (inverse) declarations.push("filter:invert(1)");
+    return declarations.length ? `<span style="${declarations.join(";")}">` : "<span>";
+  };
+  for (const match of value.matchAll(pattern)) {
+    result += `${style()}${escapeTerminalHtml(value.slice(last, match.index))}</span>`;
+    const codes = (match[1] || "0").split(";").map(Number);
+    for (const code of codes) {
+      if (code === 0) { foreground = ""; bold = dim = italic = underline = inverse = false; }
+      else if (code === 1) bold = true;
+      else if (code === 2) dim = true;
+      else if (code === 3) italic = true;
+      else if (code === 4) underline = true;
+      else if (code === 7) inverse = true;
+      else if (code === 22) bold = dim = false;
+      else if (code === 23) italic = false;
+      else if (code === 24) underline = false;
+      else if (code === 27) inverse = false;
+      else if (code === 39) foreground = "";
+      else if (code >= 30 && code <= 37) foreground = colors[code - 30];
+      else if (code >= 90 && code <= 97) foreground = bright[code - 90];
+    }
+    last = (match.index ?? 0) + match[0].length;
+  }
+  return `${result}${style()}${escapeTerminalHtml(value.slice(last))}</span>`;
+}
+
+function escapeTerminalHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function trimScrollback(text: string): string {

@@ -1816,9 +1816,9 @@ button {
 .terminal-panel {
   min-height: 0;
   display: grid;
-  grid-template-rows: 32px 28px minmax(0, 1fr) 28px;
+  grid-template-rows: 34px 30px minmax(0, 1fr) 34px;
   border-top: 1px solid var(--border);
-  background: var(--bg-2);
+  background: color-mix(in srgb, var(--bg) 96%, #000);
 }
 
 .terminal-panel[hidden] {
@@ -1877,24 +1877,61 @@ button {
 
 .terminal-output {
   margin: 0;
-  padding: 8px 10px;
+  padding: 12px 14px 18px;
   overflow: auto;
-  color: var(--fg);
-  background: var(--bg);
-  font-family: var(--editor-font-family);
-  font-size: 12px;
-  white-space: pre-wrap;
+  color: color-mix(in srgb, var(--fg) 96%, #fff);
+  background: color-mix(in srgb, var(--bg) 94%, #000);
+  font-family: var(--editor-font-family), "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  font-size: max(13px, calc(var(--editor-font-size, 14px) - 1px));
+  font-variant-ligatures: none;
+  line-height: 1.55;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+  scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
+  text-shadow: 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
+  user-select: text;
 }
 
 .aux-output {
   color: var(--muted);
 }
 
+.terminal-input-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--bg-3) 88%, var(--accent));
+}
+
+.terminal-input-row[hidden] { display: none; }
+
+.terminal-input-prompt {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-family: var(--editor-font-family), monospace;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .terminal-input {
-  border-radius: 0;
-  border-left: 0;
-  border-right: 0;
-  border-bottom: 0;
+  min-width: 0;
+  min-height: 32px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: var(--editor-font-family), monospace;
+  font-size: 13px;
+  caret-color: var(--accent);
+}
+
+.terminal-input:focus {
+  border: 0;
+  outline: 0;
 }
 
 .error-lens {
