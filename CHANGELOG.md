@@ -11,6 +11,8 @@ Description:
 - Corrige o Remote Host no Electron substituindo diálogos `prompt()` não suportados por um modal interno para host, senha, pasta e operações remotas.
 - Corrige instalações da Open VSX que retornavam 404 usando a URL oficial de download informada pelo registro, com validação de origem e identidade da extensão.
 - Corrige a descoberta do executável Codex empacotado pela extensão no Linux e macOS e amplia a busca para instalações do VS Code, Insiders, VSCodium, Cursor e Windsurf.
+- Corrige conexões remotas duplicadas reutilizando a operação em andamento para o mesmo host e bloqueando novos cliques no painel até sua conclusão.
+- Migra o provedor Codex com login ChatGPT dos modelos legados incompatíveis para GPT-5.6 Sol e atualiza o seletor com a família GPT-5.6.
 
 ## 26.8.39 - 2026-08-06
 

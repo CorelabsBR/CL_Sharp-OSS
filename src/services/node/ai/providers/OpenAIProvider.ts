@@ -64,9 +64,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async listModels(apiKey: string | undefined): Promise<AIModel[]> {
-    const fallback = this.descriptor.id === "codex"
-      ? ["gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"]
-      : ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.4-mini"];
+    const fallback = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.4-mini"];
     if (!apiKey) return fallback.map(model);
     const response = await checkedFetch("https://api.openai.com/v1/models", {
       headers: { Authorization: `Bearer ${apiKey}` }
@@ -75,7 +73,7 @@ export class OpenAIProvider implements AIProvider {
     const ids = asRecords(json?.data)
       .map(item => stringValue(item.id))
       .filter((id): id is string => Boolean(id))
-      .filter(id => this.descriptor.id === "codex" ? id.includes("codex") : /^gpt-/u.test(id) && !id.includes("codex"))
+      .filter(id => /^gpt-/u.test(id) && !id.includes("codex"))
       .sort();
     return (ids.length ? ids : fallback).map(model);
   }

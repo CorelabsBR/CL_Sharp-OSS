@@ -49,7 +49,7 @@ export class CodexAppServerProvider implements AIProvider {
     displayName: "Codex",
     supportsStreaming: true,
     requiresApiKey: false,
-    defaultModel: "gpt-5.2-codex"
+    defaultModel: "gpt-5.6-sol"
   };
 
   private process?: ChildProcess;
@@ -110,7 +110,7 @@ export class CodexAppServerProvider implements AIProvider {
   }
 
   async listModels(): Promise<AIModel[]> {
-    return ["gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"].map(id => ({ id, displayName: id }));
+    return ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].map(id => ({ id, displayName: id }));
   }
 
   private async threadFor(request: AIProviderRequest): Promise<string> {

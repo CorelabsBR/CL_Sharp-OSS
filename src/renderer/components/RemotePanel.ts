@@ -19,6 +19,7 @@ export class RemotePanel {
   private password = "";
   private currentPath = ".";
   private sessionId?: string;
+  private connecting = false;
   private disposeStatus?: () => void;
   private watcherId?: string;
 
@@ -152,19 +153,23 @@ export class RemotePanel {
   }
 
   private async connect(host: RemoteHostConfig): Promise<void> {
-    this.active = host;
-    if (host.authMethod === "password") {
-      this.password = await showInputDialog(`Senha para ${host.username}@${host.host}`, "", { password: true }) ?? "";
-    }
-    const tested = await this.testAndTrust(host, this.password || undefined);
-    if (!tested.success) {
-      this.updateStatus(tested.output || "Falha ao conectar ao host remoto");
+    if (this.connecting) {
+      this.updateStatus("Conexão remota já está em andamento...");
       return;
     }
+    this.connecting = true;
+    this.active = host;
     try {
+      if (host.authMethod === "password") {
+        this.password = await showInputDialog(`Senha para ${host.username}@${host.host}`, "", { password: true }) ?? "";
+      }
+      const tested = await this.testAndTrust(host, this.password || undefined);
+      if (!tested.success) {
+        this.updateStatus(tested.output || "Falha ao conectar ao host remoto");
+        return;
+      }
       const session = await api.remote.connect(host.id!, this.password || undefined);
       this.sessionId = session.id;
-      this.password = "";
       this.currentPath = host.defaultPath || session.platform.homeDirectory;
       const workspaceUri = await api.remote.openFolder(session.id, this.currentPath);
       this.watcherId = (await api.remote.sendRpc<{ id: string }>(session.id, "fs.watch", { path: this.currentPath, recursive: true })).id;
@@ -173,6 +178,9 @@ export class RemotePanel {
       await this.list(this.currentPath);
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao conectar ao NPSharp Server");
+    } finally {
+      this.password = "";
+      this.connecting = false;
     }
   }
 

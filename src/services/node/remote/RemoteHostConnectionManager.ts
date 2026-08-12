@@ -29,6 +29,7 @@ export class RemoteHostConnectionManager {
   private readonly logs: RemoteLogEntry[] = [];
   private readonly credentials = new RemoteCredentialStore();
   private abort?: AbortController;
+  private connectionInProgress?: { hostId: string; promise: Promise<RemoteSessionSummary> };
 
   constructor(private readonly serverDist: string, private readonly emit: (channel: string, value: unknown) => void) {}
 
@@ -36,8 +37,20 @@ export class RemoteHostConnectionManager {
   listSessions(): RemoteSessionSummary[] { return [...this.sessions.values()].map(value => value.summary); }
   getLogs(): RemoteLogEntry[] { return [...this.logs]; }
 
-  async connect(hostId: string, password?: string): Promise<RemoteSessionSummary> {
-    if (this.abort) throw new Error("Já existe uma conexão em andamento.");
+  connect(hostId: string, password?: string): Promise<RemoteSessionSummary> {
+    if (this.connectionInProgress) {
+      if (this.connectionInProgress.hostId === hostId) return this.connectionInProgress.promise;
+      return Promise.reject(coded("REMOTE_CONNECTION_IN_PROGRESS", "Já existe uma conexão em andamento para outro host."));
+    }
+    const promise = this.connectOnce(hostId, password);
+    this.connectionInProgress = { hostId, promise };
+    void promise.finally(() => {
+      if (this.connectionInProgress?.promise === promise) this.connectionInProgress = undefined;
+    }).catch(() => undefined);
+    return promise;
+  }
+
+  private async connectOnce(hostId: string, password?: string): Promise<RemoteSessionSummary> {
     this.abort = new AbortController();
     let ssh: Client | undefined; let tunnel: net.Server | undefined; let rpc: RemoteRpcClient | undefined;
     let bootstrap: RemoteServerBootstrap | undefined; let bootstrapPath = "";

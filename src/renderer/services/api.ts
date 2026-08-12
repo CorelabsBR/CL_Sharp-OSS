@@ -936,7 +936,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
   return {
     providers: async () => [
       { id: "openai", displayName: "OpenAI", supportsStreaming: true, requiresApiKey: true, defaultModel: "gpt-5.6-terra" },
-      { id: "codex", displayName: "Codex", supportsStreaming: true, requiresApiKey: false, defaultModel: "gpt-5.2-codex" },
+      { id: "codex", displayName: "Codex", supportsStreaming: true, requiresApiKey: false, defaultModel: "gpt-5.6-sol" },
       { id: "gemini", displayName: "Google Gemini", supportsStreaming: true, requiresApiKey: true, defaultModel: "gemini-2.5-flash" },
       { id: "openrouter", displayName: "OpenRouter", supportsStreaming: true, requiresApiKey: true, defaultModel: "openai/gpt-5.6-terra" },
       { id: "ollama", displayName: "Ollama (Local)", supportsStreaming: true, requiresApiKey: false, defaultModel: "qwen2.5-coder:7b" }
@@ -944,7 +944,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
     listModels: async provider => {
       const defaults: Record<typeof provider, string[]> = {
         openai: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
-        codex: ["gpt-5.2-codex"],
+        codex: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
         gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
         openrouter: ["openai/gpt-5.6-terra"],
         ollama: ["qwen2.5-coder:7b"]

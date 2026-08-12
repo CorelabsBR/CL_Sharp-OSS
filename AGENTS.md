@@ -18,7 +18,7 @@ Every completed task MUST:
 - Update package.json.
 - Update every other version reference.
 - Keep all versions synchronized.
-IF THE CHANGES ARE MINIMAL, DO NOT CHANGE THE VERSION
+- IF THE CHANGES ARE MINIMAL, DO NOT CHANGE THE VERSION
 
 ## Changelog
 

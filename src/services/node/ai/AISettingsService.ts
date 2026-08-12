@@ -13,7 +13,7 @@ interface PersistedAISettings extends Omit<AISettings, "apiKeyConfigured"> {
 
 const DEFAULT_AI_SETTINGS: AISettings = {
   provider: "codex",
-  model: "gpt-5.2-codex",
+  model: "gpt-5.6-sol",
   temperature: 0.2,
   maxTokens: 8192,
   streaming: true,
@@ -33,11 +33,11 @@ export class AISettingsService {
 
   async load(): Promise<AISettings> {
     const persisted = await this.loadPersisted();
-    return {
+    return migrateLegacyCodexModel({
       ...DEFAULT_AI_SETTINGS,
       ...withoutKeys(persisted),
       apiKeyConfigured: Boolean(await this.apiKey(persisted.provider))
-    };
+    });
   }
 
   async save(request: AISaveSettingsRequest): Promise<AISettings> {
@@ -58,7 +58,7 @@ export class AISettingsService {
     }
     const next: PersistedAISettings = {
       provider: request.provider,
-      model: request.model.trim(),
+      model: migratedCodexModel(request.provider, request.model.trim()),
       temperature: clamp(request.temperature, 0, 2),
       maxTokens: Math.round(clamp(request.maxTokens, 1, 128000)),
       streaming: request.streaming,
@@ -127,3 +127,10 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum));
 }
 
+function migrateLegacyCodexModel(settings: AISettings): AISettings {
+  return { ...settings, model: migratedCodexModel(settings.provider, settings.model) };
+}
+
+function migratedCodexModel(provider: AIProviderId, model: string): string {
+  return provider === "codex" && /^gpt-5\.[12]-codex(?:-|$)/u.test(model) ? "gpt-5.6-sol" : model;
+}

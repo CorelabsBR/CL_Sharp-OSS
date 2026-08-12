@@ -20,7 +20,6 @@ REQUEST_LOG: List[str] = []
 HOST = "0.0.0.0"
 ADMIN_PORT = 9999
 USER_PORT = 5500
-#ELA, NELA = thainá
 db_pool_admin: Optional[aiomysql.Pool] = None
 db_pool_user: Optional[aiomysql.Pool] = None
 connected_admin = set()
