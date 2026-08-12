@@ -20,6 +20,7 @@ Description:
 - Remove o carregamento antecipado do binário Electron pelo serviço de arquivos, permitindo executar testes Node no CI sem baixar o runtime gráfico desnecessariamente.
 - Corrige a seleção de shell por ambiente: cmd no Windows, `$SHELL` local (incluindo fish) e shell detectado no host remoto; no Linux sem `node-pty`, usa `/usr/bin/script` como PTY real em vez do fallback por pipes.
 - Evita carregar `node-pty` quando não existe binário nativo compatível, removendo o stack trace no Linux e selecionando diretamente o PTY fornecido por `/usr/bin/script`.
+- Corrige a compilação Android removendo o uso de `Process.pid()`, API inexistente no `java.lang.Process` fornecido pelo SDK Android; o PID já é opcional no contrato do terminal.
 
 ## 26.8.40 - 2026-08-06
 

@@ -47,7 +47,6 @@ public class NpsharpTerminalPlugin extends Plugin {
             result.put("cwd", call.getString("cwd", ""));
             result.put("shell", "/system/bin/sh");
             result.put("backend", "android-shell");
-            result.put("pid", session.pid());
             result.put("running", true);
             call.resolve(result);
         } catch (Exception error) {
@@ -163,10 +162,6 @@ public class NpsharpTerminalPlugin extends Plugin {
             emitData("\n[NPSharp] Shell Android iniciado em " + cwd.getAbsolutePath() + "\n");
             startOutputReader();
             startExitWatcher();
-        }
-
-        int pid() {
-            return process == null ? -1 : (int) process.pid();
         }
 
         synchronized void write(String data) throws IOException {
