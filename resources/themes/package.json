@@ -113,7 +113,8 @@
         "id": "operacional",
         "label": "Operacional",
         "uiTheme": "vs-dark",
-        "path": "./operacional.json"
+        "path": "./operacional.json",
+        "welcomeLogo": "./welcomelogos/operacional.png"
       }
     ],
     "specialThemes": [
