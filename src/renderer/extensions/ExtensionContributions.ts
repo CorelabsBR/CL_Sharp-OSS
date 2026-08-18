@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import type { InstalledExtension } from "../../shared/types";
 import { registerExtensionLanguage } from "../../editor/monacoSetup";
 import { api } from "../services/api";
