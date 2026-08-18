@@ -1,10 +1,11 @@
 # CHANGELOG
 
-## 26.8.42 - 2026-08-17
+## 26.8.42 - 2026-08-18
 
 Type: Feature / Fix / Refactor / Performance
 
 Description:
+- Restaura os módulos-fonte de Command Registry, Quick Open, contribuições de extensões e Monaco Diff Viewer que estavam referenciados pelo renderer, mas ausentes do projeto, corrigindo a resolução de imports do Vite.
 - Centraliza comandos do workbench em um Command Registry tipado e conecta Command Palette, atalhos personalizados e comandos enviados pelos menus Electron ao mesmo caminho de execução.
 - Evolui Quick Open com índice assíncrono no backend, fuzzy ranking, destaque de correspondências, arquivos recentes, ignores do workspace e abertura em `arquivo:linha:coluna`.
 - Completa a busca global com include/exclude, regex, case-sensitive, whole word, cancelamento real de requisições, `.gitignore`, resultados agrupados e Replace in Files.
