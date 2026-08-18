@@ -98,6 +98,18 @@
         "path": "./ocean.json"
       },
       {
+        "id": "dark_core",
+        "label": "Amethyst",
+        "uiTheme": "vs-dark",
+        "path": "./amethyst.json"
+      },
+      {
+        "id": "emerald",
+        "label": "Emerald",
+        "uiTheme": "vs-dark",
+        "path": "./emerald.json"
+      },
+      {
         "id": "terminal",
         "label": "Terminal",
         "uiTheme": "vs-dark",
@@ -138,6 +150,17 @@
           "Special Themes"
         ],
         "preview": "./previews/crimson_screen.png"
+      },
+      {
+        "id": "christmas",
+        "label": "Christmas Frost",
+        "uiTheme": "vs-dark",
+        "path": "./christmas.json",
+        "categories": [
+          "Special Themes"
+        ],
+        "preview": "./previews/crimson_screen.png",
+        "welcomeLogo": "./welcomelogos/sakura.png"
       }
     ],
     "iconThemes": [
