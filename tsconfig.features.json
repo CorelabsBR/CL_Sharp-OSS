@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.electron.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist-electron"
+  },
+  "include": [
+    "src/renderer/commands/commandRegistry.ts",
+    "src/renderer/commands/quickOpen.ts"
+  ]
+}

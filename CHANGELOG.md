@@ -5,6 +5,7 @@
 Type: Feature / Fix / Refactor / Performance
 
 Description:
+- Restaura a configuração e os entrypoints da suíte `test:features`, incluindo cobertura executável para busca, Git, Command Registry, fuzzy matching e Quick Open.
 - Restaura os módulos-fonte de Command Registry, Quick Open, contribuições de extensões e Monaco Diff Viewer que estavam referenciados pelo renderer, mas ausentes do projeto, corrigindo a resolução de imports do Vite.
 - Centraliza comandos do workbench em um Command Registry tipado e conecta Command Palette, atalhos personalizados e comandos enviados pelos menus Electron ao mesmo caminho de execução.
 - Evolui Quick Open com índice assíncrono no backend, fuzzy ranking, destaque de correspondências, arquivos recentes, ignores do workspace e abertura em `arquivo:linha:coluna`.
