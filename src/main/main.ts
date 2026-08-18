@@ -38,6 +38,7 @@ import {
   createBranch,
   discard,
   gitDiff,
+  gitDiffContent,
   gitHistory,
   readGitStatus,
   runGit,
@@ -62,7 +63,7 @@ import {
   updateRuntimeConfig,
   validateRuntime
 } from "../services/node/runtimeService";
-import { replaceAll, searchWorkspace } from "../services/node/searchService";
+import { cancelSearch, indexWorkspaceFiles, replaceAll, searchWorkspace } from "../services/node/searchService";
 import { loadSession, loadSettings, resetSettings, saveSession, saveSettings } from "../services/node/settingsService";
 import { applyTemplate } from "../services/node/templateService";
 import { runJavaDiagnostics } from "../services/node/diagnosticsService";
@@ -308,6 +309,7 @@ function createApplicationMenu(): void {
       label: "Arquivo",
       submenu: [
         { label: "Novo", accelerator: "CmdOrCtrl+N", click: () => sendCommand("file:new") },
+        { label: "Nova janela", accelerator: "CmdOrCtrl+Shift+N", click: () => void createMainWindow() },
         { label: "Abrir...", accelerator: "CmdOrCtrl+O", click: () => sendCommand("file:open") },
         { type: "separator" },
         { label: "Salvar", accelerator: "CmdOrCtrl+S", click: () => sendCommand("file:save") },
@@ -529,15 +531,16 @@ function registerIpcHandlers(): void {
   ipcMain.handle(UPDATE_IPC.download, () => updateService?.downloadUpdate() ?? Promise.resolve({ state: "idle", message: "Atualizador iniciando…" }));
   ipcMain.handle(UPDATE_IPC.install, () => updateService?.installUpdate());
 
-  ipcMain.handle("window:minimize", () => currentMainWindow()?.minimize());
-  ipcMain.handle("window:maximize", () => {
-    const window = currentMainWindow();
+  ipcMain.handle("window:new", () => createMainWindow());
+  ipcMain.handle("window:minimize", event => BrowserWindow.fromWebContents(event.sender)?.minimize());
+  ipcMain.handle("window:maximize", event => {
+    const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) return;
     if (window.isMaximized()) window.unmaximize();
     else window.maximize();
   });
-  ipcMain.handle("window:close", () => currentMainWindow()?.close());
-  ipcMain.handle("window:isMaximized", () => currentMainWindow()?.isMaximized() ?? false);
+  ipcMain.handle("window:close", event => BrowserWindow.fromWebContents(event.sender)?.close());
+  ipcMain.handle("window:isMaximized", event => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false);
 
   ipcMain.handle("dialog:openFile", async () => {
     const result = await showOpenDialog({ properties: ["openFile"] });
@@ -561,7 +564,7 @@ function registerIpcHandlers(): void {
     const result = await showOpenDialog({
       properties: ["openFile"],
       filters: [
-        { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] },
+        { name: "Imagens (PNG, JPEG, JFIF, WebP, GIF e BMP)", extensions: ["png", "jpg", "jpeg", "jfif", "webp", "gif", "bmp"] },
         { name: "All Files", extensions: ["*"] }
       ]
     });
@@ -713,8 +716,10 @@ function registerIpcHandlers(): void {
     disposeWorkspaceWatcher(watchId);
   });
 
+  ipcMain.handle("search:files", (_event, workspace: string) => indexWorkspaceFiles(workspace));
   ipcMain.handle("search:workspace", async (_event, query: SearchQuery) => { const remote = remoteHostManager!.resolveUri(query.workspace); if (!remote) return searchWorkspace(query); const results = await remoteHostManager!.request<SearchResult[]>(remote.sessionId, "search.workspace", { ...query, workspace: remote.path }); const prefix = query.workspace.slice(0, query.workspace.length - remote.path.length); return results.map(result => ({ ...result, filePath: `${prefix}${result.filePath}` })); });
   ipcMain.handle("search:replaceAll", (_event, request: ReplaceAllRequest) => { const remote = remoteHostManager!.resolveUri(request.workspace); return remote ? remoteHostManager!.request(remote.sessionId, "search.replaceAll", { ...request, workspace: remote.path }) : replaceAll(request); });
+  ipcMain.handle("search:cancel", (_event, requestId: string) => cancelSearch(requestId));
   ipcMain.handle("diagnostics:java", (_event, workspace: string, filePath?: string) => runJavaDiagnostics(workspace, filePath));
 
   ipcMain.handle("git:status", (_event, workspace: string) => readGitStatus(workspace));
@@ -726,6 +731,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("git:checkout", (_event, repo: string, branch: string) => checkout(repo, branch));
   ipcMain.handle("git:createBranch", (_event, repo: string, branch: string) => createBranch(repo, branch));
   ipcMain.handle("git:diff", (_event, repo: string, file: GitFileStatus, staged: boolean) => gitDiff(repo, file, staged));
+  ipcMain.handle("git:diffContent", (_event, repo: string, file: GitFileStatus, staged: boolean) => gitDiffContent(repo, file, staged));
   ipcMain.handle("git:history", (_event, repo: string) => gitHistory(repo));
 
   ipcMain.handle("terminal:run", async (_event, request: TerminalRunRequest) => {
@@ -777,6 +783,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("extensions:disable", (_event, id: string) => remoteExtensionRequest("extensions.disable", { id }) ?? extensionManager.disable(id));
   ipcMain.handle("extensions:uninstall", (_event, id: string) => remoteExtensionRequest("extensions.uninstall", { id }) ?? extensionManager.uninstall(id));
   ipcMain.handle("extensions:reload", (_event, id?: string) => remoteExtensionRequest("extensions.reload", { id }) ?? extensionManager.reload(id));
+  ipcMain.handle("extensions:readFile", (_event, id: string, relativePath: string) => extensionManager.readContributionFile(id, relativePath));
 
   ipcMain.handle("arduino:detect", (_event, request?: ArduinoCliRequest) => detectArduinoCli(request));
   ipcMain.handle("arduino:loadConfig", (_event, request: ArduinoConfigRequest) => loadArduinoConfig(request));
@@ -992,7 +999,11 @@ function closeRegisteredTerminals(): void {
 }
 
 function currentMainWindow(): BrowserWindow | undefined {
-  return !shuttingDown && isUsableWindow(mainWindow) ? mainWindow : undefined;
+  if (shuttingDown) return undefined;
+  const focused = BrowserWindow.getFocusedWindow();
+  if (isUsableWindow(focused ?? undefined)) return focused ?? undefined;
+  if (isUsableWindow(mainWindow)) return mainWindow;
+  return BrowserWindow.getAllWindows().find(isUsableWindow);
 }
 
 function isUsableWindow(window: BrowserWindow | undefined): window is BrowserWindow {

@@ -223,6 +223,9 @@ export interface SearchQuery {
   useRegex?: boolean;
   includeHidden?: boolean;
   limit?: number;
+  include?: string;
+  exclude?: string;
+  requestId?: string;
 }
 
 export interface SearchResult {
@@ -303,6 +306,14 @@ export interface GitCommit {
 export interface GitOperationResult {
   success: boolean;
   output: string;
+}
+
+export interface GitDiffContent {
+  original: string;
+  modified: string;
+  originalLabel: string;
+  modifiedLabel: string;
+  language: string;
 }
 
 export interface TerminalRunRequest {
@@ -404,6 +415,18 @@ export interface ExtensionManifest {
   icon?: string;
   iconPath?: string;
   categories: string[];
+  contributes?: ExtensionContributions;
+}
+
+export interface ExtensionThemeContribution { id?: string; label: string; path: string; uiTheme?: string; }
+export interface ExtensionLanguageContribution { id: string; aliases?: string[]; extensions?: string[]; configuration?: string; monarch?: string; }
+export interface ExtensionSnippetContribution { language: string; path: string; }
+export interface ExtensionCommandContribution { command: string; title: string; category?: string; action?: string; }
+export interface ExtensionContributions {
+  themes?: ExtensionThemeContribution[];
+  languages?: ExtensionLanguageContribution[];
+  snippets?: ExtensionSnippetContribution[];
+  commands?: ExtensionCommandContribution[];
 }
 
 export interface InstalledExtension extends ExtensionManifest {
@@ -588,6 +611,7 @@ export interface RemoteFileRequest {
 }
 
 export interface WindowControlsApi {
+  newWindow(): Promise<void>;
   minimize(): Promise<void>;
   maximize(): Promise<void>;
   close(): Promise<void>;
@@ -787,8 +811,10 @@ export interface NpsharpApi {
     open(path: string): Promise<void>;
   };
   search: {
+    files(workspace: string): Promise<string[]>;
     workspace(query: SearchQuery): Promise<SearchResult[]>;
     replaceAll(request: ReplaceAllRequest): Promise<ReplaceAllResult>;
+    cancel(requestId: string): Promise<void>;
   };
   diagnostics: {
     java(workspace: string, filePath?: string): Promise<EditorDiagnostic[]>;
@@ -803,6 +829,7 @@ export interface NpsharpApi {
     checkout(repo: string, branch: string): Promise<GitOperationResult>;
     createBranch(repo: string, branch: string): Promise<GitOperationResult>;
     diff(repo: string, file: GitFileStatus, staged: boolean): Promise<string>;
+    diffContent(repo: string, file: GitFileStatus, staged: boolean): Promise<GitDiffContent>;
     history(repo: string): Promise<GitCommit[]>;
   };
   terminal: {
@@ -836,6 +863,7 @@ export interface NpsharpApi {
     disable(id: string): Promise<InstalledExtension[]>;
     uninstall(id: string): Promise<InstalledExtension[]>;
     reload(id?: string): Promise<InstalledExtension[]>;
+    readFile(id: string, relativePath: string): Promise<string>;
   };
   arduino: {
     detect(request?: ArduinoCliRequest): Promise<ArduinoCliInfo>;

@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 26.8.42 - 2026-08-17
+
+Type: Feature / Fix / Refactor / Performance
+
+Description:
+- Centraliza comandos do workbench em um Command Registry tipado e conecta Command Palette, atalhos personalizados e comandos enviados pelos menus Electron ao mesmo caminho de execução.
+- Evolui Quick Open com índice assíncrono no backend, fuzzy ranking, destaque de correspondências, arquivos recentes, ignores do workspace e abertura em `arquivo:linha:coluna`.
+- Completa a busca global com include/exclude, regex, case-sensitive, whole word, cancelamento real de requisições, `.gitignore`, resultados agrupados e Replace in Files.
+- Reestrutura o Source Control em Changes, Staged Changes, Untracked e Conflicts, adicionando trava de operações, amend, stash, stash pop, branches e feedback detalhado.
+- Integra o Monaco Diff Editor ao sistema existente de abas para comparações HEAD, index e working tree, incluindo arquivos novos, removidos e renomeados.
+- Torna extensões declarativas funcionais com validação de contributions, ativação e descarregamento dinâmicos de temas, linguagens, Monarch, configurações, snippets e comandos seguros.
+- Reforça a segurança de arquivos de extensão contra path traversal e symlinks externos e adiciona testes de registry, fuzzy matching, Quick Open, busca, Git e manifests/contributions.
+- Restringe o scanner de dependências do Vite ao `index.html` da aplicação, ignorando fixtures HTML, relatórios Gradle, assets Android e artefatos de release durante o desenvolvimento.
+- Corrige os ícones quebrados da Open VSX com permissão de origem restrita e fallback automático, e refina o visual dos cards de extensões.
+- Limita o papel de parede à área do editor, preservando fundos sólidos e legíveis no Explorer, painéis laterais e terminal.
+- Mantém a opção selecionada da Command Palette visível durante a navegação pelas setas do teclado.
+- Adiciona suporte a imagens JFIF no seletor de papel de parede e no visualizador, com indicação dos formatos aceitos.
+- Implementa a abertura real de múltiplas janelas e vincula minimizar, maximizar e fechar à janela que originou o comando.
+- Corrige a decodificação de mensagens localizadas de compiladores no Windows, preservando acentos em diagnósticos como “parâmetros”.
+
 ## 26.8.41 - 2026-08-12
 
 Type: Fix

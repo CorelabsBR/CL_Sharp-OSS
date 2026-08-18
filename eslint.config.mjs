@@ -31,7 +31,7 @@ const headerPlugin = {
 
 export default tseslint.config(
   {
-    ignores: [".vscode/**", "node_modules/**", "dist/**", "dist-electron/**", "release/**", "android/**", "testes/**"]
+    ignores: [".vscode/**", "node_modules/**", "dist/**", "dist-electron/**", "dist-tests/**", "release/**", "android/**", "testes/**"]
   },
   {
     files: ["**/*.{ts,tsx,js,mjs,cjs}"],

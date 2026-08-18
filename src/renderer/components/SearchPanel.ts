@@ -15,11 +15,14 @@ export class SearchPanel {
   private readonly useRegex = el("input", { attrs: { type: "checkbox" } });
   private readonly caseSensitive = el("input", { attrs: { type: "checkbox" } });
   private readonly wholeWord = el("input", { attrs: { type: "checkbox" } });
+  private readonly include = el("input", { className: "panel-input", attrs: { placeholder: "Incluir: *.ts, src/**" } });
+  private readonly exclude = el("input", { className: "panel-input", attrs: { placeholder: "Excluir: node_modules, dist/**" } });
   private readonly summary = el("div", { className: "panel-summary", text: "Digite para pesquisar" });
   private readonly list = el("div", { className: "search-results" });
   private workspace?: string;
   private debounce?: number;
   private requestVersion = 0;
+  private activeRequestId?: string;
   private disposed = false;
 
   constructor(
@@ -33,6 +36,7 @@ export class SearchPanel {
     if (this.disposed) return;
     this.disposed = true;
     this.requestVersion += 1;
+    if (this.activeRequestId) void api.search.cancel(this.activeRequestId);
     if (this.debounce !== undefined) {
       window.clearTimeout(this.debounce);
       this.debounce = undefined;
@@ -60,6 +64,8 @@ export class SearchPanel {
 
   private build(): void {
     this.query.addEventListener("input", () => this.scheduleSearch());
+    this.include.addEventListener("input", () => this.scheduleSearch());
+    this.exclude.addEventListener("input", () => this.scheduleSearch());
     this.query.addEventListener("keydown", event => {
       if (event.key === "Enter" && !(event.ctrlKey || event.metaKey || event.altKey)) {
         this.list.querySelector<HTMLButtonElement>(".search-result")?.click();
@@ -75,7 +81,7 @@ export class SearchPanel {
 
     const options = el("div", { className: "search-options" });
     options.append(labelled(this.useRegex, "Regex"), labelled(this.caseSensitive, "Diferenciar maiúsculas/minúsculas"), labelled(this.wholeWord, "Palavra inteira"));
-    this.element.append(this.query, this.replace, replaceAll, options, this.summary, this.list);
+    this.element.append(this.query, this.replace, replaceAll, options, this.include, this.exclude, this.summary, this.list);
   }
 
   private scheduleSearch(): void {
@@ -90,6 +96,8 @@ export class SearchPanel {
   private async runSearch(): Promise<void> {
     if (this.disposed) return;
     const version = ++this.requestVersion;
+    if (this.activeRequestId) void api.search.cancel(this.activeRequestId);
+    this.activeRequestId = undefined;
     const text = this.query.value;
     if (!text) {
       this.summary.textContent = "Digite para pesquisar";
@@ -102,6 +110,8 @@ export class SearchPanel {
         : "Abra uma pasta para pesquisar";
       return;
     }
+    const requestId = crypto.randomUUID();
+    this.activeRequestId = requestId;
 
     try {
       this.summary.textContent = "Pesquisando...";
@@ -110,7 +120,10 @@ export class SearchPanel {
         text,
         useRegex: this.useRegex.checked,
         caseSensitive: this.caseSensitive.checked,
-        wholeWord: this.wholeWord.checked
+        wholeWord: this.wholeWord.checked,
+        include: this.include.value,
+        exclude: this.exclude.value,
+        requestId
       });
       if (this.disposed || version !== this.requestVersion) return;
       this.renderResults(results);
@@ -118,6 +131,8 @@ export class SearchPanel {
     } catch (error) {
       if (this.disposed || version !== this.requestVersion) return;
       this.summary.textContent = reportError(error, this.updateStatus, "Falha na pesquisa");
+    } finally {
+      if (this.activeRequestId === requestId) this.activeRequestId = undefined;
     }
   }
 
@@ -146,7 +161,9 @@ export class SearchPanel {
         replaceWith: this.replace.value,
         useRegex: this.useRegex.checked,
         caseSensitive: this.caseSensitive.checked,
-        wholeWord: this.wholeWord.checked
+        wholeWord: this.wholeWord.checked,
+        include: this.include.value,
+        exclude: this.exclude.value
       });
       if (this.disposed) return;
       this.summary.textContent = `${result.replacements} ocorrência(s) substituída(s)`;

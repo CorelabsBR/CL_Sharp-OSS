@@ -1,6 +1,6 @@
 {
   "name": "NPSharp",
-  "version": "26.8.41",
+  "version": "26.8.42",
   "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -22,7 +22,8 @@
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
     "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p npsharp-server/tsconfig.json",
     "lint": "npm run config:sync && eslint .",
-    "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote && npm run test:discord",
+    "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote && npm run test:discord && npm run test:features",
+    "test:features": "npm run build:electron && tsc -p tsconfig.features.json && node --test dist-electron/services/node/featureInfrastructure.test.js && node --test scripts/feature-renderer.test.mjs",
     "test:discord": "npm run build:electron && node --test dist-electron/main/discord/DiscordRichPresenceBuilder.test.js",
     "test:remote": "npm run build:electron && npm run build:server && node dist-electron/services/node/remote/remoteProtocol.test.js && node --test npsharp-server/dist/security/PathGuard.test.js && node scripts/remote-server-smoke.test.mjs",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
@@ -182,5 +183,11 @@
   },
   "optionalDependencies": {
     "node-pty": "1.1.0"
+  },
+  "allowScripts": {
+    "cpu-features@0.0.10": true,
+    "node-pty@1.1.0": true,
+    "ssh2@1.17.0": true,
+    "electron-winstaller@5.4.0": true
   }
 }

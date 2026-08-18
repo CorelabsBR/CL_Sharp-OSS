@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { GitCommit, GitFileStatus, GitOperationResult, GitRepositoryStatus, GitStatusKind } from "../../shared/types";
+import type { GitCommit, GitDiffContent, GitFileStatus, GitOperationResult, GitRepositoryStatus, GitStatusKind } from "../../shared/types";
 import { runProcess } from "./processService";
 
 const GIT_TIMEOUT_MS = 45000;
@@ -71,7 +71,7 @@ export async function readStatus(repo: string): Promise<GitRepositoryStatus> {
         ahead = counts[0];
         behind = counts[1];
       } else if (line.trim()) {
-        files.push(parseStatusLine(repo, line));
+        files.push(...parseStatusLines(repo, line));
       }
     }
   }
@@ -148,6 +148,35 @@ export async function gitDiff(repo: string, file: GitFileStatus, staged: boolean
   return (await runGit(repo, args)).output;
 }
 
+export async function gitDiffContent(repo: string, file: GitFileStatus, staged: boolean): Promise<GitDiffContent> {
+  const filePath = file.path;
+  const originalPath = file.oldPath || filePath;
+  const head = await readGitObject(repo, `HEAD:${originalPath}`);
+  const index = await readGitObject(repo, `:${filePath}`);
+  const working = await readWorkingFile(repo, filePath);
+  return {
+    original: staged ? head : (index || head),
+    modified: staged ? index : working,
+    originalLabel: staged ? `HEAD — ${originalPath}` : `INDEX — ${filePath}`,
+    modifiedLabel: staged ? `STAGED — ${filePath}` : `WORKING TREE — ${filePath}`,
+    language: path.extname(filePath).slice(1) || "plaintext"
+  };
+}
+
+async function readGitObject(repo: string, object: string): Promise<string> {
+  const result = await runGit(repo, ["show", object]);
+  return result.success ? result.output : "";
+}
+
+async function readWorkingFile(repo: string, file: string): Promise<string> {
+  try {
+    return await fs.readFile(path.join(repo, file), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+    throw error;
+  }
+}
+
 export async function gitHistory(repo: string): Promise<GitCommit[]> {
   const result = await runGit(repo, ["log", "--max-count=80", "--date=short", "--pretty=format:%H%x1f%an%x1f%ad%x1f%s%x1f%b%x1e"]);
   if (!result.success) return [];
@@ -161,7 +190,7 @@ export async function gitHistory(repo: string): Promise<GitCommit[]> {
   return commits;
 }
 
-function parseStatusLine(repo: string, line: string): GitFileStatus {
+export function parseStatusLines(repo: string, line: string): GitFileStatus[] {
   const xy = line.length >= 2 ? line.slice(0, 2) : "??";
   const pathPart = line.length > 3 ? line.slice(3).trim() : "";
   let oldPath = "";
@@ -187,7 +216,7 @@ function parseStatusLine(repo: string, line: string): GitFileStatus {
   else if (x === "D" || y === "D") kind = "deleted";
   else kind = "modified";
 
-  return {
+  const base = {
     repositoryName: path.basename(repo),
     repo,
     path: filePath,
@@ -199,7 +228,24 @@ function parseStatusLine(repo: string, line: string): GitFileStatus {
     ignored,
     x,
     y
-  };
+  } satisfies GitFileStatus;
+  if (conflicted || ignored || untracked || x === " " || y === " ") return [base];
+  const stagedKind = kindForStatus(x, false);
+  const workingKind = kindForStatus(y, false);
+  return [
+    { ...base, kind: stagedKind, staged: true },
+    { ...base, kind: workingKind, staged: false }
+  ];
+}
+
+function kindForStatus(status: string, conflict: boolean): GitStatusKind {
+  if (conflict || status === "U") return "conflicted";
+  if (status === "A") return "added";
+  if (status === "D") return "deleted";
+  if (status === "R") return "renamed";
+  if (status === "?") return "untracked";
+  if (status === "!") return "ignored";
+  return "modified";
 }
 
 function isConflict(x: string, y: string): boolean {

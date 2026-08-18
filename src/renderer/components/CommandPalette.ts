@@ -2,9 +2,11 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import { api } from "../services/api";
+import { api, platform } from "../services/api";
 import { basename, relativePath } from "../utils/path";
 import { el } from "../utils/dom";
+import { CommandRegistry, fuzzyScore } from "../commands/commandRegistry";
+import { parseQuickOpenQuery } from "../commands/quickOpen";
 
 export interface CommandAction {
   id?: string;
@@ -35,7 +37,12 @@ export class CommandPalette {
   private workspaceFiles: string[] = [];
   private workspace?: string;
   private workspaceIndexGeneration = 0;
-  private openFile: (file: string) => void = () => undefined;
+  private openFile: (file: string, line?: number, column?: number) => void = () => undefined;
+  private registry?: CommandRegistry;
+
+  setRegistry(registry: CommandRegistry): void {
+    this.registry = registry;
+  }
 
   setCommands(commands: CommandAction[]): void {
     this.commands = commands;
@@ -53,12 +60,18 @@ export class CommandPalette {
     this.quickOpenFiles = [...new Set(files)];
   }
 
-  setFileOpener(opener: (file: string) => void): void {
+  setFileOpener(opener: (file: string, line?: number, column?: number) => void): void {
     this.openFile = opener;
   }
 
   showCommands(): void {
-    this.show(">", this.commands.map(command => ({
+    const registered = this.registry?.list(false).map(command => ({
+      label: `${command.category}: ${command.title}`,
+      hint: command.shortcut ?? "",
+      keywords: [command.id, command.keywords ?? ""].join(" "),
+      run: async () => { await this.registry?.execute(command.id); }
+    })) ?? [];
+    this.show(">", registered.length ? registered : this.commands.map(command => ({
       label: translateCommandLabel(command.label),
       hint: command.shortcut ?? "",
       keywords: [command.id ?? "", command.keywords ?? ""].join(" "),
@@ -67,7 +80,7 @@ export class CommandPalette {
   }
 
   showQuickOpen(initialQuery = ""): void {
-    this.show(initialQuery, this.quickOpenItems(), "Pesquisar arquivos por nome ou caminho");
+    this.show(initialQuery, this.quickOpenItems(), "Pesquisar arquivos por nome ou caminho", true);
   }
   //só pra botar o workflow funcionar
 
@@ -80,6 +93,15 @@ export class CommandPalette {
   }
 
   private async indexWorkspaceFiles(workspace: string, generation: number): Promise<void> {
+    if (platform.canUseNodeBackend && !workspace.startsWith("npsharp-remote://")) {
+      try {
+        const indexed = await api.search.files(workspace);
+        if (generation === this.workspaceIndexGeneration) this.workspaceFiles = indexed;
+      } catch (error) {
+        console.warn(`[NPSharp quick open] Workspace index failed (${workspace})`, error);
+      }
+      return;
+    }
     const files: string[] = [];
     const seen = new Set<string>();
     const walk = async (directory: string): Promise<void> => {
@@ -108,43 +130,56 @@ export class CommandPalette {
     }
   }
 
-  private quickOpenItems(): PaletteItem[] {
+  private quickOpenItems(line?: number, column?: number): PaletteItem[] {
     const files = [...new Set([...this.workspaceFiles, ...this.quickOpenFiles])];
     return files.map(file => ({
       label: this.workspace && file.startsWith(this.workspace) ? relativePath(this.workspace, file) : basename(file),
       hint: this.workspace && file.startsWith(this.workspace) ? "" : file,
       keywords: file,
-      run: () => this.openFile(file)
+      run: () => this.openFile(file, line, column)
     }));
   }
 
-  private show(initialValue: string, items: PaletteItem[], placeholder: string): void {
+  private show(initialValue: string, items: PaletteItem[], placeholder: string, quickOpen = false): void {
     this.close();
     const overlay = el("div", { className: "palette-overlay" });
     const box = el("div", { className: "palette" });
     const input = el("input", { className: "palette-input", attrs: { value: initialValue, placeholder } });
-    const list = el("div", { className: "palette-list" });
+    const list = el("div", { className: "palette-list", attrs: { role: "listbox" } });
     let selectedIndex = 0;
     let filteredItems: PaletteItem[] = [];
     box.append(input, list);
     overlay.append(box);
     document.body.append(overlay);
 
-    const updateSelectedRow = () => {
+    const updateSelectedRow = (reveal = false) => {
+      let selectedRow: HTMLElement | undefined;
       for (const row of list.querySelectorAll<HTMLElement>(".palette-row")) {
-        row.classList.toggle("active", Number(row.dataset.index) === selectedIndex);
+        const selected = Number(row.dataset.index) === selectedIndex;
+        row.classList.toggle("active", selected);
+        row.setAttribute("aria-selected", String(selected));
+        if (selected) selectedRow = row;
       }
+      if (reveal) selectedRow?.scrollIntoView({ block: "nearest", inline: "nearest" });
     };
 
     const render = () => {
-      const query = input.value.replace(/^>/, "").trim().toLowerCase();
-      filteredItems = items
-        .filter(item => matchesPaletteQuery(item, query))
+      const parsed = quickOpen ? parseQuickOpenQuery(input.value) : { query: input.value.replace(/^>/, "").trim() };
+      const query = parsed.query.toLowerCase();
+      const candidates = quickOpen ? this.quickOpenItems(parsed.line, parsed.column) : items;
+      filteredItems = candidates
+        .map(item => ({ item, score: paletteScore(item, query) }))
+        .filter(match => match.score >= 0)
+        .sort((left, right) => right.score - left.score || left.item.label.localeCompare(right.item.label))
+        .map(match => match.item)
         .slice(0, 50);
       selectedIndex = Math.min(selectedIndex, Math.max(filteredItems.length - 1, 0));
       list.replaceChildren();
       filteredItems.forEach((item, index) => {
-        const row = el("button", { className: `palette-row ${index === selectedIndex ? "active" : ""} ${item.active ? "selected" : ""}`.trim() });
+        const row = el("button", {
+          className: `palette-row ${index === selectedIndex ? "active" : ""} ${item.active ? "selected" : ""}`.trim(),
+          attrs: { role: "option", "aria-selected": String(index === selectedIndex) }
+        });
         row.dataset.index = String(index);
         const label = el("span", { className: "palette-label" });
         label.append(el("span", { className: "palette-check", text: item.active ? "✓" : "" }));
@@ -153,7 +188,9 @@ export class CommandPalette {
           swatch.style.background = item.swatch;
           label.append(swatch);
         }
-        label.append(el("span", { className: "palette-text", text: item.label }));
+        const text = el("span", { className: "palette-text" });
+        appendHighlighted(text, item.label, query);
+        label.append(text);
         row.append(label, el("span", { className: "menu-shortcut", text: item.hint ?? "" }));
         row.addEventListener("mouseenter", () => {
           selectedIndex = index;
@@ -180,7 +217,7 @@ export class CommandPalette {
         event.preventDefault();
         if (filteredItems.length) {
           selectedIndex = (selectedIndex + (event.key === "ArrowDown" ? 1 : -1) + filteredItems.length) % filteredItems.length;
-          render();
+          updateSelectedRow(true);
         }
         return;
       }
@@ -200,19 +237,25 @@ export class CommandPalette {
   }
 }
 
-function matchesPaletteQuery(item: PaletteItem, query: string): boolean {
-  if (!query) return true;
-  const haystack = [item.label, item.hint ?? "", item.keywords ?? ""].join(" ").toLowerCase();
-  return haystack.includes(query) || isSubsequence(query, haystack);
+function paletteScore(item: PaletteItem, query: string): number {
+  if (!query) return 0;
+  const label = item.label.toLowerCase();
+  const score = fuzzyScore(query, [label, item.hint ?? "", item.keywords ?? ""].join(" ").toLowerCase());
+  const basename = label.split(/[\\/]/).pop() ?? label;
+  return score + (basename.includes(query) ? 500 : 0);
 }
 
-function isSubsequence(query: string, text: string): boolean {
-  let queryIndex = 0;
-  for (const character of text) {
-    if (character === query[queryIndex]) queryIndex++;
-    if (queryIndex === query.length) return true;
+function appendHighlighted(container: HTMLElement, value: string, query: string): void {
+  if (!query) {
+    container.textContent = value;
+    return;
   }
-  return false;
+  let queryIndex = 0;
+  for (const character of value) {
+    const matched = queryIndex < query.length && character.toLowerCase() === query[queryIndex];
+    container.append(el("span", { className: matched ? "palette-match" : "", text: character }));
+    if (matched) queryIndex++;
+  }
 }
 
 function translateCommandLabel(label: string): string {

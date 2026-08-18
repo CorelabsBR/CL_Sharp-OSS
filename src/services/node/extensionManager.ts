@@ -19,6 +19,7 @@ interface ExtensionPackageJson {
   description?: string;
   icon?: string;
   categories?: string[];
+  contributes?: import("../../shared/types").ExtensionContributions;
 }
 
 export interface ExtensionActivationContext {
@@ -142,8 +143,25 @@ export class ExtensionManager {
     return installed;
   }
 
-  async activate(_context: ExtensionActivationContext): Promise<void> {
-    throw new Error("Extension activation is not implemented yet.");
+  async readContributionFile(id: string, relativePath: string): Promise<string> {
+    const installed = (await this.scanInstalledExtensions()).find(item => sameExtensionId(item.id, id));
+    if (!installed || !installed.enabled) throw new Error(`Extensão não habilitada: ${id}`);
+    const resolved = path.resolve(installed.path, relativePath);
+    const relative = path.relative(installed.path, resolved);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Caminho de contribution inválido.");
+    const realRoot = await fs.realpath(installed.path);
+    const realFile = await fs.realpath(resolved);
+    const realRelative = path.relative(realRoot, realFile);
+    if (!realRelative || realRelative.startsWith("..") || path.isAbsolute(realRelative)) throw new Error("Contribution não pode seguir links para fora da extensão.");
+    const stat = await fs.stat(realFile);
+    if (!stat.isFile() || stat.size > 5 * 1024 * 1024) throw new Error("Arquivo de contribution inválido ou muito grande.");
+    return fs.readFile(realFile, "utf8");
+  }
+
+  async activate(context: ExtensionActivationContext): Promise<void> {
+    if (!context.extension.enabled) throw new Error(`Extensão desabilitada: ${context.extension.id}`);
+    if (!this.isManagedExtensionPath(context.extensionPath)) throw new Error("Caminho de ativação inválido.");
+    await this.readManifest(context.extensionPath);
   }
 
   private async scanInstalledExtensions(): Promise<InstalledExtension[]> {
@@ -211,7 +229,8 @@ export class ExtensionManager {
       description: parsed.description?.trim() || "",
       icon: parsed.icon,
       iconPath,
-      categories: parsed.categories ?? []
+      categories: parsed.categories ?? [],
+      contributes: parsed.contributes
     };
   }
 
@@ -301,8 +320,18 @@ function parsePackageJson(raw: string, filePath: string): ExtensionPackageJson {
     displayName: stringValue(parsed.displayName),
     description: stringValue(parsed.description),
     icon: stringValue(parsed.icon),
-    categories: stringArrayValue(parsed.categories)
+    categories: stringArrayValue(parsed.categories),
+    contributes: parseContributions(parsed.contributes)
   };
+}
+
+function parseContributions(value: unknown): import("../../shared/types").ExtensionContributions | undefined {
+  if (!isRecord(value)) return undefined;
+  const themes = Array.isArray(value.themes) ? value.themes.filter(isRecord).map(item => ({ id: stringValue(item.id) || undefined, label: stringValue(item.label), path: stringValue(item.path), uiTheme: stringValue(item.uiTheme) || undefined })).filter(item => item.label && item.path) : undefined;
+  const languages = Array.isArray(value.languages) ? value.languages.filter(isRecord).map(item => ({ id: stringValue(item.id), aliases: stringArrayValue(item.aliases), extensions: stringArrayValue(item.extensions), configuration: stringValue(item.configuration) || undefined, monarch: stringValue(item.monarch) || undefined })).filter(item => item.id) : undefined;
+  const snippets = Array.isArray(value.snippets) ? value.snippets.filter(isRecord).map(item => ({ language: stringValue(item.language), path: stringValue(item.path) })).filter(item => item.language && item.path) : undefined;
+  const commands = Array.isArray(value.commands) ? value.commands.filter(isRecord).map(item => ({ command: stringValue(item.command), title: stringValue(item.title), category: stringValue(item.category) || undefined, action: stringValue(item.action) || undefined })).filter(item => item.command && item.title) : undefined;
+  return { themes, languages, snippets, commands };
 }
 
 function isRegistryEntry(value: unknown): value is ExtensionRegistryEntry {

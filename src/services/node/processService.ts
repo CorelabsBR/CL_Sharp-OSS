@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
-import { StringDecoder } from "node:string_decoder";
+import { TextDecoder } from "node:util";
 import os from "node:os";
 import path from "node:path";
 import type { TerminalRunResult } from "../../shared/types";
@@ -117,13 +117,12 @@ export function runProcess(
       windowsHide: true
     });
 
-    let output = "";
+    const outputChunks: Buffer[] = [];
+    let timeoutMessage = "";
     let settled = false;
-    const stdoutDecoder = new StringDecoder("utf8");
-    const stderrDecoder = new StringDecoder("utf8");
     const timeout = options.timeoutMs
       ? setTimeout(() => {
-        output += "\n[ERRO] Processo excedeu o tempo limite.";
+        timeoutMessage = "\n[ERRO] Processo excedeu o tempo limite.";
         child.kill("SIGKILL");
       }, options.timeoutMs)
       : undefined;
@@ -135,20 +134,30 @@ export function runProcess(
     };
 
     child.stdout.on("data", (chunk: Buffer) => {
-      output += stdoutDecoder.write(chunk);
+      outputChunks.push(Buffer.from(chunk));
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      output += stderrDecoder.write(chunk);
+      outputChunks.push(Buffer.from(chunk));
     });
     child.on("error", error => {
       finish({ output: error.message, code: 1 });
     });
     child.on("close", code => {
-      output += stdoutDecoder.end();
-      output += stderrDecoder.end();
+      const output = `${decodeProcessOutput(Buffer.concat(outputChunks))}${timeoutMessage}`;
       finish({ output: output.trimEnd(), code });
     });
   });
+}
+
+/** Decodes compiler output without replacing localized Windows characters with U+FFFD. */
+export function decodeProcessOutput(buffer: Buffer, allowWindowsFallback = process.platform === "win32"): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    return allowWindowsFallback
+      ? new TextDecoder("windows-1252").decode(buffer)
+      : new TextDecoder("utf-8").decode(buffer);
+  }
 }
 
 export async function commandExists(command: string): Promise<string | undefined> {

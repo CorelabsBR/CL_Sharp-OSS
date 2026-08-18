@@ -22,8 +22,9 @@ export class ExtensionManagerPanel {
   private marketplaceQuery = "";
   private searchTimer?: number;
   private remoteHost?: string;
+  private activationStates = new Map<string, { state: "active" | "error"; message?: string }>();
 
-  constructor(private readonly updateStatus: (text: string) => void) {
+  constructor(private readonly updateStatus: (text: string) => void, private readonly onChanged: () => void | Promise<void> = () => undefined) {
     const toolbar = el("div", { className: "panel-toolbar extensions-toolbar" });
     toolbar.append(
       buttonIcon("cloud-download", "Instalar de VSIX", () => void this.installFromVsix()),
@@ -58,6 +59,11 @@ export class ExtensionManagerPanel {
     this.search.select();
   }
 
+  setActivationStates(states: ReadonlyMap<string, { state: "active" | "error"; message?: string }>): void {
+    this.activationStates = new Map(states);
+    this.render();
+  }
+
   async installFromVsix(): Promise<void> {
     if (!platform.canUseNodeBackend) {
       this.updateStatus("A instalação de VSIX está disponível no desktop.");
@@ -69,6 +75,7 @@ export class ExtensionManagerPanel {
       const installed = await api.extensions.installVsix(result.paths[0]);
       this.updateStatus(`Extensão instalada: ${installed.displayName}`);
       await this.refresh();
+      await this.onChanged();
     } catch (error) {
       reportError(error, this.updateStatus, "Falha na instalação do VSIX");
     }
@@ -83,6 +90,7 @@ export class ExtensionManagerPanel {
       this.installed = await api.extensions.reload(id);
       this.render();
       this.updateStatus(id ? `Extensão recarregada: ${id}` : "Extensões recarregadas");
+      await this.onChanged();
       return this.installed;
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao recarregar extensões");
@@ -137,19 +145,19 @@ export class ExtensionManagerPanel {
 
   private extensionRow(extension: InstalledExtension): HTMLElement {
     const row = el("section", { className: `extension-row ${extension.enabled ? "enabled" : "disabled"}` });
-    const extensionIcon = extension.iconPath
-      ? el("img", { className: "extension-icon", attrs: { src: fileUri(extension.iconPath), alt: "" } })
-      : el("span", { className: "extension-icon placeholder", children: [icon("extensions-large", extension.displayName)] });
+    const extensionIcon = this.createExtensionIcon(extension.displayName, extension.iconPath ? fileUri(extension.iconPath) : undefined);
     const title = el("div", { className: "extension-title" });
     title.append(
       el("strong", { text: extension.displayName }),
       el("span", { text: extension.id })
     );
     const meta = el("div", { className: "extension-meta" });
+    const activation = this.activationStates.get(extension.id);
     meta.append(
       el("span", { text: extension.version }),
-      el("span", { text: extension.enabled ? "Habilitada" : "Desabilitada" })
+      el("span", { text: !extension.enabled ? "Desabilitada" : activation?.state === "active" ? "Ativa" : activation?.state === "error" ? "Erro" : "Habilitada" })
     );
+    if (activation?.message) meta.append(el("span", { className: "extension-error", text: activation.message }));
     const description = el("p", { className: "extension-description", text: extension.description || "Sem descrição." });
     const categories = el("div", { className: "extension-categories" });
     for (const category of extension.categories.slice(0, 4)) {
@@ -176,9 +184,7 @@ export class ExtensionManagerPanel {
     const id = `${extension.namespace}.${extension.name}`.toLowerCase();
     const installed = this.installed.some(item => item.id.toLowerCase() === id);
     const row = el("section", { className: "extension-row marketplace-extension" });
-    const extensionIcon = extension.iconUrl
-      ? el("img", { className: "extension-icon", attrs: { src: extension.iconUrl, alt: "" } })
-      : el("span", { className: "extension-icon placeholder", children: [icon("extensions-large", extension.displayName)] });
+    const extensionIcon = this.createExtensionIcon(extension.displayName, extension.iconUrl);
     const title = el("div", { className: "extension-title" });
     title.append(el("strong", { text: extension.displayName }), el("span", { text: id }));
     const meta = el("div", { className: "extension-meta", text: `${extension.version}${extension.downloads ? ` · ${extension.downloads.toLocaleString()} downloads` : ""}` });
@@ -189,6 +195,22 @@ export class ExtensionManagerPanel {
     install.addEventListener("click", () => void this.installFromOpenVsx(extension));
     row.append(extensionIcon, copy, el("div", { className: "extension-actions", children: [install] }));
     return row;
+  }
+
+  private createExtensionIcon(displayName: string, source?: string): HTMLElement {
+    const fallback = () => el("span", {
+      className: "extension-icon placeholder",
+      title: displayName,
+      children: [icon("extensions-large", displayName)]
+    });
+    if (!source) return fallback();
+
+    const image = el("img", {
+      className: "extension-icon",
+      attrs: { src: source, alt: "", loading: "lazy", decoding: "async" }
+    });
+    image.addEventListener("error", () => image.replaceWith(fallback()), { once: true });
+    return image;
   }
 
   private scheduleMarketplaceSearch(): void {
@@ -229,6 +251,7 @@ export class ExtensionManagerPanel {
       const installed = await api.extensions.installOpenVsx(extension);
       this.updateStatus(`Extensão instalada: ${installed.displayName}`);
       await this.refresh();
+      await this.onChanged();
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao instalar a extensão da Open VSX");
     }
@@ -241,6 +264,7 @@ export class ExtensionManagerPanel {
         : await api.extensions.enable(extension.id);
       this.render();
       this.updateStatus(`${extension.enabled ? "Desabilitada" : "Habilitada"} ${extension.displayName}`);
+      await this.onChanged();
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao alterar a extensão");
     }
@@ -251,6 +275,7 @@ export class ExtensionManagerPanel {
       this.installed = await api.extensions.uninstall(extension.id);
       this.render();
       this.updateStatus(`Extensão desinstalada: ${extension.displayName}`);
+      await this.onChanged();
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao desinstalar a extensão");
     }

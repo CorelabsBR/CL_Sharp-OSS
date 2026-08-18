@@ -48,6 +48,7 @@ const BUNDLED_THEME_ASSETS = import.meta.glob("../../../resources/themes/*.json"
 }) as Record<string, string>;
 
 const themeFileCache = new Map<string, Promise<VSCodeThemeFile | undefined>>();
+const extensionThemes = new Map<string, ThemeSummary>();
 
 export interface ThemeSummary {
   id: string;
@@ -119,7 +120,7 @@ const BUILT_IN_FALLBACKS: ThemeSummary[] = [
 
 export async function listThemes(): Promise<ThemeSummary[]> {
   const bundledManifest = bundledThemeAsset("package.json");
-  if (bundledManifest) return themesFromManifest(bundledManifest, "bundle");
+  if (bundledManifest) return [...await themesFromManifest(bundledManifest, "bundle"), ...extensionThemes.values()];
 
   const manifestUrl = resourceUrl("themes/package.json");
   const response = await fetch(manifestUrl).catch(error => {
@@ -128,10 +129,24 @@ export async function listThemes(): Promise<ThemeSummary[]> {
   });
   if (!response?.ok) {
     if (response) console.warn(`[NPSharp assets] Theme manifest returned ${response.status}: ${manifestUrl}`);
-    return BUILT_IN_FALLBACKS;
+    return [...BUILT_IN_FALLBACKS, ...extensionThemes.values()];
   }
 
-  return themesFromManifest(await response.text(), manifestUrl);
+  return [...await themesFromManifest(await response.text(), manifestUrl), ...extensionThemes.values()];
+}
+
+export function registerExtensionTheme(id: string, name: string, source: string, uiTheme = "vs-dark"): () => void {
+  const parsed = parseThemeFile(source, id);
+  if (!parsed) throw new Error(`Tema inválido: ${name}`);
+  const theme: ThemeSummary = {
+    id,
+    name,
+    uiTheme,
+    colors: { ...baseColors(uiTheme), ...mapVSCodeColors(parsed.colors ?? {}, uiTheme) },
+    tokenColors: parsed.tokenColors
+  };
+  extensionThemes.set(id, theme);
+  return () => extensionThemes.delete(id);
 }
 
 export async function applyTheme(settings: AppSettings): Promise<ThemeSummary> {

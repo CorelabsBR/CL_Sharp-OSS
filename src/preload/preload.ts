@@ -88,6 +88,7 @@ const api: NpsharpApi = {
     }
   },
   window: {
+    newWindow: () => invoke("window:new"),
     minimize: () => invoke("window:minimize"),
     maximize: () => invoke("window:maximize"),
     close: () => invoke("window:close"),
@@ -175,8 +176,10 @@ const api: NpsharpApi = {
     open: (targetPath: string) => invoke("office:open", targetPath)
   },
   search: {
+    files: (workspace: string) => invoke("search:files", workspace),
     workspace: (query: SearchQuery) => invoke("search:workspace", query),
-    replaceAll: (request: ReplaceAllRequest) => invoke("search:replaceAll", request)
+    replaceAll: (request: ReplaceAllRequest) => invoke("search:replaceAll", request),
+    cancel: (requestId: string) => invoke("search:cancel", requestId)
   },
   diagnostics: {
     java: (workspace: string, filePath?: string) => invoke("diagnostics:java", workspace, filePath)
@@ -191,6 +194,7 @@ const api: NpsharpApi = {
     checkout: (repo: string, branch: string) => invoke("git:checkout", repo, branch),
     createBranch: (repo: string, branch: string) => invoke("git:createBranch", repo, branch),
     diff: (repo: string, file: GitFileStatus, staged: boolean) => invoke("git:diff", repo, file, staged),
+    diffContent: (repo: string, file: GitFileStatus, staged: boolean) => invoke("git:diffContent", repo, file, staged),
     history: (repo: string) => invoke("git:history", repo)
   },
   terminal: {
@@ -231,7 +235,8 @@ const api: NpsharpApi = {
     enable: (id: string) => invoke("extensions:enable", id),
     disable: (id: string) => invoke("extensions:disable", id),
     uninstall: (id: string) => invoke("extensions:uninstall", id),
-    reload: (id?: string) => invoke("extensions:reload", id)
+    reload: (id?: string) => invoke("extensions:reload", id),
+    readFile: (id: string, relativePath: string) => invoke("extensions:readFile", id, relativePath)
   },
   arduino: {
     detect: (request?: ArduinoCliRequest) => invoke("arduino:detect", request),

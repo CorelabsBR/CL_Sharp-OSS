@@ -30,7 +30,7 @@ const IGNORED_DIRECTORY_NAMES = new Set([
   "coverage"
 ]);
 
-const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".ico", ".tiff", ".tif", ".avif"]);
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".jfif", ".gif", ".bmp", ".webp", ".svg", ".ico", ".tiff", ".tif", ".avif"]);
 const BINARY_EXTENSIONS = new Set([".exe", ".dll", ".so", ".dylib", ".bin", ".dat", ".elf", ".class", ".jar", ".war", ".ear", ".apk", ".ipa", ".dex", ".o", ".obj", ".a", ".lib", ".wasm", ".pyc", ".pyd"]);
 const MEDIA_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".oga", ".m4a", ".aac", ".flac", ".mp4", ".webm", ".ogv", ".mov", ".mkv"]);
 const ARCHIVE_EXTENSIONS = new Set([".zip", ".jar", ".war", ".ear", ".apk", ".vsix"]);
@@ -379,7 +379,7 @@ function isImageContent(extension: string, buffer: Buffer): boolean {
   const startsWith = (...bytes: number[]) => bytes.every((byte, index) => buffer[index] === byte);
   switch (extension) {
     case ".png": return startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
-    case ".jpg": case ".jpeg": return startsWith(0xff, 0xd8, 0xff);
+    case ".jpg": case ".jpeg": case ".jfif": return startsWith(0xff, 0xd8, 0xff);
     case ".gif": return buffer.subarray(0, 6).toString("ascii") === "GIF87a" || buffer.subarray(0, 6).toString("ascii") === "GIF89a";
     case ".bmp": return startsWith(0x42, 0x4d);
     case ".webp": return buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
@@ -880,7 +880,7 @@ function decodeText(buffer: Buffer): { content: string; encoding: TextEncoding }
 
 function mimeTypeFor(extension: string): string {
   return ({
-    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".bmp": "image/bmp", ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".tiff": "image/tiff", ".tif": "image/tiff", ".avif": "image/avif",
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".jfif": "image/jpeg", ".gif": "image/gif", ".bmp": "image/bmp", ".webp": "image/webp", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".tiff": "image/tiff", ".tif": "image/tiff", ".avif": "image/avif",
     ".pdf": "application/pdf", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".oga": "audio/ogg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".flac": "audio/flac",
     ".mp4": "video/mp4", ".webm": "video/webm", ".ogv": "video/ogg", ".mov": "video/quicktime", ".mkv": "video/x-matroska"
   } as Record<string, string>)[extension] ?? "application/octet-stream";

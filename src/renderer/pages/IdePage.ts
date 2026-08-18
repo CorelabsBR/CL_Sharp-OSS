@@ -32,6 +32,8 @@ import { showInputDialog } from "../utils/inputDialog";
 import { cssUrl, DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, dirname, extname, fileUri, isSubPath, joinPath, relativePath } from "../utils/path";
 import type { CommandAction } from "../components/CommandPalette";
+import { CommandRegistry } from "../commands/commandRegistry";
+import { ExtensionContributions } from "../extensions/ExtensionContributions";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "extensions" | "remote" | "arduino" | "ai" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench" | "Discord";
@@ -98,7 +100,11 @@ export class IdePage {
     (): Promise<void> => this.remote.openRemoteFolder()
   );
   private readonly search = new SearchPanel(result => void this.editor.openSearchResult(result), text => this.updateStatus(text));
-  private readonly source = new SourceControlPanel((title, uri, content) => this.editor.openVirtualFile(title, uri, content), text => this.updateStatus(text));
+  private readonly source = new SourceControlPanel(
+    (title, uri, content) => this.editor.openVirtualFile(title, uri, content),
+    text => this.updateStatus(text),
+    (title, uri, filePath, content) => void this.editor.openDiff(title, uri, filePath, content)
+  );
   private readonly terminal = new TerminalPanel(() => this.terminalCwd(), text => this.updateStatus(text), () => this.closeTerminalPanel(), () => this.remote.connection());
   private readonly aiChat = new AIChatPanel({
     workspace: () => this.explorer.workspace,
@@ -122,7 +128,9 @@ export class IdePage {
     text => this.updateStatus(text),
     () => void this.showLanguageRuntimes()
   );
-  private readonly extensions = new ExtensionManagerPanel(text => this.updateStatus(text));
+  private readonly commands = new CommandRegistry();
+  private readonly extensionContributions = new ExtensionContributions(this.commands, text => this.updateStatus(text));
+  private readonly extensions = new ExtensionManagerPanel(text => this.updateStatus(text), () => this.reloadExtensionContributions());
   private readonly remote: RemotePanel = new RemotePanel((title, uri, content, save) => this.editor.openVirtualFile(title, uri, content, save), text => this.updateStatus(text), (uri, name, location) => this.explorer.openFolder(uri, name, location));
   private readonly arduino = new ArduinoPanel(() => this.explorer.workspace, file => this.editor.openFile(file), text => this.updateStatus(text));
   private readonly palette = new CommandPalette();
@@ -174,6 +182,7 @@ export class IdePage {
     this.palette.close();
     this.languageRuntimes.close();
     this.keyboardShortcuts.close();
+    this.extensionContributions.disposeAll();
     closeContextMenus();
     document.querySelector(".html-preview-overlay")?.remove();
   };
@@ -210,6 +219,8 @@ export class IdePage {
   /** Restaura recursos persistidos depois que o editor já pode receber entrada. */
   private async restoreStartupState(): Promise<void> {
     try {
+      await this.extensionContributions.reload();
+      this.extensions.setActivationStates(this.extensionContributions.states());
       const [appInfo, session, theme] = await Promise.all([
         api.appInfo(),
         api.settings.loadSession(),
@@ -228,18 +239,29 @@ export class IdePage {
     }
   }
 
+  private async reloadExtensionContributions(): Promise<void> {
+    await this.extensionContributions.reload();
+    this.extensions.setActivationStates(this.extensionContributions.states());
+    const themes = await listThemes();
+    if (!themes.some(theme => theme.id === this.settings.theme)) {
+      this.settings = await api.settings.save({ ...this.settings, theme: "np-dark" });
+    }
+    this.editor.applyTheme(await applyTheme(this.settings));
+  }
+
   private build(): void {
     this.buildTitleBar();
     this.buildActivityBar();
     this.buildSideBar();
     const center = el("section", { className: "center-area" });
     this.editor.element.append(this.commandCenter.element);
+    this.editor.element.append(this.wallpaper);
     this.editorStack.append(this.editor.element, this.terminal.element);
     this.setTerminalVisible(this.session.terminalVisible, false);
     this.aiDock.hidden = true;
     center.append(this.activityBar, this.sideBar, this.editorStack, this.aiDock);
     this.workbench.append(center);
-    this.element.append(this.wallpaper, this.titleBar, this.workbench, this.statusBar());
+    this.element.append(this.titleBar, this.workbench, this.statusBar());
     this.showPanel((this.session.sidePanel as PanelId) || "explorer");
   }
 
@@ -453,7 +475,11 @@ export class IdePage {
       this.showPanel("ai");
       void this.aiChat.runAction(action);
     };
-    this.palette.setFileOpener(file => void this.editor.openFile(file));
+    this.palette.setFileOpener((file, line, column) => {
+      void this.editor.openFile(file).then(() => {
+        if (line) this.editor.goToPosition(line, column ?? 1);
+      });
+    });
     const handleError = (event: ErrorEvent) => this.updateStatus(`Error: ${errorMessage(event.error ?? event.message)}`);
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => this.updateStatus(`Error: ${errorMessage(event.reason)}`);
     window.addEventListener("keydown", this.handleShortcut, true);
@@ -574,17 +600,43 @@ export class IdePage {
       { label: "NPSharp: Central de comandos", shortcut: "Ctrl+Alt+C", run: () => this.updateStatus("Central de comandos") },
       { label: "NPSharp: Seletor de temas", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
     ];
-    this.palette.setCommands(commands);
     this.refreshShortcuts();
+    for (const command of commands) {
+      const id = command.id ?? commandIdForLabel(command.label);
+      const separator = command.label.indexOf(":");
+      const category = separator >= 0 ? command.label.slice(0, separator).trim() : "NPSharp";
+      const title = separator >= 0 ? command.label.slice(separator + 1).trim() : command.label;
+      if (this.commands.get(id) || this.commands.list().some(existing => existing.category.toLowerCase() === category.toLowerCase() && existing.title.toLowerCase() === title.toLowerCase())) continue;
+      this.commands.register({ id, category, title, shortcut: command.shortcut, keywords: command.keywords, execute: command.run });
+    }
+    this.palette.setRegistry(this.commands);
   }
 
   private refreshShortcuts(): void {
     this.shortcutController?.dispose();
+    const actions = this.shortcutActions();
     this.shortcuts = createShortcutRegistry({
-      actions: this.shortcutActions(),
+      actions,
       when: { canCloseTransient: () => this.canCloseTransient() },
       customBindings: this.customKeyboardShortcuts()
     });
+    for (const shortcut of this.shortcuts.filter(item => !item.custom)) {
+      if (!this.commands.get(shortcut.id)) {
+        const separator = shortcut.label.indexOf(":");
+        this.commands.register({
+          id: shortcut.id,
+          category: separator >= 0 ? shortcut.label.slice(0, separator) : shortcut.category,
+          title: separator >= 0 ? shortcut.label.slice(separator + 1).trim() : shortcut.label,
+          shortcut: shortcut.keys[0],
+          when: shortcut.when,
+          execute: actions[shortcut.commandId ?? shortcut.id] ?? shortcut.run
+        });
+      }
+      shortcut.run = () => this.commands.execute(shortcut.commandId ?? shortcut.id).then(() => undefined);
+    }
+    for (const shortcut of this.shortcuts.filter(item => item.custom)) {
+      shortcut.run = () => this.commands.execute(shortcut.commandId ?? shortcut.id).then(() => undefined);
+    }
     this.shortcutController = useGlobalShortcuts(this.shortcuts, { updateStatus: text => this.updateStatus(text) });
     this.editor.registerMonacoShortcuts(this.shortcuts);
     this.updateCommandCenter();
@@ -1302,6 +1354,7 @@ export class IdePage {
       const result = await api.dialog.chooseWallpaper();
       if (!result.canceled && result.paths[0]) {
         await this.updateSettings({ ...this.settings, wallpaperPath: result.paths[0] });
+        this.updateStatus("Papel de parede aplicado. Formatos aceitos: PNG, JPG, JPEG, JFIF, WebP, GIF e BMP.");
       }
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha ao escolher papel de parede");
@@ -1438,12 +1491,17 @@ export class IdePage {
     }
   }
 
-  private openNewWindow(): void {
+  private async openNewWindow(): Promise<void> {
     if (!platform.isDesktop) {
       this.updateStatus("Nova janela disponivel apenas no desktop");
       return;
     }
-    this.updateStatus("Nova janela ainda depende do backend Electron");
+    try {
+      await api.window.newWindow();
+      this.updateStatus("Nova janela aberta");
+    } catch (error) {
+      reportError(error, text => this.updateStatus(text), "Falha ao abrir nova janela");
+    }
   }
 
   private showRecentWorkspaces(): void {
@@ -2161,6 +2219,21 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   }
 
   private handleCommand(command: string): void {
+    const commandAliases: Record<string, string> = {
+      "file:new": "file.new", "file:open": "file.open", "file:save": "file.save", "file:saveAs": "file.saveAs",
+      "file:close": "file.closeEditor", "file:reopenClosed": "file.reopenClosedEditor", "workspace:openFolder": "file.openWorkspace",
+      "editor:find": "search.findInFile", "editor:replace": "search.replaceInFile", "editor:goToLine": "editor.goToLine",
+      "view:search": "search.findInWorkspace", "view:replaceInFiles": "search.replaceInWorkspace", "view:explorer": "view.explorer",
+      "view:source": "view.sourceControl", "view:extensions": "view.extensions", "view:commandPalette": "view.commandPalette",
+      "view:keyboardShortcuts": "view.keyboardShortcuts", "view:settings": "view.settings", "view:terminal": "view.toggleTerminal",
+      "tools:runWithoutDebug": "run.withoutDebug", "tools:build": "run.build", "notes:open": "npsharp.notes",
+      "npsharp:commandCenter": "npsharp.commandCenter", "npsharp:configureLanguageRuntimes": "npsharp.configureLanguageRuntimes"
+    };
+    const registered = commandAliases[command];
+    if (registered) {
+      void this.commands.execute(registered);
+      return;
+    }
     const map: Record<string, () => void> = {
       "file:new": () => this.editor.newTab(),
       "file:open": () => void this.editor.openFileFromDialog(),
@@ -2517,6 +2590,11 @@ function settingRow(label: string, description: string, control: HTMLElement): H
 function clampNumber(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
+}
+function commandIdForLabel(label: string): string {
+  return label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+(.)/g, (_match, character: string) => character.toUpperCase())
+    .replace(/^[^a-z]+/, "") || "npsharp.command";
 }
 function remoteRunCommand(filePath: string): string | undefined {
   const file = `'${filePath.replace(/'/g, `'"'"'`)}'`;

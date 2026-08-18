@@ -572,18 +572,12 @@ button {
 
 .wallpaper {
   position: absolute;
-  inset: 34px 0 22px 0;
+  inset: 35px 0 0;
   pointer-events: none;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
   opacity: 0.18;
-  /*
-   * The workbench panels have theme backgrounds and therefore hide an image
-   * placed behind them. Keep the wallpaper above the workbench, but below the
-   * title bar, so its configured opacity remains visible without intercepting
-   * editor input.
-   */
   z-index: 2;
 }
 
@@ -785,10 +779,6 @@ button {
   grid-template-rows: 34px 1fr;
 }
 
-.app-shell.focus-mode .wallpaper {
-  inset: 34px 0 0 0;
-}
-
 .app-shell.focus-mode .center-area {
   display: flex;
 }
@@ -932,6 +922,8 @@ button {
 
 .editor-shell {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 0;
   display: grid;
   grid-template-rows: 35px minmax(0, 1fr);
@@ -1174,6 +1166,7 @@ button {
 
 .editor-host {
   position: relative;
+  z-index: 1;
   min-height: 0;
 }
 
@@ -1608,7 +1601,7 @@ button {
   overflow: auto;
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 6px;
   padding-right: 4px;
 }
 
@@ -1625,10 +1618,18 @@ button {
 
 .extension-row {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 82%, var(--bg));
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.extension-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
 }
 
 .extension-row.disabled {
@@ -1636,18 +1637,26 @@ button {
 }
 
 .extension-icon {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   object-fit: contain;
-  background: var(--bg);
+  padding: 3px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
 }
 
 .extension-icon.placeholder {
   display: grid;
   place-items: center;
   color: var(--accent);
+}
+
+.extension-icon.placeholder .codicon-mask {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
 }
 
 .extension-copy {
@@ -1667,7 +1676,8 @@ button {
 }
 
 .extension-title {
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 .extension-title strong,
@@ -1683,6 +1693,10 @@ button {
 .extension-description {
   color: var(--muted);
   font-size: 12px;
+}
+
+.extension-title span {
+  margin-left: auto;
 }
 
 .extension-description {
@@ -1710,6 +1724,7 @@ button {
   grid-column: 2;
   flex-wrap: wrap;
   justify-content: flex-start;
+  padding-top: 2px;
 }
 
 .scm-repo {
@@ -1717,6 +1732,16 @@ button {
   padding-top: 6px;
   margin-top: 6px;
 }
+.scm-group-title {
+  padding: 8px 6px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.diff-viewer { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); }
+.diff-header { flex: 0 0 auto; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.diff-editor-host { flex: 1 1 auto; min-height: 0; }
 
 .scm-repo-header,
 .scm-file,
@@ -3080,6 +3105,8 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.palette-match { color: var(--accent); font-weight: 700; }
+.extension-error { color: var(--danger); }
 
 .html-preview-overlay {
   position: fixed;

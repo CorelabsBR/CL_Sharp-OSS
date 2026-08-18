@@ -27,6 +27,17 @@ self.MonacoEnvironment = {
 
 let configured = false;
 const loadedLanguages = new Set<string>();
+const extensionLanguages = new Map<string, string>();
+
+export function registerExtensionLanguage(definition: { id: string; extensions?: string[]; aliases?: string[]; monarch?: unknown; configuration?: monaco.languages.LanguageConfiguration }): monaco.IDisposable {
+  const normalizedExtensions = (definition.extensions ?? []).map(extension => extension.startsWith(".") ? extension.toLowerCase() : `.${extension.toLowerCase()}`);
+  monaco.languages.register({ id: definition.id, extensions: normalizedExtensions, aliases: definition.aliases });
+  for (const extension of normalizedExtensions) extensionLanguages.set(extension, definition.id);
+  const disposables: monaco.IDisposable[] = [];
+  if (definition.monarch) disposables.push(monaco.languages.setMonarchTokensProvider(definition.id, definition.monarch as monaco.languages.IMonarchLanguage));
+  if (definition.configuration) disposables.push(monaco.languages.setLanguageConfiguration(definition.id, definition.configuration));
+  return { dispose: () => { for (const disposable of disposables) disposable.dispose(); for (const extension of normalizedExtensions) if (extensionLanguages.get(extension) === definition.id) extensionLanguages.delete(extension); } };
+}
 
 const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
   bat: () => import("monaco-editor/languages/definitions/bat/register.js"),
@@ -203,6 +214,7 @@ export function configureMonaco(): typeof monaco {
 
 export function languageForPath(filePath: string): string {
   const lower = filePath.toLowerCase();
+  for (const [extension, language] of extensionLanguages) if (lower.endsWith(extension)) return language;
   if (lower.endsWith(".por") || lower.endsWith(".gol") || lower.endsWith(".alg") || lower.endsWith(".portugol")) return "portugol";
   if (lower.endsWith(".java")) return "java";
   if (lower.endsWith(".kt") || lower.endsWith(".kts")) return "kotlin";

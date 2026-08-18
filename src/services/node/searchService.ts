@@ -56,9 +56,28 @@ const BINARY_EXTENSIONS = new Set([
   ".woff",
   ".woff2"
 ]);
+const cancelledSearches = new Set<string>();
+
+export function cancelSearch(requestId: string): void {
+  if (requestId) cancelledSearches.add(requestId);
+}
+
+export async function indexWorkspaceFiles(workspace: string, limit = 50_000): Promise<string[]> {
+  const root = path.resolve(workspace);
+  const gitIgnore = await readGitIgnore(root);
+  const files: string[] = [];
+  await walk(root, false, async file => {
+    if (files.length >= limit) return false;
+    const relative = path.relative(root, file).replace(/\\/g, "/");
+    if (!gitIgnore.some(pattern => gitIgnoreMatches(relative, pattern))) files.push(file);
+    return true;
+  });
+  return files.sort((left, right) => path.relative(root, left).localeCompare(path.relative(root, right), undefined, { sensitivity: "base" }));
+}
 
 export async function searchWorkspace(query: SearchQuery): Promise<SearchResult[]> {
   const root = path.resolve(query.workspace);
+  const gitIgnore = await readGitIgnore(root);
   if (!query.text) {
     return [];
   }
@@ -69,18 +88,59 @@ export async function searchWorkspace(query: SearchQuery): Promise<SearchResult[
   const results: SearchResult[] = [];
   let scannedFiles = 0;
 
-  await walk(root, query.includeHidden ?? false, async file => {
-    if (results.length >= (query.limit ?? MAX_RESULTS) || scannedFiles >= MAX_SCANNED_FILES) {
-      return false;
-    }
-    scannedFiles++;
-    await searchFile(root, file, query, results);
-    return results.length < (query.limit ?? MAX_RESULTS);
-  });
-
+  if (query.requestId) cancelledSearches.delete(query.requestId);
+  try {
+    await walk(root, query.includeHidden ?? false, async file => {
+      if (query.requestId && cancelledSearches.has(query.requestId)) return false;
+      if (results.length >= (query.limit ?? MAX_RESULTS) || scannedFiles >= MAX_SCANNED_FILES) return false;
+      scannedFiles++;
+      const relative = path.relative(root, file).replace(/\\/g, "/");
+      if (!gitIgnore.some(pattern => gitIgnoreMatches(relative, pattern)) && matchesFileFilters(relative, query.include, query.exclude)) await searchFile(root, file, query, results);
+      return results.length < (query.limit ?? MAX_RESULTS);
+    });
+  } finally {
+    if (query.requestId) cancelledSearches.delete(query.requestId);
+  }
   return results
     .sort((a, b) => b.score - a.score || a.relativePath.localeCompare(b.relativePath) || a.line - b.line || a.column - b.column)
     .slice(0, query.limit ?? MAX_RESULTS);
+}
+
+async function readGitIgnore(root: string): Promise<string[]> {
+  try {
+    return (await fs.readFile(path.join(root, ".gitignore"), "utf8")).split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#") && !line.startsWith("!"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.warn(`[NPSharp search] Failed to read ${path.join(root, ".gitignore")}`, error);
+    return [];
+  }
+}
+
+function gitIgnoreMatches(relativePath: string, pattern: string): boolean {
+  const normalized = pattern.replace(/^\//, "").replace(/\/$/, "/**");
+  return globMatches(relativePath, normalized) || (!normalized.includes("/") && relativePath.split("/").includes(normalized));
+}
+
+function matchesFileFilters(relativePath: string, include?: string, exclude?: string): boolean {
+  const includes = splitPatterns(include);
+  const excludes = splitPatterns(exclude);
+  if (includes.length && !includes.some(pattern => globMatches(relativePath, pattern))) return false;
+  return !excludes.some(pattern => globMatches(relativePath, pattern) || relativePath.split("/").includes(pattern.replace(/^\*\*\//, "")));
+}
+
+function splitPatterns(value?: string): string[] {
+  return (value ?? "").split(",").map(item => item.trim().replace(/\\/g, "/")).filter(Boolean);
+}
+
+function globMatches(value: string, glob: string): boolean {
+  let source = "";
+  for (let index = 0; index < glob.length; index++) {
+    const character = glob[index];
+    if (character === "*" && glob[index + 1] === "*") { source += ".*"; index++; }
+    else if (character === "*") source += "[^/]*";
+    else if (character === "?") source += "[^/]";
+    else source += escapeRegExp(character);
+  }
+  return new RegExp(`^(?:${source})$`, "i").test(value) || (!glob.includes("/") && new RegExp(`^(?:${source})$`, "i").test(path.basename(value)));
 }
 
 export async function replaceAll(request: ReplaceAllRequest): Promise<ReplaceAllResult> {

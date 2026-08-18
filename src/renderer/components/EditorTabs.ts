@@ -2,7 +2,7 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import type { EditorDiagnostic, FileOpenResult, SearchResult, TextEncoding } from "../../shared/types";
+import type { EditorDiagnostic, FileOpenResult, GitDiffContent, SearchResult, TextEncoding } from "../../shared/types";
 import { COMPACT_MINIMAP_OPTIONS, configureMonaco, ensureLanguageSupport, languageForPath, monaco } from "../../editor/monacoSetup";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
@@ -13,6 +13,7 @@ import { DEFAULT_LOGO_URL } from "../utils/assets";
 import { basename, extname } from "../utils/path";
 import { ImageViewer } from "./ImageViewer";
 import { UniversalFileViewer } from "./UniversalFileViewer";
+import { MonacoDiffViewer } from "./MonacoDiffViewer";
 
 interface BrandHighlightRule {
   readonly terms: string[];
@@ -71,7 +72,7 @@ export class EditorTabs {
   private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } });
   private editor: monaco.editor.IStandaloneCodeEditor;
   private tabs: EditorTab[] = [];
-  private readonly fileViewers = new Map<string, ImageViewer | UniversalFileViewer>();
+  private readonly fileViewers = new Map<string, ImageViewer | UniversalFileViewer | MonacoDiffViewer>();
   private activeId: string | undefined;
   private closedTabs: ClosedEditorTab[] = [];
   private navigationBackStack: string[] = [];
@@ -409,6 +410,22 @@ export class EditorTabs {
     } catch (error) {
       reportError(error, this.onStatus, options.context ?? `Open file failed (${filePath})`);
     }
+  }
+
+  async openDiff(title: string, uri: string, filePath: string, content: GitDiffContent): Promise<void> {
+    const existing = this.tabs.find(tab => tab.id === uri);
+    if (existing) {
+      this.selectTab(existing.id);
+      return;
+    }
+    const model = this.createTextModel("", "plaintext", monaco.Uri.parse(uri));
+    const tab: EditorTab = { id: uri, title, initialContent: "", dirty: false, lineEnding: "\n", encoding: "utf8", displayType: "Diff", virtualUri: uri, model };
+    const viewer = await MonacoDiffViewer.create(content, filePath);
+    viewer.element.hidden = true;
+    this.fileViewers.set(tab.id, viewer);
+    this.editorHost.append(viewer.element);
+    this.tabs.push(tab);
+    this.selectTab(tab.id);
   }
 
   private openImageFile(file: FileOpenResult): void {

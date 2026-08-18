@@ -2,3 +2,109 @@
 build/ 
 *.iml 
 .idea/ 
+# Dependências e caches JavaScript/TypeScript
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.vite/
+*.tsbuildinfo
+
+# Artefatos de build e distribuição
+dist/
+dist-electron/
+dist-tests/
+release/
+out/
+coverage/
+build/*
+!build/linux-after-install.sh
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.asar
+*.apk
+*.aab
+*.ipa
+*.zip
+*.tar.gz
+*.rar
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Variáveis locais, credenciais e assinaturas
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+
+# Ambientes e caches Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Android/Gradle
+android/.gradle/
+android/.idea/
+android/build/
+android/app/build/
+android/captures/
+android/local.properties
+
+# Artefatos das amostras de múltiplas linguagens
+testes/**/.gradle/
+testes/**/build/
+testes/**/target/
+testes/**/bin/
+testes/**/obj/
+testes/**/coverage/
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.metadata/
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+*.code-workspace
+
+# Dados locais gerados pelo aplicativo e pelas ferramentas de desenvolvimento
+.npsharp/
+.agents/
+.codex/
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.~lock.*#

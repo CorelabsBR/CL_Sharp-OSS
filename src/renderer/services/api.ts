@@ -745,6 +745,7 @@ function createBrowserApi(): NpsharpApi {
       onStatus: () => () => undefined
     },
     window: {
+      newWindow: async () => undefined,
       minimize: async () => undefined,
       maximize: async () => undefined,
       close: async () => undefined,
@@ -1055,12 +1056,14 @@ function createUnavailableGitApi(): NpsharpApi["git"] {
     checkout: async () => result(),
     createBranch: async () => result(),
     diff: async () => message,
+    diffContent: async () => ({ original: "", modified: message, originalLabel: "HEAD", modifiedLabel: "Indisponível", language: "plaintext" }),
     history: async () => []
   };
 }
 
 function createSearchApi(fs: FsApi): NpsharpApi["search"] {
   return {
+    files: async workspace => collectFiles(fs, workspace, 20_000, false),
     workspace: async query => {
       const files = await collectFiles(fs, query.workspace, query.limit ?? 5000, query.includeHidden ?? false);
       const results: SearchResult[] = [];
@@ -1084,7 +1087,8 @@ function createSearchApi(fs: FsApi): NpsharpApi["search"] {
         await fs.writeFile(filePath, replaced.content);
       }
       return { changedFiles, replacements };
-    }
+    },
+    cancel: async () => undefined
   };
 }
 
@@ -1139,7 +1143,8 @@ function createExtensionFallbackApi(): NpsharpApi["extensions"] {
     enable: list,
     disable: list,
     uninstall: list,
-    reload: list
+    reload: list,
+    readFile: async () => { throw new Error(unavailable); }
   };
 }
 

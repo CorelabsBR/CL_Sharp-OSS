@@ -19,6 +19,11 @@ export default defineConfig({
       "@shared": path.resolve(__dirname, "src/shared")
     }
   },
+  optimizeDeps: {
+    // The repository intentionally contains HTML/package fixtures and generated
+    // reports. Only the application entry belongs to Vite's dependency graph.
+    entries: [path.resolve(__dirname, "index.html")]
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,

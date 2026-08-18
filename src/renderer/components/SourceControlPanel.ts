@@ -2,7 +2,7 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import type { GitCommit, GitFileStatus, GitRepositoryStatus } from "../../shared/types";
+import type { GitCommit, GitDiffContent, GitFileStatus, GitRepositoryStatus } from "../../shared/types";
 import { api, platform } from "../services/api";
 import { buttonIcon, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
@@ -13,14 +13,17 @@ export class SourceControlPanel {
   private readonly summary = el("div", { className: "panel-summary", text: "Nenhum repositório" });
   private readonly commitInput = el("input", { className: "panel-input", attrs: { placeholder: "Mensagem do commit" } });
   private readonly allowEmpty = el("input", { attrs: { type: "checkbox" } });
+  private readonly amend = el("input", { attrs: { type: "checkbox" } });
   private readonly list = el("div", { className: "scm-list" });
   private readonly gitActions: HTMLButtonElement[] = [];
   private workspace?: string;
   private repos: GitRepositoryStatus[] = [];
+  private busy = false;
 
   constructor(
     private readonly openVirtualFile: (title: string, uri: string, content: string) => void,
-    private readonly updateStatus: (text: string) => void
+    private readonly updateStatus: (text: string) => void,
+    private readonly openDiffEditor?: (title: string, uri: string, filePath: string, content: GitDiffContent) => void
   ) {
     this.build();
   }
@@ -56,9 +59,7 @@ export class SourceControlPanel {
     }
     const repo = this.repos[0];
     if (!repo) return;
-    const result = await api.git.run(repo.repo, args);
-    this.updateStatus(result.output || (result.success ? "Operação Git concluída" : "Falha na operação Git"));
-    await this.refresh();
+    await this.runOperation(`Git ${args[0]}...`, async () => api.git.run(repo.repo, args));
   }
 
   async commit(): Promise<void> {
@@ -86,14 +87,18 @@ export class SourceControlPanel {
     const pull = buttonIcon("repo-pull", "Pull", () => void this.runOnFirstRepo(["pull"]));
     const push = buttonIcon("repo-push", "Push", () => void this.runOnFirstRepo(["push"]));
     const fetch = buttonIcon("repo-fetch", "Fetch", () => void this.runOnFirstRepo(["fetch"]));
-    this.gitActions.push(stageAll, unstageAll, commit, pull, push, fetch);
-    toolbar.append(refresh, stageAll, unstageAll, commit, pull, push, fetch);
+    const stash = buttonIcon("archive", "Stash", () => void this.runOnFirstRepo(["stash", "push"]));
+    const stashPop = buttonIcon("restore", "Stash pop", () => void this.runOnFirstRepo(["stash", "pop"]));
+    this.gitActions.push(stageAll, unstageAll, commit, pull, push, fetch, stash, stashPop);
+    toolbar.append(refresh, stageAll, unstageAll, commit, pull, push, fetch, stash, stashPop);
     this.commitInput.addEventListener("keydown", event => {
       if (event.key === "Enter") void this.commitAll();
     });
     const allowEmptyRow = el("label", { className: "check-row" });
     allowEmptyRow.append(this.allowEmpty, el("span", { text: "Permitir commit vazio" }));
-    this.element.append(toolbar, this.summary, this.commitInput, allowEmptyRow, this.list);
+    const amendRow = el("label", { className: "check-row" });
+    amendRow.append(this.amend, el("span", { text: "Amend" }));
+    this.element.append(toolbar, this.summary, this.commitInput, allowEmptyRow, amendRow, this.list);
     this.applyCapabilityState();
   }
 
@@ -110,11 +115,22 @@ export class SourceControlPanel {
         el("span", { text: repo.branch }),
         el("span", { text: repo.ahead || repo.behind ? `↑${repo.ahead} ↓${repo.behind}` : "" }),
         buttonIcon("git-branch", "Branch", () => void this.chooseBranch(repo)),
+        buttonIcon("trash", "Excluir branch", () => void this.deleteBranch(repo)),
         buttonIcon("history", "History", () => void this.showHistory(repo))
       );
       repoBlock.append(header);
       if (repo.clean) repoBlock.append(el("div", { className: "muted-row", text: "Árvore de trabalho limpa" }));
-      for (const file of repo.files) repoBlock.append(this.fileRow(repo, file));
+      const groups: Array<[string, GitFileStatus[]]> = [
+        ["Conflicts", repo.files.filter(file => file.conflicted)],
+        ["Staged Changes", repo.files.filter(file => file.staged && !file.conflicted)],
+        ["Changes", repo.files.filter(file => !file.staged && !file.conflicted && file.kind !== "untracked" && !file.ignored)],
+        ["Untracked", repo.files.filter(file => file.kind === "untracked")]
+      ];
+      for (const [label, files] of groups) {
+        if (!files.length) continue;
+        repoBlock.append(el("div", { className: "scm-group-title", text: `${label} (${files.length})` }));
+        for (const file of files) repoBlock.append(this.fileRow(repo, file));
+      }
       this.list.append(repoBlock);
     }
   }
@@ -139,10 +155,11 @@ export class SourceControlPanel {
   }
 
   private applyCapabilityState(): void {
-    const disabled = !platform.canUseGit;
+    const disabled = !platform.canUseGit || this.busy;
     for (const button of this.gitActions) button.disabled = disabled;
     this.commitInput.disabled = disabled;
     this.allowEmpty.disabled = disabled;
+    this.amend.disabled = disabled;
   }
 
   private fileRow(repo: GitRepositoryStatus, file: GitFileStatus): HTMLElement {
@@ -197,17 +214,13 @@ export class SourceControlPanel {
 
   private async stageToggle(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
     if (!platform.canUseGit) return this.renderLimitedMode();
-    const result = file.staged ? await api.git.unstage(repo.repo, file) : await api.git.stage(repo.repo, file);
-    this.updateStatus(result.output || (result.success ? "Operação Git concluída" : "Falha na operação Git"));
-    await this.refresh();
+    await this.runOperation(file.staged ? "Removendo do stage..." : "Adicionando ao stage...", () => file.staged ? api.git.unstage(repo.repo, file) : api.git.stage(repo.repo, file));
   }
 
   private async discard(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
     if (!platform.canUseGit) return this.renderLimitedMode();
     if (!confirm(`Discard changes in ${file.path}?`)) return;
-    const result = await api.git.discard(repo.repo, file);
-    this.updateStatus(result.output || (result.success ? "Alterações descartadas" : "Falha ao descartar"));
-    await this.refresh();
+    await this.runOperation("Descartando alterações...", () => api.git.discard(repo.repo, file));
   }
 
   private async commitAll(): Promise<void> {
@@ -215,14 +228,49 @@ export class SourceControlPanel {
     const message = this.commitInput.value.trim();
     const repo = this.repos[0];
     if (!repo || !message) return;
-    const result = await api.git.commit(repo.repo, message, this.allowEmpty.checked);
-    this.updateStatus(result.output || (result.success ? "Commit criado" : "Falha no commit"));
-    if (result.success) this.commitInput.value = "";
-    await this.refresh();
+    this.busy = true;
+    this.applyCapabilityState();
+    this.updateStatus(this.amend.checked ? "Alterando último commit..." : "Criando commit...");
+    try {
+      const result = this.amend.checked
+        ? await api.git.run(repo.repo, ["commit", "--amend", "-m", message])
+        : await api.git.commit(repo.repo, message, this.allowEmpty.checked);
+      this.updateStatus(result.output || (result.success ? "Commit criado" : "Falha no commit"));
+      if (result.success) this.commitInput.value = "";
+    } catch (error) {
+      reportError(error, this.updateStatus, "Falha no commit");
+    } finally {
+      this.busy = false;
+      await this.refresh();
+    }
+  }
+
+  private async runOperation(label: string, operation: () => Promise<{ success: boolean; output: string }>): Promise<void> {
+    if (this.busy) {
+      this.updateStatus("Já existe uma operação Git em andamento.");
+      return;
+    }
+    this.busy = true;
+    this.applyCapabilityState();
+    this.updateStatus(label);
+    try {
+      const result = await operation();
+      this.updateStatus(result.output || (result.success ? "Operação Git concluída" : "Falha ao executar Git"));
+    } catch (error) {
+      reportError(error, this.updateStatus, "Falha ao executar Git");
+    } finally {
+      this.busy = false;
+      await this.refresh();
+    }
   }
 
   private async showDiff(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
     try {
+      if (this.openDiffEditor) {
+        const content = await api.git.diffContent(repo.repo, file, file.staged);
+        this.openDiffEditor(`${file.path} (${file.staged ? "Staged" : "Changes"})`, `git-diff:${repo.repo}:${file.path}:${file.staged}`, file.path, content);
+        return;
+      }
       const diff = await api.git.diff(repo.repo, file, file.staged);
       this.openVirtualFile(`${file.path}.diff`, `git:${repo.repo}:${file.path}:${file.staged}`, diff || "Nenhuma diferença disponível");
     } catch (error) {
@@ -246,6 +294,16 @@ export class SourceControlPanel {
         : { success: false, output: "Operação de branch cancelada" };
     this.updateStatus(result.output || (result.success ? "Operação de branch concluída" : "Falha na operação de branch"));
     await this.refresh();
+  }
+
+  private async deleteBranch(repo: GitRepositoryStatus): Promise<void> {
+    const branch = (await showInputDialog("Excluir branch local", "", { placeholder: repo.branches.filter(item => item !== repo.branch).join(", ") }))?.trim();
+    if (!branch || branch === repo.branch || !repo.branches.includes(branch)) {
+      this.updateStatus(branch === repo.branch ? "Não é possível excluir a branch atual." : "Branch inválida.");
+      return;
+    }
+    if (!confirm(`Excluir a branch local "${branch}"?`)) return;
+    await this.runOperation("Excluindo branch...", () => api.git.run(repo.repo, ["branch", "-d", branch]));
   }
 
   private async resolveConflict(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
