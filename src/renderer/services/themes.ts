@@ -13,6 +13,7 @@ interface ThemeManifestEntry {
   label: string;
   path: string;
   uiTheme?: string;
+  cat?: string;
   welcomeLogo?: string;
   categories?: string[];
   preview?: string;
@@ -55,10 +56,21 @@ export interface ThemeSummary {
   name: string;
   path?: string;
   uiTheme?: string;
+  cat?: string;
   welcomeLogo?: string;
   special?: boolean;
   colors: ThemeColors;
   tokenColors?: TokenColor[];
+}
+
+export type ThemeCategory = "Dark" | "Light";
+
+export function themeCategory(theme: ThemeSummary): ThemeCategory {
+  return theme.uiTheme === "vs" ? "Light" : "Dark";
+}
+
+export function themeGroup(theme: ThemeSummary): string {
+  return theme.cat?.trim() || themeCategory(theme);
 }
 
 const DEFAULT_WELCOME_LOGO = DEFAULT_LOGO_URL;
@@ -67,6 +79,7 @@ const BUILT_IN_FALLBACKS: ThemeSummary[] = [
   {
     id: "np-dark",
     name: "NPSharp Dark",
+    cat: "DEFAULT DARK",
     uiTheme: "vs-dark",
     colors: {
       "--bg": "#1e1e1e",
@@ -94,6 +107,7 @@ const BUILT_IN_FALLBACKS: ThemeSummary[] = [
     id: "np-light",
     name: "NPSharp Light",
     uiTheme: "vs",
+    cat: "DEFAULT LIGHT",
     colors: {
       "--bg": "#f7f7f7",
       "--bg-2": "#ffffff",
@@ -135,13 +149,14 @@ export async function listThemes(): Promise<ThemeSummary[]> {
   return [...await themesFromManifest(await response.text(), manifestUrl), ...extensionThemes.values()];
 }
 
-export function registerExtensionTheme(id: string, name: string, source: string, uiTheme = "vs-dark"): () => void {
+export function registerExtensionTheme(id: string, name: string, source: string, uiTheme = "vs-dark", cat?: string): () => void {
   const parsed = parseThemeFile(source, id);
   if (!parsed) throw new Error(`Tema inválido: ${name}`);
   const theme: ThemeSummary = {
     id,
     name,
     uiTheme,
+    cat: cat?.trim() || undefined,
     colors: { ...baseColors(uiTheme), ...mapVSCodeColors(parsed.colors ?? {}, uiTheme) },
     tokenColors: parsed.tokenColors
   };
@@ -184,6 +199,7 @@ function manifestEntriesToThemes(entries: ThemeManifestEntry[], special: boolean
     name: entry.label,
     path: toResourcePath(entry.path),
     uiTheme: entry.uiTheme,
+    cat: entry.cat?.trim() || undefined,
     welcomeLogo: entry.welcomeLogo ? toResourcePath(entry.welcomeLogo) : undefined,
     special,
     colors: special ? BUILT_IN_FALLBACKS[0].colors : baseColors(entry.uiTheme)

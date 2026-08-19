@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import type { EditorDiagnostic, FileOpenResult, GitDiffContent, SearchResult, TextEncoding } from "../../shared/types";
 import { COMPACT_MINIMAP_OPTIONS, configureMonaco, ensureLanguageSupport, languageForPath, monaco } from "../../editor/monacoSetup";
+import { htmlAbbreviationAt } from "../../editor/emmet";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
 import { api } from "../services/api";
@@ -123,9 +124,42 @@ export class EditorTabs {
       lineNumbers: "on",
       wordWrap: "off",
       scrollBeyondLastLine: false,
-      bracketPairColorization: { enabled: true }
+      bracketPairColorization: { enabled: true },
+      quickSuggestions: { other: true, comments: false, strings: true },
+      suggestOnTriggerCharacters: true,
+      acceptSuggestionOnEnter: "on",
+      tabCompletion: "on",
+      snippetSuggestions: "top",
+      wordBasedSuggestions: "allDocuments",
+      suggest: {
+        showWords: true,
+        showKeywords: true,
+        showSnippets: true,
+        showClasses: true,
+        showFunctions: true,
+        showMethods: true,
+        showProperties: true,
+        showVariables: true,
+        showValues: true,
+        showConstants: true,
+        showConstructors: true,
+        showInterfaces: true,
+        showStructs: true,
+        showEvents: true,
+        showOperators: true,
+        showModules: true
+      }
     });
+    const handleEmmetTab = (event: KeyboardEvent): void => {
+      if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+      if (!(event.target instanceof Element) || !event.target.closest(".monaco-editor")) return;
+      if (!this.expandEmmetAtCursor()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    this.editorHost.addEventListener("keydown", handleEmmetTab, true);
     this.disposables.push(
+      { dispose: () => this.editorHost.removeEventListener("keydown", handleEmmetTab, true) },
       this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor()),
       this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus()),
       monaco.editor.onDidChangeMarkers(changedModels => {
@@ -138,6 +172,24 @@ export class EditorTabs {
     document.head.append(this.colorStyle);
     this.registerAIContextActions();
     this.render();
+  }
+
+  private expandEmmetAtCursor(): boolean {
+    const model = this.editor.getModel();
+    const position = this.editor.getPosition();
+    if (!model || !position) return false;
+    const prefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+    const expansion = htmlAbbreviationAt(prefix);
+    if (!expansion) return false;
+    const language = model.getLanguageId();
+    const isNewHtmlDocument = language === "plaintext" && expansion.abbreviation === "!" && model.getValue().trim() === "!";
+    if (language !== "html" && !isNewHtmlDocument) return false;
+
+    const range = new monaco.Range(position.lineNumber, position.column - expansion.abbreviation.length, position.lineNumber, position.column);
+    this.editor.executeEdits("emmet", [{ range, text: "" }]);
+    if (isNewHtmlDocument) monaco.editor.setModelLanguage(model, "html");
+    this.editor.trigger("emmet", "editor.action.insertSnippet", { snippet: expansion.snippet });
+    return true;
   }
 
   get activeTab(): EditorTab | undefined {
@@ -1204,6 +1256,7 @@ export class EditorTabs {
   }
 
   private createTextModel(content: string, language: string, uri: monaco.Uri): monaco.editor.ITextModel {
+    void ensureLanguageSupport(language).catch(error => reportError(error, this.onStatus, `Language support failed (${language})`));
     const model = monaco.editor.createModel(content, language, uri);
     model.updateOptions({ tabSize: this.tabSize });
     return model;

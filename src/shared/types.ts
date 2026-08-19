@@ -418,7 +418,7 @@ export interface ExtensionManifest {
   contributes?: ExtensionContributions;
 }
 
-export interface ExtensionThemeContribution { id?: string; label: string; path: string; uiTheme?: string; }
+export interface ExtensionThemeContribution { id?: string; label: string; path: string; uiTheme?: string; cat?: string; }
 export interface ExtensionLanguageContribution { id: string; aliases?: string[]; extensions?: string[]; configuration?: string; monarch?: string; }
 export interface ExtensionSnippetContribution { language: string; path: string; }
 export interface ExtensionCommandContribution { command: string; title: string; category?: string; action?: string; }

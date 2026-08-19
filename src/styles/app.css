@@ -2154,6 +2154,21 @@ button {
   text-align: left;
 }
 
+.theme-category-title,
+.palette-group {
+  margin: 10px 7px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-category-title:first-child,
+.palette-group:first-child {
+  margin-top: 4px;
+}
+
 .theme-row.active {
   outline: 1px solid var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, transparent);

@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## 26.8.45 - 2026-08-19
+
+Type: Feature
+
+Description:
+- Adiciona o campo opcional `cat` aos temas do pacote e de extensões para criar categorias personalizadas e agrupar automaticamente todos os temas com o mesmo nome de categoria.
+- Mantém Dark e Light como categorias automáticas de fallback quando `cat` não é informado.
+
+## 26.8.44 - 2026-08-19
+
+Type: Feature
+
+Description:
+- Separa os temas nas categorias Dark e Light em todos os seletores, classificando `vs-dark` como Dark e `vs` como Light, inclusive para temas fornecidos por extensões.
+- Adiciona cabeçalhos de categoria ao seletor rápido e à página de Aparência, além de grupos nativos no seletor exibido pela pesquisa de configurações.
+
+## 26.8.43 - 2026-08-19
+
+Type: Feature
+
+Description:
+- Adiciona autocomplete Emmet ao editor HTML, com sugestões em formato de snippet, placeholders navegáveis e expansão direta pelo Tab, como no VS Code.
+- Permite gerar o documento HTML5 completo com `!` ou `html:5` e expandir abreviações comuns, seletores de classe/ID, hierarquia e repetição, como `div.container`, `ul>li*3`, `link:css` e `script:src`.
+- Carrega as contribuições de Suggest e Snippet do Monaco para disponibilizar o mesmo fluxo de aceite e navegação encontrado em editores como o VS Code.
+- Garante que o Tab expanda a abreviação antes de ser consumido pelo widget interno do Monaco e reconhece `!` também em um documento novo ainda identificado como texto simples.
+- Ativa os language services completos do Monaco para HTML, CSS, SCSS, JavaScript e TypeScript e amplia o autocomplete por palavras-chave para Python, Java, Kotlin, C/C++, C#, Go, Rust, PHP, Ruby, Shell e SQL.
+- Exibe sugestões automaticamente durante a digitação, incluindo palavras, snippets, métodos, funções, classes, propriedades, variáveis, valores, módulos e demais símbolos disponíveis.
+
 ## 26.8.42 - 2026-08-18
 
 Type: Feature / Fix / Refactor / Performance

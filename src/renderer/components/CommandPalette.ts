@@ -18,6 +18,7 @@ export interface CommandAction {
 
 export interface PaletteItem {
   label: string;
+  group?: string;
   hint?: string;
   keywords?: string;
   active?: boolean;
@@ -170,12 +171,20 @@ export class CommandPalette {
       filteredItems = candidates
         .map(item => ({ item, score: paletteScore(item, query) }))
         .filter(match => match.score >= 0)
-        .sort((left, right) => right.score - left.score || left.item.label.localeCompare(right.item.label))
+        .sort((left, right) => {
+          if (left.item.group && right.item.group && left.item.group !== right.item.group) return left.item.group.localeCompare(right.item.group);
+          return right.score - left.score || left.item.label.localeCompare(right.item.label);
+        })
         .map(match => match.item)
         .slice(0, 50);
       selectedIndex = Math.min(selectedIndex, Math.max(filteredItems.length - 1, 0));
       list.replaceChildren();
+      let renderedGroup: string | undefined;
       filteredItems.forEach((item, index) => {
+        if (item.group && item.group !== renderedGroup) {
+          renderedGroup = item.group;
+          list.append(el("div", { className: "palette-group", text: item.group }));
+        }
         const row = el("button", {
           className: `palette-row ${index === selectedIndex ? "active" : ""} ${item.active ? "selected" : ""}`.trim(),
           attrs: { role: "option", "aria-selected": String(index === selectedIndex) }

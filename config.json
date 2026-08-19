@@ -3,8 +3,8 @@
   "application": {
     "packageName": "NPSharp",
     "displayName": "NPSharp",
-    "version": "26.8.42",
-    "versionCode": 260842,
+    "version": "26.8.45",
+    "versionCode": 260845,
     "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",

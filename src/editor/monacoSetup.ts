@@ -9,6 +9,9 @@ import "monaco-editor/features/codicon/register.js";
 // editor.api does not register the Find contribution; import it explicitly so
 // Ctrl+F/Cmd+F and the title-bar command share Monaco's real Find widget.
 import "monaco-editor/features/find/register.js";
+import "monaco-editor/features/snippet/register.js";
+import "monaco-editor/features/suggest/register.js";
+import { htmlAbbreviationAt } from "./emmet";
 import editorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker.js?worker";
 import cssWorker from "monaco-editor/language/css/css.worker.js?worker";
@@ -44,13 +47,13 @@ const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
   cpp: () => import("monaco-editor/languages/definitions/cpp/register.js"),
   c: () => import("monaco-editor/languages/definitions/cpp/register.js"),
   csharp: () => import("monaco-editor/languages/definitions/csharp/register.js"),
-  css: () => import("monaco-editor/languages/definitions/css/register.js"),
-  scss: () => import("monaco-editor/languages/definitions/scss/register.js"),
+  css: () => Promise.all([import("monaco-editor/languages/definitions/css/register.js"), import("monaco-editor/language/css/monaco.contribution.js")]),
+  scss: () => Promise.all([import("monaco-editor/languages/definitions/scss/register.js"), import("monaco-editor/language/css/monaco.contribution.js")]),
   go: () => import("monaco-editor/languages/definitions/go/register.js"),
-  html: () => import("monaco-editor/languages/definitions/html/register.js"),
+  html: () => Promise.all([import("monaco-editor/languages/definitions/html/register.js"), import("monaco-editor/language/html/monaco.contribution.js")]),
   ini: () => import("monaco-editor/languages/definitions/ini/register.js"),
   java: () => import("monaco-editor/languages/definitions/java/register.js"),
-  javascript: () => import("monaco-editor/languages/definitions/javascript/register.js"),
+  javascript: () => Promise.all([import("monaco-editor/languages/definitions/javascript/register.js"), import("monaco-editor/language/typescript/monaco.contribution.js")]),
   kotlin: () => import("monaco-editor/languages/definitions/kotlin/register.js"),
   lua: () => import("monaco-editor/languages/definitions/lua/register.js"),
   markdown: () => import("monaco-editor/languages/definitions/markdown/register.js"),
@@ -61,7 +64,7 @@ const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
   rust: () => import("monaco-editor/languages/definitions/rust/register.js"),
   shell: () => import("monaco-editor/languages/definitions/shell/register.js"),
   sql: () => import("monaco-editor/languages/definitions/sql/register.js"),
-  typescript: () => import("monaco-editor/languages/definitions/typescript/register.js"),
+  typescript: () => Promise.all([import("monaco-editor/languages/definitions/typescript/register.js"), import("monaco-editor/language/typescript/monaco.contribution.js")]),
   xml: () => import("monaco-editor/languages/definitions/xml/register.js"),
   yaml: () => import("monaco-editor/languages/definitions/yaml/register.js"),
   json: () => import("monaco-editor/languages/features/json/register.js")
@@ -187,6 +190,29 @@ export function configureMonaco(): typeof monaco {
     }
   });
 
+  monaco.languages.registerCompletionItemProvider("html", {
+    triggerCharacters: ["!", ".", "#", ">", "*", ":"],
+    provideCompletionItems(model, position) {
+      const prefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+      const expansion = htmlAbbreviationAt(prefix);
+      if (!expansion) return { suggestions: [] };
+      return {
+        suggestions: [{
+          label: expansion.abbreviation,
+          detail: "Emmet Abbreviation",
+          documentation: "Expandir abreviação Emmet",
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: expansion.snippet,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range: new monaco.Range(position.lineNumber, position.column - expansion.abbreviation.length, position.lineNumber, position.column),
+          sortText: "0000"
+        }]
+      };
+    }
+  });
+
+  registerLanguageKeywordCompletions();
+
   monaco.editor.defineTheme("npsharp-dark", {
     base: "vs-dark",
     inherit: true,
@@ -210,6 +236,40 @@ export function configureMonaco(): typeof monaco {
   monaco.editor.setTheme("npsharp-dark");
 
   return monaco;
+}
+
+const LANGUAGE_KEYWORDS: Record<string, string[]> = {
+  python: ["and", "as", "assert", "async", "await", "break", "case", "class", "continue", "def", "del", "elif", "else", "except", "False", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "match", "None", "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield", "print", "len", "range", "str", "int", "list", "dict", "set", "tuple"],
+  java: ["abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "native", "new", "package", "private", "protected", "public", "record", "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "try", "var", "void", "volatile", "while"],
+  kotlin: ["as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "is", "null", "object", "package", "return", "super", "this", "throw", "true", "try", "typealias", "typeof", "val", "var", "when", "while"],
+  c: ["auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"],
+  cpp: ["alignas", "auto", "bool", "break", "case", "catch", "char", "class", "concept", "const", "constexpr", "continue", "default", "delete", "do", "double", "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend", "if", "inline", "int", "long", "namespace", "new", "nullptr", "private", "protected", "public", "return", "short", "signed", "sizeof", "static", "struct", "switch", "template", "this", "throw", "true", "try", "typedef", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "while"],
+  csharp: ["abstract", "as", "async", "await", "base", "bool", "break", "case", "catch", "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else", "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float", "for", "foreach", "if", "implicit", "in", "int", "interface", "internal", "is", "lock", "long", "namespace", "new", "null", "object", "operator", "out", "override", "params", "private", "protected", "public", "readonly", "record", "ref", "return", "sealed", "short", "sizeof", "static", "string", "struct", "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using", "var", "virtual", "void", "volatile", "while"],
+  go: ["break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select", "struct", "switch", "type", "var"],
+  rust: ["as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while"],
+  php: ["abstract", "and", "array", "as", "break", "callable", "case", "catch", "class", "clone", "const", "continue", "declare", "default", "do", "echo", "else", "elseif", "empty", "endfor", "endforeach", "endif", "endswitch", "endwhile", "enum", "extends", "final", "finally", "fn", "for", "foreach", "function", "global", "if", "implements", "include", "include_once", "instanceof", "interface", "isset", "match", "namespace", "new", "null", "or", "private", "protected", "public", "readonly", "require", "require_once", "return", "static", "switch", "throw", "trait", "true", "try", "use", "var", "while", "yield"],
+  ruby: ["alias", "and", "begin", "break", "case", "class", "def", "defined?", "do", "else", "elsif", "end", "ensure", "false", "for", "if", "in", "module", "next", "nil", "not", "or", "redo", "rescue", "retry", "return", "self", "super", "then", "true", "undef", "unless", "until", "when", "while", "yield"],
+  shell: ["case", "do", "done", "elif", "else", "esac", "export", "fi", "for", "function", "if", "in", "local", "readonly", "return", "select", "then", "until", "while"],
+  sql: ["ALTER", "AND", "AS", "ASC", "BEGIN", "BETWEEN", "BY", "CASE", "COMMIT", "CREATE", "DATABASE", "DELETE", "DESC", "DISTINCT", "DROP", "ELSE", "END", "EXISTS", "FROM", "FULL", "GROUP", "HAVING", "IN", "INDEX", "INNER", "INSERT", "INTO", "IS", "JOIN", "LEFT", "LIKE", "LIMIT", "NOT", "NULL", "ON", "OR", "ORDER", "OUTER", "PRIMARY", "REFERENCES", "RIGHT", "ROLLBACK", "SELECT", "SET", "TABLE", "THEN", "UNION", "UNIQUE", "UPDATE", "VALUES", "VIEW", "WHEN", "WHERE", "WITH"]
+};
+
+function registerLanguageKeywordCompletions(): void {
+  for (const [language, keywords] of Object.entries(LANGUAGE_KEYWORDS)) {
+    monaco.languages.registerCompletionItemProvider(language, {
+      provideCompletionItems(model, position) {
+        const word = model.getWordUntilPosition(position);
+        const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+        return {
+          suggestions: keywords.map(keyword => ({
+            label: keyword,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: keyword,
+            range
+          }))
+        };
+      }
+    });
+  }
 }
 
 export function languageForPath(filePath: string): string {

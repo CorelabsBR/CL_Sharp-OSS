@@ -25,7 +25,7 @@ import { createShortcutRegistry, type ShortcutAction } from "../shortcuts/shortc
 import { useGlobalShortcuts, type GlobalShortcutController } from "../shortcuts/useGlobalShortcuts";
 import { TerminalPanel } from "../components/TerminalPanel";
 import { api, DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform } from "../services/api";
-import { applyTheme, listThemes } from "../services/themes";
+import { applyTheme, listThemes, themeGroup } from "../services/themes";
 import { buttonIcon, closeContextMenus, contextMenu, el, icon, installContextMenuDismiss, localizeElementTree } from "../utils/dom";
 import { errorMessage, reportError } from "../utils/errors";
 import { showInputDialog } from "../utils/inputDialog";
@@ -1088,11 +1088,13 @@ export class IdePage {
   private async showThemePicker(includeSpecial = false): Promise<void> {
     try {
       const themes = await listThemes();
-      const visibleThemes = themes.filter(theme => includeSpecial || !theme.special);
+      const visibleThemes = themes.filter(theme => includeSpecial || !theme.special)
+        .sort((left, right) => compareThemeGroups(themeGroup(left), themeGroup(right)) || left.name.localeCompare(right.name));
       this.palette.showPicker("Selecionar tema de cores", visibleThemes.map(theme => {
         const active = theme.id === this.settings.theme || theme.name === this.settings.theme;
         return {
           label: theme.name,
+          group: themeGroup(theme),
           hint: active ? "Atual" : theme.special ? "Especial" : theme.uiTheme === "vs" ? "Claro" : "Escuro",
           active,
           swatch: theme.colors["--accent"],
@@ -1109,7 +1111,9 @@ export class IdePage {
     const query = this.settingsQuery.trim().toLowerCase();
     const themes = await listThemes();
     const regularThemes = themes.filter(theme => !theme.special);
-    const themeOptions = regularThemes.map(theme => ({ value: theme.id, label: theme.name }));
+    const themeOptions = regularThemes
+      .sort((left, right) => compareThemeGroups(themeGroup(left), themeGroup(right)) || left.name.localeCompare(right.name))
+      .map(theme => ({ value: theme.id, label: theme.name, group: themeGroup(theme) }));
 
     if (query) {
       page.append(el("h2", { className: "settings-page-title", text: "Resultados da pesquisa" }));
@@ -1154,15 +1158,20 @@ export class IdePage {
       const languages = await api.i18n.availableLanguages();
       page.append(settingSelect("Idioma", "Escolha o idioma da interface. A aplicação será recarregada.", this.settings.language, languages.map(language => ({ value: language.code, label: language.label })), value => void this.setLanguage(value as AppLocale)));
       const themeList = el("div", { className: "settings-list" });
-      for (const theme of regularThemes) {
-        const active = theme.id === this.settings.theme || theme.name === this.settings.theme;
-        const row = el("button", { className: `theme-row ${active ? "active" : ""}` });
-        const swatch = el("span", { className: "theme-swatch" });
-        swatch.style.background = theme.colors["--accent"];
-        row.append(swatch, el("span", { className: "theme-name", text: theme.name }));
-        if (theme.special) row.append(el("span", { className: "theme-badge", text: "Especial" }));
-        row.addEventListener("click", () => void this.updateSettings({ ...this.settings, theme: theme.id }));
-        themeList.append(row);
+      const themeGroups = [...new Set(regularThemes.map(themeGroup))].sort(compareThemeGroups);
+      for (const category of themeGroups) {
+        const categoryThemes = regularThemes.filter(theme => themeGroup(theme) === category).sort((left, right) => left.name.localeCompare(right.name));
+        if (!categoryThemes.length) continue;
+        themeList.append(el("h3", { className: "theme-category-title", text: category }));
+        for (const theme of categoryThemes) {
+          const active = theme.id === this.settings.theme || theme.name === this.settings.theme;
+          const row = el("button", { className: `theme-row ${active ? "active" : ""}` });
+          const swatch = el("span", { className: "theme-swatch" });
+          swatch.style.background = theme.colors["--accent"];
+          row.append(swatch, el("span", { className: "theme-name", text: theme.name }));
+          row.addEventListener("click", () => void this.updateSettings({ ...this.settings, theme: theme.id }));
+          themeList.append(row);
+        }
       }
       page.append(themeList);
       page.append(settingSelect("Tema de ícones", "Default preserva as cores dos ícones; Monocromático usa a cor definida abaixo.", this.settings.iconTheme, [
@@ -2569,14 +2578,31 @@ function settingToggle(label: string, description: string, value: boolean, onCha
   return settingRow(label, description, input);
 }
 
-function settingSelect(label: string, description: string, value: string, options: Array<{ value: string; label: string }>, onChange: (value: string) => void): HTMLElement {
+function settingSelect(label: string, description: string, value: string, options: Array<{ value: string; label: string; group?: string }>, onChange: (value: string) => void): HTMLElement {
   const select = el("select", { className: "panel-input" });
+  const groups = new Map<string, HTMLOptGroupElement>();
   for (const option of options) {
-    select.append(el("option", { text: option.label, attrs: { value: option.value } }));
+    const element = el("option", { text: option.label, attrs: { value: option.value } });
+    if (!option.group) {
+      select.append(element);
+      continue;
+    }
+    let group = groups.get(option.group);
+    if (!group) {
+      group = el("optgroup", { attrs: { label: option.group } });
+      groups.set(option.group, group);
+      select.append(group);
+    }
+    group.append(element);
   }
   select.value = value;
   select.addEventListener("change", () => onChange(select.value));
   return settingRow(label, description, select);
+}
+
+function compareThemeGroups(left: string, right: string): number {
+  const priority = (group: string): number => group === "Dark" ? 0 : group === "Light" ? 1 : 2;
+  return priority(left) - priority(right) || left.localeCompare(right);
 }
 
 function settingRow(label: string, description: string, control: HTMLElement): HTMLElement {

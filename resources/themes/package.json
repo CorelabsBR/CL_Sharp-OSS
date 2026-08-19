@@ -16,42 +16,49 @@
       {
         "id": "dark_core",
         "label": "Dark Core",
+        "cat": "DEFAULT DARK",
         "uiTheme": "vs-dark",
         "path": "./dark_core.json"
       },
       {
         "id": "oled_black",
         "label": "OLED Black",
+        "cat": "DEFAULT DARK",
         "uiTheme": "vs-dark",
         "path": "./oled_black.json"
       },
       {
         "id": "light_core",
         "label": "Light Core",
+        "cat": "DEFAULT LIGHT",
         "uiTheme": "vs",
         "path": "./light_core.json"
       },
       {
         "id": "dark_plus",
         "label": "Dark Plus",
+        "cat": "DEFAULT DARK",
         "uiTheme": "vs-dark",
         "path": "./dark_plus.json"
       },
       {
         "id": "light_plus",
         "label": "Light Plus",
+        "cat": "DEFAULT LIGHT",
         "uiTheme": "vs",
         "path": "./light_plus.json"
       },
       {
         "id": "steel",
         "label": "Steel",
+        "cat": "DEFAULT DARK",
         "uiTheme": "vs-dark",
         "path": "./steel.json"
       },
       {
         "id": "frost",
         "label": "Frost",
+        "cat": "DEFAULT LIGHT",
         "uiTheme": "vs",
         "path": "./frost.json"
       },
@@ -59,74 +66,94 @@
         "id": "neutral",
         "label": "Neutral",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./neutral.json"
       },
       {
         "id": "spectrum",
         "label": "Spectrum",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./spectrum.json"
       },
       {
         "id": "solar",
         "label": "Solar",
         "uiTheme": "vs",
+        "cat": "DEFAULT LIGHT",
         "path": "./solar.json"
       },
       {
         "id": "dawn",
         "label": "Dawn",
         "uiTheme": "vs",
+        "cat": "DEFAULT LIGHT",
         "path": "./dawn.json"
       },
       {
         "id": "coffee",
         "label": "Coffee",
         "uiTheme": "vs",
+        "cat": "DEFAULT LIGHT",
         "path": "./coffee.json"
       },
       {
         "id": "mint",
         "label": "Mint",
         "uiTheme": "vs",
+        "cat": "DEFAULT LIGHT",
         "path": "./mint.json"
       },
       {
         "id": "ocean",
         "label": "Ocean",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./ocean.json"
       },
       {
-        "id": "dark_core",
+        "id": "amethyst",
         "label": "Amethyst",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./amethyst.json"
       },
       {
         "id": "emerald",
         "label": "Emerald",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./emerald.json"
       },
       {
         "id": "terminal",
         "label": "Terminal",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./terminal.json"
       },
       {
         "id": "graphite",
         "label": "Graphite",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./graphite.json"
       },
           {
         "id": "operacional",
         "label": "Operacional",
         "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
         "path": "./operacional.json",
         "welcomeLogo": "./welcomelogos/operacional.png"
+      },
+       {
+        "id": "christmas",
+        "label": "Christmas Frost",
+        "uiTheme": "vs-dark",
+        "cat": "SAZONAIS",
+        "path": "./christmas.json",
+        "welcomeLogo": "./welcomelogos/sakura.png"
       }
     ],
     "specialThemes": [
@@ -134,6 +161,7 @@
         "id": "sakura",
         "label": "Pink Spectrum",
         "uiTheme": "vs-dark",
+        "cat": "ESPECIAIS",
         "path": "./sakura.json",
         "categories": [
           "Special Themes"
@@ -145,22 +173,12 @@
         "id": "crimson_screen",
         "label": "Crimson Screen",
         "uiTheme": "vs-dark",
+        "cat": "ESPECIAIS",
         "path": "./crimson_screen.json",
         "categories": [
           "Special Themes"
         ],
         "preview": "./previews/crimson_screen.png"
-      },
-      {
-        "id": "christmas",
-        "label": "Christmas Frost",
-        "uiTheme": "vs-dark",
-        "path": "./christmas.json",
-        "categories": [
-          "Special Themes"
-        ],
-        "preview": "./previews/crimson_screen.png",
-        "welcomeLogo": "./welcomelogos/sakura.png"
       }
     ],
     "iconThemes": [

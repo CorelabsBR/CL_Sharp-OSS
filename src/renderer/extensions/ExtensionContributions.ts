@@ -44,7 +44,7 @@ export class ExtensionContributions {
   private async activate(extension: InstalledExtension): Promise<void> {
     for (const theme of extension.contributes?.themes ?? []) {
       const source = await api.extensions.readFile(extension.id, theme.path);
-      this.disposers.push(registerExtensionTheme(theme.id ?? `${extension.id}.${theme.label}`, theme.label, source, theme.uiTheme));
+      this.disposers.push(registerExtensionTheme(theme.id ?? `${extension.id}.${theme.label}`, theme.label, source, theme.uiTheme, theme.cat));
     }
     for (const language of extension.contributes?.languages ?? []) {
       const monarch = language.monarch ? JSON.parse(await api.extensions.readFile(extension.id, language.monarch)) as unknown : undefined;
