@@ -971,8 +971,12 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
       writeStorage(AI_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
       return settings;
     },
+    codexAccount: async () => ({ signedIn: false }),
     loginWithChatGpt: async () => {
       throw new Error("O login do ChatGPT para Codex está disponível apenas no aplicativo desktop.");
+    },
+    logoutCodex: async () => {
+      throw new Error("O gerenciamento da conta Codex está disponível apenas no aplicativo desktop.");
     },
     listConversations: async () => loadConversations().sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     createConversation: async (provider = loadAISettings().provider, model = loadAISettings().model) => {

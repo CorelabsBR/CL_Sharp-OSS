@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 26.8.51 - 2026-08-20
+
+Type: Feature / Fix
+
+Description:
+- Completa a integracao Codex desktop sobre o App Server oficial, com login pela conta ChatGPT no navegador, leitura do estado da conta, exibicao de e-mail/plano, troca de conta e logout.
+- Passa a carregar o catalogo de modelos disponibilizado pelo Codex para a conta autenticada em vez de manter uma lista fixa.
+- Habilita o modo agente para ler, editar e testar o workspace local aberto, limitando a escrita ao caminho canonico desse workspace e mantendo rede desabilitada; sem workspace valido, usa somente leitura.
+- Localiza o executavel Codex tanto no PATH quanto na extensao oficial instalada no NPSharp, VS Code, VS Code Insiders, VSCodium, Cursor ou Windsurf.
+- Adiciona teste da politica de sandbox e documentacao do fluxo de conta e das garantias de credenciais.
+- Corrige o botão de confirmação de exclusão do Explorer para remover arquivos e pastas da worktree durante a execução do projeto.
+
 ## 26.8.50 - 2026-08-20
 
 Type: Feature

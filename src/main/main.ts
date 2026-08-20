@@ -481,7 +481,7 @@ function registerIpcHandlers(): void {
   const extensionManager = new ExtensionManager(app.getPath("userData"));
   const aiSettings = new AISettingsService(app.getPath("userData"));
   const conversations = new ConversationManager(app.getPath("userData"));
-  const providerManager = new ProviderManager(aiSettings);
+  const providerManager = new ProviderManager(aiSettings, path.join(app.getPath("userData"), "extensions"));
   aiStreamingController = new StreamingController();
   const aiService = new AIService(providerManager, aiSettings, aiStreamingController);
   const serverDist = app.isPackaged ? path.join(process.resourcesPath, "npsharp-server", "dist") : path.join(app.getAppPath(), "npsharp-server", "dist");
@@ -615,11 +615,13 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle("ai:settings:load", () => aiSettings.load());
   ipcMain.handle("ai:settings:save", (_event, settings: AISaveSettingsRequest) => aiSettings.save(settings));
+  ipcMain.handle("ai:codex:account", () => providerManager.codexAccount());
   ipcMain.handle("ai:loginWithChatGpt", async () => {
     const login = await providerManager.startCodexChatGptLogin();
     await shell.openExternal(login.authUrl);
     return login.completed;
   });
+  ipcMain.handle("ai:codex:logout", () => providerManager.logoutCodex());
   ipcMain.handle("ai:conversations:list", () => conversations.list());
   ipcMain.handle("ai:conversations:create", (_event, provider?: AIProviderId, model?: string) => conversations.create(provider, model));
   ipcMain.handle("ai:conversations:update", (_event, update: AIConversationUpdate) => conversations.update(update));

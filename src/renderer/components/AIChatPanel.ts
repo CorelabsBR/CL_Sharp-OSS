@@ -497,7 +497,8 @@ export class AIChatPanel {
     const ollamaUrl = textField("URL do Ollama", this.settings.ollamaBaseUrl);
     const keyStatus = el("div", { className: "ai-key-status", text: this.settings.apiKeyConfigured ? "Uma chave está armazenada com segurança para este provedor." : "Nenhuma chave de API está armazenada para este provedor." });
     const chatGptLogin = el("button", { className: "primary", text: "Entrar com ChatGPT", attrs: { type: "button" } });
-    const chatGptStatus = el("div", { className: "ai-key-status", text: "Entre pela sua conta ChatGPT. Nenhuma chave de API será solicitada." });
+    const chatGptLogout = el("button", { text: "Sair da conta", attrs: { type: "button" } });
+    const chatGptStatus = el("div", { className: "ai-key-status", text: "Verificando a conta Codex…" });
     const clearKey = checkboxField("Limpar chave de API salva", false);
     const actions = el("div", { className: "ai-settings-actions" });
     const cancel = el("button", { text: "Cancelar", attrs: { type: "button" } });
@@ -505,7 +506,7 @@ export class AIChatPanel {
     actions.append(cancel, save);
     dialog.append(
       el("h2", { text: "Configurações de IA" }),
-      provider.row, chatGptLogin, chatGptStatus, key.row, keyStatus, model.row, temperature.row, maxTokens.row,
+      provider.row, chatGptLogin, chatGptLogout, chatGptStatus, key.row, keyStatus, model.row, temperature.row, maxTokens.row,
       contextSize.row, streaming.row, systemPrompt.row, ollamaUrl.row, clearKey.row, actions
     );
     overlay.append(dialog);
@@ -517,10 +518,19 @@ export class AIChatPanel {
     const updateAuthenticationFields = () => {
       const isCodex = provider.input.value === "codex";
       chatGptLogin.hidden = !isCodex;
+      chatGptLogout.hidden = !isCodex || chatGptLogout.dataset.signedIn !== "true";
       chatGptStatus.hidden = !isCodex;
       key.row.hidden = isCodex;
       keyStatus.hidden = isCodex;
       clearKey.row.hidden = isCodex;
+    };
+    const renderAccount = (account: { signedIn: boolean; email?: string; planType?: string }): void => {
+      chatGptLogout.dataset.signedIn = String(account.signedIn);
+      chatGptLogout.hidden = provider.input.value !== "codex" || !account.signedIn;
+      chatGptLogin.textContent = account.signedIn ? "Trocar conta ChatGPT" : "Entrar com ChatGPT";
+      chatGptStatus.textContent = account.signedIn
+        ? `Conectado${account.email ? ` como ${account.email}` : ""}${account.planType ? ` (${account.planType})` : ""}. O Codex pode ler e editar o workspace aberto.`
+        : "Entre pela sua conta ChatGPT. Nenhuma chave de API será solicitada.";
     };
     chatGptLogin.addEventListener("click", () => {
       chatGptLogin.disabled = true;
@@ -530,11 +540,22 @@ export class AIChatPanel {
         this.settings = await api.ai.saveSettings({ ...settingsRequest(this.settings!), provider: "codex", model: model.input.value });
         this.renderProviders();
         await this.renderModels();
-        chatGptStatus.textContent = `Conectado${result.email ? ` como ${result.email}` : ""}${result.planType ? ` (${result.planType})` : ""}.`;
+        renderAccount({ signedIn: true, email: result.email, planType: result.planType });
       }).catch(error => {
         chatGptStatus.textContent = error instanceof Error ? error.message : String(error);
       }).finally(() => {
         chatGptLogin.disabled = false;
+      });
+    });
+    chatGptLogout.addEventListener("click", () => {
+      chatGptLogout.disabled = true;
+      chatGptStatus.textContent = "Saindo da conta Codex…";
+      void api.ai.logoutCodex().then(() => {
+        renderAccount({ signedIn: false });
+      }).catch(error => {
+        chatGptStatus.textContent = error instanceof Error ? error.message : String(error);
+      }).finally(() => {
+        chatGptLogout.disabled = false;
       });
     });
     dialog.addEventListener("submit", event => {
@@ -564,6 +585,9 @@ export class AIChatPanel {
       updateAuthenticationFields();
     });
     updateAuthenticationFields();
+    void api.ai.codexAccount().then(renderAccount).catch(error => {
+      chatGptStatus.textContent = error instanceof Error ? error.message : String(error);
+    });
     if (provider.input.value === "codex") chatGptLogin.focus();
     else key.input.focus();
   }

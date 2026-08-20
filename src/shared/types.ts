@@ -713,6 +713,12 @@ export interface CodexChatGptLoginResult {
   error?: string;
 }
 
+export interface CodexAccountState {
+  signedIn: boolean;
+  email?: string;
+  planType?: string;
+}
+
 export type AIStreamEventType = "start" | "delta" | "complete" | "error" | "cancelled";
 
 export interface AIStreamEvent {
@@ -779,7 +785,9 @@ export interface NpsharpApi {
     listModels(provider: AIProviderId): Promise<AIModel[]>;
     loadSettings(): Promise<AISettings>;
     saveSettings(settings: AISaveSettingsRequest): Promise<AISettings>;
+    codexAccount(): Promise<CodexAccountState>;
     loginWithChatGpt(): Promise<CodexChatGptLoginResult>;
+    logoutCodex(): Promise<void>;
     listConversations(): Promise<AIConversation[]>;
     createConversation(provider?: AIProviderId, model?: string): Promise<AIConversation>;
     updateConversation(update: AIConversationUpdate): Promise<AIConversation>;

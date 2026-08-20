@@ -554,7 +554,7 @@ export class FileExplorer {
     const rememberLabel = el("label", { className: "file-delete-remember", children: [remember, " Não perguntar novamente"] });
     const error = el("div", { className: "file-delete-error", attrs: { role: "alert", "aria-live": "polite" } });
     const cancel = el("button", { className: "secondary", text: "Cancelar", attrs: { type: "button" } });
-    const submit = el("button", { className: "danger", text: "Excluir", attrs: { type: "submit" } });
+    const submit = el("button", { className: "danger", text: "Excluir", attrs: { type: "button" } });
     const actions = el("div", { className: "file-delete-actions", children: [cancel, submit] });
     dialog.append(title, description, rememberLabel, error, actions);
     overlay.append(dialog);
@@ -570,8 +570,8 @@ export class FileExplorer {
         close();
       }
     });
-    dialog.addEventListener("submit", event => {
-      event.preventDefault();
+    const confirmDelete = () => {
+      if (submit.disabled) return;
       submit.disabled = true;
       cancel.disabled = true;
       void this.deleteItem(filePath)
@@ -589,6 +589,11 @@ export class FileExplorer {
           submit.disabled = false;
           cancel.disabled = false;
         });
+    };
+    submit.addEventListener("click", confirmDelete);
+    dialog.addEventListener("submit", event => {
+      event.preventDefault();
+      confirmDelete();
     });
 
     this.deleteDialog = overlay;

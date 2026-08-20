@@ -8,6 +8,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
   AIChatRequest,
+  CodexAccountState,
   AIConversationUpdate,
   AIProviderId,
   AISaveSettingsRequest,
@@ -124,7 +125,9 @@ const api: NpsharpApi = {
     listModels: (provider: AIProviderId) => invoke("ai:listModels", provider),
     loadSettings: () => invoke("ai:settings:load"),
     saveSettings: (settings: AISaveSettingsRequest) => invoke("ai:settings:save", settings),
+    codexAccount: (): Promise<CodexAccountState> => invoke("ai:codex:account"),
     loginWithChatGpt: () => invoke("ai:loginWithChatGpt"),
+    logoutCodex: () => invoke("ai:codex:logout"),
     listConversations: () => invoke("ai:conversations:list"),
     createConversation: (provider?: AIProviderId, model?: string) => invoke("ai:conversations:create", provider, model),
     updateConversation: (update: AIConversationUpdate) => invoke("ai:conversations:update", update),

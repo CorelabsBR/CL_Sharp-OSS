@@ -8,12 +8,22 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import { BUILD_CONFIG } from "../../../shared/buildConfig";
-import type { AIModel, AIProviderDescriptor, AIStreamEvent, CodexChatGptLoginResult } from "../../../shared/types";
+import type { AIModel, AIProviderDescriptor, AIStreamEvent, CodexAccountState, CodexChatGptLoginResult } from "../../../shared/types";
 import { commandExists } from "../processService";
 import type { AIProvider, AIProviderRequest } from "./AIProvider";
 
 interface JsonRecord {
   [key: string]: unknown;
+}
+
+export type CodexSandboxPolicy =
+  | { type: "readOnly" }
+  | { type: "workspaceWrite"; writableRoots: string[]; networkAccess: false };
+
+export function codexSandboxPolicy(workspace: string | undefined): CodexSandboxPolicy {
+  return workspace
+    ? { type: "workspaceWrite", writableRoots: [workspace], networkAccess: false }
+    : { type: "readOnly" };
 }
 
 interface PendingRequest {
@@ -57,8 +67,10 @@ export class CodexAppServerProvider implements AIProvider {
   private nextRequestId = 1;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly loginWaiters = new Map<string, LoginWaiter>();
-  private readonly conversationThreads = new Map<string, string>();
+  private readonly conversationThreads = new Map<string, { threadId: string; workspace?: string }>();
   private readonly turnStreams = new Map<string, TurnStream>();
+
+  constructor(private readonly npsharpExtensionsRoot?: string) {}
 
   async startChatGptLogin(): Promise<LoginSession> {
     await this.ensureStarted();
@@ -76,6 +88,23 @@ export class CodexAppServerProvider implements AIProvider {
     return { authUrl, completed };
   }
 
+  async accountState(): Promise<CodexAccountState> {
+    await this.ensureStarted();
+    const result = await this.request("account/read", { refreshToken: false });
+    const account = record(result.account);
+    return {
+      signedIn: text(account?.type) === "chatgpt",
+      email: text(account?.email),
+      planType: text(account?.planType)
+    };
+  }
+
+  async logout(): Promise<void> {
+    await this.ensureStarted();
+    await this.request("account/logout", {});
+    this.conversationThreads.clear();
+  }
+
   async *sendMessage(request: AIProviderRequest): AsyncIterable<AIStreamEvent> {
     await this.ensureStarted();
     await this.assertChatGptLogin();
@@ -91,12 +120,13 @@ export class CodexAppServerProvider implements AIProvider {
     try {
       const userMessage = [...request.messages].reverse().find(message => message.role === "user")?.content.trim();
       if (!userMessage) throw new Error("A conversa não possui uma mensagem do usuário para enviar ao Codex.");
+      const workspace = await localWorkspace(request.workspace);
       const result = await this.request("turn/start", {
         threadId,
         input: [{ type: "text", text: userMessage }],
-        cwd: request.workspace || undefined,
+        cwd: workspace,
         approvalPolicy: "never",
-        sandboxPolicy: { type: "readOnly" },
+        sandboxPolicy: codexSandboxPolicy(workspace),
         model: request.settings.model || this.descriptor.defaultModel,
         effort: "medium",
         summary: "concise"
@@ -110,22 +140,31 @@ export class CodexAppServerProvider implements AIProvider {
   }
 
   async listModels(): Promise<AIModel[]> {
-    return ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].map(id => ({ id, displayName: id }));
+    await this.ensureStarted();
+    const result = await this.request("model/list", { limit: 100, includeHidden: false });
+    const data = Array.isArray(result.data) ? result.data : [];
+    const models = data.flatMap(value => {
+      const model = record(value);
+      const id = text(model?.id) ?? text(model?.model);
+      return id ? [{ id, displayName: text(model?.displayName) ?? id }] : [];
+    });
+    return models.length ? models : [this.descriptor.defaultModel].map(id => ({ id, displayName: id }));
   }
 
   private async threadFor(request: AIProviderRequest): Promise<string> {
+    const workspace = await localWorkspace(request.workspace);
     const existing = this.conversationThreads.get(request.conversationId);
-    if (existing) return existing;
+    if (existing && existing.workspace === workspace) return existing.threadId;
     const result = await this.request("thread/start", {
-      cwd: request.workspace || undefined,
+      cwd: workspace,
       approvalPolicy: "never",
-      sandboxPolicy: { type: "readOnly" },
+      sandboxPolicy: codexSandboxPolicy(workspace),
       model: request.settings.model || this.descriptor.defaultModel,
       serviceName: "npsharp"
     });
     const threadId = text(record(result.thread)?.id);
     if (!threadId) throw new Error("O Codex não iniciou uma conversa.");
-    this.conversationThreads.set(request.conversationId, threadId);
+    this.conversationThreads.set(request.conversationId, { threadId, workspace });
     return threadId;
   }
 
@@ -149,9 +188,9 @@ export class CodexAppServerProvider implements AIProvider {
   }
 
   private async start(): Promise<void> {
-    const executable = await findCodexExecutable();
+    const executable = await findCodexExecutable(this.npsharpExtensionsRoot);
     if (!executable) {
-      throw new Error("Codex não foi encontrado. Instale ou habilite a extensão Codex no VS Code, ou defina NPSHARP_CODEX_PATH.");
+      throw new Error("Codex não foi encontrado. Instale a extensão oficial Codex no NPSharp ou em um editor compatível, instale o Codex CLI, ou defina NPSHARP_CODEX_PATH.");
     }
     const child = spawn(executable, ["app-server", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -292,6 +331,17 @@ export class CodexAppServerProvider implements AIProvider {
   }
 }
 
+async function localWorkspace(value: string | undefined): Promise<string | undefined> {
+  if (!value || !path.isAbsolute(value)) return undefined;
+  const resolved = path.resolve(value);
+  try {
+    if (!(await fs.stat(resolved)).isDirectory()) return undefined;
+    return await fs.realpath(resolved);
+  } catch {
+    return undefined;
+  }
+}
+
 class AsyncQueue<T> implements AsyncIterable<T> {
   private readonly values: T[] = [];
   private nextValue?: (value: IteratorResult<T>) => void;
@@ -347,17 +397,17 @@ class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-async function findCodexExecutable(): Promise<string | undefined> {
+async function findCodexExecutable(npsharpExtensionsRoot?: string): Promise<string | undefined> {
   const configured = process.env.NPSHARP_CODEX_PATH?.trim();
   if (configured && await fileExists(configured)) return configured;
   const fromPath = await commandExists("codex");
   if (fromPath) return fromPath;
   const binary = codexBundledBinary();
   if (!binary) return undefined;
-  for (const extensionsRoot of codexExtensionRoots()) {
+  for (const extensionsRoot of codexExtensionRoots(npsharpExtensionsRoot)) {
     try {
       const entries = await fs.readdir(extensionsRoot, { withFileTypes: true });
-      const folders = entries.filter(entry => entry.isDirectory() && entry.name.startsWith("openai.chatgpt-"))
+      const folders = entries.filter(entry => entry.isDirectory() && (entry.name === "openai.chatgpt" || entry.name.startsWith("openai.chatgpt-")))
         .map(entry => entry.name)
         .sort()
         .reverse();
@@ -381,11 +431,12 @@ function codexBundledBinary(): { directory: string; name: string } | undefined {
   return undefined;
 }
 
-function codexExtensionRoots(): string[] {
+function codexExtensionRoots(npsharpExtensionsRoot?: string): string[] {
   const home = os.homedir();
   const configured = process.env.VSCODE_EXTENSIONS?.trim();
   return [...new Set([
     configured,
+    npsharpExtensionsRoot,
     path.join(home, ".vscode", "extensions"),
     path.join(home, ".vscode-insiders", "extensions"),
     path.join(home, ".vscode-oss", "extensions"),

@@ -10,14 +10,14 @@ import { OllamaProvider } from "./providers/OllamaProvider";
 import { OpenAIProvider } from "./providers/OpenAIProvider";
 import { OpenRouterProvider } from "./providers/OpenRouterProvider";
 import { CodexAppServerProvider } from "./CodexAppServerProvider";
-import type { CodexChatGptLoginResult } from "../../../shared/types";
+import type { CodexAccountState, CodexChatGptLoginResult } from "../../../shared/types";
 
 export class ProviderManager {
   private readonly providers = new Map<AIProviderId, AIProvider>();
 
-  constructor(private readonly settingsService: AISettingsService) {
+  constructor(private readonly settingsService: AISettingsService, npsharpExtensionsRoot?: string) {
     this.register(new OpenAIProvider("openai"));
-    this.register(new CodexAppServerProvider());
+    this.register(new CodexAppServerProvider(npsharpExtensionsRoot));
     this.register(new GeminiProvider());
     this.register(new OpenRouterProvider());
     this.register(new OllamaProvider());
@@ -43,6 +43,20 @@ export class ProviderManager {
     return provider.startChatGptLogin();
   }
 
+  async codexAccount(): Promise<CodexAccountState> {
+    return this.codexProvider().accountState();
+  }
+
+  async logoutCodex(): Promise<void> {
+    await this.codexProvider().logout();
+  }
+
+  private codexProvider(): CodexAppServerProvider {
+    const provider = this.get("codex");
+    if (!(provider instanceof CodexAppServerProvider)) throw new Error("O provedor Codex não está disponível.");
+    return provider;
+  }
+
   register(provider: AIProvider): void {
     if (this.providers.has(provider.descriptor.id)) {
       throw new Error(`AI provider already registered: ${provider.descriptor.id}`);
@@ -50,4 +64,3 @@ export class ProviderManager {
     this.providers.set(provider.descriptor.id, provider);
   }
 }
-
