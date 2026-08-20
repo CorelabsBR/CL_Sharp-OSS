@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import type { EditorDiagnostic, FileOpenResult, GitDiffContent, SearchResult, TextEncoding } from "../../shared/types";
 import { COMPACT_MINIMAP_OPTIONS, configureMonaco, ensureLanguageSupport, languageForPath, monaco } from "../../editor/monacoSetup";
-import { htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "../../editor/emmet";
+import { emmetAbbreviationAt, emmetLanguageConfig, htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "../../editor/emmet";
 import { matchingSnippets, snippetAtPrefix, typedSnippetPrefix } from "../../editor/snippets";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
@@ -184,11 +184,12 @@ export class EditorTabs {
     const position = this.editor.getPosition();
     if (!model || !position) return false;
     const prefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
-    const expansion = htmlAbbreviationAt(prefix);
-    if (!expansion) return false;
     const language = model.getLanguageId();
+    const config = emmetLanguageConfig(language, model.uri.path);
+    const expansion = config ? emmetAbbreviationAt(prefix, config) : htmlAbbreviationAt(prefix);
+    if (!expansion) return false;
     const isNewHtmlDocument = language === "plaintext" && isLikelyHtmlAbbreviation(expansion.abbreviation) && model.getValue().trim() === expansion.abbreviation;
-    if (language !== "html" && !isNewHtmlDocument) return false;
+    if (!config && !isNewHtmlDocument) return false;
 
     const range = new monaco.Range(position.lineNumber, position.column - expansion.abbreviation.length, position.lineNumber, position.column);
     this.editor.executeEdits("emmet", [{ range, text: "" }]);

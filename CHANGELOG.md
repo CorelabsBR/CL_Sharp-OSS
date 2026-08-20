@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 26.8.50 - 2026-08-20
+
+Type: Feature
+
+Description:
+- Estende o autocomplete Emmet do HTML para CSS, SCSS, LESS, XML, PHP, Handlebars, Razor, JSX e TSX, com expansoes adequadas a cada dialeto.
+- Permite aceitar as novas expansoes tanto pelo menu de sugestoes quanto diretamente pela tecla Tab, sem habilitar marcacao HTML em arquivos JavaScript ou TypeScript comuns.
+- Adiciona cobertura automatizada para selecao de dialeto e expansoes JSX, CSS e XML.
+
 ## 26.8.49 - 2026-08-20
 
 Type: Feature

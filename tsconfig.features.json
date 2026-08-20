@@ -6,6 +6,7 @@
   },
   "include": [
     "src/renderer/commands/commandRegistry.ts",
-    "src/renderer/commands/quickOpen.ts"
+    "src/renderer/commands/quickOpen.ts",
+    "src/editor/emmet.ts"
   ]
 }

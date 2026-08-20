@@ -7,8 +7,8 @@ android {
         applicationId "br.com.corelabs.npsharp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 260849
-        versionName "26.8.49"
+        versionCode 260850
+        versionName "26.8.50"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

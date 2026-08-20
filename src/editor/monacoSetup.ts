@@ -11,7 +11,7 @@ import "monaco-editor/features/codicon/register.js";
 import "monaco-editor/features/find/register.js";
 import "monaco-editor/features/snippet/register.js";
 import "monaco-editor/features/suggest/register.js";
-import { htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "./emmet";
+import { emmetAbbreviationAt, emmetLanguageConfig, htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "./emmet";
 import { matchingSnippets, registerSnippetSource, typedSnippetPrefix } from "./snippets";
 import editorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker.js?worker";
@@ -58,6 +58,7 @@ const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
   csharp: () => import("monaco-editor/languages/definitions/csharp/register.js"),
   css: () => Promise.all([import("monaco-editor/languages/definitions/css/register.js"), import("monaco-editor/language/css/monaco.contribution.js")]),
   scss: () => Promise.all([import("monaco-editor/languages/definitions/scss/register.js"), import("monaco-editor/language/css/monaco.contribution.js")]),
+  less: () => Promise.all([import("monaco-editor/languages/definitions/less/register.js"), import("monaco-editor/language/css/monaco.contribution.js")]),
   go: () => import("monaco-editor/languages/definitions/go/register.js"),
   html: () => Promise.all([import("monaco-editor/languages/definitions/html/register.js"), import("monaco-editor/language/html/monaco.contribution.js")]),
   ini: () => import("monaco-editor/languages/definitions/ini/register.js"),
@@ -200,17 +201,18 @@ export function configureMonaco(): typeof monaco {
   });
 
   const emmetCompletionProvider: monaco.languages.CompletionItemProvider = {
-    triggerCharacters: ["!", ".", "#", ">", "*", ":"],
+    triggerCharacters: ["!", ".", "#", ">", "+", "*", ":", "-", "@"],
     provideCompletionItems(model, position) {
       const prefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
-      const expansion = htmlAbbreviationAt(prefix);
+      const config = emmetLanguageConfig(model.getLanguageId(), model.uri.path);
+      const expansion = config ? emmetAbbreviationAt(prefix, config) : htmlAbbreviationAt(prefix);
       if (!expansion) return { suggestions: [] };
       if (model.getLanguageId() === "plaintext" && (!isLikelyHtmlAbbreviation(expansion.abbreviation) || model.getValue().trim() !== expansion.abbreviation)) return { suggestions: [] };
       return {
         suggestions: [{
           label: expansion.abbreviation,
           detail: "Emmet Abbreviation",
-          documentation: { value: `**Emmet**\n\n\`\`\`html\n${expansion.snippet.replace(/\$\{?\d+(?::([^}]*))?\}?/g, "$1")}\n\`\`\`` },
+          documentation: { value: `**Emmet**\n\n\`\`\`${config?.syntax ?? "html"}\n${expansion.snippet.replace(/\$\{?\d+(?::([^}]*))?\}?/g, "$1")}\n\`\`\`` },
           kind: monaco.languages.CompletionItemKind.Snippet,
           insertText: expansion.snippet,
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
@@ -222,6 +224,9 @@ export function configureMonaco(): typeof monaco {
   };
   monaco.languages.registerCompletionItemProvider("html", emmetCompletionProvider);
   monaco.languages.registerCompletionItemProvider("plaintext", emmetCompletionProvider);
+  for (const language of ["css", "scss", "less", "xml", "php", "handlebars", "razor", "javascript", "typescript"]) {
+    monaco.languages.registerCompletionItemProvider(language, emmetCompletionProvider);
+  }
 
   registerLanguageKeywordCompletions();
   for (const [path, source] of Object.entries(bundledSnippetSources)) {
@@ -327,6 +332,7 @@ export function languageForPath(filePath: string): string {
   if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
   if (lower.endsWith(".css")) return "css";
   if (lower.endsWith(".scss")) return "scss";
+  if (lower.endsWith(".less")) return "less";
   if (lower.endsWith(".xml")) return "xml";
   if (lower.endsWith(".md")) return "markdown";
   if (lower.endsWith(".py")) return "python";
