@@ -106,6 +106,18 @@ interface AndroidWorkspacePlugin {
 
 const AndroidWorkspace = registerPlugin<AndroidWorkspacePlugin>("NpsharpWorkspace");
 
+interface AndroidGitPlugin {
+  status(options: { workspace: string }): Promise<{ repos: GitRepositoryStatus[] }>;
+  run(options: { repo: string; args: string[] }): Promise<GitOperationResult>;
+  diff(options: { repo: string; path: string; staged: boolean }): Promise<{ text: string }>;
+  content(options: { repo: string; path: string; staged: boolean }): Promise<import("../../shared/types").GitDiffContent>;
+  history(options: { repo: string }): Promise<{ commits: GitCommit[] }>;
+  credentials(options: { username: string; token: string }): Promise<void>;
+  identity(options: { repo: string; name: string; email: string }): Promise<GitOperationResult>;
+}
+
+const AndroidGit = registerPlugin<AndroidGitPlugin>("NpsharpGit");
+
 export interface RendererApi extends NpsharpApi {
   platform: PlatformInfo;
   notes: {
@@ -788,7 +800,7 @@ function createBrowserApi(): NpsharpApi {
     diagnostics: {
       java: async () => []
     },
-    git: createUnavailableGitApi(),
+    git: createGitApi(),
     terminal: createTerminalApi(),
     runtime: {
       list: async () => [],
@@ -1059,6 +1071,57 @@ function createUnavailableGitApi(): NpsharpApi["git"] {
     diffContent: async () => ({ original: "", modified: message, originalLabel: "HEAD", modifiedLabel: "Indisponível", language: "plaintext" }),
     history: async () => []
   };
+}
+
+function createGitApi(): NpsharpApi["git"] {
+  if (!platform.canUseGit || platform.kind !== "capacitor") return createUnavailableGitApi();
+  const runNative = async (repo: string, args: string[]): Promise<GitOperationResult> => {
+    try {
+      return await AndroidGit.run({ repo, args });
+    } catch (error) {
+      if (!isRemoteGitCommand(args[0]) || !looksLikeGitAuthenticationError(error)) throw error;
+      const username = await showInputDialog("Usuário Git", "git", { placeholder: "Usuário do GitHub, GitLab ou servidor Git" });
+      if (username === undefined) return { success: false, output: "Autenticação Git cancelada." };
+      const token = await showInputDialog("Token de acesso Git", "", { password: true, placeholder: "Token pessoal; mantido somente nesta sessão" });
+      if (!token) return { success: false, output: "Autenticação Git cancelada." };
+      await AndroidGit.credentials({ username: username.trim() || "git", token });
+      return AndroidGit.run({ repo, args });
+    }
+  };
+  const run = async (repo: string, args: string[]): Promise<GitOperationResult> => {
+    const first = await runNative(repo, args);
+    if (first.success || first.output !== "GIT_IDENTITY_REQUIRED") return first;
+    const name = await showInputDialog("Nome do autor Git", "", { placeholder: "Seu nome nos commits" });
+    if (!name?.trim()) return { success: false, output: "Commit cancelado: identidade Git não informada." };
+    const email = await showInputDialog("E-mail do autor Git", "", { placeholder: "seu-email@exemplo.com" });
+    if (!email?.trim()) return { success: false, output: "Commit cancelado: identidade Git não informada." };
+    const identity = await AndroidGit.identity({ repo, name: name.trim(), email: email.trim() });
+    return identity.success ? runNative(repo, args) : identity;
+  };
+  return {
+    status: async workspace => (await AndroidGit.status({ workspace })).repos,
+    run,
+    stage: (repo, file) => run(repo, ["add", "--", file.path]),
+    unstage: (repo, file) => run(repo, ["restore", "--staged", "--", file.path]),
+    discard: (repo, file) => run(repo, file.kind === "untracked" || file.kind === "ignored"
+      ? ["clean", "-f", "--", file.path]
+      : ["restore", "--worktree", "--", file.path]),
+    commit: (repo, message, allowEmpty = false) => run(repo, ["commit", ...(allowEmpty ? ["--allow-empty"] : []), "-m", message]),
+    checkout: (repo, branch) => run(repo, ["checkout", branch]),
+    createBranch: (repo, branch) => run(repo, ["checkout", "-b", branch]),
+    diff: async (repo, file, staged) => (await AndroidGit.diff({ repo, path: file.path, staged })).text,
+    diffContent: (repo, file, staged) => AndroidGit.content({ repo, path: file.path, staged }),
+    history: async repo => (await AndroidGit.history({ repo })).commits
+  };
+}
+
+function isRemoteGitCommand(command?: string): boolean {
+  return command === "clone" || command === "fetch" || command === "pull" || command === "push";
+}
+
+function looksLikeGitAuthenticationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /auth|credential|not authorized|unauthorized|forbidden|401|403/i.test(message);
 }
 
 function createSearchApi(fs: FsApi): NpsharpApi["search"] {
@@ -1336,7 +1399,7 @@ function notesPath(workspace?: string): string {
 
 function fallbackMessageFor(feature: "git" | "terminal" | "liveServer" | "run"): string {
   const messages: Record<"git" | "terminal" | "liveServer" | "run", string> = {
-    git: platform.canUseGit ? "Git desktop habilitado." : (platform.isMobile ? MOBILE_GIT_MESSAGE : WEB_GIT_MESSAGE),
+    git: platform.canUseGit ? (platform.isMobile ? "Git nativo Android habilitado." : "Git desktop habilitado.") : (platform.isMobile ? MOBILE_GIT_MESSAGE : WEB_GIT_MESSAGE),
     terminal: platform.canUseTerminal ? "Terminal desktop habilitado." : (platform.isMobile ? MOBILE_TERMINAL_MESSAGE : WEB_TERMINAL_MESSAGE),
     liveServer: platform.canUseLiveServer ? "Live Server Node habilitado." : "Live Server Node nao esta disponivel; HTML usa preview local.",
     run: platform.canUseNodeBackend ? "Runtimes locais habilitados." : "Runtimes locais dependem de backend nativo futuro."

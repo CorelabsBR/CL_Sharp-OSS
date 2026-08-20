@@ -1,0 +1,910 @@
+{
+  "HTML5 boilerplate": {
+    "prefix": "html5",
+    "body": [
+      "<!DOCTYPE html>",
+      "<html lang=\"${1:pt-BR}\">",
+      "<head>",
+      "\t<meta charset=\"UTF-8\">",
+      "\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
+      "\t<title>${2:Document}</title>",
+      "</head>",
+      "<body>",
+      "\t$0",
+      "</body>",
+      "</html>"
+    ],
+    "description": "Estrutura básica HTML5"
+  },
+
+  "doctype": {
+    "prefix": "doctype",
+    "body": [
+      "<!DOCTYPE html>$0"
+    ],
+    "description": "Declara DOCTYPE HTML5"
+  },
+
+  "html": {
+    "prefix": "html",
+    "body": [
+      "<html lang=\"${1:pt-BR}\">",
+      "\t$0",
+      "</html>"
+    ],
+    "description": "Tag html"
+  },
+
+  "head": {
+    "prefix": "head",
+    "body": [
+      "<head>",
+      "\t$0",
+      "</head>"
+    ],
+    "description": "Tag head"
+  },
+
+  "body": {
+    "prefix": "body",
+    "body": [
+      "<body>",
+      "\t$0",
+      "</body>"
+    ],
+    "description": "Tag body"
+  },
+
+  "meta charset": {
+    "prefix": "charset",
+    "body": [
+      "<meta charset=\"UTF-8\">$0"
+    ],
+    "description": "Meta charset UTF-8"
+  },
+
+  "meta viewport": {
+    "prefix": "viewport",
+    "body": [
+      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">$0"
+    ],
+    "description": "Meta viewport responsiva"
+  },
+
+  "meta description": {
+    "prefix": "metadesc",
+    "body": [
+      "<meta name=\"description\" content=\"${1:Descrição da página}\">$0"
+    ],
+    "description": "Meta description"
+  },
+
+  "meta keywords": {
+    "prefix": "keywords",
+    "body": [
+      "<meta name=\"keywords\" content=\"${1:palavra1, palavra2}\">$0"
+    ],
+    "description": "Meta keywords"
+  },
+
+  "meta author": {
+    "prefix": "author",
+    "body": [
+      "<meta name=\"author\" content=\"${1:Autor}\">$0"
+    ],
+    "description": "Meta author"
+  },
+
+  "title": {
+    "prefix": "title",
+    "body": [
+      "<title>${1:Título}</title>$0"
+    ],
+    "description": "Título da página"
+  },
+
+  "favicon": {
+    "prefix": "favicon",
+    "body": [
+      "<link rel=\"icon\" type=\"image/x-icon\" href=\"${1:/favicon.ico}\">$0"
+    ],
+    "description": "Adiciona favicon"
+  },
+
+  "stylesheet": {
+    "prefix": "css",
+    "body": [
+      "<link rel=\"stylesheet\" href=\"${1:style.css}\">$0"
+    ],
+    "description": "Importa folha de estilos CSS"
+  },
+
+  "script": {
+    "prefix": "script",
+    "body": [
+      "<script src=\"${1:script.js}\"></script>$0"
+    ],
+    "description": "Importa JavaScript"
+  },
+
+  "script defer": {
+    "prefix": "scriptdefer",
+    "body": [
+      "<script src=\"${1:script.js}\" defer></script>$0"
+    ],
+    "description": "Importa JavaScript com defer"
+  },
+
+  "script module": {
+    "prefix": "scriptmodule",
+    "body": [
+      "<script type=\"module\" src=\"${1:script.js}\"></script>$0"
+    ],
+    "description": "Importa JavaScript como ES Module"
+  },
+
+  "style": {
+    "prefix": "style",
+    "body": [
+      "<style>",
+      "\t$0",
+      "</style>"
+    ],
+    "description": "Bloco CSS interno"
+  },
+
+  "div": {
+    "prefix": "div",
+    "body": [
+      "<div${1: class=\"${2:container}\"}>",
+      "\t$0",
+      "</div>"
+    ],
+    "description": "Div"
+  },
+
+  "section": {
+    "prefix": "section",
+    "body": [
+      "<section${1: class=\"${2:section}\"}>",
+      "\t$0",
+      "</section>"
+    ],
+    "description": "Seção semântica"
+  },
+
+  "main": {
+    "prefix": "main",
+    "body": [
+      "<main>",
+      "\t$0",
+      "</main>"
+    ],
+    "description": "Conteúdo principal"
+  },
+
+  "header": {
+    "prefix": "header",
+    "body": [
+      "<header>",
+      "\t$0",
+      "</header>"
+    ],
+    "description": "Cabeçalho"
+  },
+
+  "footer": {
+    "prefix": "footer",
+    "body": [
+      "<footer>",
+      "\t$0",
+      "</footer>"
+    ],
+    "description": "Rodapé"
+  },
+
+  "nav": {
+    "prefix": "nav",
+    "body": [
+      "<nav>",
+      "\t$0",
+      "</nav>"
+    ],
+    "description": "Navegação"
+  },
+
+  "article": {
+    "prefix": "article",
+    "body": [
+      "<article>",
+      "\t$0",
+      "</article>"
+    ],
+    "description": "Artigo semântico"
+  },
+
+  "aside": {
+    "prefix": "aside",
+    "body": [
+      "<aside>",
+      "\t$0",
+      "</aside>"
+    ],
+    "description": "Conteúdo lateral"
+  },
+
+  "h1": {
+    "prefix": "h1",
+    "body": [
+      "<h1>${1:Título}</h1>$0"
+    ],
+    "description": "Heading h1"
+  },
+
+  "h2": {
+    "prefix": "h2",
+    "body": [
+      "<h2>${1:Título}</h2>$0"
+    ],
+    "description": "Heading h2"
+  },
+
+  "h3": {
+    "prefix": "h3",
+    "body": [
+      "<h3>${1:Título}</h3>$0"
+    ],
+    "description": "Heading h3"
+  },
+
+  "h4": {
+    "prefix": "h4",
+    "body": [
+      "<h4>${1:Título}</h4>$0"
+    ],
+    "description": "Heading h4"
+  },
+
+  "h5": {
+    "prefix": "h5",
+    "body": [
+      "<h5>${1:Título}</h5>$0"
+    ],
+    "description": "Heading h5"
+  },
+
+  "h6": {
+    "prefix": "h6",
+    "body": [
+      "<h6>${1:Título}</h6>$0"
+    ],
+    "description": "Heading h6"
+  },
+
+  "paragraph": {
+    "prefix": "p",
+    "body": [
+      "<p>${1:Texto}</p>$0"
+    ],
+    "description": "Parágrafo"
+  },
+
+  "span": {
+    "prefix": "span",
+    "body": [
+      "<span>${1:Texto}</span>$0"
+    ],
+    "description": "Span inline"
+  },
+
+  "strong": {
+    "prefix": "strong",
+    "body": [
+      "<strong>${1:Texto}</strong>$0"
+    ],
+    "description": "Texto com importância forte"
+  },
+
+  "em": {
+    "prefix": "em",
+    "body": [
+      "<em>${1:Texto}</em>$0"
+    ],
+    "description": "Texto enfatizado"
+  },
+
+  "small": {
+    "prefix": "small",
+    "body": [
+      "<small>${1:Texto}</small>$0"
+    ],
+    "description": "Texto secundário"
+  },
+
+  "mark": {
+    "prefix": "mark",
+    "body": [
+      "<mark>${1:Texto}</mark>$0"
+    ],
+    "description": "Texto destacado"
+  },
+
+  "code": {
+    "prefix": "code",
+    "body": [
+      "<code>${1:código}</code>$0"
+    ],
+    "description": "Código inline"
+  },
+
+  "pre": {
+    "prefix": "pre",
+    "body": [
+      "<pre>",
+      "\t${1:conteúdo}",
+      "</pre>$0"
+    ],
+    "description": "Texto pré-formatado"
+  },
+
+  "blockquote": {
+    "prefix": "blockquote",
+    "body": [
+      "<blockquote>",
+      "\t${1:Citação}",
+      "</blockquote>$0"
+    ],
+    "description": "Bloco de citação"
+  },
+
+  "anchor": {
+    "prefix": "a",
+    "body": [
+      "<a href=\"${1:#}\">${2:Link}</a>$0"
+    ],
+    "description": "Link"
+  },
+
+  "anchor blank": {
+    "prefix": "ablank",
+    "body": [
+      "<a href=\"${1:https://example.com}\" target=\"_blank\" rel=\"noopener noreferrer\">${2:Link}</a>$0"
+    ],
+    "description": "Link que abre em nova aba"
+  },
+
+  "mailto": {
+    "prefix": "mailto",
+    "body": [
+      "<a href=\"mailto:${1:email@example.com}\">${2:Enviar e-mail}</a>$0"
+    ],
+    "description": "Link de e-mail"
+  },
+
+  "tel": {
+    "prefix": "tel",
+    "body": [
+      "<a href=\"tel:${1:+5511999999999}\">${2:Telefone}</a>$0"
+    ],
+    "description": "Link de telefone"
+  },
+
+  "image": {
+    "prefix": "img",
+    "body": [
+      "<img src=\"${1:image.jpg}\" alt=\"${2:Descrição da imagem}\">$0"
+    ],
+    "description": "Imagem"
+  },
+
+  "responsive image": {
+    "prefix": "imgr",
+    "body": [
+      "<img src=\"${1:image.jpg}\" alt=\"${2:Descrição}\" width=\"${3:800}\" height=\"${4:600}\" loading=\"lazy\">$0"
+    ],
+    "description": "Imagem com dimensões e lazy loading"
+  },
+
+  "figure": {
+    "prefix": "figure",
+    "body": [
+      "<figure>",
+      "\t<img src=\"${1:image.jpg}\" alt=\"${2:Descrição}\">",
+      "\t<figcaption>${3:Legenda}</figcaption>",
+      "</figure>$0"
+    ],
+    "description": "Imagem com legenda"
+  },
+
+  "picture": {
+    "prefix": "picture",
+    "body": [
+      "<picture>",
+      "\t<source media=\"${1:(min-width: 768px)}\" srcset=\"${2:image-large.jpg}\">",
+      "\t<img src=\"${3:image.jpg}\" alt=\"${4:Descrição}\">",
+      "</picture>$0"
+    ],
+    "description": "Imagem responsiva usando picture"
+  },
+
+  "unordered list": {
+    "prefix": "ul",
+    "body": [
+      "<ul>",
+      "\t<li>${1:Item}</li>",
+      "\t<li>${2:Item}</li>",
+      "</ul>$0"
+    ],
+    "description": "Lista não ordenada"
+  },
+
+  "ordered list": {
+    "prefix": "ol",
+    "body": [
+      "<ol>",
+      "\t<li>${1:Item}</li>",
+      "\t<li>${2:Item}</li>",
+      "</ol>$0"
+    ],
+    "description": "Lista ordenada"
+  },
+
+  "list item": {
+    "prefix": "li",
+    "body": [
+      "<li>${1:Item}</li>$0"
+    ],
+    "description": "Item de lista"
+  },
+
+  "description list": {
+    "prefix": "dl",
+    "body": [
+      "<dl>",
+      "\t<dt>${1:Termo}</dt>",
+      "\t<dd>${2:Descrição}</dd>",
+      "</dl>$0"
+    ],
+    "description": "Lista de descrição"
+  },
+
+  "table": {
+    "prefix": "table",
+    "body": [
+      "<table>",
+      "\t<thead>",
+      "\t\t<tr>",
+      "\t\t\t<th>${1:Coluna 1}</th>",
+      "\t\t\t<th>${2:Coluna 2}</th>",
+      "\t\t</tr>",
+      "\t</thead>",
+      "\t<tbody>",
+      "\t\t<tr>",
+      "\t\t\t<td>${3:Valor 1}</td>",
+      "\t\t\t<td>${4:Valor 2}</td>",
+      "\t\t</tr>",
+      "\t</tbody>",
+      "</table>$0"
+    ],
+    "description": "Tabela HTML"
+  },
+
+  "table row": {
+    "prefix": "tr",
+    "body": [
+      "<tr>",
+      "\t<td>${1:Valor}</td>",
+      "</tr>$0"
+    ],
+    "description": "Linha de tabela"
+  },
+
+  "table header": {
+    "prefix": "th",
+    "body": [
+      "<th>${1:Título}</th>$0"
+    ],
+    "description": "Cabeçalho de tabela"
+  },
+
+  "table cell": {
+    "prefix": "td",
+    "body": [
+      "<td>${1:Valor}</td>$0"
+    ],
+    "description": "Célula de tabela"
+  },
+
+  "form": {
+    "prefix": "form",
+    "body": [
+      "<form action=\"${1:/}\" method=\"${2:post}\">",
+      "\t$0",
+      "</form>"
+    ],
+    "description": "Formulário HTML"
+  },
+
+  "form complete": {
+    "prefix": "formfull",
+    "body": [
+      "<form action=\"${1:/}\" method=\"${2:post}\">",
+      "\t<div>",
+      "\t\t<label for=\"${3:name}\">${4:Nome}</label>",
+      "\t\t<input type=\"text\" id=\"${3:name}\" name=\"${3:name}\" required>",
+      "\t</div>",
+      "",
+      "\t<button type=\"submit\">${5:Enviar}</button>",
+      "</form>$0"
+    ],
+    "description": "Formulário básico completo"
+  },
+
+  "label": {
+    "prefix": "label",
+    "body": [
+      "<label for=\"${1:field}\">${2:Campo}</label>$0"
+    ],
+    "description": "Label de formulário"
+  },
+
+  "input text": {
+    "prefix": "input",
+    "body": [
+      "<input type=\"${1:text}\" id=\"${2:field}\" name=\"${2:field}\"${3: required}>$0"
+    ],
+    "description": "Input HTML"
+  },
+
+  "input text complete": {
+    "prefix": "inputtext",
+    "body": [
+      "<label for=\"${1:name}\">${2:Nome}</label>",
+      "<input type=\"text\" id=\"${1:name}\" name=\"${1:name}\" placeholder=\"${3:Digite aqui}\" required>$0"
+    ],
+    "description": "Campo de texto completo"
+  },
+
+  "input email": {
+    "prefix": "inputemail",
+    "body": [
+      "<input type=\"email\" id=\"${1:email}\" name=\"${1:email}\" placeholder=\"${2:email@example.com}\" required>$0"
+    ],
+    "description": "Input de e-mail"
+  },
+
+  "input password": {
+    "prefix": "inputpassword",
+    "body": [
+      "<input type=\"password\" id=\"${1:password}\" name=\"${1:password}\" required>$0"
+    ],
+    "description": "Input de senha"
+  },
+
+  "input number": {
+    "prefix": "inputnumber",
+    "body": [
+      "<input type=\"number\" id=\"${1:number}\" name=\"${1:number}\" min=\"${2:0}\" max=\"${3:100}\">$0"
+    ],
+    "description": "Input numérico"
+  },
+
+  "input checkbox": {
+    "prefix": "checkbox",
+    "body": [
+      "<input type=\"checkbox\" id=\"${1:option}\" name=\"${1:option}\" value=\"${2:value}\">",
+      "<label for=\"${1:option}\">${3:Opção}</label>$0"
+    ],
+    "description": "Checkbox"
+  },
+
+  "input radio": {
+    "prefix": "radio",
+    "body": [
+      "<input type=\"radio\" id=\"${1:option}\" name=\"${2:group}\" value=\"${3:value}\">",
+      "<label for=\"${1:option}\">${4:Opção}</label>$0"
+    ],
+    "description": "Radio button"
+  },
+
+  "input file": {
+    "prefix": "inputfile",
+    "body": [
+      "<input type=\"file\" id=\"${1:file}\" name=\"${1:file}\" accept=\"${2:*/*}\">$0"
+    ],
+    "description": "Input de arquivo"
+  },
+
+  "input date": {
+    "prefix": "inputdate",
+    "body": [
+      "<input type=\"date\" id=\"${1:date}\" name=\"${1:date}\">$0"
+    ],
+    "description": "Input de data"
+  },
+
+  "input time": {
+    "prefix": "inputtime",
+    "body": [
+      "<input type=\"time\" id=\"${1:time}\" name=\"${1:time}\">$0"
+    ],
+    "description": "Input de hora"
+  },
+
+  "input range": {
+    "prefix": "range",
+    "body": [
+      "<input type=\"range\" id=\"${1:range}\" name=\"${1:range}\" min=\"${2:0}\" max=\"${3:100}\" value=\"${4:50}\">$0"
+    ],
+    "description": "Input range"
+  },
+
+  "input hidden": {
+    "prefix": "hidden",
+    "body": [
+      "<input type=\"hidden\" name=\"${1:name}\" value=\"${2:value}\">$0"
+    ],
+    "description": "Input oculto"
+  },
+
+  "textarea": {
+    "prefix": "textarea",
+    "body": [
+      "<textarea id=\"${1:message}\" name=\"${1:message}\" rows=\"${2:4}\" cols=\"${3:50}\">${4}</textarea>$0"
+    ],
+    "description": "Área de texto"
+  },
+
+  "select": {
+    "prefix": "select",
+    "body": [
+      "<select id=\"${1:select}\" name=\"${1:select}\">",
+      "\t<option value=\"${2:value1}\">${3:Opção 1}</option>",
+      "\t<option value=\"${4:value2}\">${5:Opção 2}</option>",
+      "</select>$0"
+    ],
+    "description": "Campo select"
+  },
+
+  "option": {
+    "prefix": "option",
+    "body": [
+      "<option value=\"${1:value}\">${2:Opção}</option>$0"
+    ],
+    "description": "Opção de select"
+  },
+
+  "button": {
+    "prefix": "button",
+    "body": [
+      "<button type=\"${1:button}\">${2:Botão}</button>$0"
+    ],
+    "description": "Botão"
+  },
+
+  "submit button": {
+    "prefix": "submit",
+    "body": [
+      "<button type=\"submit\">${1:Enviar}</button>$0"
+    ],
+    "description": "Botão de submit"
+  },
+
+  "fieldset": {
+    "prefix": "fieldset",
+    "body": [
+      "<fieldset>",
+      "\t<legend>${1:Título}</legend>",
+      "\t$0",
+      "</fieldset>"
+    ],
+    "description": "Agrupa campos de formulário"
+  },
+
+  "details": {
+    "prefix": "details",
+    "body": [
+      "<details>",
+      "\t<summary>${1:Título}</summary>",
+      "\t${2:Conteúdo}",
+      "</details>$0"
+    ],
+    "description": "Elemento expansível"
+  },
+
+  "dialog": {
+    "prefix": "dialog",
+    "body": [
+      "<dialog id=\"${1:dialog}\">",
+      "\t${2:Conteúdo}",
+      "</dialog>$0"
+    ],
+    "description": "Elemento dialog"
+  },
+
+  "audio": {
+    "prefix": "audio",
+    "body": [
+      "<audio controls>",
+      "\t<source src=\"${1:audio.mp3}\" type=\"${2:audio/mpeg}\">",
+      "\tSeu navegador não suporta áudio.",
+      "</audio>$0"
+    ],
+    "description": "Player de áudio"
+  },
+
+  "video": {
+    "prefix": "video",
+    "body": [
+      "<video controls width=\"${1:640}\" height=\"${2:360}\">",
+      "\t<source src=\"${3:video.mp4}\" type=\"${4:video/mp4}\">",
+      "\tSeu navegador não suporta vídeo.",
+      "</video>$0"
+    ],
+    "description": "Player de vídeo"
+  },
+
+  "iframe": {
+    "prefix": "iframe",
+    "body": [
+      "<iframe src=\"${1:https://example.com}\" title=\"${2:Conteúdo incorporado}\" loading=\"lazy\"></iframe>$0"
+    ],
+    "description": "Iframe"
+  },
+
+  "canvas": {
+    "prefix": "canvas",
+    "body": [
+      "<canvas id=\"${1:canvas}\" width=\"${2:800}\" height=\"${3:600}\"></canvas>$0"
+    ],
+    "description": "Elemento canvas"
+  },
+
+  "svg": {
+    "prefix": "svg",
+    "body": [
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"${1:0 0 24 24}\">",
+      "\t$0",
+      "</svg>"
+    ],
+    "description": "SVG inline"
+  },
+
+  "progress": {
+    "prefix": "progress",
+    "body": [
+      "<progress value=\"${1:50}\" max=\"${2:100}\">${1:50}%</progress>$0"
+    ],
+    "description": "Barra de progresso"
+  },
+
+  "meter": {
+    "prefix": "meter",
+    "body": [
+      "<meter min=\"${1:0}\" max=\"${2:100}\" value=\"${3:50}\">${3:50}</meter>$0"
+    ],
+    "description": "Elemento meter"
+  },
+
+  "br": {
+    "prefix": "br",
+    "body": [
+      "<br>$0"
+    ],
+    "description": "Quebra de linha"
+  },
+
+  "hr": {
+    "prefix": "hr",
+    "body": [
+      "<hr>$0"
+    ],
+    "description": "Linha horizontal"
+  },
+
+  "comment": {
+    "prefix": "comment",
+    "body": [
+      "<!-- ${1:Comentário} -->$0"
+    ],
+    "description": "Comentário HTML"
+  },
+
+  "data attribute": {
+    "prefix": "data",
+    "body": [
+      "data-${1:name}=\"${2:value}\"$0"
+    ],
+    "description": "Atributo data-*"
+  },
+
+  "aria label": {
+    "prefix": "aria",
+    "body": [
+      "aria-label=\"${1:Descrição}\"$0"
+    ],
+    "description": "Atributo aria-label"
+  },
+
+  "role": {
+    "prefix": "role",
+    "body": [
+      "role=\"${1:button}\"$0"
+    ],
+    "description": "Atributo role"
+  },
+
+  "bootstrap CDN": {
+    "prefix": "bootstrap",
+    "body": [
+      "<link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\">",
+      "<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\"></script>$0"
+    ],
+    "description": "Importa Bootstrap 5 via CDN"
+  },
+
+  "font awesome CDN": {
+    "prefix": "fontawesome",
+    "body": [
+      "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css\">$0"
+    ],
+    "description": "Importa Font Awesome via CDN"
+  },
+
+  "google font": {
+    "prefix": "gfont",
+    "body": [
+      "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">",
+      "<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>",
+      "<link href=\"${1:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap}\" rel=\"stylesheet\">$0"
+    ],
+    "description": "Importa Google Font"
+  },
+
+  "open graph": {
+    "prefix": "og",
+    "body": [
+      "<meta property=\"og:title\" content=\"${1:Título}\">",
+      "<meta property=\"og:description\" content=\"${2:Descrição}\">",
+      "<meta property=\"og:image\" content=\"${3:https://example.com/image.jpg}\">",
+      "<meta property=\"og:url\" content=\"${4:https://example.com}\">",
+      "<meta property=\"og:type\" content=\"${5:website}\">$0"
+    ],
+    "description": "Metadados Open Graph"
+  },
+
+  "twitter card": {
+    "prefix": "twittercard",
+    "body": [
+      "<meta name=\"twitter:card\" content=\"summary_large_image\">",
+      "<meta name=\"twitter:title\" content=\"${1:Título}\">",
+      "<meta name=\"twitter:description\" content=\"${2:Descrição}\">",
+      "<meta name=\"twitter:image\" content=\"${3:https://example.com/image.jpg}\">$0"
+    ],
+    "description": "Metadados Twitter Card"
+  },
+
+  "canonical": {
+    "prefix": "canonical",
+    "body": [
+      "<link rel=\"canonical\" href=\"${1:https://example.com/pagina}\">$0"
+    ],
+    "description": "URL canônica"
+  },
+
+  "manifest": {
+    "prefix": "manifest",
+    "body": [
+      "<link rel=\"manifest\" href=\"${1:/manifest.json}\">$0"
+    ],
+    "description": "Importa Web App Manifest"
+  },
+
+  "theme color": {
+    "prefix": "themecolor",
+    "body": [
+      "<meta name=\"theme-color\" content=\"${1:#000000}\">$0"
+    ],
+    "description": "Define cor do tema"
+  }
+}

@@ -5,7 +5,7 @@ O NPSharp usa a mesma base renderer para Electron, Capacitor e fallback web. A c
 ## Plataformas
 
 - Electron Desktop: usa `window.npsharpApi` ou `window.npsharp` vindo do preload. Tem filesystem nativo, Git real, terminal real, runtimes locais, diagnosticos Java e Live Server Node.
-- Capacitor Mobile: usa `Capacitor.isNativePlatform()` e `@capacitor/filesystem`. Tem workspace mobile no sandbox do app, Notes, settings, temas e preview HTML. Git, terminal real, runtimes locais e Live Server Node ficam em modo limitado.
+- Capacitor Mobile: usa `Capacitor.isNativePlatform()` e `@capacitor/filesystem`. Tem workspace mobile em `Documents/NPSharp`, Notes, settings, temas, preview HTML e Git nativo no Android para workspaces armazenados nessa area. Runtimes locais e Live Server Node ficam em modo limitado.
 - Web/dev fallback: usa memoria/localStorage para settings, sessao e arquivos basicos. Serve para desenvolvimento do renderer sem Electron nem app nativo.
 
 ## Mobile Workspace
@@ -27,7 +27,7 @@ O Command Center mostra "Abrir workspace mobile" e cria/abre pastas dentro de `D
 
 - Desktop: Command Center, Notes, Source Control/Git, terminal, Live Server, Run, Theme Lab, settings, diagnosticos e filesystem completo seguem pelo backend Electron/Node.
 - Mobile: Command Center, Notes, Theme Lab, settings, editor, Explorer, busca local no sandbox e preview HTML funcionam sem backend Node.
-- Mobile limitado: Source Control mostra modo limitado; Git nativo completo depende de backend futuro. Terminal vira Output/Command Log. Run nao tenta executar Node/Python/Java locais. Live Server nao inicia servidor Node e usa preview HTML quando possivel.
+- Mobile: Source Control executa Git nativo no Android em `Documents/NPSharp/workspaces`, incluindo init, clone HTTPS, status, stage, commit, branches, diff, historico, fetch, pull e push. O primeiro commit solicita nome e e-mail e os salva apenas na configuracao local do repositorio. Repositorios privados solicitam usuario e token quando o servidor exigir; o token permanece apenas na memoria da sessao. Pastas externas abertas pelo seletor SAF continuam sem Git porque o Android fornece apenas uma URI, nao um caminho nativo. Run nao tenta executar Node/Python/Java locais. Live Server nao inicia servidor Node e usa preview HTML quando possivel.
 
 ## Scripts
 
@@ -70,7 +70,7 @@ Builds Gradle/APK/AAB nao devem ser versionados.
 
 ## Limitacoes atuais
 
-- Git nativo no mobile ainda nao esta implementado.
+- Git nativo requer Android e um workspace armazenado em `Documents/NPSharp`; pastas SAF externas ainda nao sao suportadas pelo JGit.
 - Terminal real no mobile ainda nao existe.
 - Runtimes locais para Java, Python, Node e outras linguagens dependem de backend nativo futuro.
 - Live Server Node e PHP continuam desktop-only; HTML usa preview local no mobile.

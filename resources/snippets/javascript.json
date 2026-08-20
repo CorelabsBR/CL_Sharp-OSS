@@ -1,0 +1,1075 @@
+{
+  "console.log": {
+    "prefix": "clg",
+    "body": [
+      "console.log(${1:value});$0"
+    ],
+    "description": "Imprime valor no console"
+  },
+
+  "console.error": {
+    "prefix": "cle",
+    "body": [
+      "console.error(${1:error});$0"
+    ],
+    "description": "Imprime erro no console"
+  },
+
+  "console.warn": {
+    "prefix": "clw",
+    "body": [
+      "console.warn(${1:value});$0"
+    ],
+    "description": "Imprime aviso no console"
+  },
+
+  "console.table": {
+    "prefix": "clt",
+    "body": [
+      "console.table(${1:data});$0"
+    ],
+    "description": "Exibe dados em formato de tabela"
+  },
+
+  "const": {
+    "prefix": "const",
+    "body": [
+      "const ${1:name} = ${2:value};$0"
+    ],
+    "description": "Declara constante"
+  },
+
+  "let": {
+    "prefix": "let",
+    "body": [
+      "let ${1:name} = ${2:value};$0"
+    ],
+    "description": "Declara variável"
+  },
+
+  "if": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Estrutura if"
+  },
+
+  "if else": {
+    "prefix": "ifelse",
+    "body": [
+      "if (${1:condition}) {",
+      "\t${2}",
+      "} else {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Estrutura if/else"
+  },
+
+  "if else if": {
+    "prefix": "elseif",
+    "body": [
+      "if (${1:condition}) {",
+      "\t${2}",
+      "} else if (${3:condition}) {",
+      "\t${4}",
+      "} else {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Estrutura if/else if/else"
+  },
+
+  "switch": {
+    "prefix": "switch",
+    "body": [
+      "switch (${1:value}) {",
+      "\tcase ${2:value}:",
+      "\t\t${3}",
+      "\t\tbreak;",
+      "\tdefault:",
+      "\t\t$0",
+      "\t\tbreak;",
+      "}"
+    ],
+    "description": "Estrutura switch"
+  },
+
+  "for": {
+    "prefix": "for",
+    "body": [
+      "for (let ${1:i} = 0; ${1:i} < ${2:length}; ${1:i}++) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Loop for"
+  },
+
+  "for reverse": {
+    "prefix": "forr",
+    "body": [
+      "for (let ${1:i} = ${2:length} - 1; ${1:i} >= 0; ${1:i}--) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Loop for reverso"
+  },
+
+  "for of": {
+    "prefix": "forof",
+    "body": [
+      "for (const ${1:item} of ${2:iterable}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Loop for...of"
+  },
+
+  "for in": {
+    "prefix": "forin",
+    "body": [
+      "for (const ${1:key} in ${2:object}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Loop for...in"
+  },
+
+  "while": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Loop while"
+  },
+
+  "do while": {
+    "prefix": "dowhile",
+    "body": [
+      "do {",
+      "\t${1}",
+      "} while (${2:condition});$0"
+    ],
+    "description": "Loop do...while"
+  },
+
+  "function": {
+    "prefix": "fn",
+    "body": [
+      "function ${1:functionName}(${2}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria função tradicional"
+  },
+
+  "function return": {
+    "prefix": "fnret",
+    "body": [
+      "function ${1:functionName}(${2}) {",
+      "\t${3}",
+      "\treturn ${4:value};",
+      "}$0"
+    ],
+    "description": "Cria função com retorno"
+  },
+
+  "arrow function": {
+    "prefix": "afn",
+    "body": [
+      "const ${1:functionName} = (${2}) => {",
+      "\t$0",
+      "};"
+    ],
+    "description": "Cria arrow function"
+  },
+
+  "arrow function return": {
+    "prefix": "afnr",
+    "body": [
+      "const ${1:functionName} = (${2}) => ${3:value};$0"
+    ],
+    "description": "Arrow function com retorno implícito"
+  },
+
+  "async function": {
+    "prefix": "asyncfn",
+    "body": [
+      "async function ${1:functionName}(${2}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria função async"
+  },
+
+  "async arrow function": {
+    "prefix": "asyncafn",
+    "body": [
+      "const ${1:functionName} = async (${2}) => {",
+      "\t$0",
+      "};"
+    ],
+    "description": "Cria arrow function async"
+  },
+
+  "await": {
+    "prefix": "await",
+    "body": [
+      "await ${1:promise};$0"
+    ],
+    "description": "Executa await"
+  },
+
+  "return": {
+    "prefix": "ret",
+    "body": [
+      "return ${1:value};$0"
+    ],
+    "description": "Retorna um valor"
+  },
+
+  "return true": {
+    "prefix": "rtrue",
+    "body": [
+      "return true;$0"
+    ],
+    "description": "Retorna true"
+  },
+
+  "return false": {
+    "prefix": "rfalse",
+    "body": [
+      "return false;$0"
+    ],
+    "description": "Retorna false"
+  },
+
+  "return null": {
+    "prefix": "rnull",
+    "body": [
+      "return null;$0"
+    ],
+    "description": "Retorna null"
+  },
+
+  "class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:ClassName} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria classe"
+  },
+
+  "class constructor": {
+    "prefix": "classctor",
+    "body": [
+      "class ${1:ClassName} {",
+      "\tconstructor(${2}) {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Cria classe com constructor"
+  },
+
+  "constructor": {
+    "prefix": "ctor",
+    "body": [
+      "constructor(${1}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria constructor"
+  },
+
+  "class extends": {
+    "prefix": "classext",
+    "body": [
+      "class ${1:ClassName} extends ${2:ParentClass} {",
+      "\tconstructor(${3}) {",
+      "\t\tsuper(${4});",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Cria classe que herda outra classe"
+  },
+
+  "method": {
+    "prefix": "method",
+    "body": [
+      "${1:methodName}(${2}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria método de classe"
+  },
+
+  "async method": {
+    "prefix": "amethod",
+    "body": [
+      "async ${1:methodName}(${2}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria método async"
+  },
+
+  "static method": {
+    "prefix": "smethod",
+    "body": [
+      "static ${1:methodName}(${2}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Cria método estático"
+  },
+
+  "getter": {
+    "prefix": "getter",
+    "body": [
+      "get ${1:name}() {",
+      "\treturn this.${2:_name};",
+      "}"
+    ],
+    "description": "Cria getter"
+  },
+
+  "setter": {
+    "prefix": "setter",
+    "body": [
+      "set ${1:name}(${2:value}) {",
+      "\tthis.${3:_name} = ${2:value};",
+      "}"
+    ],
+    "description": "Cria setter"
+  },
+
+  "try catch": {
+    "prefix": "try",
+    "body": [
+      "try {",
+      "\t${1}",
+      "} catch (${2:error}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Bloco try/catch"
+  },
+
+  "try catch finally": {
+    "prefix": "tryfinally",
+    "body": [
+      "try {",
+      "\t${1}",
+      "} catch (${2:error}) {",
+      "\t${3}",
+      "} finally {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Bloco try/catch/finally"
+  },
+
+  "throw error": {
+    "prefix": "throw",
+    "body": [
+      "throw new Error(${1:\"Mensagem\"});$0"
+    ],
+    "description": "Lança um Error"
+  },
+
+  "promise": {
+    "prefix": "promise",
+    "body": [
+      "const ${1:promise} = new Promise((resolve, reject) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Cria Promise"
+  },
+
+  "promise then catch": {
+    "prefix": "then",
+    "body": [
+      "${1:promise}",
+      "\t.then((${2:result}) => {",
+      "\t\t${3}",
+      "\t})",
+      "\t.catch((${4:error}) => {",
+      "\t\t$0",
+      "\t});"
+    ],
+    "description": "Promise com then/catch"
+  },
+
+  "Promise all": {
+    "prefix": "promiseall",
+    "body": [
+      "const ${1:results} = await Promise.all([",
+      "\t${2:promise1},",
+      "\t${3:promise2}",
+      "]);$0"
+    ],
+    "description": "Executa múltiplas Promises em paralelo"
+  },
+
+  "fetch": {
+    "prefix": "fetch",
+    "body": [
+      "const response = await fetch(${1:url});",
+      "const data = await response.json();$0"
+    ],
+    "description": "Realiza requisição HTTP com fetch"
+  },
+
+  "fetch full": {
+    "prefix": "fetchfull",
+    "body": [
+      "try {",
+      "\tconst response = await fetch(${1:url});",
+      "",
+      "\tif (!response.ok) {",
+      "\t\tthrow new Error(`HTTP ${response.status}`);",
+      "\t}",
+      "",
+      "\tconst data = await response.json();",
+      "\t$0",
+      "} catch (error) {",
+      "\tconsole.error(error);",
+      "}"
+    ],
+    "description": "Fetch com tratamento de erro"
+  },
+
+  "fetch POST JSON": {
+    "prefix": "fetchpost",
+    "body": [
+      "const response = await fetch(${1:url}, {",
+      "\tmethod: \"POST\",",
+      "\theaders: {",
+      "\t\t\"Content-Type\": \"application/json\"",
+      "\t},",
+      "\tbody: JSON.stringify(${2:data})",
+      "});",
+      "",
+      "const result = await response.json();$0"
+    ],
+    "description": "Requisição POST enviando JSON"
+  },
+
+  "forEach": {
+    "prefix": "foreach",
+    "body": [
+      "${1:array}.forEach((${2:item}, ${3:index}) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Array forEach"
+  },
+
+  "map": {
+    "prefix": "map",
+    "body": [
+      "const ${1:result} = ${2:array}.map((${3:item}) => {",
+      "\treturn ${4:item};",
+      "});$0"
+    ],
+    "description": "Array map"
+  },
+
+  "map short": {
+    "prefix": "maps",
+    "body": [
+      "const ${1:result} = ${2:array}.map((${3:item}) => ${4:item});$0"
+    ],
+    "description": "Array map com retorno implícito"
+  },
+
+  "filter": {
+    "prefix": "filter",
+    "body": [
+      "const ${1:result} = ${2:array}.filter((${3:item}) => ${4:condition});$0"
+    ],
+    "description": "Array filter"
+  },
+
+  "find": {
+    "prefix": "find",
+    "body": [
+      "const ${1:result} = ${2:array}.find((${3:item}) => ${4:condition});$0"
+    ],
+    "description": "Busca item com Array.find"
+  },
+
+  "findIndex": {
+    "prefix": "findindex",
+    "body": [
+      "const ${1:index} = ${2:array}.findIndex((${3:item}) => ${4:condition});$0"
+    ],
+    "description": "Busca índice usando findIndex"
+  },
+
+  "some": {
+    "prefix": "some",
+    "body": [
+      "const ${1:result} = ${2:array}.some((${3:item}) => ${4:condition});$0"
+    ],
+    "description": "Verifica se algum item atende à condição"
+  },
+
+  "every": {
+    "prefix": "every",
+    "body": [
+      "const ${1:result} = ${2:array}.every((${3:item}) => ${4:condition});$0"
+    ],
+    "description": "Verifica se todos os itens atendem à condição"
+  },
+
+  "reduce": {
+    "prefix": "reduce",
+    "body": [
+      "const ${1:result} = ${2:array}.reduce((${3:acc}, ${4:item}) => {",
+      "\treturn ${5:acc};",
+      "}, ${6:0});$0"
+    ],
+    "description": "Array reduce"
+  },
+
+  "sort": {
+    "prefix": "sort",
+    "body": [
+      "${1:array}.sort((${2:a}, ${3:b}) => ${2:a} - ${3:b});$0"
+    ],
+    "description": "Ordena array numericamente"
+  },
+
+  "push": {
+    "prefix": "push",
+    "body": [
+      "${1:array}.push(${2:value});$0"
+    ],
+    "description": "Adiciona item ao final de um array"
+  },
+
+  "includes": {
+    "prefix": "includes",
+    "body": [
+      "${1:array}.includes(${2:value})$0"
+    ],
+    "description": "Verifica se array contém valor"
+  },
+
+  "object": {
+    "prefix": "obj",
+    "body": [
+      "const ${1:object} = {",
+      "\t${2:key}: ${3:value}",
+      "};$0"
+    ],
+    "description": "Cria objeto"
+  },
+
+  "destructuring object": {
+    "prefix": "desobj",
+    "body": [
+      "const { ${1:property} } = ${2:object};$0"
+    ],
+    "description": "Desestrutura objeto"
+  },
+
+  "destructuring array": {
+    "prefix": "desarr",
+    "body": [
+      "const [${1:first}, ${2:second}] = ${3:array};$0"
+    ],
+    "description": "Desestrutura array"
+  },
+
+  "spread object": {
+    "prefix": "spreadobj",
+    "body": [
+      "const ${1:newObject} = {",
+      "\t...${2:object},",
+      "\t${3:key}: ${4:value}",
+      "};$0"
+    ],
+    "description": "Copia objeto usando spread"
+  },
+
+  "spread array": {
+    "prefix": "spreadarr",
+    "body": [
+      "const ${1:newArray} = [...${2:array}, ${3:value}];$0"
+    ],
+    "description": "Copia array usando spread"
+  },
+
+  "optional chaining": {
+    "prefix": "optional",
+    "body": [
+      "${1:object}?.${2:property}$0"
+    ],
+    "description": "Optional chaining"
+  },
+
+  "nullish coalescing": {
+    "prefix": "nullish",
+    "body": [
+      "${1:value} ?? ${2:fallback}$0"
+    ],
+    "description": "Nullish coalescing"
+  },
+
+  "ternary": {
+    "prefix": "ternary",
+    "body": [
+      "${1:condition} ? ${2:trueValue} : ${3:falseValue}$0"
+    ],
+    "description": "Operador ternário"
+  },
+
+  "template literal": {
+    "prefix": "template",
+    "body": [
+      "`${1:text} \\${${2:value}}`$0"
+    ],
+    "description": "Template literal"
+  },
+
+  "JSON stringify": {
+    "prefix": "jsonstr",
+    "body": [
+      "JSON.stringify(${1:data}, null, 2)$0"
+    ],
+    "description": "Converte objeto para JSON"
+  },
+
+  "JSON parse": {
+    "prefix": "jsonparse",
+    "body": [
+      "JSON.parse(${1:data})$0"
+    ],
+    "description": "Converte JSON para objeto"
+  },
+
+  "setTimeout": {
+    "prefix": "timeout",
+    "body": [
+      "setTimeout(() => {",
+      "\t$0",
+      "}, ${1:1000});"
+    ],
+    "description": "Executa código após um intervalo"
+  },
+
+  "setInterval": {
+    "prefix": "interval",
+    "body": [
+      "const ${1:interval} = setInterval(() => {",
+      "\t$0",
+      "}, ${2:1000});"
+    ],
+    "description": "Executa código repetidamente"
+  },
+
+  "clearInterval": {
+    "prefix": "clearinterval",
+    "body": [
+      "clearInterval(${1:interval});$0"
+    ],
+    "description": "Cancela setInterval"
+  },
+
+  "ES module import": {
+    "prefix": "import",
+    "body": [
+      "import ${1:name} from \"${2:module}\";$0"
+    ],
+    "description": "Import default ES Module"
+  },
+
+  "ES module named import": {
+    "prefix": "importnamed",
+    "body": [
+      "import { ${1:name} } from \"${2:module}\";$0"
+    ],
+    "description": "Import nomeado ES Module"
+  },
+
+  "ES module import all": {
+    "prefix": "importall",
+    "body": [
+      "import * as ${1:name} from \"${2:module}\";$0"
+    ],
+    "description": "Importa módulo inteiro"
+  },
+
+  "export default": {
+    "prefix": "exportdefault",
+    "body": [
+      "export default ${1:value};$0"
+    ],
+    "description": "Export default"
+  },
+
+  "export named": {
+    "prefix": "export",
+    "body": [
+      "export { ${1:value} };$0"
+    ],
+    "description": "Export nomeado"
+  },
+
+  "export function": {
+    "prefix": "exportfn",
+    "body": [
+      "export function ${1:functionName}(${2}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Exporta função"
+  },
+
+  "CommonJS require": {
+    "prefix": "req",
+    "body": [
+      "const ${1:module} = require(\"${2:module}\");$0"
+    ],
+    "description": "Import CommonJS"
+  },
+
+  "module exports": {
+    "prefix": "moduleexports",
+    "body": [
+      "module.exports = ${1:value};$0"
+    ],
+    "description": "Export CommonJS"
+  },
+
+  "require destructuring": {
+    "prefix": "reqdes",
+    "body": [
+      "const { ${1:value} } = require(\"${2:module}\");$0"
+    ],
+    "description": "Require com destructuring"
+  },
+
+  "DOMContentLoaded": {
+    "prefix": "domload",
+    "body": [
+      "document.addEventListener(\"DOMContentLoaded\", () => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Executa após carregamento do DOM"
+  },
+
+  "querySelector": {
+    "prefix": "qs",
+    "body": [
+      "const ${1:element} = document.querySelector(\"${2:selector}\");$0"
+    ],
+    "description": "Seleciona elemento do DOM"
+  },
+
+  "querySelectorAll": {
+    "prefix": "qsa",
+    "body": [
+      "const ${1:elements} = document.querySelectorAll(\"${2:selector}\");$0"
+    ],
+    "description": "Seleciona múltiplos elementos"
+  },
+
+  "getElementById": {
+    "prefix": "gid",
+    "body": [
+      "const ${1:element} = document.getElementById(\"${2:id}\");$0"
+    ],
+    "description": "Seleciona elemento por ID"
+  },
+
+  "createElement": {
+    "prefix": "createel",
+    "body": [
+      "const ${1:element} = document.createElement(\"${2:div}\");$0"
+    ],
+    "description": "Cria elemento HTML"
+  },
+
+  "appendChild": {
+    "prefix": "append",
+    "body": [
+      "${1:parent}.appendChild(${2:child});$0"
+    ],
+    "description": "Adiciona elemento filho"
+  },
+
+  "addEventListener": {
+    "prefix": "event",
+    "body": [
+      "${1:element}.addEventListener(\"${2:click}\", (${3:event}) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Adiciona event listener"
+  },
+
+  "preventDefault": {
+    "prefix": "prevent",
+    "body": [
+      "${1:event}.preventDefault();$0"
+    ],
+    "description": "Impede comportamento padrão do evento"
+  },
+
+  "localStorage set": {
+    "prefix": "lsset",
+    "body": [
+      "localStorage.setItem(\"${1:key}\", JSON.stringify(${2:value}));$0"
+    ],
+    "description": "Salva valor no localStorage"
+  },
+
+  "localStorage get": {
+    "prefix": "lsget",
+    "body": [
+      "const ${1:value} = JSON.parse(localStorage.getItem(\"${2:key}\"));$0"
+    ],
+    "description": "Recupera valor do localStorage"
+  },
+
+  "localStorage remove": {
+    "prefix": "lsremove",
+    "body": [
+      "localStorage.removeItem(\"${1:key}\");$0"
+    ],
+    "description": "Remove item do localStorage"
+  },
+
+  "express server": {
+    "prefix": "express",
+    "body": [
+      "import express from \"express\";",
+      "",
+      "const app = express();",
+      "const PORT = process.env.PORT || ${1:3000};",
+      "",
+      "app.use(express.json());",
+      "",
+      "app.listen(PORT, () => {",
+      "\tconsole.log(`Servidor rodando na porta \\${PORT}`);",
+      "});$0"
+    ],
+    "description": "Servidor Express básico"
+  },
+
+  "express get": {
+    "prefix": "get",
+    "body": [
+      "app.get(\"${1:/}\", async (req, res) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Rota GET Express"
+  },
+
+  "express post": {
+    "prefix": "post",
+    "body": [
+      "app.post(\"${1:/}\", async (req, res) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Rota POST Express"
+  },
+
+  "express put": {
+    "prefix": "put",
+    "body": [
+      "app.put(\"${1:/}\", async (req, res) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Rota PUT Express"
+  },
+
+  "express patch": {
+    "prefix": "patch",
+    "body": [
+      "app.patch(\"${1:/}\", async (req, res) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Rota PATCH Express"
+  },
+
+  "express delete": {
+    "prefix": "delete",
+    "body": [
+      "app.delete(\"${1:/}\", async (req, res) => {",
+      "\t$0",
+      "});"
+    ],
+    "description": "Rota DELETE Express"
+  },
+
+  "express response json": {
+    "prefix": "resjson",
+    "body": [
+      "res.status(${1:200}).json({",
+      "\t${2:success}: ${3:true}",
+      "});$0"
+    ],
+    "description": "Resposta JSON Express"
+  },
+
+  "express middleware": {
+    "prefix": "middleware",
+    "body": [
+      "const ${1:middleware} = (req, res, next) => {",
+      "\t${2}",
+      "\tnext();",
+      "};$0"
+    ],
+    "description": "Middleware Express"
+  },
+
+  "process env": {
+    "prefix": "env",
+    "body": [
+      "const ${1:value} = process.env.${2:VARIABLE};$0"
+    ],
+    "description": "Obtém variável de ambiente"
+  },
+
+  "async main": {
+    "prefix": "main",
+    "body": [
+      "async function main() {",
+      "\t$0",
+      "}",
+      "",
+      "main().catch(console.error);"
+    ],
+    "description": "Função principal assíncrona"
+  },
+
+  "IIFE": {
+    "prefix": "iife",
+    "body": [
+      "(() => {",
+      "\t$0",
+      "})();"
+    ],
+    "description": "Immediately Invoked Function Expression"
+  },
+
+  "async IIFE": {
+    "prefix": "aiife",
+    "body": [
+      "(async () => {",
+      "\t$0",
+      "})();"
+    ],
+    "description": "IIFE assíncrona"
+  },
+
+  "null check": {
+    "prefix": "ifnull",
+    "body": [
+      "if (${1:value} === null) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Verifica se valor é null"
+  },
+
+  "undefined check": {
+    "prefix": "ifundefined",
+    "body": [
+      "if (${1:value} === undefined) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Verifica se valor é undefined"
+  },
+
+  "null or undefined check": {
+    "prefix": "ifnullish",
+    "body": [
+      "if (${1:value} == null) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Verifica null ou undefined"
+  },
+
+  "typeof": {
+    "prefix": "typeof",
+    "body": [
+      "typeof ${1:value} === \"${2:string}\"$0"
+    ],
+    "description": "Verifica tipo com typeof"
+  },
+
+  "instanceof": {
+    "prefix": "instanceof",
+    "body": [
+      "${1:value} instanceof ${2:ClassName}$0"
+    ],
+    "description": "Verifica instância de classe"
+  },
+
+  "break": {
+    "prefix": "break",
+    "body": [
+      "break;$0"
+    ],
+    "description": "Interrompe loop ou switch"
+  },
+
+  "continue": {
+    "prefix": "continue",
+    "body": [
+      "continue;$0"
+    ],
+    "description": "Avança para próxima iteração"
+  },
+
+  "TODO": {
+    "prefix": "todo",
+    "body": [
+      "// TODO: ${1:descrição}$0"
+    ],
+    "description": "Comentário TODO"
+  },
+
+  "JSDoc function": {
+    "prefix": "jsdoc",
+    "body": [
+      "/**",
+      " * ${1:Descrição da função}.",
+      " * @param {${2:string}} ${3:param} ${4:Descrição do parâmetro}.",
+      " * @returns {${5:string}} ${6:Descrição do retorno}.",
+      " */",
+      "$0"
+    ],
+    "description": "Cria documentação JSDoc"
+  },
+
+  "debugger": {
+    "prefix": "debugger",
+    "body": [
+      "debugger;$0"
+    ],
+    "description": "Insere breakpoint debugger"
+  }
+}

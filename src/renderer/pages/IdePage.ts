@@ -1428,7 +1428,7 @@ export class IdePage {
     if (!platform.canUseGit) {
       this.showTerminal(false);
       this.terminal.appendOutput(`[git] ${url.trim()}`);
-      this.terminal.appendOutput("Git nativo ainda nao esta disponivel no mobile.");
+      this.terminal.appendOutput("Git requer Android e um workspace salvo na área do NPSharp.");
       try {
         await this.saveFutureRemote(url.trim());
         this.terminal.appendOutput("URL salva como projeto remoto futuro.");
@@ -1438,9 +1438,15 @@ export class IdePage {
       }
       return;
     }
-    const target = await api.dialog.openFolder();
-    if (target.canceled || !target.paths[0]) return;
-    const parent = target.paths[0];
+    let parent: string;
+    if (platform.isMobile) {
+      parent = MOBILE_WORKSPACES_ROOT;
+      await api.fs.createFolder(parent);
+    } else {
+      const target = await api.dialog.openFolder();
+      if (target.canceled || !target.paths[0]) return;
+      parent = target.paths[0];
+    }
     this.showTerminal(true);
     this.terminal.appendOutput(`[git] git clone ${url.trim()}`);
     try {
@@ -1939,7 +1945,7 @@ export class IdePage {
       { id: "open-folder", label: openWorkspaceLabel, detail: openWorkspaceDetail, iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
       { id: "new-file", label: "Novo arquivo", detail: "Criar um arquivo sem sair do hub.", iconName: "new-file", run: () => this.editor.newTab() },
       { id: "new-project", label: "Novo projeto", detail: platform.isMobile ? "Criar workspace em Documents/NPSharp/workspaces." : "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
-      { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? "Executar git clone em uma pasta escolhida." : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
+      { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? (platform.isMobile ? "Clonar em Documents/NPSharp/workspaces." : "Executar git clone em uma pasta escolhida.") : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
       { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir saída", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponível neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
       { id: "arduino", label: "Arduino", detail: platform.canUseNodeBackend ? "Placas, portas, compilação e envio via Arduino CLI." : "Modo limitado para sketches Arduino.", iconName: "circuit-board", run: () => this.showPanel("arduino") },
       { id: "extensions", label: "Extensões", detail: "Instalar pacotes VSIX locais e gerenciar extensões instaladas.", iconName: "extensions-large", run: () => this.showPanel("extensions") },

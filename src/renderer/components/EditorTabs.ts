@@ -4,7 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 import type { EditorDiagnostic, FileOpenResult, GitDiffContent, SearchResult, TextEncoding } from "../../shared/types";
 import { COMPACT_MINIMAP_OPTIONS, configureMonaco, ensureLanguageSupport, languageForPath, monaco } from "../../editor/monacoSetup";
-import { htmlAbbreviationAt } from "../../editor/emmet";
+import { htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "../../editor/emmet";
+import { matchingSnippets, snippetAtPrefix, typedSnippetPrefix } from "../../editor/snippets";
 import type { ShortcutBinding } from "../shortcuts/keybindings";
 import { monacoKeybindingFromShortcut } from "../shortcuts/keybindings";
 import { api } from "../services/api";
@@ -153,14 +154,18 @@ export class EditorTabs {
     const handleEmmetTab = (event: KeyboardEvent): void => {
       if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
       if (!(event.target instanceof Element) || !event.target.closest(".monaco-editor")) return;
-      if (!this.expandEmmetAtCursor()) return;
+      if (!this.expandSnippetAtCursor() && !this.expandEmmetAtCursor()) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
     this.editorHost.addEventListener("keydown", handleEmmetTab, true);
     this.disposables.push(
       { dispose: () => this.editorHost.removeEventListener("keydown", handleEmmetTab, true) },
-      this.editor.onDidChangeModelContent(() => this.markDirtyFromEditor()),
+      this.editor.onDidChangeModelContent(event => {
+        this.markDirtyFromEditor();
+        if (event.isFlush) return;
+        queueMicrotask(() => this.triggerSnippetSuggestions());
+      }),
       this.editor.onDidChangeCursorPosition(() => this.updateCaretStatus()),
       monaco.editor.onDidChangeMarkers(changedModels => {
         const model = this.editor.getModel();
@@ -182,14 +187,49 @@ export class EditorTabs {
     const expansion = htmlAbbreviationAt(prefix);
     if (!expansion) return false;
     const language = model.getLanguageId();
-    const isNewHtmlDocument = language === "plaintext" && expansion.abbreviation === "!" && model.getValue().trim() === "!";
+    const isNewHtmlDocument = language === "plaintext" && isLikelyHtmlAbbreviation(expansion.abbreviation) && model.getValue().trim() === expansion.abbreviation;
     if (language !== "html" && !isNewHtmlDocument) return false;
 
     const range = new monaco.Range(position.lineNumber, position.column - expansion.abbreviation.length, position.lineNumber, position.column);
     this.editor.executeEdits("emmet", [{ range, text: "" }]);
     if (isNewHtmlDocument) monaco.editor.setModelLanguage(model, "html");
-    this.editor.trigger("emmet", "editor.action.insertSnippet", { snippet: expansion.snippet });
+    this.insertSnippet(expansion.snippet);
     return true;
+  }
+
+  private expandSnippetAtCursor(): boolean {
+    const model = this.editor.getModel();
+    const position = this.editor.getPosition();
+    if (!model || !position) return false;
+    const prefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+    const snippet = snippetAtPrefix(model.getLanguageId(), prefix);
+    if (!snippet) return false;
+    const range = new monaco.Range(position.lineNumber, position.column - snippet.prefix.length, position.lineNumber, position.column);
+    this.editor.executeEdits("snippet", [{ range, text: "" }]);
+    this.insertSnippet(snippet.body);
+    return true;
+  }
+
+  private triggerSnippetSuggestions(): void {
+    const model = this.editor.getModel();
+    const position = this.editor.getPosition();
+    if (!model || !position || !this.editor.hasTextFocus()) return;
+    const linePrefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+    const typedPrefix = typedSnippetPrefix(linePrefix);
+    if (!typedPrefix || !matchingSnippets(model.getLanguageId(), typedPrefix).length) return;
+    this.editor.trigger("snippets", "editor.action.triggerSuggest", {});
+  }
+
+  private insertSnippet(template: string): void {
+    const controller = this.editor.getContribution("snippetController2") as unknown as { insert(template: string): void } | null;
+    if (controller) {
+      controller.insert(template);
+      return;
+    }
+    // The feature registration normally guarantees the controller. Keep text
+    // insertion functional if a custom Monaco build removes that contribution.
+    const selection = this.editor.getSelection();
+    if (selection) this.editor.executeEdits("snippet-fallback", [{ range: selection, text: template.replace(/\$\{\d+(?::([^}]*))?\}|\$\d+/g, "$1") }]);
   }
 
   get activeTab(): EditorTab | undefined {

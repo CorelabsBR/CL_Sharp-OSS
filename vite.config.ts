@@ -7,7 +7,7 @@ import path from "node:path";
 
 const vitePort = Number(process.env.VITE_PORT ?? 5173);
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   root: ".",
   publicDir: "resources",
   base: "./",
@@ -25,6 +25,7 @@ export default defineConfig({
     entries: [path.resolve(__dirname, "index.html")]
   },
   build: {
+    target: mode === "mobile" ? "chrome80" : "baseline-widely-available",
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: true,
@@ -55,4 +56,4 @@ export default defineConfig({
       ignored: ["**/.git/**", "**/dist/**", "**/dist-electron/**", "**/android/**", "**/release/**"]
     }
   }
-});
+}));

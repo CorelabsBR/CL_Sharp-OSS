@@ -112,6 +112,20 @@
         "path": "./ocean.json"
       },
       {
+        "id": "arcano",
+        "label": "Arcano",
+        "uiTheme": "vs",
+        "cat": "DEFAULT LIGHT",
+        "path": "./arcano.json"
+      },
+      {
+        "id": "aurora",
+        "label": "Aurora",
+        "uiTheme": "vs-dark",
+        "cat": "DEFAULT DARK",
+        "path": "./aurora.json"
+      },
+      {
         "id": "amethyst",
         "label": "Amethyst",
         "uiTheme": "vs-dark",

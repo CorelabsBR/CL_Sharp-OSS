@@ -54,7 +54,7 @@ export class SourceControlPanel {
 
   async runOnFirstRepo(args: string[]): Promise<void> {
     if (!platform.canUseGit) {
-      this.updateStatus(platform.isMobile ? "Git nativo ainda nao esta disponivel no mobile." : "Git local nao esta disponivel neste modo.");
+      this.updateStatus(platform.isMobile ? "Git requer Android e um workspace salvo na área do NPSharp." : "Git local nao esta disponivel neste modo.");
       return;
     }
     const repo = this.repos[0];

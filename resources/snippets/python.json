@@ -1,0 +1,773 @@
+{
+  "print": {
+    "prefix": "print",
+    "body": [
+      "print(${1:value})$0"
+    ],
+    "description": "Imprime um valor no console"
+  },
+
+  "if": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition}:",
+      "\t$0"
+    ],
+    "description": "Estrutura if"
+  },
+
+  "if else": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition}:",
+      "\t${2:pass}",
+      "else:",
+      "\t$0"
+    ],
+    "description": "Estrutura if/else"
+  },
+
+  "if elif else": {
+    "prefix": "ifelif",
+    "body": [
+      "if ${1:condition}:",
+      "\t${2:pass}",
+      "elif ${3:condition}:",
+      "\t${4:pass}",
+      "else:",
+      "\t$0"
+    ],
+    "description": "Estrutura if/elif/else"
+  },
+
+  "for": {
+    "prefix": "for",
+    "body": [
+      "for ${1:item} in ${2:iterable}:",
+      "\t$0"
+    ],
+    "description": "Loop for"
+  },
+
+  "for range": {
+    "prefix": "forrange",
+    "body": [
+      "for ${1:i} in range(${2:10}):",
+      "\t$0"
+    ],
+    "description": "Loop for com range"
+  },
+
+  "for range start end": {
+    "prefix": "forrange2",
+    "body": [
+      "for ${1:i} in range(${2:start}, ${3:end}):",
+      "\t$0"
+    ],
+    "description": "Loop for com início e fim"
+  },
+
+  "for enumerate": {
+    "prefix": "forenum",
+    "body": [
+      "for ${1:index}, ${2:item} in enumerate(${3:iterable}):",
+      "\t$0"
+    ],
+    "description": "Loop for com enumerate"
+  },
+
+  "for zip": {
+    "prefix": "forzip",
+    "body": [
+      "for ${1:a}, ${2:b} in zip(${3:list_a}, ${4:list_b}):",
+      "\t$0"
+    ],
+    "description": "Loop for com zip"
+  },
+
+  "while": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition}:",
+      "\t$0"
+    ],
+    "description": "Loop while"
+  },
+
+  "while true": {
+    "prefix": "whiletrue",
+    "body": [
+      "while True:",
+      "\t$0"
+    ],
+    "description": "Loop infinito"
+  },
+
+  "function": {
+    "prefix": "def",
+    "body": [
+      "def ${1:function_name}(${2}):",
+      "\t$0"
+    ],
+    "description": "Cria uma função"
+  },
+
+  "function return": {
+    "prefix": "defret",
+    "body": [
+      "def ${1:function_name}(${2}):",
+      "\t${3}",
+      "\treturn ${4:value}$0"
+    ],
+    "description": "Cria uma função com retorno"
+  },
+
+  "typed function": {
+    "prefix": "deft",
+    "body": [
+      "def ${1:function_name}(${2:value}: ${3:str}) -> ${4:str}:",
+      "\t$0"
+    ],
+    "description": "Cria função com type hints"
+  },
+
+  "async function": {
+    "prefix": "adef",
+    "body": [
+      "async def ${1:function_name}(${2}):",
+      "\t$0"
+    ],
+    "description": "Cria função assíncrona"
+  },
+
+  "lambda": {
+    "prefix": "lambda",
+    "body": [
+      "lambda ${1:x}: ${2:x}$0"
+    ],
+    "description": "Expressão lambda"
+  },
+
+  "class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:ClassName}:",
+      "\t$0"
+    ],
+    "description": "Cria uma classe"
+  },
+
+  "class constructor": {
+    "prefix": "classinit",
+    "body": [
+      "class ${1:ClassName}:",
+      "\tdef __init__(self, ${2}):",
+      "\t\t$0"
+    ],
+    "description": "Cria uma classe com construtor"
+  },
+
+  "init": {
+    "prefix": "init",
+    "body": [
+      "def __init__(self, ${1}):",
+      "\t$0"
+    ],
+    "description": "Cria método __init__"
+  },
+
+  "str": {
+    "prefix": "strmethod",
+    "body": [
+      "def __str__(self):",
+      "\treturn ${1:\"${2:ClassName}\"}$0"
+    ],
+    "description": "Cria método __str__"
+  },
+
+  "repr": {
+    "prefix": "repr",
+    "body": [
+      "def __repr__(self):",
+      "\treturn ${1:\"${2:ClassName}()\"}$0"
+    ],
+    "description": "Cria método __repr__"
+  },
+
+  "property": {
+    "prefix": "property",
+    "body": [
+      "@property",
+      "def ${1:name}(self):",
+      "\treturn self._${1:name}$0"
+    ],
+    "description": "Cria uma property"
+  },
+
+  "property setter": {
+    "prefix": "setter",
+    "body": [
+      "@${1:name}.setter",
+      "def ${1:name}(self, value):",
+      "\tself._${1:name} = value$0"
+    ],
+    "description": "Cria setter de uma property"
+  },
+
+  "staticmethod": {
+    "prefix": "staticmethod",
+    "body": [
+      "@staticmethod",
+      "def ${1:function_name}(${2}):",
+      "\t$0"
+    ],
+    "description": "Cria método estático"
+  },
+
+  "classmethod": {
+    "prefix": "classmethod",
+    "body": [
+      "@classmethod",
+      "def ${1:function_name}(cls, ${2}):",
+      "\t$0"
+    ],
+    "description": "Cria classmethod"
+  },
+
+  "dataclass": {
+    "prefix": "dataclass",
+    "body": [
+      "from dataclasses import dataclass",
+      "",
+      "@dataclass",
+      "class ${1:ClassName}:",
+      "\t${2:name}: ${3:str}$0"
+    ],
+    "description": "Cria uma dataclass"
+  },
+
+  "main": {
+    "prefix": "main",
+    "body": [
+      "if __name__ == \"__main__\":",
+      "\t$0"
+    ],
+    "description": "Bloco principal Python"
+  },
+
+  "main function": {
+    "prefix": "mainfunc",
+    "body": [
+      "def main():",
+      "\t${1:pass}",
+      "",
+      "",
+      "if __name__ == \"__main__\":",
+      "\tmain()$0"
+    ],
+    "description": "Estrutura completa com função main"
+  },
+
+  "try except": {
+    "prefix": "try",
+    "body": [
+      "try:",
+      "\t${1}",
+      "except ${2:Exception} as ${3:e}:",
+      "\t$0"
+    ],
+    "description": "Bloco try/except"
+  },
+
+  "try except else": {
+    "prefix": "tryelse",
+    "body": [
+      "try:",
+      "\t${1}",
+      "except ${2:Exception} as ${3:e}:",
+      "\t${4}",
+      "else:",
+      "\t$0"
+    ],
+    "description": "Bloco try/except/else"
+  },
+
+  "try except finally": {
+    "prefix": "tryfinally",
+    "body": [
+      "try:",
+      "\t${1}",
+      "except ${2:Exception} as ${3:e}:",
+      "\t${4}",
+      "finally:",
+      "\t$0"
+    ],
+    "description": "Bloco try/except/finally"
+  },
+
+  "raise": {
+    "prefix": "raise",
+    "body": [
+      "raise ${1:ValueError}(${2:\"Mensagem\"})$0"
+    ],
+    "description": "Lança uma exceção"
+  },
+
+  "with open read": {
+    "prefix": "openr",
+    "body": [
+      "with open(${1:\"arquivo.txt\"}, \"r\", encoding=\"utf-8\") as ${2:file}:",
+      "\t${3:content} = ${2:file}.read()$0"
+    ],
+    "description": "Abre arquivo para leitura"
+  },
+
+  "with open write": {
+    "prefix": "openw",
+    "body": [
+      "with open(${1:\"arquivo.txt\"}, \"w\", encoding=\"utf-8\") as ${2:file}:",
+      "\t${2:file}.write(${3:content})$0"
+    ],
+    "description": "Abre arquivo para escrita"
+  },
+
+  "with open append": {
+    "prefix": "opena",
+    "body": [
+      "with open(${1:\"arquivo.txt\"}, \"a\", encoding=\"utf-8\") as ${2:file}:",
+      "\t${2:file}.write(${3:content})$0"
+    ],
+    "description": "Abre arquivo para acrescentar conteúdo"
+  },
+
+  "list": {
+    "prefix": "list",
+    "body": [
+      "${1:items} = [${2}]$0"
+    ],
+    "description": "Cria uma lista"
+  },
+
+  "dictionary": {
+    "prefix": "dict",
+    "body": [
+      "${1:data} = {",
+      "\t\"${2:key}\": ${3:value}",
+      "}$0"
+    ],
+    "description": "Cria um dicionário"
+  },
+
+  "set": {
+    "prefix": "set",
+    "body": [
+      "${1:items} = {${2}}$0"
+    ],
+    "description": "Cria um set"
+  },
+
+  "tuple": {
+    "prefix": "tuple",
+    "body": [
+      "${1:items} = (${2},)$0"
+    ],
+    "description": "Cria uma tupla"
+  },
+
+  "list comprehension": {
+    "prefix": "listcomp",
+    "body": [
+      "[${1:item} for ${1:item} in ${2:iterable}]$0"
+    ],
+    "description": "List comprehension"
+  },
+
+  "list comprehension if": {
+    "prefix": "listcompif",
+    "body": [
+      "[${1:item} for ${1:item} in ${2:iterable} if ${3:condition}]$0"
+    ],
+    "description": "List comprehension com condição"
+  },
+
+  "dict comprehension": {
+    "prefix": "dictcomp",
+    "body": [
+      "{${1:key}: ${2:value} for ${3:item} in ${4:iterable}}$0"
+    ],
+    "description": "Dict comprehension"
+  },
+
+  "set comprehension": {
+    "prefix": "setcomp",
+    "body": [
+      "{${1:item} for ${1:item} in ${2:iterable}}$0"
+    ],
+    "description": "Set comprehension"
+  },
+
+  "generator expression": {
+    "prefix": "genexp",
+    "body": [
+      "(${1:item} for ${1:item} in ${2:iterable})$0"
+    ],
+    "description": "Generator expression"
+  },
+
+  "generator function": {
+    "prefix": "generator",
+    "body": [
+      "def ${1:generator_name}(${2}):",
+      "\tfor ${3:item} in ${4:iterable}:",
+      "\t\tyield ${3:item}$0"
+    ],
+    "description": "Cria uma função generator"
+  },
+
+  "match case": {
+    "prefix": "match",
+    "body": [
+      "match ${1:value}:",
+      "\tcase ${2:pattern}:",
+      "\t\t${3}",
+      "\tcase _:",
+      "\t\t$0"
+    ],
+    "description": "Pattern matching com match/case"
+  },
+
+  "import": {
+    "prefix": "import",
+    "body": [
+      "import ${1:module}$0"
+    ],
+    "description": "Importa módulo"
+  },
+
+  "from import": {
+    "prefix": "from",
+    "body": [
+      "from ${1:module} import ${2:name}$0"
+    ],
+    "description": "Importa símbolo de um módulo"
+  },
+
+  "import as": {
+    "prefix": "importas",
+    "body": [
+      "import ${1:module} as ${2:alias}$0"
+    ],
+    "description": "Importa módulo com alias"
+  },
+
+  "from import as": {
+    "prefix": "fromas",
+    "body": [
+      "from ${1:module} import ${2:name} as ${3:alias}$0"
+    ],
+    "description": "Importa símbolo com alias"
+  },
+
+  "input": {
+    "prefix": "input",
+    "body": [
+      "${1:value} = input(${2:\"Digite: \"})$0"
+    ],
+    "description": "Lê uma string do usuário"
+  },
+
+  "input int": {
+    "prefix": "inputint",
+    "body": [
+      "${1:value} = int(input(${2:\"Digite um número: \"}))$0"
+    ],
+    "description": "Lê um número inteiro"
+  },
+
+  "input float": {
+    "prefix": "inputfloat",
+    "body": [
+      "${1:value} = float(input(${2:\"Digite um número: \"}))$0"
+    ],
+    "description": "Lê um número decimal"
+  },
+
+  "f-string": {
+    "prefix": "fstr",
+    "body": [
+      "f\"${1:texto} {${2:value}}\"$0"
+    ],
+    "description": "Cria uma f-string"
+  },
+
+  "return": {
+    "prefix": "ret",
+    "body": [
+      "return ${1:value}$0"
+    ],
+    "description": "Retorna um valor"
+  },
+
+  "return none": {
+    "prefix": "rnone",
+    "body": [
+      "return None$0"
+    ],
+    "description": "Retorna None"
+  },
+
+  "pass": {
+    "prefix": "pass",
+    "body": [
+      "pass$0"
+    ],
+    "description": "Instrução pass"
+  },
+
+  "break": {
+    "prefix": "break",
+    "body": [
+      "break$0"
+    ],
+    "description": "Interrompe um loop"
+  },
+
+  "continue": {
+    "prefix": "continue",
+    "body": [
+      "continue$0"
+    ],
+    "description": "Avança para a próxima iteração"
+  },
+
+  "assert": {
+    "prefix": "assert",
+    "body": [
+      "assert ${1:condition}, ${2:\"Mensagem\"}$0"
+    ],
+    "description": "Cria uma assertion"
+  },
+
+  "is none": {
+    "prefix": "ifnone",
+    "body": [
+      "if ${1:value} is None:",
+      "\t$0"
+    ],
+    "description": "Verifica se valor é None"
+  },
+
+  "is not none": {
+    "prefix": "ifnotnone",
+    "body": [
+      "if ${1:value} is not None:",
+      "\t$0"
+    ],
+    "description": "Verifica se valor não é None"
+  },
+
+  "ternary": {
+    "prefix": "ternary",
+    "body": [
+      "${1:value_if_true} if ${2:condition} else ${3:value_if_false}$0"
+    ],
+    "description": "Expressão condicional ternária"
+  },
+
+  "asyncio main": {
+    "prefix": "asyncmain",
+    "body": [
+      "import asyncio",
+      "",
+      "",
+      "async def main():",
+      "\t${1:pass}",
+      "",
+      "",
+      "if __name__ == \"__main__\":",
+      "\tasyncio.run(main())$0"
+    ],
+    "description": "Estrutura principal com asyncio"
+  },
+
+  "async with": {
+    "prefix": "asyncwith",
+    "body": [
+      "async with ${1:resource} as ${2:value}:",
+      "\t$0"
+    ],
+    "description": "Bloco async with"
+  },
+
+  "async for": {
+    "prefix": "asyncfor",
+    "body": [
+      "async for ${1:item} in ${2:iterable}:",
+      "\t$0"
+    ],
+    "description": "Loop async for"
+  },
+
+  "await": {
+    "prefix": "await",
+    "body": [
+      "await ${1:function}(${2})$0"
+    ],
+    "description": "Executa await"
+  },
+
+  "thread": {
+    "prefix": "thread",
+    "body": [
+      "from threading import Thread",
+      "",
+      "${1:thread} = Thread(target=${2:function}, args=(${3},))",
+      "${1:thread}.start()$0"
+    ],
+    "description": "Cria e inicia uma Thread"
+  },
+
+  "logging basic": {
+    "prefix": "logging",
+    "body": [
+      "import logging",
+      "",
+      "logging.basicConfig(",
+      "\tlevel=logging.${1:INFO},",
+      "\tformat=\"%(asctime)s [%(levelname)s] %(message)s\"",
+      ")",
+      "",
+      "logger = logging.getLogger(__name__)$0"
+    ],
+    "description": "Configuração básica de logging"
+  },
+
+  "logger info": {
+    "prefix": "loginfo",
+    "body": [
+      "logger.info(${1:\"Mensagem\"})$0"
+    ],
+    "description": "Log nível INFO"
+  },
+
+  "logger debug": {
+    "prefix": "logdebug",
+    "body": [
+      "logger.debug(${1:\"Mensagem\"})$0"
+    ],
+    "description": "Log nível DEBUG"
+  },
+
+  "logger warning": {
+    "prefix": "logwarn",
+    "body": [
+      "logger.warning(${1:\"Mensagem\"})$0"
+    ],
+    "description": "Log nível WARNING"
+  },
+
+  "logger error": {
+    "prefix": "logerror",
+    "body": [
+      "logger.error(${1:\"Mensagem\"})$0"
+    ],
+    "description": "Log nível ERROR"
+  },
+
+  "logger exception": {
+    "prefix": "logexception",
+    "body": [
+      "logger.exception(${1:\"Mensagem\"})$0"
+    ],
+    "description": "Log de exceção com traceback"
+  },
+
+  "pathlib": {
+    "prefix": "path",
+    "body": [
+      "from pathlib import Path",
+      "",
+      "${1:path} = Path(${2:\"arquivo.txt\"})$0"
+    ],
+    "description": "Cria Path usando pathlib"
+  },
+
+  "json load": {
+    "prefix": "jsonload",
+    "body": [
+      "import json",
+      "",
+      "with open(${1:\"arquivo.json\"}, \"r\", encoding=\"utf-8\") as file:",
+      "\t${2:data} = json.load(file)$0"
+    ],
+    "description": "Lê arquivo JSON"
+  },
+
+  "json dump": {
+    "prefix": "jsondump",
+    "body": [
+      "import json",
+      "",
+      "with open(${1:\"arquivo.json\"}, \"w\", encoding=\"utf-8\") as file:",
+      "\tjson.dump(${2:data}, file, ensure_ascii=False, indent=4)$0"
+    ],
+    "description": "Salva dados em JSON"
+  },
+
+  "dictionary get": {
+    "prefix": "dictget",
+    "body": [
+      "${1:data}.get(${2:\"key\"}, ${3:None})$0"
+    ],
+    "description": "Obtém valor de dicionário com fallback"
+  },
+
+  "sorted": {
+    "prefix": "sorted",
+    "body": [
+      "sorted(${1:iterable}, key=lambda ${2:x}: ${3:x})$0"
+    ],
+    "description": "Ordena um iterável"
+  },
+
+  "filter": {
+    "prefix": "filter",
+    "body": [
+      "filter(lambda ${1:x}: ${2:condition}, ${3:iterable})$0"
+    ],
+    "description": "Filtra elementos"
+  },
+
+  "map": {
+    "prefix": "map",
+    "body": [
+      "map(lambda ${1:x}: ${2:x}, ${3:iterable})$0"
+    ],
+    "description": "Mapeia elementos"
+  },
+
+  "docstring function": {
+    "prefix": "doc",
+    "body": [
+      "\"\"\"",
+      "${1:Descrição da função.}",
+      "",
+      "Args:",
+      "\t${2:param}: ${3:Descrição.}",
+      "",
+      "Returns:",
+      "\t${4:Descrição do retorno.}",
+      "\"\"\"",
+      "$0"
+    ],
+    "description": "Docstring de função"
+  },
+
+  "todo": {
+    "prefix": "todo",
+    "body": [
+      "# TODO: ${1:descrição}$0"
+    ],
+    "description": "Comentário TODO"
+  }
+}

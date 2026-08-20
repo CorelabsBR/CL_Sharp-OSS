@@ -11,7 +11,8 @@ import "monaco-editor/features/codicon/register.js";
 import "monaco-editor/features/find/register.js";
 import "monaco-editor/features/snippet/register.js";
 import "monaco-editor/features/suggest/register.js";
-import { htmlAbbreviationAt } from "./emmet";
+import { htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "./emmet";
+import { matchingSnippets, registerSnippetSource, typedSnippetPrefix } from "./snippets";
 import editorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker.js?worker";
 import cssWorker from "monaco-editor/language/css/css.worker.js?worker";
@@ -31,6 +32,14 @@ self.MonacoEnvironment = {
 let configured = false;
 const loadedLanguages = new Set<string>();
 const extensionLanguages = new Map<string, string>();
+const snippetCompletionLanguages = new Set<string>();
+const bundledSnippetSources = import.meta.glob("../../resources/snippets/*.json", { eager: true, query: "?raw", import: "default" }) as Record<string, string>;
+
+export function registerLanguageSnippets(language: string, source: string): () => void {
+  const disposeSource = registerSnippetSource(language, source);
+  registerSnippetCompletionProvider(language);
+  return disposeSource;
+}
 
 export function registerExtensionLanguage(definition: { id: string; extensions?: string[]; aliases?: string[]; monarch?: unknown; configuration?: monaco.languages.LanguageConfiguration }): monaco.IDisposable {
   const normalizedExtensions = (definition.extensions ?? []).map(extension => extension.startsWith(".") ? extension.toLowerCase() : `.${extension.toLowerCase()}`);
@@ -190,17 +199,18 @@ export function configureMonaco(): typeof monaco {
     }
   });
 
-  monaco.languages.registerCompletionItemProvider("html", {
+  const emmetCompletionProvider: monaco.languages.CompletionItemProvider = {
     triggerCharacters: ["!", ".", "#", ">", "*", ":"],
     provideCompletionItems(model, position) {
       const prefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
       const expansion = htmlAbbreviationAt(prefix);
       if (!expansion) return { suggestions: [] };
+      if (model.getLanguageId() === "plaintext" && (!isLikelyHtmlAbbreviation(expansion.abbreviation) || model.getValue().trim() !== expansion.abbreviation)) return { suggestions: [] };
       return {
         suggestions: [{
           label: expansion.abbreviation,
           detail: "Emmet Abbreviation",
-          documentation: "Expandir abreviação Emmet",
+          documentation: { value: `**Emmet**\n\n\`\`\`html\n${expansion.snippet.replace(/\$\{?\d+(?::([^}]*))?\}?/g, "$1")}\n\`\`\`` },
           kind: monaco.languages.CompletionItemKind.Snippet,
           insertText: expansion.snippet,
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
@@ -209,9 +219,15 @@ export function configureMonaco(): typeof monaco {
         }]
       };
     }
-  });
+  };
+  monaco.languages.registerCompletionItemProvider("html", emmetCompletionProvider);
+  monaco.languages.registerCompletionItemProvider("plaintext", emmetCompletionProvider);
 
   registerLanguageKeywordCompletions();
+  for (const [path, source] of Object.entries(bundledSnippetSources)) {
+    const language = path.split("/").pop()?.replace(/\.json$/i, "");
+    if (language) registerLanguageSnippets(language, source);
+  }
 
   monaco.editor.defineTheme("npsharp-dark", {
     base: "vs-dark",
@@ -270,6 +286,33 @@ function registerLanguageKeywordCompletions(): void {
       }
     });
   }
+}
+
+function registerSnippetCompletionProvider(language: string): void {
+  if (snippetCompletionLanguages.has(language)) return;
+  snippetCompletionLanguages.add(language);
+  monaco.languages.registerCompletionItemProvider(language, {
+    provideCompletionItems(model, position) {
+      const linePrefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+      const typedPrefix = typedSnippetPrefix(linePrefix);
+      const range = new monaco.Range(position.lineNumber, position.column - typedPrefix.length, position.lineNumber, position.column);
+      return {
+        suggestions: matchingSnippets(language, typedPrefix).map((snippet, index) => ({
+          label: snippet.prefix,
+          detail: snippet.name,
+          documentation: snippet.description,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: snippet.body,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          filterText: snippet.prefix,
+          range,
+          sortText: `0000-${snippet.prefix}`,
+          preselect: index === 0
+        })),
+        incomplete: true
+      };
+    }
+  });
 }
 
 export function languageForPath(filePath: string): string {

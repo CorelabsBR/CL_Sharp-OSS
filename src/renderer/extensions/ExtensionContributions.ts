@@ -3,7 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import type { InstalledExtension } from "../../shared/types";
-import { registerExtensionLanguage } from "../../editor/monacoSetup";
+import { registerExtensionLanguage, registerLanguageSnippets } from "../../editor/monacoSetup";
 import { api } from "../services/api";
 import { registerExtensionTheme } from "../services/themes";
 import type { CommandRegistry } from "../commands/commandRegistry";
@@ -51,6 +51,10 @@ export class ExtensionContributions {
       const configuration = language.configuration ? JSON.parse(await api.extensions.readFile(extension.id, language.configuration)) as object : undefined;
       const disposable = registerExtensionLanguage({ ...language, monarch, configuration });
       this.disposers.push(() => disposable.dispose());
+    }
+    for (const snippets of extension.contributes?.snippets ?? []) {
+      const source = await api.extensions.readFile(extension.id, snippets.path);
+      this.disposers.push(registerLanguageSnippets(snippets.language, source));
     }
     for (const contribution of extension.contributes?.commands ?? []) {
       this.disposers.push(this.commands.register({

@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 26.8.49 - 2026-08-20
+
+Type: Feature
+
+Description:
+- Adiciona um backend Git nativo para Android baseado em JGit, habilitando descoberta de repositorios, init, clone HTTPS, status, stage, commit, checkout, branches, diff, historico, stash, fetch, pull e push nos workspaces mobile do NPSharp.
+- Integra o backend Android ao mesmo painel Source Control usado no desktop e informa claramente quando uma pasta externa SAF nao pode fornecer um caminho nativo ao Git.
+- Adiciona autenticacao HTTPS sob demanda para repositorios privados, mantendo usuario e token somente na memoria do processo Android e repetindo a operacao remota apos o login.
+- Solicita nome e e-mail no primeiro commit mobile e salva a identidade somente na configuracao local daquele repositorio.
+- Transpila o bundle mobile para Chromium 80+, evitando tela preta por sintaxe JavaScript moderna em WebViews presentes no Android 11.
+- Inclui compatibilidade para APIs DOM, String, Array, referências fracas e `crypto.randomUUID` ausentes em Android System WebView antigos usados por aparelhos Android 11.
+- Registra os plugins nativos antes da criacao da ponte Capacitor e faz o Git operar no mesmo `Documents/NPSharp` usado pelo editor, garantindo que status, stage e commit enxerguem os arquivos reais do workspace.
+- Usa a linha JGit 5.13 compativel com as APIs Java disponiveis no Android 11, evitando encerramento do app ao consultar o status do repositorio.
+
+## 26.8.48 - 2026-08-19
+
+Type: Feature / Refactor
+
+Description:
+- Substitui o expansor HTML parcial pelo motor oficial Emmet 2 usado na integração do VS Code, com sugestões dinâmicas e prévia da expansão no autocomplete.
+- Amplia abreviações HTML com classes e IDs, filhos, irmãos, subida de nível, repetição, numeração, atributos, texto, tags implícitas e snippets padrão do Emmet.
+- Garante expansões como `div.card` para `<div class="card"></div>` pelo Tab, preservando placeholders navegáveis do Monaco.
+
+## 26.8.47 - 2026-08-19
+
+Type: Feature
+
+Description:
+- Torna a descoberta de snippets proativa: o NPSharp acompanha o prefixo digitado e abre o autocomplete assim que encontra atalhos compatíveis com a linguagem ativa.
+- Mantém todos os snippets registrados disponíveis pelo `Ctrl+Espaço`, prioriza snippets na lista e atualiza os candidatos enquanto o prefixo é completado.
+
+## 26.8.46 - 2026-08-19
+
+Type: Feature / Fix
+
+Description:
+- Adiciona um registro genérico e ilimitado de snippets por linguagem, exibido no autocomplete e expandido diretamente com Tab.
+- Adiciona o snippet Java `psvm`, que gera `public static void main(String[] args)`, e centraliza snippets internos em arquivos editáveis `resources/snippets/<linguagem>.json` compatíveis com o formato do VS Code.
+- Corrige a ativação de snippets fornecidos por extensões, que já eram reconhecidos no manifesto mas ainda não tinham seus arquivos carregados pelo editor.
+- Corrige a expansão por Tab usando diretamente o controlador modular de snippets do Monaco, pois o comando global `editor.action.insertSnippet` não existe nessa distribuição.
+- Monitora o prefixo digitado e abre automaticamente o autocomplete com todos os snippets compatíveis da linguagem, incluindo contribuições instaladas por extensões.
+
 ## 26.8.45 - 2026-08-19
 
 Type: Feature
