@@ -1,3 +1,8 @@
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
 declare module "monaco-editor/language/css/monaco.contribution.js";
 declare module "monaco-editor/language/html/monaco.contribution.js";
 declare module "monaco-editor/language/typescript/monaco.contribution.js";
