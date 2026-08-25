@@ -1,4 +1,4 @@
-# Sharp-OSS Development Rules
+# Sharp Development Rules
 
 ## Mandatory
 
