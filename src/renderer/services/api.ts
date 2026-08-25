@@ -39,7 +39,7 @@ import type {
   LiveServerRequest,
   LiveServerResult,
   OpenVsxExtension,
-  NpsharpApi,
+  SharpApi,
   PersistedSession,
   RemoteCommandRequest,
   RemoteFileRequest,
@@ -76,9 +76,9 @@ import { DEFAULT_MOBILE_WORKSPACE, getDesktopApi, MOBILE_ROOT, MOBILE_WORKSPACES
 
 export { DEFAULT_MOBILE_WORKSPACE, MOBILE_ROOT, MOBILE_WORKSPACES_ROOT, platform } from "./platform";
 
-type FsApi = NpsharpApi["fs"];
-type RemoteApi = NpsharpApi["remote"];
-type TerminalApi = NpsharpApi["terminal"];
+type FsApi = SharpApi["fs"];
+type RemoteApi = SharpApi["remote"];
+type TerminalApi = SharpApi["terminal"];
 
 interface AndroidTerminalPlugin {
   create(options: TerminalCreateRequest): Promise<TerminalSessionInfo>;
@@ -91,7 +91,7 @@ interface AndroidTerminalPlugin {
   addListener(eventName: "exit", listener: (event: TerminalExitEvent) => void): Promise<{ remove: () => Promise<void> }>;
 }
 
-const AndroidTerminal = registerPlugin<AndroidTerminalPlugin>("NpsharpTerminal");
+const AndroidTerminal = registerPlugin<AndroidTerminalPlugin>("SharpTerminal");
 
 interface AndroidWorkspacePlugin {
   pick(): Promise<{ canceled: boolean; uri?: string; name?: string; location?: string }>;
@@ -104,7 +104,7 @@ interface AndroidWorkspacePlugin {
   exists(options: { uri: string; relative: string }): Promise<{ exists: boolean }>;
 }
 
-const AndroidWorkspace = registerPlugin<AndroidWorkspacePlugin>("NpsharpWorkspace");
+const AndroidWorkspace = registerPlugin<AndroidWorkspacePlugin>("SharpWorkspace");
 
 interface AndroidGitPlugin {
   status(options: { workspace: string }): Promise<{ repos: GitRepositoryStatus[] }>;
@@ -116,9 +116,9 @@ interface AndroidGitPlugin {
   identity(options: { repo: string; name: string; email: string }): Promise<GitOperationResult>;
 }
 
-const AndroidGit = registerPlugin<AndroidGitPlugin>("NpsharpGit");
+const AndroidGit = registerPlugin<AndroidGitPlugin>("SharpGit");
 
-export interface RendererApi extends NpsharpApi {
+export interface RendererApi extends SharpApi {
   platform: PlatformInfo;
   notes: {
     path(workspace?: string): string;
@@ -146,11 +146,11 @@ export interface RendererApi extends NpsharpApi {
 const SETTINGS_PATH = `${MOBILE_ROOT}/settings.json`;
 const SESSION_PATH = `${MOBILE_ROOT}/session.json`;
 const REMOTE_HOSTS_PATH = `${MOBILE_ROOT}/remote-hosts.json`;
-const ARDUINO_CONFIG_PATH = `${MOBILE_ROOT}/.npsharp/arduino.json`;
+const ARDUINO_CONFIG_PATH = `${MOBILE_ROOT}/.sharp/arduino.json`;
 const LANGUAGE_RUNTIMES_PATH = `${MOBILE_ROOT}/language-runtimes.json`;
 const NOTES_PATH = `${MOBILE_ROOT}/notes.nps.md`;
-const AI_SETTINGS_STORAGE_KEY = "npsharp:ai-settings";
-const AI_CONVERSATIONS_STORAGE_KEY = "npsharp:ai-conversations";
+const AI_SETTINGS_STORAGE_KEY = "sharp:ai-settings";
+const AI_CONVERSATIONS_STORAGE_KEY = "sharp:ai-conversations";
 
 const DEFAULT_SETTINGS: AppSettings = {
   language: DEFAULT_LOCALE,
@@ -186,8 +186,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   keyboardShortcuts: [],
   discordRichPresence: {
     enabled: true, applicationId: "", showFileName: true, showProjectName: true, showLanguage: true,
-    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "npsharp",
-    largeImageText: "NPSharp", localSmallImageKey: "local", remoteSmallImageKey: "remote",
+    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "sharp",
+    largeImageText: "Sharp-OSS", localSmallImageKey: "local", remoteSmallImageKey: "remote",
     localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host", buttons: []
   }
 };
@@ -198,14 +198,14 @@ const DEFAULT_SESSION: PersistedSession = {
   terminalVisible: false
 };
 
-const NOTES_TEMPLATE = "# NPSharp Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n";
+const NOTES_TEMPLATE = "# Sharp-OSS Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n";
 const MOBILE_GIT_MESSAGE = "Git nativo ainda nao esta disponivel no mobile.";
 const WEB_GIT_MESSAGE = "Git local nao esta disponivel neste modo web.";
 const MOBILE_TERMINAL_MESSAGE = "O shell Android integrado não está disponível neste dispositivo. Use este painel como saída e registro de comandos.";
 const WEB_TERMINAL_MESSAGE = "O terminal real não está disponível no modo web. Use este painel como saída e registro de comandos.";
 const MOBILE_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no mobile. Use este painel para manter configuracao e sketches; compile/upload dependem do desktop.";
 const WEB_ARDUINO_MESSAGE = "Arduino CLI nao esta disponivel no modo web. Compile/upload dependem do desktop.";
-const MOBILE_STORAGE_DENIED_MESSAGE = "Acesso ao armazenamento negado. Permita o acesso ao armazenamento para usar arquivos em Documents/NPSharp.";
+const MOBILE_STORAGE_DENIED_MESSAGE = "Acesso ao armazenamento negado. Permita o acesso ao armazenamento para usar arquivos em Documents/Sharp-OSS.";
 const SEARCH_IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "dist-electron", "release", ".git", "build", ".cache"]);
 const CONFIGURABLE_LANGUAGE_IDS = ["c", "cpp", "csharp", "java", "node", "python", "go", "rust", "php", "lua", "kotlin", "dart"];
 const BROWSER_UPDATE_STATUS: AppUpdateStatus = {
@@ -569,19 +569,19 @@ class LocalSandboxFs implements FsApi {
   }
 
   private load(): void {
-    const raw = readStorage("npsharp:webfs");
+    const raw = readStorage("sharp:webfs");
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as Record<string, StoredEntry>;
       this.entries = new Map(Object.entries(parsed));
     } catch (error) {
-      console.warn("[NPSharp browser storage] Failed to parse web filesystem state; clearing invalid state.", error);
+      console.warn("[Sharp-OSS browser storage] Failed to parse web filesystem state; clearing invalid state.", error);
       this.entries.clear();
     }
   }
 
   private persist(): void {
-    writeStorage("npsharp:webfs", JSON.stringify(Object.fromEntries(this.entries)));
+    writeStorage("sharp:webfs", JSON.stringify(Object.fromEntries(this.entries)));
   }
 }
 
@@ -709,9 +709,9 @@ async function pickAndroidWorkspace(): Promise<DialogFileResult> {
   };
 }
 
-function createBrowserApi(): NpsharpApi {
+function createBrowserApi(): SharpApi {
   const documentFs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Documents, true) : new LocalSandboxFs();
-  const fs = platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpWorkspace")
+  const fs = platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("SharpWorkspace")
     ? new AndroidTreeFs(documentFs)
     : documentFs;
   const appDataFs = platform.kind === "capacitor" ? new CapacitorSandboxFs(Directory.Data, false) : fs;
@@ -765,7 +765,7 @@ function createBrowserApi(): NpsharpApi {
     },
     dialog: {
       openFile: () => openSandboxFile(fs),
-      openFolder: () => platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpWorkspace")
+      openFolder: () => platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("SharpWorkspace")
         ? pickAndroidWorkspace()
         : openSandboxWorkspace(fs),
       openVsix: async () => ({ canceled: true, paths: [] }),
@@ -832,7 +832,7 @@ function createBrowserApi(): NpsharpApi {
 }
 
 function createTerminalApi(): TerminalApi {
-  if (platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpTerminal")) {
+  if (platform.kind === "capacitor" && platform.capacitorPlatform === "android" && Capacitor.isPluginAvailable("SharpTerminal")) {
     return new AndroidTerminalApi();
   }
   return {
@@ -914,7 +914,7 @@ class AndroidTerminalApi implements TerminalApi {
   }
 }
 
-function createAIFallbackApi(): NpsharpApi["ai"] {
+function createAIFallbackApi(): SharpApi["ai"] {
   const listeners = new Set<(event: AIStreamEvent) => void>();
   const defaultSettings: AISettings = {
     provider: "ollama",
@@ -922,7 +922,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
     temperature: 0.2,
     maxTokens: 8192,
     streaming: true,
-    systemPrompt: "You are NPSharp AI, a precise coding assistant.",
+    systemPrompt: "You are Sharp-OSS AI, a precise coding assistant.",
     contextSize: 32768,
     ollamaBaseUrl: "http://127.0.0.1:11434",
     apiKeyConfigured: false
@@ -1018,7 +1018,7 @@ function createAIFallbackApi(): NpsharpApi["ai"] {
   };
 }
 
-function createRendererApi(base: NpsharpApi): RendererApi {
+function createRendererApi(base: SharpApi): RendererApi {
   return {
     ...base,
     platform,
@@ -1059,7 +1059,7 @@ function createRendererApi(base: NpsharpApi): RendererApi {
   };
 }
 
-function createUnavailableGitApi(): NpsharpApi["git"] {
+function createUnavailableGitApi(): SharpApi["git"] {
   const message = platform.isMobile ? MOBILE_GIT_MESSAGE : WEB_GIT_MESSAGE;
   const result = (): GitOperationResult => ({ success: false, output: message });
   return {
@@ -1077,7 +1077,7 @@ function createUnavailableGitApi(): NpsharpApi["git"] {
   };
 }
 
-function createGitApi(): NpsharpApi["git"] {
+function createGitApi(): SharpApi["git"] {
   if (!platform.canUseGit || platform.kind !== "capacitor") return createUnavailableGitApi();
   const runNative = async (repo: string, args: string[]): Promise<GitOperationResult> => {
     try {
@@ -1128,7 +1128,7 @@ function looksLikeGitAuthenticationError(error: unknown): boolean {
   return /auth|credential|not authorized|unauthorized|forbidden|401|403/i.test(message);
 }
 
-function createSearchApi(fs: FsApi): NpsharpApi["search"] {
+function createSearchApi(fs: FsApi): SharpApi["search"] {
   return {
     files: async workspace => collectFiles(fs, workspace, 20_000, false),
     workspace: async query => {
@@ -1193,7 +1193,7 @@ function createRemoteFallbackApi(fs: FsApi): RemoteApi {
   };
 }
 
-function createExtensionFallbackApi(): NpsharpApi["extensions"] {
+function createExtensionFallbackApi(): SharpApi["extensions"] {
   const unavailable = "Extension Manager local depende do backend Electron/Node.";
   const list = async (): Promise<InstalledExtension[]> => [];
   return {
@@ -1264,7 +1264,7 @@ function normalizeBrowserRuntimeConfig(config?: Partial<LanguageRuntimeConfig>):
   };
 }
 
-function createArduinoFallbackApi(fs: FsApi): NpsharpApi["arduino"] {
+function createArduinoFallbackApi(fs: FsApi): SharpApi["arduino"] {
   const unavailable = (): ArduinoOperationResult => ({
     success: false,
     output: platform.isMobile ? MOBILE_ARDUINO_MESSAGE : WEB_ARDUINO_MESSAGE,
@@ -1388,7 +1388,7 @@ function browserAppInfo(): AppInfo {
     platform: platform.kind === "capacitor" ? platform.capacitorPlatform : "web",
     userDataPath: platform.kind === "capacitor" ? `AppData/${MOBILE_ROOT}` : `localStorage://${MOBILE_ROOT}`,
     appPath: window.location.origin,
-    npsharpHome: MOBILE_ROOT,
+    sharpHome: MOBILE_ROOT,
     architecture: "web",
     isPackaged: platform.kind === "capacitor",
     runtime: {}
@@ -1397,7 +1397,7 @@ function browserAppInfo(): AppInfo {
 
 function notesPath(workspace?: string): string {
   if (!platform.isDesktop) return NOTES_PATH;
-  const base = workspace ? joinPath(workspace, ".npsharp") : MOBILE_ROOT;
+  const base = workspace ? joinPath(workspace, ".sharp") : MOBILE_ROOT;
   return joinPath(base, "notes.nps.md");
 }
 
@@ -1543,7 +1543,7 @@ async function readJsonFile<T>(fs: FsApi, path: string, fallback: T): Promise<T>
   } catch (error) {
     if (isStorageAccessDeniedError(error)) throw error;
     if (!isMissingPathError(error) && !(error instanceof SyntaxError)) {
-      console.warn(`[NPSharp browser storage] Failed to read ${path}; fallback value will be used.`, error);
+      console.warn(`[Sharp-OSS browser storage] Failed to read ${path}; fallback value will be used.`, error);
     }
     return fallback;
   }
@@ -1654,7 +1654,7 @@ function readStorage(key: string): string | undefined {
   try {
     return window.localStorage.getItem(key) ?? undefined;
   } catch (error) {
-    console.warn(`[NPSharp browser storage] Failed to read ${key} from localStorage.`, error);
+    console.warn(`[Sharp-OSS browser storage] Failed to read ${key} from localStorage.`, error);
     return undefined;
   }
 }
@@ -1663,7 +1663,7 @@ function writeStorage(key: string, value: string): void {
   try {
     window.localStorage.setItem(key, value);
   } catch (error) {
-    console.warn(`[NPSharp browser storage] Failed to write ${key} to localStorage.`, error);
+    console.warn(`[Sharp-OSS browser storage] Failed to write ${key} to localStorage.`, error);
   }
 }
 

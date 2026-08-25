@@ -10,12 +10,12 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { GTA6_EASTER_EGG_CONTENT, PORTUGOL_EXAMPLE_CONTENT, initialContentForNewNPSharpFile } = require("../dist-electron/core/easterEggs.js");
+const { GTA6_EASTER_EGG_CONTENT, PORTUGOL_EXAMPLE_CONTENT, initialContentForNewSharpFile } = require("../dist-electron/core/easterEggs.js");
 const { createNewFile } = require("../dist-electron/services/node/fileSystemService.js");
 const { PortugolInterpreter } = require("../dist-electron/core/portugol/interpreter.js");
 
 async function withWorkspace(run) {
-  const workspace = await mkdtemp(path.join(os.tmpdir(), "npsharp-gta6-"));
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "sharp-gta6-"));
   try {
     await run(workspace);
   } finally {
@@ -23,23 +23,23 @@ async function withWorkspace(run) {
   }
 }
 
-/** Uses the same atomic filesystem creation called by NPSharp's workspace create-file IPC. */
-async function createFromNPSharp(workspace, name) {
+/** Uses the same atomic filesystem creation called by Sharp-OSS's workspace create-file IPC. */
+async function createFromSharp(workspace, name) {
   const target = path.join(workspace, name);
-  await createNewFile(target, initialContentForNewNPSharpFile(name));
+  await createNewFile(target, initialContentForNewSharpFile(name));
   return target;
 }
 
-test("1. Criar gta6.py pelo NPSharp recebe o easter egg", async () => {
+test("1. Criar gta6.py pelo Sharp-OSS recebe o easter egg", async () => {
   await withWorkspace(async workspace => {
-    const file = await createFromNPSharp(workspace, "gta6.py");
+    const file = await createFromSharp(workspace, "gta6.py");
     assert.equal(await readFile(file, "utf8"), GTA6_EASTER_EGG_CONTENT);
   });
 });
 
-test("2. Criar normal.py pelo NPSharp nasce vazio", async () => {
+test("2. Criar normal.py pelo Sharp-OSS nasce vazio", async () => {
   await withWorkspace(async workspace => {
-    const file = await createFromNPSharp(workspace, "normal.py");
+    const file = await createFromSharp(workspace, "normal.py");
     assert.equal(await readFile(file, "utf8"), "");
   });
 });
@@ -69,7 +69,7 @@ test("5. Atualizar a File Tree não altera gta6.py existente", async () => {
   });
 });
 
-test("6. Fechar e reabrir o NPSharp não altera gta6.py existente", async () => {
+test("6. Fechar e reabrir o Sharp-OSS não altera gta6.py existente", async () => {
   await withWorkspace(async workspace => {
     const file = path.join(workspace, "gta6.py");
     await writeFile(file, "persistente");
@@ -90,14 +90,14 @@ test("8. Criar gta6.py quando já existe falha sem sobrescrever", async () => {
   await withWorkspace(async workspace => {
     const file = path.join(workspace, "gta6.py");
     await writeFile(file, "não sobrescreva");
-    await assert.rejects(() => createFromNPSharp(workspace, "gta6.py"), { code: "EEXIST" });
+    await assert.rejects(() => createFromSharp(workspace, "gta6.py"), { code: "EEXIST" });
     assert.equal(await readFile(file, "utf8"), "não sobrescreva");
   });
 });
 
-test("9. Criar um arquivo .gol pelo NPSharp inclui um exemplo Portugol executável", async () => {
+test("9. Criar um arquivo .gol pelo Sharp-OSS inclui um exemplo Portugol executável", async () => {
   await withWorkspace(async workspace => {
-    const file = await createFromNPSharp(workspace, "ola.gol");
+    const file = await createFromSharp(workspace, "ola.gol");
     assert.equal(await readFile(file, "utf8"), PORTUGOL_EXAMPLE_CONTENT);
     assert.deepEqual(new PortugolInterpreter().executeCollecting(PORTUGOL_EXAMPLE_CONTENT), ["Olá, Portugol!"]);
   });
@@ -107,7 +107,7 @@ test("10. Arquivos .gol existentes continuam intactos e não são sobrescritos",
   await withWorkspace(async workspace => {
     const file = path.join(workspace, "existente.gol");
     await writeFile(file, "conteúdo do usuário");
-    await assert.rejects(() => createFromNPSharp(workspace, "existente.gol"), { code: "EEXIST" });
+    await assert.rejects(() => createFromSharp(workspace, "existente.gol"), { code: "EEXIST" });
     assert.equal(await readFile(file, "utf8"), "conteúdo do usuário");
   });
 });

@@ -17,7 +17,7 @@ export type AIAskHandler = (prompt: string, options?: AIAskOptions) => Promise<A
 let askHandler: AIAskHandler | undefined;
 
 /**
- * Internal bridge used by NPSharp's extension host. Extensions depend on this
+ * Internal bridge used by Sharp-OSS's extension host. Extensions depend on this
  * provider-neutral contract rather than a concrete remote API.
  */
 export function configureAIService(handler: AIAskHandler): void {
@@ -25,6 +25,6 @@ export function configureAIService(handler: AIAskHandler): void {
 }
 
 export async function ask(prompt: string, options?: AIAskOptions): Promise<AIAskResult> {
-  if (!askHandler) throw new Error("NPSharp AIService is not available in this extension host.");
+  if (!askHandler) throw new Error("Sharp-OSS AIService is not available in this extension host.");
   return askHandler(prompt, options);
 }

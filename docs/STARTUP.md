@@ -3,10 +3,10 @@
 Ative a instrumentação somente para diagnóstico:
 
 ```bash
-NPSharp.exe --profile-startup --profile-startup-file=C:\\temp\\npsharp-startup.json
+Sharp-OSS.exe --profile-startup --profile-startup-file=C:\\temp\\sharp-startup.json
 ```
 
-No Linux/macOS, use `NPSHARP_PROFILE_STARTUP=1`. O relatório JSON contém:
+No Linux/macOS, use `SHARP_PROFILE_STARTUP=1`. O relatório JSON contém:
 
 | Marco | Significado |
 | --- | --- |

@@ -10,17 +10,17 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { WebSocket } from "ws";
 
-const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "npsharp-server-test-"));
+const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "sharp-server-test-"));
 const bootstrapFile = path.join(temporaryDirectory, "bootstrap.json");
 const logFile = path.join(temporaryDirectory, "server.log");
-await fs.writeFile(path.join(temporaryDirectory, "remote-search.txt"), "NPSharp remote context\n", "utf8");
-const serverFile = path.resolve("npsharp-server/dist/index.js");
+await fs.writeFile(path.join(temporaryDirectory, "remote-search.txt"), "Sharp-OSS remote context\n", "utf8");
+const serverFile = path.resolve("sharp-server/dist/index.js");
 const child = spawn(process.execPath, [serverFile], {
   env: {
     ...process.env,
-    NPSHARP_BOOTSTRAP_FILE: bootstrapFile,
-    NPSHARP_LOG_FILE: logFile,
-    NPSHARP_ALLOWED_ROOTS: temporaryDirectory
+    SHARP_BOOTSTRAP_FILE: bootstrapFile,
+    SHARP_LOG_FILE: logFile,
+    SHARP_ALLOWED_ROOTS: temporaryDirectory
   },
   stdio: ["ignore", "pipe", "pipe"]
 });

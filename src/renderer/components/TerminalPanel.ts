@@ -338,7 +338,7 @@ export class TerminalPanel {
     try {
       this.shellOptions = await api.terminal.shells();
     } catch (error) {
-      console.warn("[NPSharp terminal] Failed to load shell options.", error);
+      console.warn("[Sharp-OSS terminal] Failed to load shell options.", error);
       this.shellOptions = [];
     }
     if (this.disposed) return;

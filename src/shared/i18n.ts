@@ -2,7 +2,7 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/** Idiomas oferecidos pela interface do NPSharp. */
+/** Idiomas oferecidos pela interface do Sharp-OSS. */
 export const SUPPORTED_LOCALES = ["pt-BR", "en-US"] as const;
 
 export type AppLocale = typeof SUPPORTED_LOCALES[number];
@@ -85,7 +85,7 @@ const EN_US: Record<string, string> = {
   "Central de comandos": "Command Center",
   "Verificar atualizações": "Check for Updates",
   "Instalar extensão de VSIX": "Install VSIX Extension",
-  "Sobre o NPSharp": "About NPSharp",
+  "Sobre o Sharp-OSS": "About Sharp-OSS",
   "Idioma": "Language",
   "Escolha o idioma da interface. A aplicação será recarregada.": "Choose the interface language. The application will reload.",
   "Configurações": "Settings",

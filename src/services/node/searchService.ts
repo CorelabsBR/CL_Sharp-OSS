@@ -110,7 +110,7 @@ async function readGitIgnore(root: string): Promise<string[]> {
   try {
     return (await fs.readFile(path.join(root, ".gitignore"), "utf8")).split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith("#") && !line.startsWith("!"));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.warn(`[NPSharp search] Failed to read ${path.join(root, ".gitignore")}`, error);
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.warn(`[Sharp-OSS search] Failed to read ${path.join(root, ".gitignore")}`, error);
     return [];
   }
 }

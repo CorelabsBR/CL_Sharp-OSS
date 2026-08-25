@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import { Capacitor } from "@capacitor/core";
 import { BUILD_CONFIG } from "../../shared/buildConfig";
-import type { NpsharpApi } from "../../shared/types";
+import type { SharpApi } from "../../shared/types";
 
 export type PlatformKind = "electron" | "capacitor" | "web";
 
@@ -25,8 +25,8 @@ export const MOBILE_WORKSPACES_ROOT = `${MOBILE_ROOT}/workspaces`;
 export const DEFAULT_MOBILE_WORKSPACE = `${MOBILE_WORKSPACES_ROOT}/Main`;
 
 type RendererWindow = typeof window & {
-  npsharp?: NpsharpApi;
-  npsharpApi?: NpsharpApi;
+  sharp?: SharpApi;
+  sharpApi?: SharpApi;
   process?: {
     type?: string;
     versions?: {
@@ -35,9 +35,9 @@ type RendererWindow = typeof window & {
   };
 };
 
-export function getDesktopApi(): NpsharpApi | undefined {
+export function getDesktopApi(): SharpApi | undefined {
   const bridge = window as RendererWindow;
-  return bridge.npsharpApi ?? bridge.npsharp;
+  return bridge.sharpApi ?? bridge.sharp;
 }
 
 function detectPlatform(): PlatformInfo {
@@ -68,8 +68,8 @@ function detectPlatform(): PlatformInfo {
       isMobile: true,
       canUseNodeBackend: false,
       canUseNativeFilesystem: true,
-      canUseGit: capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpGit"),
-      canUseTerminal: capacitorPlatform === "android" && Capacitor.isPluginAvailable("NpsharpTerminal"),
+      canUseGit: capacitorPlatform === "android" && Capacitor.isPluginAvailable("SharpGit"),
+      canUseTerminal: capacitorPlatform === "android" && Capacitor.isPluginAvailable("SharpTerminal"),
       canUseLiveServer: false
     };
   }

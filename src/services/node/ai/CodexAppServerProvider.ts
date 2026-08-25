@@ -50,7 +50,7 @@ interface TurnStream {
  * Local JSON-RPC client for `codex app-server`.
  *
  * The App Server owns ChatGPT OAuth and persists its own refresh tokens. The
- * NPSharp renderer only receives a success/failure result and never sees an
+ * Sharp-OSS renderer only receives a success/failure result and never sees an
  * access token or API key.
  */
 export class CodexAppServerProvider implements AIProvider {
@@ -70,7 +70,7 @@ export class CodexAppServerProvider implements AIProvider {
   private readonly conversationThreads = new Map<string, { threadId: string; workspace?: string }>();
   private readonly turnStreams = new Map<string, TurnStream>();
 
-  constructor(private readonly npsharpExtensionsRoot?: string) {}
+  constructor(private readonly sharpExtensionsRoot?: string) {}
 
   async startChatGptLogin(): Promise<LoginSession> {
     await this.ensureStarted();
@@ -160,7 +160,7 @@ export class CodexAppServerProvider implements AIProvider {
       approvalPolicy: "never",
       sandboxPolicy: codexSandboxPolicy(workspace),
       model: request.settings.model || this.descriptor.defaultModel,
-      serviceName: "npsharp"
+      serviceName: "sharp"
     });
     const threadId = text(record(result.thread)?.id);
     if (!threadId) throw new Error("O Codex não iniciou uma conversa.");
@@ -188,9 +188,9 @@ export class CodexAppServerProvider implements AIProvider {
   }
 
   private async start(): Promise<void> {
-    const executable = await findCodexExecutable(this.npsharpExtensionsRoot);
+    const executable = await findCodexExecutable(this.sharpExtensionsRoot);
     if (!executable) {
-      throw new Error("Codex não foi encontrado. Instale a extensão oficial Codex no NPSharp ou em um editor compatível, instale o Codex CLI, ou defina NPSHARP_CODEX_PATH.");
+      throw new Error("Codex não foi encontrado. Instale a extensão oficial Codex no Sharp-OSS ou em um editor compatível, instale o Codex CLI, ou defina SHARP_CODEX_PATH.");
     }
     const child = spawn(executable, ["app-server", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -204,12 +204,12 @@ export class CodexAppServerProvider implements AIProvider {
     });
     if (!child.stdout || !child.stdin) throw new Error("O processo Codex não forneceu o canal de comunicação esperado.");
     readline.createInterface({ input: child.stdout }).on("line", line => this.handleLine(line));
-    child.stderr?.on("data", value => console.warn(`[NPSharp Codex] ${String(value).trim()}`));
+    child.stderr?.on("data", value => console.warn(`[Sharp-OSS Codex] ${String(value).trim()}`));
 
     await this.request("initialize", {
       clientInfo: {
-        name: "npsharp",
-        title: "NPSharp",
+        name: "sharp",
+        title: "Sharp-OSS",
         version: BUILD_CONFIG.version
       }
     });
@@ -243,7 +243,7 @@ export class CodexAppServerProvider implements AIProvider {
     try {
       message = JSON.parse(line) as JsonRecord;
     } catch {
-      console.warn("[NPSharp Codex] Ignorando mensagem JSON inválida.");
+      console.warn("[Sharp-OSS Codex] Ignorando mensagem JSON inválida.");
       return;
     }
     const id = typeof message.id === "number" ? message.id : undefined;
@@ -397,14 +397,14 @@ class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-async function findCodexExecutable(npsharpExtensionsRoot?: string): Promise<string | undefined> {
-  const configured = process.env.NPSHARP_CODEX_PATH?.trim();
+async function findCodexExecutable(sharpExtensionsRoot?: string): Promise<string | undefined> {
+  const configured = process.env.SHARP_CODEX_PATH?.trim();
   if (configured && await fileExists(configured)) return configured;
   const fromPath = await commandExists("codex");
   if (fromPath) return fromPath;
   const binary = codexBundledBinary();
   if (!binary) return undefined;
-  for (const extensionsRoot of codexExtensionRoots(npsharpExtensionsRoot)) {
+  for (const extensionsRoot of codexExtensionRoots(sharpExtensionsRoot)) {
     try {
       const entries = await fs.readdir(extensionsRoot, { withFileTypes: true });
       const folders = entries.filter(entry => entry.isDirectory() && (entry.name === "openai.chatgpt" || entry.name.startsWith("openai.chatgpt-")))
@@ -431,12 +431,12 @@ function codexBundledBinary(): { directory: string; name: string } | undefined {
   return undefined;
 }
 
-function codexExtensionRoots(npsharpExtensionsRoot?: string): string[] {
+function codexExtensionRoots(sharpExtensionsRoot?: string): string[] {
   const home = os.homedir();
   const configured = process.env.VSCODE_EXTENSIONS?.trim();
   return [...new Set([
     configured,
-    npsharpExtensionsRoot,
+    sharpExtensionsRoot,
     path.join(home, ".vscode", "extensions"),
     path.join(home, ".vscode-insiders", "extensions"),
     path.join(home, ".vscode-oss", "extensions"),

@@ -1,4 +1,4 @@
-package br.com.corelabs.npsharp;
+package br.com.corelabs.sharp;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -16,10 +16,10 @@ import java.nio.file.Files;
 import java.util.List;
 
 /** Exercises the same JGit porcelain operations used by the Android bridge. */
-public class NpsharpGitWorkflowTest {
+public class SharpGitWorkflowTest {
     @Test
     public void mobileWorkflowClonesStagesCommitsPushesAndBranches() throws Exception {
-        File root = Files.createTempDirectory("npsharp-mobile-git-").toFile();
+        File root = Files.createTempDirectory("sharp-mobile-git-").toFile();
         File seedDirectory = new File(root, "seed");
         File remoteDirectory = new File(root, "remote.git");
         File mobileDirectory = new File(root, "mobile");
@@ -69,8 +69,8 @@ public class NpsharpGitWorkflowTest {
     }
 
     private static void configureIdentity(Git git) throws Exception {
-        git.getRepository().getConfig().setString("user", null, "name", "NPSharp Mobile Test");
-        git.getRepository().getConfig().setString("user", null, "email", "mobile-test@npsharp.local");
+        git.getRepository().getConfig().setString("user", null, "name", "Sharp-OSS Mobile Test");
+        git.getRepository().getConfig().setString("user", null, "email", "mobile-test@sharp.local");
         git.getRepository().getConfig().save();
     }
 

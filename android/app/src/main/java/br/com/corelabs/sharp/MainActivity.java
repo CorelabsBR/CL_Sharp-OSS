@@ -1,4 +1,4 @@
-package br.com.corelabs.npsharp;
+package br.com.corelabs.sharp;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
@@ -6,9 +6,9 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(NpsharpTerminalPlugin.class);
-        registerPlugin(NpsharpWorkspacePlugin.class);
-        registerPlugin(NpsharpGitPlugin.class);
+        registerPlugin(SharpTerminalPlugin.class);
+        registerPlugin(SharpWorkspacePlugin.class);
+        registerPlugin(SharpGitPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

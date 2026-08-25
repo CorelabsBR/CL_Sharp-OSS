@@ -64,7 +64,7 @@ export class AIChatPanel {
   private readonly conversationSearch = el("input", { className: "panel-input ai-history-search", attrs: { placeholder: "Pesquisar conversas", "aria-label": "Pesquisar conversas" } });
   private readonly conversationList = el("div", { className: "ai-conversation-list", attrs: { role: "list" } });
   private readonly messages = el("div", { className: "ai-messages", attrs: { role: "log", "aria-live": "polite" } });
-  private readonly input = el("textarea", { className: "ai-input", attrs: { placeholder: "Pergunte ao NPSharp AI… (Ctrl+Enter para enviar)", rows: "3", "aria-label": "Mensagem do chat" } });
+  private readonly input = el("textarea", { className: "ai-input", attrs: { placeholder: "Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)", rows: "3", "aria-label": "Mensagem do chat" } });
   private readonly providerSelect = el("select", { className: "ai-provider-select", title: "Provedor de IA", attrs: { "aria-label": "Provedor de IA" } });
   private readonly modelSelect = el("select", { className: "ai-model-select", title: "Modelo de IA", attrs: { "aria-label": "Modelo de IA" } });
   private readonly contextMenu = el("div", { className: "ai-context-menu", attrs: { role: "menu" } });
@@ -252,7 +252,7 @@ export class AIChatPanel {
         el("option", { text: model.displayName, attrs: { value: model.id, ...(model.id === this.settings?.model ? { selected: "true" } : {}) } })
       ));
     } catch (error) {
-      console.warn("[NPSharp AI] Falha ao descobrir modelos; mantendo o modelo configurado.", error);
+      console.warn("[Sharp-OSS AI] Falha ao descobrir modelos; mantendo o modelo configurado.", error);
       this.modelSelect.replaceChildren(el("option", { text: this.settings.model, attrs: { value: this.settings.model } }));
     }
   }
@@ -286,7 +286,7 @@ export class AIChatPanel {
       const article = el("article", { className: `ai-message ai-message-${message.role}`, attrs: { "data-message-id": message.id } });
       const header = el("header", { className: "ai-message-header" });
       header.append(
-        el("strong", { text: message.role === "user" ? "Você" : "NPSharp AI" }),
+        el("strong", { text: message.role === "user" ? "Você" : "Sharp-OSS AI" }),
         el("time", { text: new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
       );
       const body = message.role === "assistant"

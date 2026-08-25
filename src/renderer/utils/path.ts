@@ -19,7 +19,7 @@ interface NativePathBridge {
 }
 
 type WindowWithPathBridge = typeof window & {
-  npsharpPath?: NativePathBridge;
+  sharpPath?: NativePathBridge;
 };
 
 export function basename(filePath: string): string {
@@ -34,7 +34,7 @@ export function basename(filePath: string): string {
 }
 
 export function dirname(filePath: string): string {
-  if (isRemoteUri(filePath)) { const value = remoteParts(filePath); const parent = value.pathname.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || "/"; return `npsharp-remote://${value.host}${parent}`; }
+  if (isRemoteUri(filePath)) { const value = remoteParts(filePath); const parent = value.pathname.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || "/"; return `sharp-remote://${value.host}${parent}`; }
   const native = nativePath();
   if (native) return native.dirname(filePath);
   const normalized = normalizePortable(filePath);
@@ -95,7 +95,7 @@ export function isSubPath(root: string, target: string): boolean {
 }
 
 export function normalizePath(filePath: string): string {
-  if (isRemoteUri(filePath)) { const value = remoteParts(filePath); return `npsharp-remote://${value.host}${value.pathname.replace(/\/+/g, "/").replace(/\/$/, "") || "/"}`; }
+  if (isRemoteUri(filePath)) { const value = remoteParts(filePath); return `sharp-remote://${value.host}${value.pathname.replace(/\/+/g, "/").replace(/\/$/, "") || "/"}`; }
   const native = nativePath();
   if (native) return native.normalize(filePath);
   return normalizePortable(filePath);
@@ -133,12 +133,12 @@ function stripTrailingSlash(value: string): string {
   return value.length > 1 ? value.replace(/\/+$/, "") : value;
 }
 
-function isRemoteUri(value: string): boolean { return value.startsWith("npsharp-remote://"); }
+function isRemoteUri(value: string): boolean { return value.startsWith("sharp-remote://"); }
 function remoteParts(value: string): { host: string; pathname: string } { const parsed = new URL(value); return { host: parsed.host, pathname: decodeURIComponent(parsed.pathname) }; }
 
 function nativePath(): NativePathBridge | undefined {
   if (typeof window === "undefined") return undefined;
-  return (window as WindowWithPathBridge).npsharpPath;
+  return (window as WindowWithPathBridge).sharpPath;
 }
 
 function normalizePortable(filePath: string): string {

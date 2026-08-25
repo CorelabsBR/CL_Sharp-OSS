@@ -1,4 +1,4 @@
-name: NPSharp Build Release
+name: Sharp-OSS Build Release
 
 on:
   push:
@@ -89,7 +89,7 @@ jobs:
           mvn -B clean package
 
           mkdir -p dist/linux/lib
-          cp target/*.jar dist/linux/NPSharp.jar
+          cp target/*.jar dist/linux/Sharp-OSS.jar
           mvn -q dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=dist/linux/lib
 
       - name: Build DEB
@@ -100,42 +100,42 @@ jobs:
 
           rm -rf pkg
           mkdir -p pkg/DEBIAN
-          mkdir -p pkg/opt/npsharp/lib
+          mkdir -p pkg/opt/sharp/lib
           mkdir -p pkg/usr/bin
           mkdir -p pkg/usr/share/applications
           mkdir -p pkg/usr/share/icons/hicolor/256x256/apps
           mkdir -p pkg/usr/share/pixmaps
 
-          cp dist/linux/NPSharp.jar pkg/opt/npsharp/
-          cp -r dist/linux/lib/* pkg/opt/npsharp/lib/
+          cp dist/linux/Sharp-OSS.jar pkg/opt/sharp/
+          cp -r dist/linux/lib/* pkg/opt/sharp/lib/
 
-          cp src/main/resources/icons/app.png pkg/usr/share/icons/hicolor/256x256/apps/npsharp.png
-          cp src/main/resources/icons/app.png pkg/usr/share/pixmaps/npsharp.png
+          cp src/main/resources/icons/app.png pkg/usr/share/icons/hicolor/256x256/apps/sharp.png
+          cp src/main/resources/icons/app.png pkg/usr/share/pixmaps/sharp.png
 
-          cat > pkg/usr/bin/npsharp <<'EOF'
+          cat > pkg/usr/bin/sharp <<'EOF'
           #!/usr/bin/env bash
-          java --module-path "/opt/npsharp/lib" \
+          java --module-path "/opt/sharp/lib" \
             --add-modules javafx.controls,javafx.graphics,javafx.swing \
-            -cp "/opt/npsharp/NPSharp.jar:/opt/npsharp/lib/*" \
-            br.com.corelabs.npsharpfx.Main
+            -cp "/opt/sharp/Sharp-OSS.jar:/opt/sharp/lib/*" \
+            br.com.corelabs.sharpfx.Main
           EOF
-          sed -i 's/^          //' pkg/usr/bin/npsharp
-          chmod +x pkg/usr/bin/npsharp
+          sed -i 's/^          //' pkg/usr/bin/sharp
+          chmod +x pkg/usr/bin/sharp
 
-          cat > pkg/usr/share/applications/npsharp.desktop <<'EOF'
+          cat > pkg/usr/share/applications/sharp.desktop <<'EOF'
           [Desktop Entry]
           Version=1.0
-          Name=NPSharp
+          Name=Sharp-OSS
           GenericName=Code Editor
-          Comment=CoreLabs NPSharp Editor
-          Exec=npsharp
-          Icon=npsharp
+          Comment=CoreLabs Sharp-OSS Editor
+          Exec=sharp
+          Icon=sharp
           Terminal=false
           Type=Application
           Categories=Development;IDE;
           StartupNotify=true
           EOF
-          sed -i 's/^          //' pkg/usr/share/applications/npsharp.desktop
+          sed -i 's/^          //' pkg/usr/share/applications/sharp.desktop
 
           cat > pkg/DEBIAN/postinst <<'EOF'
           #!/bin/sh
@@ -152,17 +152,17 @@ jobs:
           chmod 755 pkg/DEBIAN/postinst
 
           cat > pkg/DEBIAN/control <<EOF
-          Package: npsharp
+          Package: sharp
           Version: ${CLEAN_VERSION}
           Section: devel
           Priority: optional
           Architecture: amd64
           Maintainer: CoreLabs
           Depends: openjdk-17-jre | openjdk-21-jre
-          Description: NPSharp editor by CoreLabs
+          Description: Sharp-OSS editor by CoreLabs
           EOF
 
-          dpkg-deb --build pkg "NPSharp-${VERSION}-linux-amd64.deb"
+          dpkg-deb --build pkg "Sharp-OSS-${VERSION}-linux-amd64.deb"
 
       - name: Build Linux portable
         shell: bash
@@ -170,36 +170,36 @@ jobs:
           VERSION="${{ needs.validate.outputs.version }}"
 
           rm -rf portable
-          mkdir -p portable/NPSharp-linux-x64/lib
+          mkdir -p portable/Sharp-OSS-linux-x64/lib
 
-          cp dist/linux/NPSharp.jar portable/NPSharp-linux-x64/
-          cp -r dist/linux/lib/* portable/NPSharp-linux-x64/lib/
-          cp src/main/resources/icons/app.png portable/NPSharp-linux-x64/app.png
+          cp dist/linux/Sharp-OSS.jar portable/Sharp-OSS-linux-x64/
+          cp -r dist/linux/lib/* portable/Sharp-OSS-linux-x64/lib/
+          cp src/main/resources/icons/app.png portable/Sharp-OSS-linux-x64/app.png
 
           if [ -f LICENSE ]; then
-            cp LICENSE portable/NPSharp-linux-x64/LICENSE
+            cp LICENSE portable/Sharp-OSS-linux-x64/LICENSE
           fi
 
-          cat > portable/NPSharp-linux-x64/npsharp <<'EOF'
+          cat > portable/Sharp-OSS-linux-x64/sharp <<'EOF'
           #!/usr/bin/env bash
           APP_DIR="$(cd "$(dirname "$0")" && pwd)"
           java --module-path "$APP_DIR/lib" \
             --add-modules javafx.controls,javafx.graphics,javafx.swing \
-            -cp "$APP_DIR/NPSharp.jar:$APP_DIR/lib/*" \
-            br.com.corelabs.npsharpfx.Main
+            -cp "$APP_DIR/Sharp-OSS.jar:$APP_DIR/lib/*" \
+            br.com.corelabs.sharpfx.Main
           EOF
-          sed -i 's/^          //' portable/NPSharp-linux-x64/npsharp
-          chmod +x portable/NPSharp-linux-x64/npsharp
+          sed -i 's/^          //' portable/Sharp-OSS-linux-x64/sharp
+          chmod +x portable/Sharp-OSS-linux-x64/sharp
 
           cd portable
-          zip -r "../NPSharp-${VERSION}-linux-x64-portable.zip" NPSharp-linux-x64
+          zip -r "../Sharp-OSS-${VERSION}-linux-x64-portable.zip" Sharp-OSS-linux-x64
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
           path: |
-            NPSharp-*-linux-amd64.deb
-            NPSharp-*-linux-x64-portable.zip
+            Sharp-OSS-*-linux-amd64.deb
+            Sharp-OSS-*-linux-x64-portable.zip
 
   windows:
     needs: validate
@@ -223,31 +223,31 @@ jobs:
           mvn -B clean package
 
           New-Item -ItemType Directory -Force dist/windows/lib | Out-Null
-          Copy-Item target/*.jar dist/windows/NPSharp.jar
+          Copy-Item target/*.jar dist/windows/Sharp-OSS.jar
           mvn -q dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=dist/windows/lib
 
           @'
           @echo off
           setlocal
           set "APP_DIR=%~dp0"
-          javaw --module-path "%APP_DIR%lib" --add-modules javafx.controls,javafx.graphics,javafx.swing -cp "%APP_DIR%NPSharp.jar;%APP_DIR%lib\*" br.com.corelabs.npsharpfx.Main
+          javaw --module-path "%APP_DIR%lib" --add-modules javafx.controls,javafx.graphics,javafx.swing -cp "%APP_DIR%Sharp-OSS.jar;%APP_DIR%lib\*" br.com.corelabs.sharpfx.Main
           if errorlevel 1 pause
-          '@ | Set-Content dist/windows/run-npsharp.bat -Encoding ASCII
+          '@ | Set-Content dist/windows/run-sharp.bat -Encoding ASCII
 
       - name: Build Windows portable
         shell: powershell
         run: |
           $version = "${{ needs.validate.outputs.version }}"
 
-          New-Item -ItemType Directory -Force portable/NPSharp-windows-x64 | Out-Null
-          Copy-Item -Recurse dist/windows/* portable/NPSharp-windows-x64/
-          Copy-Item src/main/resources/icons/app.png portable/NPSharp-windows-x64/app.png
+          New-Item -ItemType Directory -Force portable/Sharp-OSS-windows-x64 | Out-Null
+          Copy-Item -Recurse dist/windows/* portable/Sharp-OSS-windows-x64/
+          Copy-Item src/main/resources/icons/app.png portable/Sharp-OSS-windows-x64/app.png
 
           if (Test-Path LICENSE) {
-            Copy-Item LICENSE portable/NPSharp-windows-x64/LICENSE
+            Copy-Item LICENSE portable/Sharp-OSS-windows-x64/LICENSE
           }
 
-          Compress-Archive -Path portable/NPSharp-windows-x64 -DestinationPath "NPSharp-$version-windows-x64-portable.zip" -Force
+          Compress-Archive -Path portable/Sharp-OSS-windows-x64 -DestinationPath "Sharp-OSS-$version-windows-x64-portable.zip" -Force
 
       - name: Ensure LICENSE exists
         shell: powershell
@@ -271,20 +271,20 @@ jobs:
         shell: powershell
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc "/DMyAppVersion=${{ needs.validate.outputs.version }}" installer\NPSharp.iss
+          & $iscc "/DMyAppVersion=${{ needs.validate.outputs.version }}" installer\Sharp-OSS.iss
 
-          if (!(Test-Path "dist\installer\NPSharp-Setup.exe")) {
-            throw "Inno Setup failed: NPSharp-Setup.exe was not generated."
+          if (!(Test-Path "dist\installer\Sharp-OSS-Setup.exe")) {
+            throw "Inno Setup failed: Sharp-OSS-Setup.exe was not generated."
           }
 
-          Rename-Item dist\installer\NPSharp-Setup.exe "NPSharp-${{ needs.validate.outputs.version }}-Setup.exe"
+          Rename-Item dist\installer\Sharp-OSS-Setup.exe "Sharp-OSS-${{ needs.validate.outputs.version }}-Setup.exe"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
           path: |
             dist/installer/*.exe
-            NPSharp-*-windows-x64-portable.zip
+            Sharp-OSS-*-windows-x64-portable.zip
 
   release:
     needs: [validate, linux, windows]
@@ -317,5 +317,5 @@ jobs:
           printf '%s\n' "${ASSETS[@]}"
 
           gh release create "$VERSION" "${ASSETS[@]}" \
-            --title "NPSharp $VERSION" \
+            --title "Sharp-OSS $VERSION" \
             --notes "Build automático da main. Arquivos alterados desde a última tag: $CHANGED_FILES."

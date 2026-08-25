@@ -16,10 +16,10 @@ export interface StartupProfileReport {
 
 /**
  * Observabilidade de startup sem custo no uso normal. O relatório é emitido
- * somente com --profile-startup ou NPSHARP_PROFILE_STARTUP=1.
+ * somente com --profile-startup ou SHARP_PROFILE_STARTUP=1.
  */
 export class StartupProfiler {
-  private readonly enabled = process.argv.includes("--profile-startup") || process.env.NPSHARP_PROFILE_STARTUP === "1";
+  private readonly enabled = process.argv.includes("--profile-startup") || process.env.SHARP_PROFILE_STARTUP === "1";
   private readonly startedAt = new Date().toISOString();
   private readonly started = performance.now();
   private readonly stages = new Map<StartupStage, number>();
@@ -50,6 +50,6 @@ export class StartupProfiler {
     const report = this.report();
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-    console.info(`[NPSharp startup] ${JSON.stringify(report)}`);
+    console.info(`[Sharp-OSS startup] ${JSON.stringify(report)}`);
   }
 }

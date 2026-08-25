@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-app_dir="/opt/NPSharp"
-executable="npsharp"
+app_dir="/opt/Sharp-OSS"
+executable="sharp"
 binary="$app_dir/$executable"
 sandbox="$app_dir/chrome-sandbox"
 crashpad="$app_dir/chrome_crashpad_handler"
 
 if [ ! -f "$binary" ]; then
-    echo "NPSharp install error: missing application binary at $binary" >&2
+    echo "Sharp-OSS install error: missing application binary at $binary" >&2
     exit 1
 fi
 
@@ -33,7 +33,7 @@ if [ -f "$sandbox" ]; then
     chmod 4755 "$sandbox"
     sandbox_owner="$(stat -c '%u:%g' "$sandbox")"
     if [ "$sandbox_owner" != "0:0" ] || [ ! -u "$sandbox" ]; then
-        echo "NPSharp install error: chrome-sandbox was not configured correctly." >&2
+        echo "Sharp-OSS install error: chrome-sandbox was not configured correctly." >&2
         exit 1
     fi
 fi

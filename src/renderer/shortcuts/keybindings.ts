@@ -13,7 +13,7 @@ export type ShortcutCategory =
   | "Executar"
   | "Controle de Origem"
   | "Preferências"
-  | "NPSharp";
+  | "Sharp-OSS";
 
 export type ShortcutScope = "global" | "editor";
 

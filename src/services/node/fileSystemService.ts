@@ -683,7 +683,7 @@ function isOleCompoundDocument(buffer: Buffer): boolean {
 function inspectPublisher(buffer: Buffer): string {
   const printable = buffer.subarray(0, Math.min(buffer.length, MAX_BINARY_PREVIEW_BYTES)).toString("utf16le").match(/[\p{L}\p{N}][\p{L}\p{N} ._\-/]{3,}/gu) ?? [];
   const names = [...new Set(printable)].slice(0, 100);
-  return `Microsoft Publisher PUB\nContêiner: OLE Compound Document\nTamanho: ${buffer.byteLength.toLocaleString("pt-BR")} bytes\n\nStreams/metadados identificáveis:\n${names.join("\n") || "Nenhum nome de stream legível encontrado."}\n\nO formato PUB é proprietário; o NPSharp o abre de forma segura para inspeção e preserva todos os recursos originais.`;
+  return `Microsoft Publisher PUB\nContêiner: OLE Compound Document\nTamanho: ${buffer.byteLength.toLocaleString("pt-BR")} bytes\n\nStreams/metadados identificáveis:\n${names.join("\n") || "Nenhum nome de stream legível encontrado."}\n\nO formato PUB é proprietário; o Sharp-OSS o abre de forma segura para inspeção e preserva todos os recursos originais.`;
 }
 
 function inspectGameSave(buffer: Buffer): string {

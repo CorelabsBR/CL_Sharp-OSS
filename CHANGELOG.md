@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 26.8.52 - 2026-08-25
+
+Type: Refactor
+
+Description:
+- Substitui integralmente a identidade anterior por Sharp-OSS, usando `sharp` em identificadores técnicos incompatíveis com hífen.
+
 ## 26.8.51 - 2026-08-20
 
 Type: Feature / Fix
@@ -8,7 +15,7 @@ Description:
 - Completa a integracao Codex desktop sobre o App Server oficial, com login pela conta ChatGPT no navegador, leitura do estado da conta, exibicao de e-mail/plano, troca de conta e logout.
 - Passa a carregar o catalogo de modelos disponibilizado pelo Codex para a conta autenticada em vez de manter uma lista fixa.
 - Habilita o modo agente para ler, editar e testar o workspace local aberto, limitando a escrita ao caminho canonico desse workspace e mantendo rede desabilitada; sem workspace valido, usa somente leitura.
-- Localiza o executavel Codex tanto no PATH quanto na extensao oficial instalada no NPSharp, VS Code, VS Code Insiders, VSCodium, Cursor ou Windsurf.
+- Localiza o executavel Codex tanto no PATH quanto na extensao oficial instalada no Sharp-OSS, VS Code, VS Code Insiders, VSCodium, Cursor ou Windsurf.
 - Adiciona teste da politica de sandbox e documentacao do fluxo de conta e das garantias de credenciais.
 - Corrige o botão de confirmação de exclusão do Explorer para remover arquivos e pastas da worktree durante a execução do projeto.
 
@@ -26,13 +33,13 @@ Description:
 Type: Feature
 
 Description:
-- Adiciona um backend Git nativo para Android baseado em JGit, habilitando descoberta de repositorios, init, clone HTTPS, status, stage, commit, checkout, branches, diff, historico, stash, fetch, pull e push nos workspaces mobile do NPSharp.
+- Adiciona um backend Git nativo para Android baseado em JGit, habilitando descoberta de repositorios, init, clone HTTPS, status, stage, commit, checkout, branches, diff, historico, stash, fetch, pull e push nos workspaces mobile do Sharp-OSS.
 - Integra o backend Android ao mesmo painel Source Control usado no desktop e informa claramente quando uma pasta externa SAF nao pode fornecer um caminho nativo ao Git.
 - Adiciona autenticacao HTTPS sob demanda para repositorios privados, mantendo usuario e token somente na memoria do processo Android e repetindo a operacao remota apos o login.
 - Solicita nome e e-mail no primeiro commit mobile e salva a identidade somente na configuracao local daquele repositorio.
 - Transpila o bundle mobile para Chromium 80+, evitando tela preta por sintaxe JavaScript moderna em WebViews presentes no Android 11.
 - Inclui compatibilidade para APIs DOM, String, Array, referências fracas e `crypto.randomUUID` ausentes em Android System WebView antigos usados por aparelhos Android 11.
-- Registra os plugins nativos antes da criacao da ponte Capacitor e faz o Git operar no mesmo `Documents/NPSharp` usado pelo editor, garantindo que status, stage e commit enxerguem os arquivos reais do workspace.
+- Registra os plugins nativos antes da criacao da ponte Capacitor e faz o Git operar no mesmo `Documents/Sharp-OSS` usado pelo editor, garantindo que status, stage e commit enxerguem os arquivos reais do workspace.
 - Usa a linha JGit 5.13 compativel com as APIs Java disponiveis no Android 11, evitando encerramento do app ao consultar o status do repositorio.
 
 ## 26.8.48 - 2026-08-19
@@ -49,7 +56,7 @@ Description:
 Type: Feature
 
 Description:
-- Torna a descoberta de snippets proativa: o NPSharp acompanha o prefixo digitado e abre o autocomplete assim que encontra atalhos compatíveis com a linguagem ativa.
+- Torna a descoberta de snippets proativa: o Sharp-OSS acompanha o prefixo digitado e abre o autocomplete assim que encontra atalhos compatíveis com a linguagem ativa.
 - Mantém todos os snippets registrados disponíveis pelo `Ctrl+Espaço`, prioriza snippets na lista e atualiza os candidatos enquanto o prefixo é completado.
 
 ## 26.8.46 - 2026-08-19
@@ -118,13 +125,13 @@ Description:
 Type: Fix
 
 Description:
-- Corrige a instalação do NPSharp Server em hosts Linux removendo a transferência obrigatória de um `node-pty` nativo da máquina cliente e usando Node.js para verificar o checksum sem depender de `sha256sum`.
+- Corrige a instalação do Sharp-OSS Server em hosts Linux removendo a transferência obrigatória de um `node-pty` nativo da máquina cliente e usando Node.js para verificar o checksum sem depender de `sha256sum`.
 - Permite a conexão quando o terminal PTY opcional não está disponível, preservando filesystem, workspace, processos e watchers, e inclui o log remoto no diagnóstico de falha de inicialização.
 - Adiciona teste ponta a ponta do bootstrap autenticado, conexão WebSocket e RPC de capabilities do servidor.
-- Corrige os runners desktop para compilar o artefato do NPSharp Server em cada job e torna os downloads do Electron resilientes com cache e tentativas limitadas.
+- Corrige os runners desktop para compilar o artefato do Sharp-OSS Server em cada job e torna os downloads do Electron resilientes com cache e tentativas limitadas.
 - Substitui todas as chamadas incompatíveis a `window.prompt` por diálogos internos assíncronos nos comandos de projeto, Git, Explorer, Arduino, IA e sandbox web/mobile.
-- Corrige instalações novas do NPSharp Server criando o diretório remoto `bin` antes de mover a versão instalada.
-- Redesenha a janela Sobre com identidade visual do NPSharp, informações de build e runtime, sistema, arquitetura, caminhos, licença, repositório e cópia de diagnóstico.
+- Corrige instalações novas do Sharp-OSS Server criando o diretório remoto `bin` antes de mover a versão instalada.
+- Redesenha a janela Sobre com identidade visual do Sharp-OSS, informações de build e runtime, sistema, arquitetura, caminhos, licença, repositório e cópia de diagnóstico.
 - Alinha as capabilities RPC `process` e `watch` entre cliente e servidor remoto, preservando aliases antigos para compatibilidade.
 - Torna a sessão Remote Host o contexto ativo do Explorer, terminal, busca/substituição e extensões, executando essas operações e instalações Open VSX no host conectado em vez da máquina local.
 - Adiciona um seletor navegável de pasta remota após a conexão, com sugestões consultadas via RPC enquanto o caminho é digitado, navegação por teclado e confirmação explícita do workspace.
@@ -156,7 +163,7 @@ Type: Feature
 
 Description:
 - Completa o fluxo `Remote Host: Connect` com SSH persistente, validação de host key, detecção de plataforma, instalação SFTP versionada e verificada por SHA-256, bootstrap estruturado, túnel local e RPC WebSocket autenticado.
-- Integra workspaces `npsharp-remote://` ao Explorer e Monaco, incluindo operações de arquivos, proteção por `etag`, watchers agrupados, terminal remoto PTY e execução remota pelo Run Button.
+- Integra workspaces `sharp-remote://` ao Explorer e Monaco, incluindo operações de arquivos, proteção por `etag`, watchers agrupados, terminal remoto PTY e execução remota pelo Run Button.
 - Adiciona estados e logs de conexão, rollback, cancelamento, reconexão, limpeza no encerramento, comandos da Command Palette e testes do protocolo e proteção de caminhos.
 - Corrige o artefato remoto para incluir seu `package.json` ESM; instalações incompletas anteriores são detectadas e reinstaladas automaticamente em vez de falharem aguardando o bootstrap.
 
@@ -165,11 +172,11 @@ Description:
 Type: Feature
 
 Description:
-- Introduz a base tipada do NPSharp Remote Host: estados de conexão, protocolo RPC validado, códigos de erro e abstração de filesystem local/remoto com URI `npsharp-remote://`.
+- Introduz a base tipada do Sharp-OSS Remote Host: estados de conexão, protocolo RPC validado, códigos de erro e abstração de filesystem local/remoto com URI `sharp-remote://`.
 - Protege conexões SSH com verificação obrigatória de fingerprint, keepalive e timeouts configuráveis, sem aceitar silenciosamente chaves desconhecidas ou alteradas.
 - Adiciona armazenamento de credenciais criptografado pelo `safeStorage`, IDs persistentes de hosts e arquivos de configuração com permissões restritas.
 - Detecta conflitos de edição por `etag` antes de salvar arquivos remotos e retorna `REMOTE_FILE_MODIFIED` em vez de sobrescrever alterações externas.
-- Inclui um NPSharp Server compilável e empacotado, autenticado por token e limitado a `127.0.0.1`, com RPC funcional para sistema, workspace, filesystem e processos, limite de mensagens e restrição a raízes autorizadas.
+- Inclui um Sharp-OSS Server compilável e empacotado, autenticado por token e limitado a `127.0.0.1`, com RPC funcional para sistema, workspace, filesystem e processos, limite de mensagens e restrição a raízes autorizadas.
 
 ## 26.8.37 - 2026-07-28
 
@@ -184,7 +191,7 @@ Description:
 Type: Feature
 
 Description:
-- Integra o LibreOffice instalado ao NPSharp para editar documentos e planilhas no arquivo original, preservando formatação avançada, mídia, fórmulas e revisões suportadas pela suíte.
+- Integra o LibreOffice instalado ao Sharp-OSS para editar documentos e planilhas no arquivo original, preservando formatação avançada, mídia, fórmulas e revisões suportadas pela suíte.
 - Adiciona as ações `Editar no LibreOffice` no Explorer e `Office: Editar arquivo atual no LibreOffice` na Command Palette.
 
 ## 26.8.35 - 2026-07-28
@@ -201,7 +208,7 @@ Description:
 Type: Feature
 
 Description:
-- Adiciona um shell Android persistente e integrado ao terminal do NPSharp, executado no sandbox do aplicativo sem exigir a instalação do Termux.
+- Adiciona um shell Android persistente e integrado ao terminal do Sharp-OSS, executado no sandbox do aplicativo sem exigir a instalação do Termux.
 - Ajusta a Command Palette para telas de telefone: painel inferior de largura total, controles de toque maiores e lista sem arraste horizontal.
 
 ## 26.8.33 - 2026-07-28
@@ -252,7 +259,7 @@ Description:
 Type: Feature
 
 Description:
-- Novos arquivos `.gol` criados pelo Explorer recebem um exemplo Portugol pronto para executar, sem alterar arquivos existentes ou criados fora do NPSharp.
+- Novos arquivos `.gol` criados pelo Explorer recebem um exemplo Portugol pronto para executar, sem alterar arquivos existentes ou criados fora do Sharp-OSS.
 
 ## 26.8.26 - 2026-07-28
 
@@ -318,7 +325,7 @@ Description:
 Type: Feature
 
 Description:
-- Adiciona a opção de restaurar o último workspace ao iniciar o NPSharp. Ao desativá-la, o workspace e os arquivos associados deixam de ser gravados para a próxima abertura.
+- Adiciona a opção de restaurar o último workspace ao iniciar o Sharp-OSS. Ao desativá-la, o workspace e os arquivos associados deixam de ser gravados para a próxima abertura.
 
 ## 26.8.17 - 2026-07-28
 
@@ -333,7 +340,7 @@ Description:
 Type: Feature
 
 Description:
-- Define português do Brasil como idioma padrão e traduz os textos restantes da interface principal, terminal, paleta de comandos, configurações e painéis do NPSharp.
+- Define português do Brasil como idioma padrão e traduz os textos restantes da interface principal, terminal, paleta de comandos, configurações e painéis do Sharp-OSS.
 - Adiciona internacionalização persistente por `AppSettings.language` e a API segura `i18n` (`getLanguage`, `setLanguage` e `availableLanguages`) para desktop, web e mobile; o menu nativo é reconstruído ao trocar de idioma.
 
 ## 26.8.15 - 2026-07-28
@@ -408,14 +415,14 @@ Description:
 Type: Feature
 
 Description:
-- Corrige a tela de atalhos para carregar todos os comandos registrados, permite adicionar e remover atalhos personalizados e os salva na configuração global do NPSharp.
+- Corrige a tela de atalhos para carregar todos os comandos registrados, permite adicionar e remover atalhos personalizados e os salva na configuração global do Sharp-OSS.
 
 ## 26.8.5 - 2026-07-27
 
 Type: Feature
 
 Description:
-- Novo projeto agora solicita separadamente o nome da pasta e do repositório, cria `.npsharp/project.json`, inicializa Git quando disponível e mantém o projeto criado mesmo se `git init` falhar ou o Git não estiver instalado.
+- Novo projeto agora solicita separadamente o nome da pasta e do repositório, cria `.sharp/project.json`, inicializa Git quando disponível e mantém o projeto criado mesmo se `git init` falhar ou o Git não estiver instalado.
 
 ## 26.8.4 - 2026-07-27
 
@@ -443,7 +450,7 @@ Description:
 Type: Feature
 
 Description:
-- Adiciona o easter egg de criação explícita de arquivo: somente um novo `gta6.py` criado pelo Explorer do NPSharp recebe o conteúdo Python especial, por criação atômica e sem tocar em arquivos existentes ou detectados externamente.
+- Adiciona o easter egg de criação explícita de arquivo: somente um novo `gta6.py` criado pelo Explorer do Sharp-OSS recebe o conteúdo Python especial, por criação atômica e sem tocar em arquivos existentes ou detectados externamente.
 
 ## 26.8.0 - 2026-07-27
 
@@ -472,7 +479,7 @@ Description:
 - Conclui a tradução para português do Brasil dos textos visíveis restantes em Controle de Código-Fonte, Host Remoto, Terminal, Runtimes, Extensões, menus e paleta de comandos.
 - Carrega explicitamente a contribuição Find do Monaco e executa a ação `actions.find` na instância ativa para corrigir Ctrl+F/Cmd+F.
 - Exibe Configurações em uma janela modal própria, organiza o painel de Problemas e permite criar arquivos e pastas aninhados pelo caminho relativo informado.
-- Cria novos projetos em uma pasta escolhida, inicializa `.npsharp` e executa `git init` antes de abrir o workspace.
+- Cria novos projetos em uma pasta escolhida, inicializa `.sharp` e executa `git init` antes de abrir o workspace.
 
 ## 26.6.5 - 2026-07-27
 
@@ -547,7 +554,7 @@ Type: Fix
 Description:
 - Corrige o encerramento do pacote Linux/.deb com cleanup idempotente de janelas, WebContents, watchers, terminais e live servers.
 - Corrige o empacotamento Debian para reconstruir e extrair modulos nativos compativeis com Electron, validar chrome-sandbox e declarar dependencias Linux necessarias.
-- Corrige o fluxo mobile/Telefone para solicitar permissao de armazenamento antes de acessar Documents/NPSharp e manter dados internos em Directory.Data.
+- Corrige o fluxo mobile/Telefone para solicitar permissao de armazenamento antes de acessar Documents/Sharp-OSS e manter dados internos em Directory.Data.
 - Corrige referencias de versao divergentes entre Electron, Android, renderer fallback e metadata do pacote.
 
 ## 26.3.2 - 2026-07-21
@@ -555,4 +562,4 @@ Description:
 Type: Fix
 
 Description:
-- Implementacao inicial do changelog do NPSharp.
+- Implementacao inicial do changelog do Sharp-OSS.

@@ -1,4 +1,4 @@
-package br.com.corelabs.npsharp;
+package br.com.corelabs.sharp;
 
 import android.content.Context;
 import android.os.Environment;
@@ -25,10 +25,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * A small, persistent shell bridge for the Android app sandbox. It deliberately
  * uses the system POSIX shell instead of a remote service or a separate Termux
- * installation, so every terminal session remains private to NPSharp.
+ * installation, so every terminal session remains private to Sharp-OSS.
  */
-@CapacitorPlugin(name = "NpsharpTerminal")
-public class NpsharpTerminalPlugin extends Plugin {
+@CapacitorPlugin(name = "SharpTerminal")
+public class SharpTerminalPlugin extends Plugin {
     private final Map<String, ShellSession> sessions = new ConcurrentHashMap<>();
 
     @PluginMethod
@@ -159,7 +159,7 @@ public class NpsharpTerminalPlugin extends Plugin {
             builder.environment().put("PATH", "/system/bin:/system/xbin:/vendor/bin");
             process = builder.start();
             input = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
-            emitData("\n[NPSharp] Shell Android iniciado em " + cwd.getAbsolutePath() + "\n");
+            emitData("\n[Sharp-OSS] Shell Android iniciado em " + cwd.getAbsolutePath() + "\n");
             startOutputReader();
             startExitWatcher();
         }
@@ -183,7 +183,7 @@ public class NpsharpTerminalPlugin extends Plugin {
                 } catch (InterruptedException error) {
                     Thread.currentThread().interrupt();
                 }
-            }, "npsharp-terminal-stop").start();
+            }, "sharp-terminal-stop").start();
         }
 
         private void startOutputReader() {
@@ -195,7 +195,7 @@ public class NpsharpTerminalPlugin extends Plugin {
                 } catch (IOException error) {
                     if (!closed.get()) emitData("\n[terminal] " + error.getMessage() + "\n");
                 }
-            }, "npsharp-terminal-output");
+            }, "sharp-terminal-output");
             reader.setDaemon(true);
             reader.start();
         }
@@ -216,7 +216,7 @@ public class NpsharpTerminalPlugin extends Plugin {
                     if (stopSignal != null) event.put("signal", stopSignal);
                     notifyListeners("exit", event);
                 }
-            }, "npsharp-terminal-exit");
+            }, "sharp-terminal-exit");
             watcher.setDaemon(true);
             watcher.start();
         }

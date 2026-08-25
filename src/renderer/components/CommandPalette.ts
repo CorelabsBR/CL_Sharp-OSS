@@ -94,12 +94,12 @@ export class CommandPalette {
   }
 
   private async indexWorkspaceFiles(workspace: string, generation: number): Promise<void> {
-    if (platform.canUseNodeBackend && !workspace.startsWith("npsharp-remote://")) {
+    if (platform.canUseNodeBackend && !workspace.startsWith("sharp-remote://")) {
       try {
         const indexed = await api.search.files(workspace);
         if (generation === this.workspaceIndexGeneration) this.workspaceFiles = indexed;
       } catch (error) {
-        console.warn(`[NPSharp quick open] Workspace index failed (${workspace})`, error);
+        console.warn(`[Sharp-OSS quick open] Workspace index failed (${workspace})`, error);
       }
       return;
     }

@@ -121,7 +121,7 @@ function folderIconForName(folderName: string, expanded: boolean): string {
 
     const folders: Record<string, string> = {
 
-        ".npsharp": "nps",
+        ".sharp": "nps",
         "packages": "folder-packages",
         ".github": "folder-github",
         ".vscode": "vscode",
@@ -808,7 +808,7 @@ zig: "zig.svg",
   if (lower === "license.md") return "key.svg";
   if (lower === "license") return "license.svg";
   if (lower === "artisan") return "laravel.png";
-  if (lower === ".npsharp") return "nps.png";
+  if (lower === ".sharp") return "nps.png";
   if (lower === "package.json") return "npm.svg";
   if (lower === "cargo.lock") return "cargolock.svg";
   if (lower === "dockerfile") return "docker.svg";

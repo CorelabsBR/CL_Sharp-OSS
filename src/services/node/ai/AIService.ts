@@ -55,7 +55,7 @@ export class AIService {
         emit({ requestId: request.requestId, type: "cancelled" });
       } else {
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[NPSharp AI] Request ${request.requestId} failed.`, error);
+        console.error(`[Sharp-OSS AI] Request ${request.requestId} failed.`, error);
         emit({ requestId: request.requestId, type: "error", message });
       }
     } finally {

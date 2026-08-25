@@ -47,7 +47,7 @@ import {
 } from "../services/node/gitService";
 import { openLiveServer, stopAllLiveServers } from "../services/node/liveServerService";
 import { officeSuiteStatus, openInOfficeSuite } from "../services/node/officeService";
-import { configureNpsharpDataRoot, npsharpHome } from "../services/node/paths";
+import { configureSharpDataRoot, sharpHome } from "../services/node/paths";
 import { BUILD_CONFIG } from "../shared/buildConfig";
 import { detectPortableMode } from "../services/node/portableMode";
 import { normalizeCwd, runShell } from "../services/node/processService";
@@ -150,7 +150,7 @@ const portableMode = detectPortableMode();
 
 if (portableMode.enabled && portableMode.directory) {
   const portableData = path.join(portableMode.directory, "data");
-  configureNpsharpDataRoot(portableData);
+  configureSharpDataRoot(portableData);
   app.setPath("userData", portableData);
   app.setPath("sessionData", path.join(portableData, "chromium"));
 }
@@ -199,7 +199,7 @@ app.whenReady().then(async () => {
   // A preferência de idioma não deve atrasar a primeira janela. A tela de
   // configurações continua sendo a fonte de verdade e atualiza o menu depois.
   void loadSettings().then(async settings => { applyApplicationLocale(settings.language); await discordPresenceManager?.configure(settings.discordRichPresence); }).catch(error => {
-    console.warn("[NPSharp startup] Não foi possível carregar o idioma inicial.", error);
+    console.warn("[Sharp-OSS startup] Não foi possível carregar o idioma inicial.", error);
   });
 
   app.on("activate", async () => {
@@ -380,7 +380,7 @@ function createApplicationMenu(): void {
         { label: "Executar sem depuração", accelerator: "CmdOrCtrl+F5", click: () => sendCommand("tools:runWithoutDebug") },
         { label: "Depurar programa", accelerator: "F5", click: () => sendCommand("tools:run") },
         { label: "Arduino", click: () => sendCommand("view:arduino") },
-        { label: "Configurar runtimes de linguagem", click: () => sendCommand("npsharp:configureLanguageRuntimes") },
+        { label: "Configurar runtimes de linguagem", click: () => sendCommand("sharp:configureLanguageRuntimes") },
         { type: "separator" },
         { label: "Novo terminal", accelerator: "CmdOrCtrl+Shift+`", click: () => sendCommand("terminal:new") },
         { label: "Saída", click: () => sendCommand("terminal:output") },
@@ -401,10 +401,10 @@ function createApplicationMenu(): void {
       label: "Mais",
       submenu: [
         { label: "Paleta de comandos", accelerator: "CmdOrCtrl+Shift+P", click: () => sendCommand("view:commandPalette") },
-        { label: "Central de comandos", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("npsharp:commandCenter") },
+        { label: "Central de comandos", accelerator: "CmdOrCtrl+Alt+C", click: () => sendCommand("sharp:commandCenter") },
         { label: "Verificar atualizações", click: () => sendCommand("update:check") },
         { label: "Instalar extensão de VSIX", click: () => sendCommand("extensions:installVsix") },
-        { label: "Sobre o NPSharp", click: () => sendCommand("help:about") }
+        { label: "Sobre o Sharp-OSS", click: () => sendCommand("help:about") }
       ]
     }
   ];
@@ -484,7 +484,7 @@ function registerIpcHandlers(): void {
   const providerManager = new ProviderManager(aiSettings, path.join(app.getPath("userData"), "extensions"));
   aiStreamingController = new StreamingController();
   const aiService = new AIService(providerManager, aiSettings, aiStreamingController);
-  const serverDist = app.isPackaged ? path.join(process.resourcesPath, "npsharp-server", "dist") : path.join(app.getAppPath(), "npsharp-server", "dist");
+  const serverDist = app.isPackaged ? path.join(process.resourcesPath, "sharp-server", "dist") : path.join(app.getAppPath(), "sharp-server", "dist");
   remoteHostManager = new RemoteHostConnectionManager(serverDist, (channel, value) => {
     for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(channel, value);
   });
@@ -496,7 +496,7 @@ function registerIpcHandlers(): void {
     platform: process.platform,
     userDataPath: app.getPath("userData"),
     appPath: app.getAppPath(),
-    npsharpHome: npsharpHome(),
+    sharpHome: sharpHome(),
     architecture: process.arch,
     isPackaged: app.isPackaged,
     runtime: {
@@ -519,10 +519,10 @@ function registerIpcHandlers(): void {
     startupProfiler.mark("T6-secondary-scheduled");
     initializeAutoUpdater();
     void flushPendingOpenFiles(currentMainWindow()?.webContents).catch(error => {
-      console.warn("[NPSharp startup] Não foi possível abrir os arquivos solicitados.", error);
+      console.warn("[Sharp-OSS startup] Não foi possível abrir os arquivos solicitados.", error);
     });
     void startupProfiler.writeReport(app.getPath("userData")).catch(error => {
-      console.warn("[NPSharp startup] Não foi possível gravar o perfil de inicialização.", error);
+      console.warn("[Sharp-OSS startup] Não foi possível gravar o perfil de inicialização.", error);
     });
   });
 
@@ -703,7 +703,7 @@ function registerIpcHandlers(): void {
         sendToWebContents(sender, "fs:watch:event", { watchId, ...payload });
       },
       error => {
-        console.warn(`[NPSharp fs] Workspace watcher issue (${targetPath})`, error);
+        console.warn(`[Sharp-OSS fs] Workspace watcher issue (${targetPath})`, error);
       }
     );
     if (shuttingDown || !isUsableWebContents(sender)) {
@@ -913,10 +913,10 @@ function cleanupRuntimeResources(): void {
   aiStreamingController?.cancelAll();
   closeRegisteredTerminals();
   closeWorkspaceWatchers();
-  void remoteHostManager?.disconnectAll().catch(error => console.warn("[NPSharp remote] Failed to close remote sessions.", error));
-  void discordPresenceManager?.destroy().catch(error => console.warn("[NPSharp Discord] Failed to close Rich Presence.", error));
+  void remoteHostManager?.disconnectAll().catch(error => console.warn("[Sharp-OSS remote] Failed to close remote sessions.", error));
+  void discordPresenceManager?.destroy().catch(error => console.warn("[Sharp-OSS Discord] Failed to close Rich Presence.", error));
   void stopAllLiveServers().catch(error => {
-    console.warn("[NPSharp lifecycle] Failed to stop live servers during shutdown.", error);
+    console.warn("[Sharp-OSS lifecycle] Failed to stop live servers during shutdown.", error);
   });
 }
 
@@ -942,7 +942,7 @@ function disposeWorkspaceWatcher(watchId: string, removeDestroyedListener = true
   try {
     registration.dispose();
   } catch (error) {
-    console.warn(`[NPSharp fs] Failed to dispose workspace watcher ${watchId}.`, error);
+    console.warn(`[Sharp-OSS fs] Failed to dispose workspace watcher ${watchId}.`, error);
   }
 }
 

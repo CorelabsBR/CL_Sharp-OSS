@@ -1,4 +1,4 @@
-# NPSharp Development Rules
+# Sharp-OSS Development Rules
 
 ## Mandatory
 

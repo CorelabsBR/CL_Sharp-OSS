@@ -6,7 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { AppSettings, PersistedSession } from "../../shared/types";
 import { DEFAULT_LOCALE, normalizeLocale } from "../../shared/i18n";
-import { npsharpHome, recentFilesPath, settingsPath } from "./paths";
+import { sharpHome, recentFilesPath, settingsPath } from "./paths";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   language: DEFAULT_LOCALE,
@@ -42,8 +42,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   keyboardShortcuts: [],
   discordRichPresence: {
     enabled: true, applicationId: "", showFileName: true, showProjectName: true, showLanguage: true,
-    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "npsharp",
-    largeImageText: "NPSharp", localSmallImageKey: "local", remoteSmallImageKey: "remote",
+    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "sharp",
+    largeImageText: "Sharp-OSS", localSmallImageKey: "local", remoteSmallImageKey: "remote",
     localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host", buttons: []
   }
 };
@@ -61,7 +61,7 @@ export async function loadSettings(): Promise<AppSettings> {
     return mergeSettings(parsed);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`[NPSharp settings] Failed to load settings from ${file}; defaults will be used.`, error);
+      console.warn(`[Sharp-OSS settings] Failed to load settings from ${file}; defaults will be used.`, error);
     }
     return { ...DEFAULT_SETTINGS };
   }
@@ -69,7 +69,7 @@ export async function loadSettings(): Promise<AppSettings> {
 
 export async function saveSettings(settings: AppSettings): Promise<AppSettings> {
   const merged = mergeSettings(settings);
-  await fs.mkdir(npsharpHome(), { recursive: true });
+  await fs.mkdir(sharpHome(), { recursive: true });
   await fs.writeFile(settingsPath(), JSON.stringify(merged, null, 2) + "\n", "utf8");
   return merged;
 }
@@ -97,14 +97,14 @@ export async function loadSession(): Promise<PersistedSession> {
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`[NPSharp settings] Failed to load session from ${recentFilesPath()}; empty session will be used.`, error);
+      console.warn(`[Sharp-OSS settings] Failed to load session from ${recentFilesPath()}; empty session will be used.`, error);
     }
     return { openFiles: [], sidePanel: "explorer", terminalVisible: false };
   }
 }
 
 export async function saveSession(session: PersistedSession): Promise<void> {
-  await fs.mkdir(npsharpHome(), { recursive: true });
+  await fs.mkdir(sharpHome(), { recursive: true });
   await fs.writeFile(
     recentFilesPath(),
     JSON.stringify({

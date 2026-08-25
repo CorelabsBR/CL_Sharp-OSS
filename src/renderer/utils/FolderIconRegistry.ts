@@ -14,7 +14,7 @@ const make = (name: string): FolderIcon => ({
 
 export const FolderIcons: Record<string, FolderIcon> = {
 
-    ".npsharp": make("npsharp"),
+    ".sharp": make("sharp"),
 
     ".github": make("github"),
 

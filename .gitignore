@@ -98,7 +98,7 @@ nbdist/
 *.code-workspace
 
 # Dados locais gerados pelo aplicativo e pelas ferramentas de desenvolvimento
-.npsharp/
+.sharp/
 .agents/
 .codex/
 

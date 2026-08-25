@@ -5,12 +5,12 @@
 import { safeStorage } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { npsharpHome } from "../paths";
+import { sharpHome } from "../paths";
 
 type CredentialMap = Record<string, string>;
 
 export class RemoteCredentialStore {
-  private readonly file = path.join(npsharpHome(), "remote-credentials.json");
+  private readonly file = path.join(sharpHome(), "remote-credentials.json");
 
   async set(hostId: string, password: string): Promise<void> {
     if (!safeStorage.isEncryptionAvailable()) throw new Error("O armazenamento seguro do sistema não está disponível.");

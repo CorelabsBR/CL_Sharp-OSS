@@ -61,7 +61,7 @@ export class UpdateService {
       return this.setStatus({ state: "unsupported", message: this.unsupportedMessage() });
     }
     if (this.checkPromise) return this.checkPromise;
-    this.setStatus({ state: "checking", message: "Verificando atualizações do NPSharp…" });
+    this.setStatus({ state: "checking", message: "Verificando atualizações do Sharp-OSS…" });
     this.checkPromise = this.provider.checkForUpdates()
       .then(() => this.getStatus())
       .catch(error => this.setError(error, "Não foi possível verificar atualizações."))
@@ -87,11 +87,11 @@ export class UpdateService {
   }
 
   private bindProviderEvents(): void {
-    this.provider.on("checking-for-update", () => this.setStatus({ state: "checking", message: "Verificando atualizações do NPSharp…" }));
-    this.provider.on("update-not-available", () => this.setStatus({ state: "current", message: "O NPSharp já está atualizado." }));
+    this.provider.on("checking-for-update", () => this.setStatus({ state: "checking", message: "Verificando atualizações do Sharp-OSS…" }));
+    this.provider.on("update-not-available", () => this.setStatus({ state: "current", message: "O Sharp-OSS já está atualizado." }));
     this.provider.on("update-available", info => {
       if (!parseSemanticVersion(info.version) || !isNewerStableVersion(this.options.currentVersion, info.version)) {
-        this.setStatus({ state: "current", message: "O NPSharp já está atualizado." });
+        this.setStatus({ state: "current", message: "O Sharp-OSS já está atualizado." });
         return;
       }
       this.setStatus({ state: "available", version: info.version, message: `Atualização disponível: v${info.version}` });
@@ -119,13 +119,13 @@ export class UpdateService {
 
   private setError(error: unknown, fallback: string): AppUpdateStatus {
     const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
-    this.options.logger?.warn(`[NPSharp update] ${fallback}${detail}`);
+    this.options.logger?.warn(`[Sharp-OSS update] ${fallback}${detail}`);
     return this.setStatus({ state: "error", message: `${fallback}${detail}` });
   }
 
   private setStatus(status: AppUpdateStatus): AppUpdateStatus {
     this.status = status;
-    this.options.logger?.info(`[NPSharp update] ${status.state}${status.version ? ` v${status.version}` : ""}`);
+    this.options.logger?.info(`[Sharp-OSS update] ${status.state}${status.version ? ` v${status.version}` : ""}`);
     for (const listener of this.listeners) listener({ ...status });
     return this.getStatus();
   }

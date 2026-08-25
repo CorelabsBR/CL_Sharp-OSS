@@ -19,7 +19,7 @@ import type {
   ArduinoSketchResult,
   ArduinoUploadRequest
 } from "../../shared/types";
-import { npsharpHome } from "./paths";
+import { sharpHome } from "./paths";
 import { commandExists, runProcess } from "./processService";
 
 const DEFAULT_BAUD_RATE = 9600;
@@ -80,7 +80,7 @@ export async function listArduinoBoards(request: ArduinoCliRequest = {}): Promis
 
 export async function createArduinoSketch(request: ArduinoCreateSketchRequest): Promise<ArduinoSketchResult> {
   const name = sanitizeSketchName(request.name);
-  const root = request.workspace?.trim() || path.join(npsharpHome(), "arduino");
+  const root = request.workspace?.trim() || path.join(sharpHome(), "arduino");
   const sketchPath = path.join(root, name);
   const filePath = path.join(sketchPath, `${name}.ino`);
   const content = `void setup() {\n  Serial.begin(${DEFAULT_BAUD_RATE});\n}\n\nvoid loop() {\n}\n`;
@@ -160,8 +160,8 @@ async function resolveArduinoCli(configuredPath?: string): Promise<string | unde
 
 function arduinoConfigPath(workspace?: string): string {
   return workspace?.trim()
-    ? path.join(workspace.trim(), ".npsharp", "arduino.json")
-    : path.join(npsharpHome(), "arduino.json");
+    ? path.join(workspace.trim(), ".sharp", "arduino.json")
+    : path.join(sharpHome(), "arduino.json");
 }
 
 function normalizeConfig(config: Partial<ArduinoConfig>): ArduinoConfig {

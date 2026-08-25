@@ -18,7 +18,7 @@ test("Git status separa alterações staged e working tree", () => {
 });
 
 test("índice e busca respeitam .gitignore", async () => {
-  const workspace = await mkdtemp(path.join(os.tmpdir(), "npsharp-features-"));
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "sharp-features-"));
   try {
     await writeFile(path.join(workspace, ".gitignore"), "ignored.txt\n");
     await writeFile(path.join(workspace, "visible.ts"), "const answer = 42;\n");

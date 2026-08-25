@@ -72,7 +72,7 @@ await updateText(path.join(root, "android", "app", "build.gradle"), content => c
   .replace(/versionCode\s+\d+/, `versionCode ${application.versionCode}`)
   .replace(/versionName\s+"[^"]+"/, `versionName "${application.version}"`));
 await updateText(path.join(root, "android", "app", "src", "main", "res", "values", "strings.xml"), () => renderAndroidStrings(application));
-await updateText(path.join(root, "android", "app", "src", "main", "java", "br", "com", "corelabs", "npsharp", "MainActivity.java"), content => content
+await updateText(path.join(root, "android", "app", "src", "main", "java", "br", "com", "corelabs", "sharp", "MainActivity.java"), content => content
   .replace(/^package\s+[^;]+;/m, `package ${android.namespace};`));
 
 function validateConfig(value) {

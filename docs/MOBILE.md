@@ -1,33 +1,33 @@
-# NPSharp Desktop e Mobile
+# Sharp-OSS Desktop e Mobile
 
-O NPSharp usa a mesma base renderer para Electron, Capacitor e fallback web. A camada `src/renderer/services/platform.ts` detecta o ambiente e `src/renderer/services/api.ts` escolhe a implementacao correta para filesystem, settings, Git, terminal, runtimes e Live Server.
+O Sharp-OSS usa a mesma base renderer para Electron, Capacitor e fallback web. A camada `src/renderer/services/platform.ts` detecta o ambiente e `src/renderer/services/api.ts` escolhe a implementacao correta para filesystem, settings, Git, terminal, runtimes e Live Server.
 
 ## Plataformas
 
-- Electron Desktop: usa `window.npsharpApi` ou `window.npsharp` vindo do preload. Tem filesystem nativo, Git real, terminal real, runtimes locais, diagnosticos Java e Live Server Node.
-- Capacitor Mobile: usa `Capacitor.isNativePlatform()` e `@capacitor/filesystem`. Tem workspace mobile em `Documents/NPSharp`, Notes, settings, temas, preview HTML e Git nativo no Android para workspaces armazenados nessa area. Runtimes locais e Live Server Node ficam em modo limitado.
+- Electron Desktop: usa `window.sharpApi` ou `window.sharp` vindo do preload. Tem filesystem nativo, Git real, terminal real, runtimes locais, diagnosticos Java e Live Server Node.
+- Capacitor Mobile: usa `Capacitor.isNativePlatform()` e `@capacitor/filesystem`. Tem workspace mobile em `Documents/Sharp-OSS`, Notes, settings, temas, preview HTML e Git nativo no Android para workspaces armazenados nessa area. Runtimes locais e Live Server Node ficam em modo limitado.
 - Web/dev fallback: usa memoria/localStorage para settings, sessao e arquivos basicos. Serve para desenvolvimento do renderer sem Electron nem app nativo.
 
 ## Mobile Workspace
 
-No mobile nao existe um workspace arbitrario do sistema como no desktop. O NPSharp separa dados internos da area de arquivos do usuario:
+No mobile nao existe um workspace arbitrario do sistema como no desktop. O Sharp-OSS separa dados internos da area de arquivos do usuario:
 
 ```text
-Directory.Data/NPSharp/settings.json
-Directory.Data/NPSharp/session.json
-Documents/NPSharp/notes.nps.md
-Documents/NPSharp/workspaces/
+Directory.Data/Sharp-OSS/settings.json
+Directory.Data/Sharp-OSS/session.json
+Documents/Sharp-OSS/notes.nps.md
+Documents/Sharp-OSS/workspaces/
 ```
 
-Settings, sessao e configuracoes internas usam `Directory.Data` e nao dependem da permissao publica de armazenamento. Notes, Explorer, busca e workspaces usam `Documents/NPSharp`; antes da primeira operacao o app chama `Filesystem.checkPermissions()`/`Filesystem.requestPermissions()`. Se a permissao for negada, a operacao e interrompida com uma mensagem clara ao usuario.
+Settings, sessao e configuracoes internas usam `Directory.Data` e nao dependem da permissao publica de armazenamento. Notes, Explorer, busca e workspaces usam `Documents/Sharp-OSS`; antes da primeira operacao o app chama `Filesystem.checkPermissions()`/`Filesystem.requestPermissions()`. Se a permissao for negada, a operacao e interrompida com uma mensagem clara ao usuario.
 
-O Command Center mostra "Abrir workspace mobile" e cria/abre pastas dentro de `Documents/NPSharp/workspaces` apos a autorizacao do sistema.
+O Command Center mostra "Abrir workspace mobile" e cria/abre pastas dentro de `Documents/Sharp-OSS/workspaces` apos a autorizacao do sistema.
 
 ## Recursos
 
 - Desktop: Command Center, Notes, Source Control/Git, terminal, Live Server, Run, Theme Lab, settings, diagnosticos e filesystem completo seguem pelo backend Electron/Node.
 - Mobile: Command Center, Notes, Theme Lab, settings, editor, Explorer, busca local no sandbox e preview HTML funcionam sem backend Node.
-- Mobile: Source Control executa Git nativo no Android em `Documents/NPSharp/workspaces`, incluindo init, clone HTTPS, status, stage, commit, branches, diff, historico, fetch, pull e push. O primeiro commit solicita nome e e-mail e os salva apenas na configuracao local do repositorio. Repositorios privados solicitam usuario e token quando o servidor exigir; o token permanece apenas na memoria da sessao. Pastas externas abertas pelo seletor SAF continuam sem Git porque o Android fornece apenas uma URI, nao um caminho nativo. Run nao tenta executar Node/Python/Java locais. Live Server nao inicia servidor Node e usa preview HTML quando possivel.
+- Mobile: Source Control executa Git nativo no Android em `Documents/Sharp-OSS/workspaces`, incluindo init, clone HTTPS, status, stage, commit, branches, diff, historico, fetch, pull e push. O primeiro commit solicita nome e e-mail e os salva apenas na configuracao local do repositorio. Repositorios privados solicitam usuario e token quando o servidor exigir; o token permanece apenas na memoria da sessao. Pastas externas abertas pelo seletor SAF continuam sem Git porque o Android fornece apenas uma URI, nao um caminho nativo. Run nao tenta executar Node/Python/Java locais. Live Server nao inicia servidor Node e usa preview HTML quando possivel.
 
 ## Scripts
 
@@ -47,8 +47,8 @@ npm run android:open
 O Android usa:
 
 ```text
-appId/applicationId: br.com.corelabs.npsharp
-appName: NPSharp
+appId/applicationId: br.com.corelabs.sharp
+appName: Sharp-OSS
 webDir: dist
 ```
 
@@ -70,7 +70,7 @@ Builds Gradle/APK/AAB nao devem ser versionados.
 
 ## Limitacoes atuais
 
-- Git nativo requer Android e um workspace armazenado em `Documents/NPSharp`; pastas SAF externas ainda nao sao suportadas pelo JGit.
+- Git nativo requer Android e um workspace armazenado em `Documents/Sharp-OSS`; pastas SAF externas ainda nao sao suportadas pelo JGit.
 - Terminal real no mobile ainda nao existe.
 - Runtimes locais para Java, Python, Node e outras linguagens dependem de backend nativo futuro.
 - Live Server Node e PHP continuam desktop-only; HTML usa preview local no mobile.

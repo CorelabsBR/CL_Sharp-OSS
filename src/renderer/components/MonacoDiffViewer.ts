@@ -13,8 +13,8 @@ export class MonacoDiffViewer {
   private readonly modified: monaco.editor.ITextModel;
 
   private constructor(content: GitDiffContent, filePath: string) {
-    this.original = monaco.editor.createModel(content.original, content.language, monaco.Uri.parse(`npsharp-diff://original/${encodeURIComponent(filePath)}`));
-    this.modified = monaco.editor.createModel(content.modified, content.language, monaco.Uri.parse(`npsharp-diff://modified/${encodeURIComponent(filePath)}`));
+    this.original = monaco.editor.createModel(content.original, content.language, monaco.Uri.parse(`sharp-diff://original/${encodeURIComponent(filePath)}`));
+    this.modified = monaco.editor.createModel(content.modified, content.language, monaco.Uri.parse(`sharp-diff://modified/${encodeURIComponent(filePath)}`));
     this.editor = monaco.editor.createDiffEditor(this.element, { automaticLayout: true, readOnly: true, originalEditable: false });
     this.editor.setModel({ original: this.original, modified: this.modified });
   }

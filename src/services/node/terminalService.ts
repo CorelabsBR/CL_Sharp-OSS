@@ -184,7 +184,7 @@ function createPtySession(
       }
     };
   } catch (error) {
-    console.warn("[NPSharp terminal] node-pty failed, falling back to child_process.", error);
+    console.warn("[Sharp-OSS terminal] node-pty failed, falling back to child_process.", error);
     return createChildProcessSession(id, name, shell, args, cwd, callbacks);
   }
 }
@@ -292,7 +292,7 @@ function terminatePty(terminal: PtyProcess, signal: string, id: string): void {
     terminal.kill(signal);
   } catch (error) {
     if (!isNoSuchProcessError(error)) {
-      console.warn(`[NPSharp terminal] Failed to send ${signal} to PTY ${id}.`, error);
+      console.warn(`[Sharp-OSS terminal] Failed to send ${signal} to PTY ${id}.`, error);
     }
   }
 }
@@ -303,7 +303,7 @@ function terminateChild(child: ChildProcessWithoutNullStreams | undefined, signa
     child.kill(signal);
   } catch (error) {
     if (!isNoSuchProcessError(error)) {
-      console.warn(`[NPSharp terminal] Failed to send ${signal} to child process ${id}.`, error);
+      console.warn(`[Sharp-OSS terminal] Failed to send ${signal} to child process ${id}.`, error);
     }
   }
 }
@@ -333,7 +333,7 @@ function loadNodePty(): NodePtyModule | undefined {
   try {
     cachedPty = optionalRequire("node-pty") as NodePtyModule;
   } catch (error) {
-    console.warn(`[NPSharp terminal] node-pty indisponível; usando backend PTY do sistema (${error instanceof Error ? error.message.split("\n")[0] : String(error)}).`);
+    console.warn(`[Sharp-OSS terminal] node-pty indisponível; usando backend PTY do sistema (${error instanceof Error ? error.message.split("\n")[0] : String(error)}).`);
     cachedPty = null;
   }
   return cachedPty ?? undefined;

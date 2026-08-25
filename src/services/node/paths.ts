@@ -8,38 +8,38 @@ import { BUILD_CONFIG } from "../../shared/buildConfig";
 
 let dataRootOverride: string | undefined;
 
-export function configureNpsharpDataRoot(root?: string): void {
+export function configureSharpDataRoot(root?: string): void {
   dataRootOverride = root ? path.resolve(root) : undefined;
 }
 
-export function npsharpHome(): string {
+export function sharpHome(): string {
   return dataRootOverride ?? path.join(os.homedir(), BUILD_CONFIG.dataDirectoryName);
 }
 
-export function npsharpConfigDir(): string {
-  return path.join(npsharpHome(), "config");
+export function sharpConfigDir(): string {
+  return path.join(sharpHome(), "config");
 }
 
 export function runtimeRegistryPath(): string {
-  return path.join(npsharpConfigDir(), "runtime-registry.properties");
+  return path.join(sharpConfigDir(), "runtime-registry.properties");
 }
 
 export function languageRuntimesPath(): string {
-  return path.join(npsharpHome(), "language-runtimes.json");
+  return path.join(sharpHome(), "language-runtimes.json");
 }
 
 export function settingsPath(): string {
-  return path.join(npsharpHome(), "settings.json");
+  return path.join(sharpHome(), "settings.json");
 }
 
 export function recentFilesPath(): string {
-  return path.join(npsharpHome(), "recent-files.json");
+  return path.join(sharpHome(), "recent-files.json");
 }
 
 export function remoteHostsPath(): string {
-  return path.join(npsharpHome(), "remote-hosts.json");
+  return path.join(sharpHome(), "remote-hosts.json");
 }
 
 export function toolBinDir(): string {
-  return path.join(npsharpHome(), "tools", "bin");
+  return path.join(sharpHome(), "tools", "bin");
 }

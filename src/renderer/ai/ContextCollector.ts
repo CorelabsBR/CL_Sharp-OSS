@@ -94,7 +94,7 @@ export class ContextCollector {
         const clipboard = await navigator.clipboard.readText();
         if (clipboard) items.push(item("clipboard", "Clipboard", clipboard));
       } catch (error) {
-        console.warn("[NPSharp AI] Clipboard context could not be read.", error);
+        console.warn("[Sharp-OSS AI] Clipboard context could not be read.", error);
       }
     }
     if (sources.has("files")) items.push(...this.droppedFiles);
@@ -138,7 +138,7 @@ export class ContextCollector {
               + (entry.path === this.host.currentFile() ? 100 : 0);
             candidates.push({ path: entry.path, score, content });
           } catch (error) {
-            console.warn(`[NPSharp AI] Skipping unreadable context file ${entry.path}.`, error);
+            console.warn(`[Sharp-OSS AI] Skipping unreadable context file ${entry.path}.`, error);
           }
         }
         if (candidates.length >= MAX_SCAN_FILES) return;
@@ -176,7 +176,7 @@ async function safeList(directory: string): Promise<WorkspaceEntry[]> {
   try {
     return await api.fs.listDir(directory);
   } catch (error) {
-    console.warn(`[NPSharp AI] Could not inspect ${directory}.`, error);
+    console.warn(`[Sharp-OSS AI] Could not inspect ${directory}.`, error);
     return [];
   }
 }

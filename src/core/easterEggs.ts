@@ -2,7 +2,7 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/** Content written only by NPSharp's explicit new-file flow. */
+/** Content written only by Sharp-OSS's explicit new-file flow. */
 export const GTA6_EASTER_EGG_FILE_NAME = "gta6.py";
 export const PORTUGOL_FILE_EXTENSION = ".gol";
 
@@ -34,8 +34,8 @@ inicio
 fimalgoritmo
 `;
 
-/** Deliberately called only while NPSharp is creating a brand-new file. */
-export function initialContentForNewNPSharpFile(name: string): string {
+/** Deliberately called only while Sharp-OSS is creating a brand-new file. */
+export function initialContentForNewSharpFile(name: string): string {
   if (name === GTA6_EASTER_EGG_FILE_NAME) return GTA6_EASTER_EGG_CONTENT;
   return name.trim().toLowerCase().endsWith(PORTUGOL_FILE_EXTENSION) ? PORTUGOL_EXAMPLE_CONTENT : "";
 }

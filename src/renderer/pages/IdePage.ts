@@ -228,7 +228,7 @@ export class IdePage {
       ]);
       if (this.disposed) return;
       this.appPlatform = appInfo.platform;
-      this.appInfoPath = appInfo.npsharpHome;
+      this.appInfoPath = appInfo.sharpHome;
       this.session = session;
       this.editor.applyTheme(theme);
       this.applyWallpaper();
@@ -354,7 +354,7 @@ export class IdePage {
         ["Papel de parede", "", () => void this.chooseWallpaper()],
         ["Limpar papel de parede", "", () => void this.clearWallpaper()],
         ["Alternar ErrorLens", "", () => this.toggleErrorLens()],
-        ["Sobre o NPSharp", "", () => this.about()]
+        ["Sobre o Sharp-OSS", "", () => this.about()]
       ])
     );
     this.commandBar.addEventListener("click", () => this.palette.showQuickOpen(this.commandBar.value));
@@ -488,9 +488,9 @@ export class IdePage {
     window.addEventListener("beforeunload", this.dispose, { once: true });
     window.addEventListener("pagehide", this.dispose, { once: true });
     const disposeRemoteStatus = api.remote.onStatusChanged(state => {
-      this.updateStatus(state.status === "connected" ? `NPSharp Remote: ${state.message.replace(/^Conectado a |\.$/g, "")}` : state.message);
-      if (state.status === "connected") document.title = `[${state.message.replace(/^Conectado a |\.$/g, "")}] ${this.session.workspaceName ?? "Remote"} — NPSharp`;
-      else if (state.status === "disconnected") document.title = "NPSharp";
+      this.updateStatus(state.status === "connected" ? `Sharp-OSS Remote: ${state.message.replace(/^Conectado a |\.$/g, "")}` : state.message);
+      if (state.status === "connected") document.title = `[${state.message.replace(/^Conectado a |\.$/g, "")}] ${this.session.workspaceName ?? "Remote"} — Sharp-OSS`;
+      else if (state.status === "disconnected") document.title = "Sharp-OSS";
       const remoteHost = state.status === "connected" ? state.message.replace(/^Conectado a |\.$/g, "") : undefined;
       void api.discordPresence.updateContext({ remoteStatus: state.status, remoteHost });
     });
@@ -502,10 +502,10 @@ export class IdePage {
       () => window.removeEventListener("pagehide", this.dispose),
       disposeRemoteStatus
     );
-    const events = window as typeof window & { npsharpEvents?: { onCommand(callback: (command: string) => void): () => void; onOpenFile(callback: (filePath: string) => void): () => void } };
-    const disposeCommandListener = events.npsharpEvents?.onCommand(command => this.handleCommand(command));
+    const events = window as typeof window & { sharpEvents?: { onCommand(callback: (command: string) => void): () => void; onOpenFile(callback: (filePath: string) => void): () => void } };
+    const disposeCommandListener = events.sharpEvents?.onCommand(command => this.handleCommand(command));
     if (disposeCommandListener) this.disposers.push(disposeCommandListener);
-    const disposeOpenFileListener = events.npsharpEvents?.onOpenFile(filePath => void this.editor.openFile(filePath));
+    const disposeOpenFileListener = events.sharpEvents?.onOpenFile(filePath => void this.editor.openFile(filePath));
     if (disposeOpenFileListener) this.disposers.push(disposeOpenFileListener);
   }
 
@@ -522,9 +522,9 @@ export class IdePage {
       { label: "Remote Host: Add New Host", run: () => this.remote.addNewHost() },
       { label: "Remote Host: Edit Host", run: () => this.remote.editSelectedHost() },
       { label: "Remote Host: Remove Host", run: () => this.remote.removeSelectedHost() },
-      { label: "Remote Host: Install NPSharp Server", run: () => this.remote.connectSavedHost() },
+      { label: "Remote Host: Install Sharp-OSS Server", run: () => this.remote.connectSavedHost() },
       { label: "Remote Host: Kill Remote Server", run: () => this.remote.disconnect() },
-      { label: "Remote Host: Uninstall NPSharp Server", run: () => this.remote.uninstallServer() },
+      { label: "Remote Host: Uninstall Sharp-OSS Server", run: () => this.remote.uninstallServer() },
       { label: "Arquivo: Salvar", shortcut: "Ctrl+S", run: () => this.editor.saveCurrentFile() },
       { label: "Arquivo: Salvar como", shortcut: "Ctrl+Shift+S", run: () => this.editor.saveCurrentFileAs() },
       { label: "Arquivo: Salvar tudo", run: () => this.editor.saveAll() },
@@ -563,9 +563,9 @@ export class IdePage {
       { label: "Office: Editar arquivo atual no LibreOffice", keywords: "word excel calc writer docx odt ods planilha formatação", run: () => void this.editor.openActiveInOffice() },
       { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
       { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
-      { label: "NPSharp: Verificar atualizações", keywords: "atualização versão baixar", run: () => this.checkForUpdates() },
+      { label: "Sharp-OSS: Verificar atualizações", keywords: "atualização versão baixar", run: () => this.checkForUpdates() },
       { label: "Preferências: Configurações", shortcut: "Ctrl+,", run: () => this.showSettings() },
-      { id: "npsharp.configureLanguageRuntimes", label: "Configurar runtimes de linguagem", keywords: "runtimes caminho executáveis", run: () => this.showLanguageRuntimes() },
+      { id: "sharp.configureLanguageRuntimes", label: "Configurar runtimes de linguagem", keywords: "runtimes caminho executáveis", run: () => this.showLanguageRuntimes() },
       { label: "Extensões: Instalar de VSIX", keywords: "vsix extensão local instalar", run: () => this.installExtensionFromVsix() },
       { label: "Extensões: Recarregar", keywords: "recarregar gerenciador de extensões", run: () => this.reloadExtensionsCommand() },
       { label: "Extensões: Ativar", keywords: "ativar gerenciador de extensões", run: () => this.toggleExtensionCommand(true) },
@@ -596,15 +596,15 @@ export class IdePage {
       { label: "Terminal: Limpar", shortcut: "Ctrl+Alt+K", run: () => this.terminal.clearCurrentTerminal() },
       { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
       { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
-      { label: "NPSharp: Notas", shortcut: "Ctrl+Alt+N", run: () => this.openNotes() },
-      { label: "NPSharp: Central de comandos", shortcut: "Ctrl+Alt+C", run: () => this.updateStatus("Central de comandos") },
-      { label: "NPSharp: Seletor de temas", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
+      { label: "Sharp-OSS: Notas", shortcut: "Ctrl+Alt+N", run: () => this.openNotes() },
+      { label: "Sharp-OSS: Central de comandos", shortcut: "Ctrl+Alt+C", run: () => this.updateStatus("Central de comandos") },
+      { label: "Sharp-OSS: Seletor de temas", shortcut: "Ctrl+Alt+T", run: () => this.showThemePicker() },
     ];
     this.refreshShortcuts();
     for (const command of commands) {
       const id = command.id ?? commandIdForLabel(command.label);
       const separator = command.label.indexOf(":");
-      const category = separator >= 0 ? command.label.slice(0, separator).trim() : "NPSharp";
+      const category = separator >= 0 ? command.label.slice(0, separator).trim() : "Sharp-OSS";
       const title = separator >= 0 ? command.label.slice(separator + 1).trim() : command.label;
       if (this.commands.get(id) || this.commands.list().some(existing => existing.category.toLowerCase() === category.toLowerCase() && existing.title.toLowerCase() === title.toLowerCase())) continue;
       this.commands.register({ id, category, title, shortcut: command.shortcut, keywords: command.keywords, execute: command.run });
@@ -698,17 +698,17 @@ export class IdePage {
       "run.debug": () => this.runCurrentFile(true),
       "run.withoutDebug": () => this.runWithoutDebug(),
       "run.build": () => this.buildProject(),
-      "npsharp.notes": () => this.openNotes(),
-      "npsharp.commandCenter": () => this.openCommandCenter(),
-      "npsharp.themeLab": () => this.showThemePicker(true),
-      "npsharp.focusMode": () => this.toggleFocusMode(),
-      "npsharp.projectHealth": () => this.openProjectHealth(),
-      "npsharp.liveServer": () => this.toggleLiveServer(),
-      "npsharp.runDetected": () => this.runCurrentFile(),
-      "npsharp.gitQuickActions": () => this.showGitQuickActions(),
-      "npsharp.mobileLayout": () => this.toggleCompactPreview(),
-      "npsharp.clearTemporaryPanels": () => this.clearTemporaryPanels(),
-      "npsharp.snapshot": () => this.snapshotWorkspace(),
+      "sharp.notes": () => this.openNotes(),
+      "sharp.commandCenter": () => this.openCommandCenter(),
+      "sharp.themeLab": () => this.showThemePicker(true),
+      "sharp.focusMode": () => this.toggleFocusMode(),
+      "sharp.projectHealth": () => this.openProjectHealth(),
+      "sharp.liveServer": () => this.toggleLiveServer(),
+      "sharp.runDetected": () => this.runCurrentFile(),
+      "sharp.gitQuickActions": () => this.showGitQuickActions(),
+      "sharp.mobileLayout": () => this.toggleCompactPreview(),
+      "sharp.clearTemporaryPanels": () => this.clearTemporaryPanels(),
+      "sharp.snapshot": () => this.snapshotWorkspace(),
       "fallback.unavailable": () => this.updateStatus("Atalho indisponível neste contexto")
     };
   }
@@ -928,7 +928,7 @@ export class IdePage {
     const dialog = el("section", { className: "settings-dialog", attrs: { "aria-label": "Configurações" } });
     const header = el("header", { className: "settings-dialog-header" });
     header.append(
-      el("div", { children: [el("h2", { text: "Configurações" }), el("span", { text: "Preferências do NPSharp" })] }),
+      el("div", { children: [el("h2", { text: "Configurações" }), el("span", { text: "Preferências do Sharp-OSS" })] }),
       el("button", { className: "icon-button", text: "×", attrs: { title: "Fechar" } })
     );
     const close = header.querySelector<HTMLButtonElement>("button")!;
@@ -1241,7 +1241,7 @@ export class IdePage {
       page.append(settingToggle("Mostrar projeto", "Publica o nome do workspace atual.", current.showProjectName, showProjectName => update({ showProjectName })));
       page.append(settingToggle("Mostrar linguagem", "Publica a linguagem do arquivo ativo.", current.showLanguage, showLanguage => update({ showLanguage })));
       page.append(settingToggle("Mostrar host remoto", "Publica o alias do Remote Host conectado.", current.showRemoteHost, showRemoteHost => update({ showRemoteHost })));
-      page.append(settingToggle("Mostrar tempo decorrido", "Exibe há quanto tempo o NPSharp está aberto.", current.showElapsedTime, showElapsedTime => update({ showElapsedTime })));
+      page.append(settingToggle("Mostrar tempo decorrido", "Exibe há quanto tempo o Sharp-OSS está aberto.", current.showElapsedTime, showElapsedTime => update({ showElapsedTime })));
       page.append(settingToggle("Mostrar tipo de workspace", "Identifica workspaces locais e remotos.", current.showWorkspaceType, showWorkspaceType => update({ showWorkspaceType })));
       page.append(settingText("Imagem principal", "Asset key configurada no Discord Developer Portal.", current.largeImageKey, largeImageKey => update({ largeImageKey: largeImageKey.trim() })));
       page.append(settingText("Texto da imagem principal", "Texto exibido ao passar o mouse sobre a imagem.", current.largeImageText, largeImageText => update({ largeImageText: largeImageText.trim() })));
@@ -1261,7 +1261,7 @@ export class IdePage {
     page.append(settingToggle("Barra de status visível", "Mostra a barra de status inferior.", this.settings.statusBarVisible, value => void this.updateSettings({ ...this.settings, statusBarVisible: value })));
     page.append(settingToggle("Barra de atividades visível", "Mostra a barra de atividades.", this.settings.activityBarVisible, value => void this.updateSettings({ ...this.settings, activityBarVisible: value })));
     page.append(settingToggle("Barra lateral visível", "Mostra o painel lateral.", this.settings.sideBarVisible, value => void this.updateSettings({ ...this.settings, sideBarVisible: value })));
-    page.append(settingToggle("Restaurar último workspace ao iniciar", "Reabre automaticamente o workspace que estava aberto ao fechar o NPSharp.", this.settings.restoreWorkspaceOnStartup, value => void this.updateSettings({ ...this.settings, restoreWorkspaceOnStartup: value })));
+    page.append(settingToggle("Restaurar último workspace ao iniciar", "Reabre automaticamente o workspace que estava aberto ao fechar o Sharp-OSS.", this.settings.restoreWorkspaceOnStartup, value => void this.updateSettings({ ...this.settings, restoreWorkspaceOnStartup: value })));
     page.append(settingToggle("Confirmar exclusão", "Pede confirmação antes de excluir arquivos e pastas no Explorer.", this.settings.confirmDelete, value => void this.updateSettings({ ...this.settings, confirmDelete: value })));
   }
 
@@ -1298,7 +1298,7 @@ export class IdePage {
         .filter(option => option.available)
         .map(option => ({ value: option.path, label: option.label }));
     } catch (error) {
-      console.warn("[NPSharp terminal] Failed to list shells for settings.", error);
+      console.warn("[Sharp-OSS terminal] Failed to list shells for settings.", error);
       return [];
     }
   }
@@ -1397,8 +1397,8 @@ export class IdePage {
     try {
       if (await api.fs.exists(target)) throw new Error("Já existe um projeto com esse nome nessa pasta.");
       await api.fs.createFolder(target);
-      await api.fs.createFolder(joinPath(target, ".npsharp"));
-      await api.fs.writeFile(joinPath(target, ".npsharp", "project.json"), `${JSON.stringify({ folderName, repositoryName }, null, 2)}\n`);
+      await api.fs.createFolder(joinPath(target, ".sharp"));
+      await api.fs.writeFile(joinPath(target, ".sharp", "project.json"), `${JSON.stringify({ folderName, repositoryName }, null, 2)}\n`);
       const gitStatus = await this.initializeProjectGit(target, repositoryName);
       await this.explorer.openFolder(target);
       this.showPanel("explorer");
@@ -1413,7 +1413,7 @@ export class IdePage {
     try {
       const init = await api.git.run(target, ["init"]);
       if (!init.success) return `Git não disponível: ${init.output || "git init falhou"}. A pasta foi criada normalmente.`;
-      const config = await api.git.run(target, ["config", "--local", "npsharp.repositoryName", repositoryName]);
+      const config = await api.git.run(target, ["config", "--local", "sharp.repositoryName", repositoryName]);
       if (!config.success) return "Git inicializado; não foi possível registrar o nome do repositório no Git.";
       return "Git inicializado.";
     } catch (error) {
@@ -1428,7 +1428,7 @@ export class IdePage {
     if (!platform.canUseGit) {
       this.showTerminal(false);
       this.terminal.appendOutput(`[git] ${url.trim()}`);
-      this.terminal.appendOutput("Git requer Android e um workspace salvo na área do NPSharp.");
+      this.terminal.appendOutput("Git requer Android e um workspace salvo na área do Sharp-OSS.");
       try {
         await this.saveFutureRemote(url.trim());
         this.terminal.appendOutput("URL salva como projeto remoto futuro.");
@@ -1472,7 +1472,7 @@ export class IdePage {
       try {
         entries = JSON.parse((await api.fs.readFile(path)).content) as Array<{ url: string; savedAt: string }>;
       } catch (error) {
-        console.warn(`[NPSharp remote] Failed to read saved remote projects from ${path}; starting with an empty list.`, error);
+        console.warn(`[Sharp-OSS remote] Failed to read saved remote projects from ${path}; starting with an empty list.`, error);
         entries = [];
       }
     }
@@ -1492,12 +1492,12 @@ export class IdePage {
       return;
     }
 
-    const base = this.explorer.workspace ? joinPath(this.explorer.workspace, ".npsharp") : this.appInfoPath;
+    const base = this.explorer.workspace ? joinPath(this.explorer.workspace, ".sharp") : this.appInfoPath;
     const notesPath = joinPath(base, "notes.nps.md");
     try {
       await api.fs.createFolder(base);
       if (!await api.fs.exists(notesPath)) {
-        await api.fs.writeFile(notesPath, "# NPSharp Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n");
+        await api.fs.writeFile(notesPath, "# Sharp-OSS Notes\n\n## TODO\n\n- \n\n## Ideias\n\n## Bugs\n\n## Observacoes\n");
       }
       await this.editor.openFile(notesPath);
       this.updateStatus(`Notes aberto: ${notesPath}`);
@@ -1552,7 +1552,7 @@ export class IdePage {
     button.hidden = !visible;
     button.disabled = status.state === "downloading";
     button.title = status.message;
-    if (status.state === "available") button.textContent = `Atualizar NPSharp para v${status.version}`;
+    if (status.state === "available") button.textContent = `Atualizar Sharp-OSS para v${status.version}`;
     else if (status.state === "downloading") button.textContent = `Baixando atualização: ${status.percent ?? 0}%`;
     else if (status.state === "downloaded") button.textContent = "Reiniciar e instalar";
     else button.textContent = "";
@@ -1577,7 +1577,7 @@ export class IdePage {
       }
       if (status.state === "available") this.renderUpdateStatus(await api.update.download());
     } catch (error) {
-      reportError(error, text => this.updateStatus(text), "Falha ao atualizar o NPSharp");
+      reportError(error, text => this.updateStatus(text), "Falha ao atualizar o Sharp-OSS");
     }
   }
 
@@ -1596,7 +1596,7 @@ export class IdePage {
         "",
         ...diagnostics.map(item => `- ${item.severity} ${basename(item.filePath)}:${item.line}:${item.column} ${item.message}`)
       ];
-      this.editor.openVirtualFile("Project Health.md", "npsharp:project-health", `${lines.join("\n")}\n`);
+      this.editor.openVirtualFile("Project Health.md", "sharp:project-health", `${lines.join("\n")}\n`);
       this.updateStatus("Project Health aberto");
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Project Health failed");
@@ -1674,7 +1674,7 @@ export class IdePage {
   }
 
   private async snapshotWorkspace(): Promise<void> {
-    const base = this.explorer.workspace ? joinPath(this.explorer.workspace, ".npsharp") : MOBILE_ROOT;
+    const base = this.explorer.workspace ? joinPath(this.explorer.workspace, ".sharp") : MOBILE_ROOT;
     const path = joinPath(base, "snapshot.json");
     try {
       await api.fs.createFolder(base);
@@ -1727,7 +1727,7 @@ export class IdePage {
       await this.terminal.ensureTerminal();
       this.terminal.appendTerminalOutput(`[Run] Arquivo detectado: ${basename(filePath)}`);
 
-      if (filePath.startsWith("npsharp-remote://")) {
+      if (filePath.startsWith("sharp-remote://")) {
         const command = remoteRunCommand(decodeURIComponent(new URL(filePath).pathname));
         if (!command) throw new Error(`Execução remota não configurada para ${basename(filePath)}.`);
         await this.terminal.runCommand(command);
@@ -1843,7 +1843,7 @@ export class IdePage {
         if (pkg.scripts?.start) return "npm start";
         if (pkg.scripts?.test) return "npm test";
       } catch (error) {
-        console.warn(`[NPSharp runtime] Failed to inspect ${packageJson}.`, error);
+        console.warn(`[Sharp-OSS runtime] Failed to inspect ${packageJson}.`, error);
         this.updateStatus("package.json invalido para Run");
       }
     }
@@ -1944,13 +1944,13 @@ export class IdePage {
     return [
       { id: "open-folder", label: openWorkspaceLabel, detail: openWorkspaceDetail, iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
       { id: "new-file", label: "Novo arquivo", detail: "Criar um arquivo sem sair do hub.", iconName: "new-file", run: () => this.editor.newTab() },
-      { id: "new-project", label: "Novo projeto", detail: platform.isMobile ? "Criar workspace em Documents/NPSharp/workspaces." : "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
-      { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? (platform.isMobile ? "Clonar em Documents/NPSharp/workspaces." : "Executar git clone em uma pasta escolhida.") : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
+      { id: "new-project", label: "Novo projeto", detail: platform.isMobile ? "Criar workspace em Documents/Sharp-OSS/workspaces." : "Criar uma pasta e abrir como workspace.", iconName: "project", run: () => void this.createProject() },
+      { id: "clone", label: "Clonar Git", detail: platform.canUseGit ? (platform.isMobile ? "Clonar em Documents/Sharp-OSS/workspaces." : "Executar git clone em uma pasta escolhida.") : "Salvar URL para backend Git nativo futuro.", iconName: "repo-clone", run: () => void this.cloneRepository() },
       { id: "terminal", label: platform.canUseTerminal ? "Abrir terminal" : "Abrir saída", detail: platform.canUseTerminal ? "Abrir o terminal integrado." : "Terminal real indisponível neste ambiente.", iconName: "terminal", run: () => this.showTerminal(true) },
       { id: "arduino", label: "Arduino", detail: platform.canUseNodeBackend ? "Placas, portas, compilação e envio via Arduino CLI." : "Modo limitado para sketches Arduino.", iconName: "circuit-board", run: () => this.showPanel("arduino") },
       { id: "extensions", label: "Extensões", detail: "Instalar pacotes VSIX locais e gerenciar extensões instaladas.", iconName: "extensions-large", run: () => this.showPanel("extensions") },
       { id: "language-runtimes", label: "Runtimes de linguagem", detail: "Configurar caminhos de executáveis fora das configurações gerais.", iconName: "server-environment", run: () => void this.showLanguageRuntimes() },
-      { id: "notes", label: "Abrir notas", detail: platform.isMobile ? "Abrir ou criar Documents/NPSharp/notes.nps.md." : "Abrir ou criar .npsharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
+      { id: "notes", label: "Abrir notas", detail: platform.isMobile ? "Abrir ou criar Documents/Sharp-OSS/notes.nps.md." : "Abrir ou criar .sharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
       { id: "theme-lab", label: "Abrir laboratório de temas", detail: "Abrir o seletor de temas, incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
       { id: "keyboard-shortcuts", label: "Atalhos de teclado", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
@@ -2241,8 +2241,8 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "view:search": "search.findInWorkspace", "view:replaceInFiles": "search.replaceInWorkspace", "view:explorer": "view.explorer",
       "view:source": "view.sourceControl", "view:extensions": "view.extensions", "view:commandPalette": "view.commandPalette",
       "view:keyboardShortcuts": "view.keyboardShortcuts", "view:settings": "view.settings", "view:terminal": "view.toggleTerminal",
-      "tools:runWithoutDebug": "run.withoutDebug", "tools:build": "run.build", "notes:open": "npsharp.notes",
-      "npsharp:commandCenter": "npsharp.commandCenter", "npsharp:configureLanguageRuntimes": "npsharp.configureLanguageRuntimes"
+      "tools:runWithoutDebug": "run.withoutDebug", "tools:build": "run.build", "notes:open": "sharp.notes",
+      "sharp:commandCenter": "sharp.commandCenter", "sharp:configureLanguageRuntimes": "sharp.configureLanguageRuntimes"
     };
     const registered = commandAliases[command];
     if (registered) {
@@ -2313,8 +2313,8 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "preferences:errorLensToggle": () => this.toggleErrorLens(),
       "help:about": () => this.about(),
       "notes:open": () => void this.openNotes(),
-      "npsharp:commandCenter": () => this.openCommandCenter(),
-      "npsharp:configureLanguageRuntimes": () => void this.showLanguageRuntimes()
+      "sharp:commandCenter": () => this.openCommandCenter(),
+      "sharp:configureLanguageRuntimes": () => void this.showLanguageRuntimes()
     };
     map[command]?.();
   }
@@ -2385,7 +2385,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
   private async about(): Promise<void> {
     document.querySelector(".about-overlay")?.remove();
     const info = await api.appInfo().catch((): AppInfo => ({
-      name: BUILD_CONFIG.displayName, version: BUILD_CONFIG.version, platform: "unknown", userDataPath: "—", appPath: "—", npsharpHome: "—",
+      name: BUILD_CONFIG.displayName, version: BUILD_CONFIG.version, platform: "unknown", userDataPath: "—", appPath: "—", sharpHome: "—",
       architecture: "unknown", isPackaged: false, runtime: {}
     }));
     const overlay = el("div", { className: "runtime-config-overlay about-overlay", attrs: { tabindex: "-1" } });
@@ -2413,7 +2413,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
     addDetail("V8", info.runtime.v8 ?? "Não informado");
     addDetail("Sistema", `${friendlyPlatform(info.platform)} (${info.architecture})`);
     addDetail("Application ID", BUILD_CONFIG.applicationId);
-    addDetail("Dados do NPSharp", info.npsharpHome);
+    addDetail("Dados do Sharp-OSS", info.sharpHome);
     const diagnostic = [
       `${info.name} ${info.version} (${info.isPackaged ? "installed" : "development"})`,
       `Platform: ${info.platform} ${info.architecture}`,
@@ -2423,7 +2423,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       `V8: ${info.runtime.v8 ?? "n/a"}`,
       `App path: ${info.appPath}`,
       `Data path: ${info.userDataPath}`,
-      `NPSharp home: ${info.npsharpHome}`
+      `Sharp-OSS home: ${info.sharpHome}`
     ].join("\n");
     const footerCopy = el("div", { className: "about-footer-copy", children: [
       el("strong", { text: `© ${new Date().getFullYear()} ${BUILD_CONFIG.copyrightOwner}` }),
@@ -2449,8 +2449,8 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       el("section", {
         className: "fatal-screen",
         children: [
-          el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } }),
-          el("h1", { text: "Não foi possível iniciar o NPSharp" }),
+          el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "Sharp-OSS" } }),
+          el("h1", { text: "Não foi possível iniciar o Sharp-OSS" }),
           el("pre", { text: errorMessage(error) })
         ]
       })
@@ -2552,7 +2552,7 @@ function statusEncodingLabel(encoding: TextEncoding): string {
 
 function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
-  const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/NPSharp/settings.json" : "~/.npsharp/settings.json" });
+  const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/Sharp-OSS/settings.json" : "~/.sharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
   const save = el("button", { className: "wide-action", text: "Salvar" });
   save.addEventListener("click", onSave);
@@ -2626,7 +2626,7 @@ function clampNumber(value: number, min: number, max: number, fallback: number):
 function commandIdForLabel(label: string): string {
   return label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+(.)/g, (_match, character: string) => character.toUpperCase())
-    .replace(/^[^a-z]+/, "") || "npsharp.command";
+    .replace(/^[^a-z]+/, "") || "sharp.command";
 }
 function remoteRunCommand(filePath: string): string | undefined {
   const file = `'${filePath.replace(/'/g, `'"'"'`)}'`;
@@ -2635,7 +2635,7 @@ function remoteRunCommand(filePath: string): string | undefined {
   if (/\.py$/i.test(filePath)) return `python3 ${file}`;
   if (/\.java$/i.test(filePath)) return `java ${file}`;
   if (/\.go$/i.test(filePath)) return `go run ${file}`;
-  if (/\.rs$/i.test(filePath)) return `rustc ${file} -o /tmp/npsharp-run && /tmp/npsharp-run`;
+  if (/\.rs$/i.test(filePath)) return `rustc ${file} -o /tmp/sharp-run && /tmp/sharp-run`;
   if (/\.(?:sh|bash)$/i.test(filePath)) return `/bin/sh ${file}`;
   return undefined;
 }

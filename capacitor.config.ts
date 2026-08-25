@@ -5,8 +5,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'br.com.corelabs.npsharp',
-  appName: 'NPSharp',
+  appId: 'br.com.corelabs.sharp',
+  appName: 'Sharp-OSS',
   webDir: 'dist',
   server: {
     androidScheme: 'https'

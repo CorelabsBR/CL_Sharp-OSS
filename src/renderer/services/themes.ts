@@ -78,7 +78,7 @@ const DEFAULT_WELCOME_LOGO = DEFAULT_LOGO_URL;
 const BUILT_IN_FALLBACKS: ThemeSummary[] = [
   {
     id: "np-dark",
-    name: "NPSharp Dark",
+    name: "Sharp-OSS Dark",
     cat: "DEFAULT DARK",
     uiTheme: "vs-dark",
     colors: {
@@ -105,7 +105,7 @@ const BUILT_IN_FALLBACKS: ThemeSummary[] = [
   },
   {
     id: "np-light",
-    name: "NPSharp Light",
+    name: "Sharp-OSS Light",
     uiTheme: "vs",
     cat: "DEFAULT LIGHT",
     colors: {
@@ -138,11 +138,11 @@ export async function listThemes(): Promise<ThemeSummary[]> {
 
   const manifestUrl = resourceUrl("themes/package.json");
   const response = await fetch(manifestUrl).catch(error => {
-    console.warn(`[NPSharp assets] Failed to load theme manifest: ${manifestUrl}`, error);
+    console.warn(`[Sharp-OSS assets] Failed to load theme manifest: ${manifestUrl}`, error);
     return undefined;
   });
   if (!response?.ok) {
-    if (response) console.warn(`[NPSharp assets] Theme manifest returned ${response.status}: ${manifestUrl}`);
+    if (response) console.warn(`[Sharp-OSS assets] Theme manifest returned ${response.status}: ${manifestUrl}`);
     return [...BUILT_IN_FALLBACKS, ...extensionThemes.values()];
   }
 
@@ -245,12 +245,12 @@ async function loadThemeFile(url: string): Promise<VSCodeThemeFile | undefined> 
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      console.warn(`[NPSharp assets] Theme file returned ${response.status}: ${url}`);
+      console.warn(`[Sharp-OSS assets] Theme file returned ${response.status}: ${url}`);
       return undefined;
     }
     return parseThemeFile(await response.text(), url);
   } catch (error) {
-    console.warn(`[NPSharp assets] Failed to load theme file: ${url}`, error);
+    console.warn(`[Sharp-OSS assets] Failed to load theme file: ${url}`, error);
     return undefined;
   }
 }
@@ -263,7 +263,7 @@ async function themesFromManifest(source: string, sourceName: string): Promise<T
     themes.push(...manifestEntriesToThemes(pack.contributes?.specialThemes ?? [], true));
     return hydrateThemeSwatches(themes);
   } catch (error) {
-    console.warn(`[NPSharp assets] Failed to parse theme manifest: ${sourceName}`, error);
+    console.warn(`[Sharp-OSS assets] Failed to parse theme manifest: ${sourceName}`, error);
     return BUILT_IN_FALLBACKS;
   }
 }
@@ -272,7 +272,7 @@ function parseThemeFile(source: string, sourceName: string): VSCodeThemeFile | u
   try {
     return JSON.parse(stripJsonc(source)) as VSCodeThemeFile;
   } catch (error) {
-    console.warn(`[NPSharp assets] Failed to parse theme file: ${sourceName}`, error);
+    console.warn(`[Sharp-OSS assets] Failed to parse theme file: ${sourceName}`, error);
     return undefined;
   }
 }
@@ -295,13 +295,13 @@ function bundledThemeAssetFromUrl(url: string): string | undefined {
 
 function applyMonacoTheme(theme: ThemeSummary, loadedTheme?: VSCodeThemeFile): void {
   const base = monacoBase(theme, loadedTheme);
-  monaco.editor.defineTheme("npsharp-active", {
+  monaco.editor.defineTheme("sharp-active", {
     base,
     inherit: true,
     rules: tokenColorsToMonacoRules(theme.tokenColors ?? []),
     colors: loadedTheme?.colors ?? cssVariablesToMonacoColors(theme.colors)
   });
-  monaco.editor.setTheme("npsharp-active");
+  monaco.editor.setTheme("sharp-active");
 }
 
 function tokenColorsToMonacoRules(tokenColors: TokenColor[]): monaco.editor.ITokenThemeRule[] {

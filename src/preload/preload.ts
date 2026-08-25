@@ -26,7 +26,7 @@ import type {
   LanguageRuntimeConfig,
   LiveServerRequest,
   OpenVsxExtension,
-  NpsharpApi,
+  SharpApi,
   PersistedSession,
   RemoteCommandRequest,
   RemoteFileRequest,
@@ -55,7 +55,7 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   try {
     return await ipcRenderer.invoke(channel, ...args) as T;
   } catch (error) {
-    console.error(`[NPSharp IPC] ${channel} failed`, error);
+    console.error(`[Sharp-OSS IPC] ${channel} failed`, error);
     throw error;
   }
 }
@@ -69,7 +69,7 @@ function isUpdateStatus(value: unknown): value is AppUpdateStatus {
     && (status.percent === undefined || typeof status.percent === "number");
 }
 
-const api: NpsharpApi = {
+const api: SharpApi = {
   appInfo: () => invoke("app:info"),
   startup: {
     mark: stage => invoke("startup:mark", stage),
@@ -164,7 +164,7 @@ const api: NpsharpApi = {
       };
       ipcRenderer.on("fs:watch:event", listener);
       void invoke<void>("fs:watch:start", watchId, targetPath).catch(error => {
-        console.error(`[NPSharp IPC] fs:watch:start failed (${targetPath})`, error);
+        console.error(`[Sharp-OSS IPC] fs:watch:start failed (${targetPath})`, error);
       });
       return () => {
         if (disposed) return;
@@ -294,9 +294,9 @@ const api: NpsharpApi = {
   }
 };
 
-contextBridge.exposeInMainWorld("npsharp", api);
-contextBridge.exposeInMainWorld("npsharpApi", api);
-contextBridge.exposeInMainWorld("npsharpPath", {
+contextBridge.exposeInMainWorld("sharp", api);
+contextBridge.exposeInMainWorld("sharpApi", api);
+contextBridge.exposeInMainWorld("sharpPath", {
   sep: path.sep,
   delimiter: path.delimiter,
   basename: (targetPath: string) => path.basename(path.normalize(targetPath)),
@@ -316,7 +316,7 @@ contextBridge.exposeInMainWorld("npsharpPath", {
   },
   fileUri: (targetPath: string) => pathToFileURL(path.resolve(path.normalize(targetPath))).toString()
 });
-contextBridge.exposeInMainWorld("npsharpEvents", {
+contextBridge.exposeInMainWorld("sharpEvents", {
   onCommand(callback: (command: string) => void): () => void {
     const listener = (_event: Electron.IpcRendererEvent, command: string) => callback(command);
     ipcRenderer.on("command", listener);

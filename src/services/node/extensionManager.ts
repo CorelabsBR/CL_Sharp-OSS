@@ -48,7 +48,7 @@ export class ExtensionManager {
     await fs.access(source);
     await fs.mkdir(this.extensionsDir, { recursive: true });
 
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "npsharp-vsix-"));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "sharp-vsix-"));
     let installTemp: string | undefined;
     try {
       await extract(source, { dir: tempRoot });
@@ -66,7 +66,7 @@ export class ExtensionManager {
 
       const installed = await this.readInstalledExtension(target, true);
       await this.upsertRegistry(installed);
-      console.info(`[NPSharp extensions] Installed ${installed.id} ${installed.version}`);
+      console.info(`[Sharp-OSS extensions] Installed ${installed.id} ${installed.version}`);
       return installed;
     } finally {
       if (installTemp) await fs.rm(installTemp, { recursive: true, force: true }).catch(() => undefined);
@@ -99,7 +99,7 @@ export class ExtensionManager {
     if (Number.isFinite(length) && length > OPEN_VSX_MAX_DOWNLOAD_BYTES) throw new Error("A extensão excede o limite de 100 MB.");
     const content = Buffer.from(await response.arrayBuffer());
     if (content.length > OPEN_VSX_MAX_DOWNLOAD_BYTES) throw new Error("A extensão excede o limite de 100 MB.");
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "npsharp-openvsx-"));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "sharp-openvsx-"));
     const vsixPath = path.join(tempRoot, file);
     try {
       await fs.writeFile(vsixPath, content, { flag: "wx" });
@@ -130,7 +130,7 @@ export class ExtensionManager {
     await fs.rm(entry.path, { recursive: true, force: true });
     registry.installed = registry.installed.filter(item => !sameExtensionId(item.id, id));
     await this.saveRegistry(registry);
-    console.info(`[NPSharp extensions] Uninstalled ${id}`);
+    console.info(`[Sharp-OSS extensions] Uninstalled ${id}`);
     return this.scanInstalledExtensions();
   }
 
@@ -139,7 +139,7 @@ export class ExtensionManager {
     if (id && !installed.some(item => sameExtensionId(item.id, id))) {
       throw new Error(`Extensao nao encontrada: ${id}`);
     }
-    console.info(id ? `[NPSharp extensions] Reloaded ${id}` : "[NPSharp extensions] Reloaded installed extensions");
+    console.info(id ? `[Sharp-OSS extensions] Reloaded ${id}` : "[Sharp-OSS extensions] Reloaded installed extensions");
     return installed;
   }
 
@@ -179,7 +179,7 @@ export class ExtensionManager {
         installed.push(extension);
         pathsById.set(extension.id.toLowerCase(), extension.path);
       } catch (error) {
-        console.warn(`[NPSharp extensions] Ignoring invalid extension at ${extensionPath}.`, error);
+        console.warn(`[Sharp-OSS extensions] Ignoring invalid extension at ${extensionPath}.`, error);
       }
     }
 
@@ -256,7 +256,7 @@ export class ExtensionManager {
     if (!entry) throw new Error(`Extensao nao encontrada: ${id}`);
     entry.enabled = enabled;
     await this.saveRegistry(registry);
-    console.info(`[NPSharp extensions] ${enabled ? "Enabled" : "Disabled"} ${id}`);
+    console.info(`[Sharp-OSS extensions] ${enabled ? "Enabled" : "Disabled"} ${id}`);
   }
 
   private async upsertRegistry(extension: InstalledExtension): Promise<void> {
@@ -287,7 +287,7 @@ export class ExtensionManager {
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        console.warn(`[NPSharp extensions] Failed to load ${this.registryPath}; registry will be rebuilt.`, error);
+        console.warn(`[Sharp-OSS extensions] Failed to load ${this.registryPath}; registry will be rebuilt.`, error);
       }
       return { installed: [] };
     }

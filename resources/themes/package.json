@@ -1,7 +1,7 @@
 {
-  "name": "npsharp-themes",
-  "displayName": "NPSharp Themes",
-  "description": "Pacote de temas do NPSharp compatível com estrutura inspirada no VS Code.",
+  "name": "sharp-themes",
+  "displayName": "Sharp-OSS Themes",
+  "description": "Pacote de temas do Sharp-OSS compatível com estrutura inspirada no VS Code.",
   "categories": [
     "Themes"
   ],
@@ -205,6 +205,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/girellidev/npsharp.git"
+    "url": "https://github.com/girellidev/sharp.git"
   }
 }

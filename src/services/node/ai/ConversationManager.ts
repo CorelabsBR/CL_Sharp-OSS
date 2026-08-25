@@ -25,7 +25,7 @@ export class ConversationManager {
     const conversations = await Promise.all(entries
       .filter(entry => entry.isFile() && entry.name.endsWith(".json"))
       .map(entry => this.read(path.basename(entry.name, ".json")).catch(error => {
-        console.warn(`[NPSharp AI] Ignoring invalid conversation ${entry.name}.`, error);
+        console.warn(`[Sharp-OSS AI] Ignoring invalid conversation ${entry.name}.`, error);
         return undefined;
       })));
     return conversations
@@ -106,4 +106,3 @@ function normalizeMessage(message: AIMessage): AIMessage {
     ...(message.error ? { error: String(message.error) } : {})
   };
 }
-

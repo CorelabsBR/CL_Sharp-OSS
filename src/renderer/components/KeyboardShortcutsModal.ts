@@ -6,7 +6,7 @@ import { isSafeCustomShortcut, normalizeShortcut, shortcutFromEvent, type Shortc
 import { shortcutConflicts } from "../shortcuts/shortcutRegistry";
 import { el } from "../utils/dom";
 
-const CATEGORY_ORDER = ["Arquivo", "Busca", "Editor", "Visualizar", "Terminal", "Executar", "Controle de Origem", "Preferências", "NPSharp"];
+const CATEGORY_ORDER = ["Arquivo", "Busca", "Editor", "Visualizar", "Terminal", "Executar", "Controle de Origem", "Preferências", "Sharp-OSS"];
 
 export interface KeyboardShortcutActions {
   create(commandId: string, key: string): Promise<readonly ShortcutBinding[]>;

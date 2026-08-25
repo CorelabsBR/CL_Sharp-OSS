@@ -53,7 +53,7 @@ export class RemotePanel {
   async addNewHost(): Promise<void> { await this.addHost(); }
   async editSelectedHost(): Promise<void> { const host = this.active ?? this.hosts[0]; if (host) await this.editHost(host); }
   async removeSelectedHost(): Promise<void> { const host = this.active ?? this.hosts[0]; if (host) await this.deleteHost(host); }
-  async uninstallServer(): Promise<void> { if (!this.sessionId || !confirm("Desinstalar esta versão do NPSharp Server no host remoto?")) return; await api.remote.uninstallServer(this.sessionId); this.sessionId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
+  async uninstallServer(): Promise<void> { if (!this.sessionId || !confirm("Desinstalar esta versão do Sharp-OSS Server no host remoto?")) return; await api.remote.uninstallServer(this.sessionId); this.sessionId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
 
   connection(): { sessionId: string; hostName: string; cwd: string; shell?: string } | undefined {
     return this.sessionId && this.active ? { sessionId: this.sessionId, hostName: this.active.name || this.active.host, cwd: this.currentPath, shell: this.remoteShell } : undefined;
@@ -178,7 +178,7 @@ export class RemotePanel {
       if (selected) await this.activateRemoteFolder(selected);
       else this.updateStatus(`Conectado a ${session.hostName}; nenhuma pasta remota foi aberta.`);
     } catch (error) {
-      reportError(error, this.updateStatus, "Falha ao conectar ao NPSharp Server");
+      reportError(error, this.updateStatus, "Falha ao conectar ao Sharp-OSS Server");
     } finally {
       this.password = "";
       this.connecting = false;
@@ -275,7 +275,7 @@ export class RemotePanel {
     if (!this.active || !this.sessionId) return;
     const file = await api.remote.sendRpc<{ content: string; etag: string }>(this.sessionId, "fs.readFile", { path: remotePath });
     const sessionId = this.sessionId;
-    this.openVirtualFile(basename(remotePath), `npsharp-remote://${encodeURIComponent(this.active.id!)}/${remotePath.replace(/^\/+/, "")}`, file.content, content =>
+    this.openVirtualFile(basename(remotePath), `sharp-remote://${encodeURIComponent(this.active.id!)}/${remotePath.replace(/^\/+/, "")}`, file.content, content =>
       api.remote.sendRpc<void>(sessionId, "fs.writeFile", { path: remotePath, content, etag: file.etag })
     );
   }

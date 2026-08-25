@@ -122,7 +122,7 @@ async function handleStaticRequest(rawUrl: string, root: string, res: http.Serve
     res.writeHead(200, { "Content-Type": contentType(requested) });
     res.end(data);
   } catch (error) {
-    console.warn(`[NPSharp liveServer] Failed to serve ${rawUrl}`, error);
+    console.warn(`[Sharp-OSS liveServer] Failed to serve ${rawUrl}`, error);
     send(res, 500, "Internal Server Error", "text/plain; charset=utf-8");
   }
 }

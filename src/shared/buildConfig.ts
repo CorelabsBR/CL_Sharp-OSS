@@ -4,14 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 // Gerado por scripts/sync-project-config.mjs a partir de config.json. Não edite manualmente.
 export const BUILD_CONFIG = {
-  "packageName": "NPSharp",
-  "displayName": "NPSharp",
-  "version": "26.8.51",
+  "packageName": "Sharp-OSS",
+  "displayName": "Sharp-OSS",
+  "version": "26.8.52",
   "author": "CoreLabs",
   "copyrightOwner": "CoreLabs",
-  "applicationId": "br.com.corelabs.npsharp",
-  "protocol": "npsharp",
-  "homepage": "https://github.com/CoreLabsBR/CL_NPSharp",
-  "dataDirectoryName": ".npsharp",
-  "mobileDataDirectoryName": "NPSharp"
+  "applicationId": "br.com.corelabs.sharp",
+  "protocol": "sharp",
+  "homepage": "https://github.com/CoreLabsBR/Sharp-OSS",
+  "dataDirectoryName": ".sharp",
+  "mobileDataDirectoryName": "Sharp-OSS"
 } as const;

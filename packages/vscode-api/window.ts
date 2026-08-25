@@ -33,7 +33,7 @@ class MemoryOutputChannel implements OutputChannel {
   }
 
   show(): void {
-    console.info(`[NPSharp output:${this.name}]\n${this.content}`.trim());
+    console.info(`[Sharp-OSS output:${this.name}]\n${this.content}`.trim());
   }
 
   hide(): void {
@@ -50,16 +50,16 @@ export function createOutputChannel(name: string): OutputChannel {
 }
 
 export async function showInformationMessage<T extends string>(message: string, ...items: T[]): Promise<T | undefined> {
-  console.info(`[NPSharp extension] ${message}`);
+  console.info(`[Sharp-OSS extension] ${message}`);
   return items[0];
 }
 
 export async function showWarningMessage<T extends string>(message: string, ...items: T[]): Promise<T | undefined> {
-  console.warn(`[NPSharp extension] ${message}`);
+  console.warn(`[Sharp-OSS extension] ${message}`);
   return items[0];
 }
 
 export async function showErrorMessage<T extends string>(message: string, ...items: T[]): Promise<T | undefined> {
-  console.error(`[NPSharp extension] ${message}`);
+  console.error(`[Sharp-OSS extension] ${message}`);
   return items[0];
 }

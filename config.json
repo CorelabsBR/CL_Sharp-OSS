@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
   "application": {
-    "packageName": "NPSharp",
-    "displayName": "NPSharp",
-    "version": "26.8.51",
-    "versionCode": 260851,
-    "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
+    "packageName": "Sharp-OSS",
+    "displayName": "Sharp-OSS",
+    "version": "26.8.52",
+    "versionCode": 260852,
+    "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",
-    "license": "SEE LICENSE IN ../NPSharp/LICENSE.txt",
-    "homepage": "https://github.com/CoreLabsBR/CL_NPSharp",
+    "license": "SEE LICENSE IN ../Sharp-OSS/LICENSE.txt",
+    "homepage": "https://github.com/CoreLabsBR/Sharp-OSS",
     "repository": {
       "type": "git",
-      "url": "https://github.com/CoreLabsBR/CL_NPSharp.git",
+      "url": "https://github.com/CoreLabsBR/Sharp-OSS.git",
       "owner": "CoreLabsBR",
-      "name": "CL_NPSharp"
+      "name": "Sharp-OSS"
     },
-    "applicationId": "br.com.corelabs.npsharp",
-    "protocol": "npsharp",
-    "dataDirectoryName": ".npsharp",
-    "mobileDataDirectoryName": "NPSharp"
+    "applicationId": "br.com.corelabs.sharp",
+    "protocol": "sharp",
+    "dataDirectoryName": ".sharp",
+    "mobileDataDirectoryName": "Sharp-OSS"
   },
   "npm": {
     "main": "dist-electron/main/main.js",
@@ -71,8 +71,8 @@
     ],
     "extraResources": [
       {
-        "from": "npsharp-server",
-        "to": "npsharp-server",
+        "from": "sharp-server",
+        "to": "sharp-server",
         "filter": ["dist/**/*", "package.json"]
       },
       {
@@ -94,8 +94,8 @@
       "icon": "icon.png",
       "category": "Development",
       "maintainer": "CoreLabs",
-      "synopsis": "NPSharp IDE",
-      "description": "NPSharp is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor."
+      "synopsis": "Sharp-OSS IDE",
+      "description": "Sharp-OSS is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor."
     },
     "win": {
       "target": ["nsis", "portable"],
@@ -116,14 +116,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NPSharp",
+      "shortcutName": "Sharp-OSS",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },
     "portable": {
       "artifactName": "${productName}-Portable-${version}-${arch}.${ext}",
       "requestExecutionLevel": "user",
-      "unpackDirName": "NPSharp"
+      "unpackDirName": "Sharp-OSS"
     },
     "deb": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -149,7 +149,7 @@
       {
         "provider": "github",
         "owner": "CoreLabsBR",
-        "repo": "CL_NPSharp",
+        "repo": "Sharp-OSS",
         "releaseType": "release"
       }
     ]
@@ -159,7 +159,7 @@
     "androidScheme": "https"
   },
   "android": {
-    "namespace": "br.com.corelabs.npsharp",
+    "namespace": "br.com.corelabs.sharp",
     "minSdkVersion": 24,
     "compileSdkVersion": 36,
     "targetSdkVersion": 35,

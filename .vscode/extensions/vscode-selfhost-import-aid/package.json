@@ -1,6 +1,6 @@
 {
   "name": "vscode-selfhost-import-aid",
-  "displayName": "NP Sharp Selfhost Import Aid",
+  "displayName": "Sharp-OSS Selfhost Import Aid",
   "description": "Util to improve dealing with imports",
   "engines": {
     "vscode": "^1.88.0"

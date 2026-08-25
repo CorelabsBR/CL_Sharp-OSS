@@ -25,7 +25,7 @@ interface BrandHighlightRule {
 const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
   { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
   { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
-  { terms: ["corelabs","Npsharp","NPSharp"], className: "brand-highlight-red" },
+  { terms: ["corelabs","Sharp","Sharp-OSS"], className: "brand-highlight-red" },
   { terms: ["ESPERA O SPOILER"], className: "brand-highlight-special" },
   { terms: ["PRF","Policia Rodoviaria Federal"], className: "brand-highlight-police" }
 ];
@@ -71,7 +71,7 @@ export class EditorTabs {
   private readonly tabsBar = el("div", { className: "tabs-bar" });
   private readonly editorHost = el("div", { className: "editor-host" });
   private readonly welcome = el("div", { className: "welcome-pane" });
-  private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "NPSharp" } });
+  private readonly welcomeLogo = el("img", { className: "welcome-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "Sharp-OSS" } });
   private editor: monaco.editor.IStandaloneCodeEditor;
   private tabs: EditorTab[] = [];
   private readonly fileViewers = new Map<string, ImageViewer | UniversalFileViewer | MonacoDiffViewer>();
@@ -111,7 +111,7 @@ export class EditorTabs {
     this.element.append(this.tabsBar, this.editorHost);
     this.editor = monaco.editor.create(this.editorHost, {
       automaticLayout: true,
-      theme: "npsharp-dark",
+      theme: "sharp-dark",
       language: "plaintext",
       fontFamily: "var(--editor-font-family)",
       fontSize: 14,
@@ -319,21 +319,21 @@ export class EditorTabs {
     if (!model || !selection) return;
     const line = selection.endLineNumber;
     const range = new monaco.Range(line, model.getLineMaxColumn(line), line, model.getLineMaxColumn(line));
-    this.editor.executeEdits("npsharp.ai.insertBelow", [{ range, text: `\n${code}`, forceMoveMarkers: true }]);
+    this.editor.executeEdits("sharp.ai.insertBelow", [{ range, text: `\n${code}`, forceMoveMarkers: true }]);
     this.editor.focus();
   }
 
   replaceSelection(code: string): void {
     const selection = this.editor.getSelection();
     if (!selection) return;
-    this.editor.executeEdits("npsharp.ai.replaceSelection", [{ range: selection, text: code, forceMoveMarkers: true }]);
+    this.editor.executeEdits("sharp.ai.replaceSelection", [{ range: selection, text: code, forceMoveMarkers: true }]);
     this.editor.focus();
   }
 
   replaceCurrentFile(code: string): void {
     const model = this.editor.getModel();
     if (!model) return;
-    this.editor.executeEdits("npsharp.ai.replaceFile", [{
+    this.editor.executeEdits("sharp.ai.replaceFile", [{
       range: model.getFullModelRange(),
       text: code,
       forceMoveMarkers: true
@@ -356,7 +356,7 @@ export class EditorTabs {
         const keybinding = monacoKeybindingFromShortcut(key);
         if (keybinding === undefined) continue;
         this.shortcutDisposables.push(this.editor.addAction({
-          id: `npsharp.shortcut.${shortcut.id.replace(/[^a-zA-Z0-9_.-]/g, "-")}.${index}`,
+          id: `sharp.shortcut.${shortcut.id.replace(/[^a-zA-Z0-9_.-]/g, "-")}.${index}`,
           label: shortcut.label,
           keybindings: [keybinding],
           run: () => shortcut.run()
@@ -383,7 +383,7 @@ export class EditorTabs {
     ] as const;
     actions.forEach(([id, label], index) => {
       this.disposables.push(this.editor.addAction({
-        id: `npsharp.ai.${id}`,
+        id: `sharp.ai.${id}`,
         label,
         contextMenuGroupId: "9_ai",
         contextMenuOrder: index + 1,
@@ -480,7 +480,7 @@ export class EditorTabs {
       const content = file.content ?? "";
       const language = file.editableStructuredKind === "nbt" ? "json" : languageForPath(filePath);
       await ensureLanguageSupport(language);
-      const model = this.createTextModel(content, language, filePath.startsWith("npsharp-remote://") ? monaco.Uri.parse(filePath) : monaco.Uri.file(filePath));
+      const model = this.createTextModel(content, language, filePath.startsWith("sharp-remote://") ? monaco.Uri.parse(filePath) : monaco.Uri.file(filePath));
       const tab: EditorTab = {
         id: filePath,
         title: basename(filePath),
@@ -567,9 +567,9 @@ export class EditorTabs {
       return;
     }
     const language = languageForPath(title);
-    const model = this.createTextModel(content, language, monaco.Uri.parse(`npsharp:${encodeURIComponent(uri)}`));
+    const model = this.createTextModel(content, language, monaco.Uri.parse(`sharp:${encodeURIComponent(uri)}`));
     void ensureLanguageSupport(language).then(() => monaco.editor.setModelLanguage(model, language)).catch(error => {
-      console.warn(`[NPSharp editor] Não foi possível carregar o suporte para ${language}.`, error);
+      console.warn(`[Sharp-OSS editor] Não foi possível carregar o suporte para ${language}.`, error);
     });
     const tab: EditorTab = {
       id: uri,
@@ -690,7 +690,7 @@ export class EditorTabs {
     const model = this.createTextModel(
       closed.content,
       languageForPath(closed.title),
-      monaco.Uri.parse(closed.virtualUri ? `npsharp:${encodeURIComponent(closed.virtualUri)}` : `untitled:${closed.title}-${crypto.randomUUID()}`)
+      monaco.Uri.parse(closed.virtualUri ? `sharp:${encodeURIComponent(closed.virtualUri)}` : `untitled:${closed.title}-${crypto.randomUUID()}`)
     );
     const tab: EditorTab = {
       id: closed.virtualUri ?? crypto.randomUUID(),
@@ -933,7 +933,7 @@ export class EditorTabs {
 
     if (!edits.length) return;
 
-    this.editor.executeEdits("npsharp-comment-lines", edits);
+    this.editor.executeEdits("sharp-comment-lines", edits);
     this.editor.pushUndoStop();
   }
 
@@ -1125,7 +1125,7 @@ export class EditorTabs {
   }
 
   private buildWelcome(): void {
-    const title = el("h1", { text: "NPSharp" });
+    const title = el("h1", { text: "Sharp-OSS" });
     const subtitle = el("p", { text: "Código, controle e domínio" });
     const actions = el("div", { className: "welcome-actions" });
     this.welcome.append(this.welcomeLogo, title, subtitle, actions);
@@ -1234,7 +1234,7 @@ export class EditorTabs {
           inlineClassName: colorClass,
           before: {
             content: "■ ",
-            inlineClassName: `${colorClass} npsharp-hex-swatch`,
+            inlineClassName: `${colorClass} sharp-hex-swatch`,
             cursorStops: monaco.editor.InjectedTextCursorStops.None
           },
           hoverMessage: { value: `Cor: \`${color}\`` }
@@ -1248,9 +1248,9 @@ export class EditorTabs {
     const normalized = color.toLowerCase();
     const existing = this.colorClasses.get(normalized);
     if (existing) return existing;
-    const className = `npsharp-hex-color-${this.colorClasses.size}`;
+    const className = `sharp-hex-color-${this.colorClasses.size}`;
     this.colorClasses.set(normalized, className);
-    this.colorStyle.append(`.${className}{color:${normalized}!important;font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.72);}.${className}.npsharp-hex-swatch{display:inline-block;font-size:1.05em;line-height:1;vertical-align:middle;text-shadow:0 0 1px rgba(0,0,0,.9);}`);
+    this.colorStyle.append(`.${className}{color:${normalized}!important;font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.72);}.${className}.sharp-hex-swatch{display:inline-block;font-size:1.05em;line-height:1;vertical-align:middle;text-shadow:0 0 1px rgba(0,0,0,.9);}`);
     return className;
   }
 
@@ -1264,7 +1264,7 @@ export class EditorTabs {
 
   private applyDiagnosticsToTab(tab: EditorTab): void {
     if (!tab.path) {
-      monaco.editor.setModelMarkers(tab.model, "npsharp", []);
+      monaco.editor.setModelMarkers(tab.model, "sharp", []);
       return;
     }
 
@@ -1279,7 +1279,7 @@ export class EditorTabs {
         endLineNumber: boundedLine(tab.model, item.endLine ?? item.line),
         endColumn: boundedColumn(tab.model, item.endLine ?? item.line, item.endColumn ?? item.column + 1)
       }));
-    monaco.editor.setModelMarkers(tab.model, "npsharp", markers);
+    monaco.editor.setModelMarkers(tab.model, "sharp", markers);
   }
 
   private goToOffset(start: number, end: number): void {

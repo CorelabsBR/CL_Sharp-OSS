@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">NPSharp</string>
-    <string name="title_activity_main">NPSharp</string>
-    <string name="package_name">br.com.corelabs.npsharp</string>
-    <string name="custom_url_scheme">br.com.corelabs.npsharp</string>
+    <string name="app_name">Sharp-OSS</string>
+    <string name="title_activity_main">Sharp-OSS</string>
+    <string name="package_name">br.com.corelabs.sharp</string>
+    <string name="custom_url_scheme">br.com.corelabs.sharp</string>
 </resources>

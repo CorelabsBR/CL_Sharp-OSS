@@ -1,4 +1,4 @@
-package br.com.corelabs.npsharp;
+package br.com.corelabs.sharp;
 
 import android.app.Activity;
 import android.content.ContentResolver;
@@ -27,8 +27,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /** Storage Access Framework bridge. Files always remain in the folder picked by the user. */
-@CapacitorPlugin(name = "NpsharpWorkspace")
-public class NpsharpWorkspacePlugin extends Plugin {
+@CapacitorPlugin(name = "SharpWorkspace")
+public class SharpWorkspacePlugin extends Plugin {
     private static final String[] DOCUMENT_COLUMNS = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,

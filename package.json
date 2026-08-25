@@ -1,16 +1,16 @@
 {
-  "name": "NPSharp",
-  "version": "26.8.51",
-  "description": "NPSharp migrated to Electron, TypeScript and Monaco Editor.",
+  "name": "Sharp-OSS",
+  "version": "26.8.52",
+  "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
   "author": "CoreLabs",
-  "homepage": "https://github.com/CoreLabsBR/CL_NPSharp",
+  "homepage": "https://github.com/CoreLabsBR/Sharp-OSS",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CoreLabsBR/CL_NPSharp.git"
+    "url": "https://github.com/CoreLabsBR/Sharp-OSS.git"
   },
-  "license": "SEE LICENSE IN ../NPSharp/LICENSE.txt",
+  "license": "SEE LICENSE IN ../Sharp-OSS/LICENSE.txt",
   "scripts": {
     "config:sync": "node scripts/sync-project-config.mjs",
     "clean": "node scripts/clean.mjs",
@@ -18,14 +18,14 @@
     "dev:renderer": "npm run config:sync && vite",
     "build:renderer": "npm run config:sync && vite build",
     "build:electron": "npm run config:sync && tsc -p tsconfig.electron.json",
-    "build:server": "tsc -p npsharp-server/tsconfig.json",
+    "build:server": "tsc -p sharp-server/tsconfig.json",
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
-    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p npsharp-server/tsconfig.json",
+    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p sharp-server/tsconfig.json",
     "lint": "npm run config:sync && eslint .",
     "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote && npm run test:discord && npm run test:features",
     "test:features": "npm run build:electron && tsc -p tsconfig.features.json && node --test dist-electron/services/node/featureInfrastructure.test.js dist-electron/services/node/ai/CodexAppServerProvider.test.js && node --test scripts/feature-renderer.test.mjs",
     "test:discord": "npm run build:electron && node --test dist-electron/main/discord/DiscordRichPresenceBuilder.test.js",
-    "test:remote": "npm run build:electron && npm run build:server && node dist-electron/services/node/remote/remoteProtocol.test.js && node --test npsharp-server/dist/security/PathGuard.test.js && node scripts/remote-server-smoke.test.mjs",
+    "test:remote": "npm run build:electron && npm run build:server && node dist-electron/services/node/remote/remoteProtocol.test.js && node --test sharp-server/dist/security/PathGuard.test.js && node scripts/remote-server-smoke.test.mjs",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
     "test:updater": "npm run build:electron && node dist-electron/services/node/updateSemver.test.js && node dist-electron/services/node/updateService.test.js && node dist-electron/services/node/updateIpc.test.js",
     "build": "node scripts/build.mjs",
@@ -72,8 +72,8 @@
     "vite": "^8.1.5"
   },
   "build": {
-    "appId": "br.com.corelabs.npsharp",
-    "productName": "NPSharp",
+    "appId": "br.com.corelabs.sharp",
+    "productName": "Sharp-OSS",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -86,8 +86,8 @@
     ],
     "extraResources": [
       {
-        "from": "npsharp-server",
-        "to": "npsharp-server",
+        "from": "sharp-server",
+        "to": "sharp-server",
         "filter": [
           "dist/**/*",
           "package.json"
@@ -117,8 +117,8 @@
       "icon": "icon.png",
       "category": "Development",
       "maintainer": "CoreLabs",
-      "synopsis": "NPSharp IDE",
-      "description": "NPSharp is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor."
+      "synopsis": "Sharp-OSS IDE",
+      "description": "Sharp-OSS is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor."
     },
     "win": {
       "target": [
@@ -142,14 +142,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NPSharp",
+      "shortcutName": "Sharp-OSS",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },
     "portable": {
       "artifactName": "${productName}-Portable-${version}-${arch}.${ext}",
       "requestExecutionLevel": "user",
-      "unpackDirName": "NPSharp"
+      "unpackDirName": "Sharp-OSS"
     },
     "deb": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -177,7 +177,7 @@
       {
         "provider": "github",
         "owner": "CoreLabsBR",
-        "repo": "CL_NPSharp",
+        "repo": "Sharp-OSS",
         "releaseType": "release"
       }
     ]

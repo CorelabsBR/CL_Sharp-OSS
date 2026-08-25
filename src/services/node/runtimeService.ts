@@ -279,7 +279,7 @@ export async function runFile(request: RuntimeRunRequest): Promise<RuntimeRunRes
   const result = await runProcess(command[0], command.slice(1), {
     cwd: path.dirname(request.filePath),
     timeoutMs: 120000,
-    env: { NPSHARP_RUNTIME_HOME: runtime.rootPath, PATH: `${toolBinDir()}${path.delimiter}${process.env.PATH ?? ""}` }
+    env: { SHARP_RUNTIME_HOME: runtime.rootPath, PATH: `${toolBinDir()}${path.delimiter}${process.env.PATH ?? ""}` }
   });
 
   return complete({
@@ -325,10 +325,10 @@ async function resolveLanguageState(language: LanguageRuntime, config: LanguageR
       languageId: language.id,
       config: { path: executable, autoDetect: false },
       path: executable,
-      version: "npsharp",
+      version: "sharp",
       status: "installed",
       source: "internal",
-      message: "Runtime interno do NPSharp."
+      message: "Runtime interno do Sharp-OSS."
     };
   }
 
@@ -426,7 +426,7 @@ async function loadRuntimeConfig(): Promise<Map<string, LanguageRuntimeConfig>> 
     return config;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`[NPSharp runtime] Failed to read ${file}; defaults will be used.`, error);
+      console.warn(`[Sharp-OSS runtime] Failed to read ${file}; defaults will be used.`, error);
     }
   }
 
@@ -673,7 +673,7 @@ async function runJavaSource(displayName: string, filePath: string, source: stri
     };
   }
 
-  const buildDir = path.join(os.tmpdir(), "npsharp-java", createHash("sha1").update(filePath).digest("hex"));
+  const buildDir = path.join(os.tmpdir(), "sharp-java", createHash("sha1").update(filePath).digest("hex"));
   await fs.rm(buildDir, { recursive: true, force: true });
   await fs.mkdir(buildDir, { recursive: true });
 
@@ -724,7 +724,7 @@ async function runRustFile(displayName: string, filePath: string, runtime?: Inst
     return { language: displayName, output: "[ERRO] rustc nao encontrado para executar este arquivo Rust.", code: 127 };
   }
 
-  const buildDir = path.join(os.tmpdir(), "npsharp-rust", createHash("sha1").update(filePath).digest("hex"));
+  const buildDir = path.join(os.tmpdir(), "sharp-rust", createHash("sha1").update(filePath).digest("hex"));
   await fs.rm(buildDir, { recursive: true, force: true });
   await fs.mkdir(buildDir, { recursive: true });
   const binary = path.join(buildDir, process.platform === "win32" ? "main.exe" : "main");
@@ -752,7 +752,7 @@ async function runNativeSource(displayName: string, filePath: string, runtime?: 
     return { language: displayName, output: `[ERRO] Compilador ${displayName} nao encontrado. Configure-o em Configure Language Runtimes.`, code: 127 };
   }
 
-  const buildDir = path.join(os.tmpdir(), "npsharp-native", createHash("sha1").update(filePath).digest("hex"));
+  const buildDir = path.join(os.tmpdir(), "sharp-native", createHash("sha1").update(filePath).digest("hex"));
   await fs.rm(buildDir, { recursive: true, force: true });
   await fs.mkdir(buildDir, { recursive: true });
   const binary = path.join(buildDir, process.platform === "win32" ? "program.exe" : "program");
@@ -784,10 +784,10 @@ async function runCSharpSource(displayName: string, filePath: string, runtime?: 
   const project = await findProjectFile(path.dirname(filePath), ".csproj");
   let generatedProject: string | undefined;
   if (!project) {
-    const buildDir = path.join(os.tmpdir(), "npsharp-csharp", createHash("sha1").update(filePath).digest("hex"));
+    const buildDir = path.join(os.tmpdir(), "sharp-csharp", createHash("sha1").update(filePath).digest("hex"));
     await fs.rm(buildDir, { recursive: true, force: true });
     await fs.mkdir(buildDir, { recursive: true });
-    generatedProject = path.join(buildDir, "NPSharpRun.csproj");
+    generatedProject = path.join(buildDir, "SharpRun.csproj");
     await fs.writeFile(generatedProject, createCSharpProject(filePath, await dotnetTargetFramework(dotnet)), "utf8");
   }
   const command = [dotnet, "run", "--project", project ?? generatedProject!];
@@ -819,7 +819,7 @@ async function runKotlinSource(displayName: string, filePath: string, runtime?: 
   if (!java) {
     return { language: displayName, output: "[ERRO] Runtime Java nao encontrado para executar Kotlin.", code: 127 };
   }
-  const buildDir = path.join(os.tmpdir(), "npsharp-kotlin", createHash("sha1").update(filePath).digest("hex"));
+  const buildDir = path.join(os.tmpdir(), "sharp-kotlin", createHash("sha1").update(filePath).digest("hex"));
   await fs.rm(buildDir, { recursive: true, force: true });
   await fs.mkdir(buildDir, { recursive: true });
   const jar = path.join(buildDir, "program.jar");

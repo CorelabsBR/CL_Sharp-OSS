@@ -3,7 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-/** Runtime APIs missing from older Android System WebView releases supported by NPSharp. */
+/** Runtime APIs missing from older Android System WebView releases supported by Sharp-OSS. */
 function installReplaceChildren(prototype: object): void {
   if ("replaceChildren" in prototype) return;
   Object.defineProperty(prototype, "replaceChildren", {

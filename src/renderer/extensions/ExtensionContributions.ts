@@ -31,7 +31,7 @@ export class ExtensionContributions {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.activationStates.set(extension.id, { state: "error", message });
-        console.warn(`[NPSharp extensions] Failed to activate ${extension.id}`, error);
+        console.warn(`[Sharp-OSS extensions] Failed to activate ${extension.id}`, error);
       }
     }
   }

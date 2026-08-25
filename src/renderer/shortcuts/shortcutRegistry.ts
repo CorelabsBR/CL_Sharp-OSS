@@ -33,7 +33,7 @@ const DEFINITIONS: ShortcutDefinition[] = [
   shortcut("file.saveAs", "Arquivo: Salvar Como", "Salva o editor ativo em um novo caminho.", ["Ctrl+Shift+S"], "Arquivo", "file.saveAs", { allowInInput: true }),
   shortcut("file.closeEditor", "Arquivo: Fechar Editor", "Fecha a aba do editor ativo.", ["Ctrl+W"], "Arquivo", "file.closeEditor"),
   shortcut("file.reopenClosedEditor", "Arquivo: Reabrir Editor Fechado", "Reabre a aba de editor fechada mais recentemente.", ["Ctrl+Shift+T"], "Arquivo", "file.reopenClosedEditor"),
-  shortcut("file.newWindow", "Arquivo: Nova Janela", "Abre uma nova janela do NPSharp quando o backend desktop tem suporte.", ["Ctrl+Shift+N"], "Arquivo", "file.newWindow"),
+  shortcut("file.newWindow", "Arquivo: Nova Janela", "Abre uma nova janela do Sharp-OSS quando o backend desktop tem suporte.", ["Ctrl+Shift+N"], "Arquivo", "file.newWindow"),
   shortcut("file.recentWorkspaces", "Arquivo: Workspaces Recentes", "Escolhe um workspace recente.", ["Ctrl+R"], "Arquivo", "file.recentWorkspaces"),
 
   shortcut("search.findInFile", "Busca: Localizar no Arquivo", "Abre o Localizar do Monaco no arquivo atual.", ["Ctrl+F"], "Busca", "search.findInFile", { scope: "editor", allowInInput: true }),
@@ -85,17 +85,17 @@ const DEFINITIONS: ShortcutDefinition[] = [
   shortcut("run.withoutDebug", "Executar: Executar Sem Depuração", "Executa o projeto ou arquivo atual sem o modo de depuração.", ["Ctrl+F5"], "Executar", "run.withoutDebug"),
   shortcut("run.build", "Executar: Tarefa de Build", "Executa a tarefa de build configurada.", ["Ctrl+Shift+B"], "Executar", "run.build"),
 
-  shortcut("npsharp.notes", "NPSharp: Abrir Notas", "Abre ou cria o arquivo de notas do NPSharp.", ["Ctrl+Alt+N"], "NPSharp", "npsharp.notes"),
-  shortcut("npsharp.commandCenter", "NPSharp: Abrir Central de Comandos", "Abre a Central de Comandos do NPSharp.", ["Ctrl+Alt+C"], "NPSharp", "npsharp.commandCenter"),
-  shortcut("npsharp.themeLab", "NPSharp: Abrir Laboratório de Temas", "Abre as ferramentas de temas e temas especiais.", ["Ctrl+Alt+T"], "NPSharp", "npsharp.themeLab"),
-  shortcut("npsharp.focusMode", "NPSharp: Alternar Modo Foco", "Alterna o layout limpo do Modo Foco.", ["Ctrl+Alt+P"], "NPSharp", "npsharp.focusMode"),
-  shortcut("npsharp.projectHealth", "NPSharp: Saúde do Projeto", "Abre um resumo de saúde do projeto.", ["Ctrl+Alt+H"], "NPSharp", "npsharp.projectHealth"),
-  shortcut("npsharp.liveServer", "NPSharp: Alternar Live Server", "Inicia ou para o Live Server para o arquivo HTML atual.", ["Ctrl+Alt+L"], "NPSharp", "npsharp.liveServer"),
-  shortcut("npsharp.runDetected", "NPSharp: Executar Arquivo Atual", "Executa o arquivo atual com detecção de runtime.", ["Ctrl+Alt+R"], "NPSharp", "npsharp.runDetected"),
-  shortcut("npsharp.gitQuickActions", "NPSharp: Ações Rápidas do Git", "Abre ações de stage, commit, push e pull.", ["Ctrl+Alt+G"], "NPSharp", "npsharp.gitQuickActions"),
-  shortcut("npsharp.mobileLayout", "NPSharp: Alternar Pré-visualização Compacta", "Alterna um layout de pré-visualização compacto/mobile quando aplicável.", ["Ctrl+Alt+M"], "NPSharp", "npsharp.mobileLayout"),
-  shortcut("npsharp.clearTemporaryPanels", "NPSharp: Limpar Painéis Temporários", "Limpa o conteúdo do terminal, saída ou painéis temporários.", ["Ctrl+Alt+K"], "NPSharp", "npsharp.clearTemporaryPanels"),
-  shortcut("npsharp.snapshot", "NPSharp: Capturar Workspace", "Salva uma captura rápida do workspace/sessão quando o armazenamento está disponível.", ["Ctrl+Alt+S"], "NPSharp", "npsharp.snapshot")
+  shortcut("sharp.notes", "Sharp-OSS: Abrir Notas", "Abre ou cria o arquivo de notas do Sharp-OSS.", ["Ctrl+Alt+N"], "Sharp-OSS", "sharp.notes"),
+  shortcut("sharp.commandCenter", "Sharp-OSS: Abrir Central de Comandos", "Abre a Central de Comandos do Sharp-OSS.", ["Ctrl+Alt+C"], "Sharp-OSS", "sharp.commandCenter"),
+  shortcut("sharp.themeLab", "Sharp-OSS: Abrir Laboratório de Temas", "Abre as ferramentas de temas e temas especiais.", ["Ctrl+Alt+T"], "Sharp-OSS", "sharp.themeLab"),
+  shortcut("sharp.focusMode", "Sharp-OSS: Alternar Modo Foco", "Alterna o layout limpo do Modo Foco.", ["Ctrl+Alt+P"], "Sharp-OSS", "sharp.focusMode"),
+  shortcut("sharp.projectHealth", "Sharp-OSS: Saúde do Projeto", "Abre um resumo de saúde do projeto.", ["Ctrl+Alt+H"], "Sharp-OSS", "sharp.projectHealth"),
+  shortcut("sharp.liveServer", "Sharp-OSS: Alternar Live Server", "Inicia ou para o Live Server para o arquivo HTML atual.", ["Ctrl+Alt+L"], "Sharp-OSS", "sharp.liveServer"),
+  shortcut("sharp.runDetected", "Sharp-OSS: Executar Arquivo Atual", "Executa o arquivo atual com detecção de runtime.", ["Ctrl+Alt+R"], "Sharp-OSS", "sharp.runDetected"),
+  shortcut("sharp.gitQuickActions", "Sharp-OSS: Ações Rápidas do Git", "Abre ações de stage, commit, push e pull.", ["Ctrl+Alt+G"], "Sharp-OSS", "sharp.gitQuickActions"),
+  shortcut("sharp.mobileLayout", "Sharp-OSS: Alternar Pré-visualização Compacta", "Alterna um layout de pré-visualização compacto/mobile quando aplicável.", ["Ctrl+Alt+M"], "Sharp-OSS", "sharp.mobileLayout"),
+  shortcut("sharp.clearTemporaryPanels", "Sharp-OSS: Limpar Painéis Temporários", "Limpa o conteúdo do terminal, saída ou painéis temporários.", ["Ctrl+Alt+K"], "Sharp-OSS", "sharp.clearTemporaryPanels"),
+  shortcut("sharp.snapshot", "Sharp-OSS: Capturar Workspace", "Salva uma captura rápida do workspace/sessão quando o armazenamento está disponível.", ["Ctrl+Alt+S"], "Sharp-OSS", "sharp.snapshot")
 ];
 
 export function createShortcutRegistry(options: ShortcutRegistryOptions): ShortcutBinding[] {

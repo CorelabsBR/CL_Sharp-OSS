@@ -85,7 +85,7 @@ function runShellWithPty(shell: string, args: string[], cwd: string): Promise<Te
         finish({ cwd, output: output.trimEnd(), code: event.exitCode });
       });
     } catch (error) {
-      console.warn("[NPSharp process] node-pty command failed, falling back to child_process.", error);
+      console.warn("[Sharp-OSS process] node-pty command failed, falling back to child_process.", error);
       finish(undefined);
     }
   });
@@ -97,7 +97,7 @@ function loadNodePty(): NodePtyModule | undefined {
     cachedPty = optionalRequire("node-pty") as NodePtyModule;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND") {
-      console.warn("[NPSharp process] node-pty could not be loaded.", error);
+      console.warn("[Sharp-OSS process] node-pty could not be loaded.", error);
     }
     cachedPty = null;
   }

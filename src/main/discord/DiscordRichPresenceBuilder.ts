@@ -20,9 +20,9 @@ export interface DiscordActivity {
 const REMOTE_STATUS: Record<string, string> = {
   "resolving-host": "Resolvendo Remote Host", connecting: "Conectando ao Remote Host",
   "verifying-host-key": "Validando chave SSH", authenticating: "Autenticando no Remote Host",
-  "detecting-platform": "Detectando ambiente remoto", "checking-server": "Verificando NPSharp Server",
-  "uploading-server": "Enviando NPSharp Server", "installing-server": "Instalando NPSharp Server",
-  "starting-server": "Iniciando NPSharp Server", "opening-tunnel": "Abrindo túnel SSH",
+  "detecting-platform": "Detectando ambiente remoto", "checking-server": "Verificando Sharp-OSS Server",
+  "uploading-server": "Enviando Sharp-OSS Server", "installing-server": "Instalando Sharp-OSS Server",
+  "starting-server": "Iniciando Sharp-OSS Server", "opening-tunnel": "Abrindo túnel SSH",
   "connecting-websocket": "Conectando ao servidor remoto", "validating-server": "Validando sessão remota",
   connected: "Conectado ao Remote Host", reconnecting: "Reconectando ao Remote Host",
   disconnecting: "Desconectando do Remote Host"
@@ -31,7 +31,7 @@ const REMOTE_STATUS: Record<string, string> = {
 export function buildDiscordActivity(settings: DiscordRichPresenceSettings, context: DiscordPresenceContext, startedAt: Date): DiscordActivity {
   const fileName = context.filePath ? path.basename(context.filePath) : "";
   const projectName = context.workspaceName || (context.workspacePath ? path.basename(context.workspacePath) : "");
-  let details = settings.showFileName && fileName ? `Editando ${fileName}` : "Desenvolvendo no NPSharp";
+  let details = settings.showFileName && fileName ? `Editando ${fileName}` : "Desenvolvendo no Sharp-OSS";
   if (context.running) details = fileName && settings.showFileName ? `Executando ${fileName}` : "Executando projeto";
   else if (context.terminalActive) details = "Usando o terminal integrado";
   else if (context.remoteStatus && context.remoteStatus !== "connected") details = REMOTE_STATUS[context.remoteStatus] || "Conectando ao Remote Host";

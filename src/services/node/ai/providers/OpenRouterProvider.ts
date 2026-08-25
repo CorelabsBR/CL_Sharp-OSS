@@ -22,8 +22,8 @@ export class OpenRouterProvider implements AIProvider {
       headers: {
         Authorization: `Bearer ${request.apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/girellidev/npsharp",
-        "X-Title": "NPSharp"
+        "HTTP-Referer": "https://github.com/girellidev/sharp",
+        "X-Title": "Sharp-OSS"
       },
       body: JSON.stringify({
         model: request.settings.model || this.descriptor.defaultModel,
@@ -69,4 +69,3 @@ export class OpenRouterProvider implements AIProvider {
       .map(id => ({ id, displayName: id }));
   }
 }
-

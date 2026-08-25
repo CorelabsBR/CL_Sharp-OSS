@@ -1,4 +1,4 @@
-package br.com.corelabs.npsharp;
+package br.com.corelabs.sharp;
 
 import android.content.Context;
 import android.os.Environment;
@@ -44,9 +44,9 @@ import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Native Git backend for workspaces stored in NPSharp's Android Documents area. */
-@CapacitorPlugin(name = "NpsharpGit")
-public class NpsharpGitPlugin extends Plugin {
+/** Native Git backend for workspaces stored in Sharp-OSS's Android Documents area. */
+@CapacitorPlugin(name = "SharpGit")
+public class SharpGitPlugin extends Plugin {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private volatile CredentialsProvider credentialsProvider;
 
@@ -223,7 +223,7 @@ public class NpsharpGitPlugin extends Plugin {
                 case "config": {
                     int offset = args.contains("--local") ? 2 : 1;
                     if (args.size() <= offset + 1) return operation(false, "Informe a chave e o valor da configuração Git.");
-                    git.getRepository().getConfig().setString("npsharp", null, args.get(offset).replaceFirst("^npsharp\\.", ""), args.get(offset + 1));
+                    git.getRepository().getConfig().setString("sharp", null, args.get(offset).replaceFirst("^sharp\\.", ""), args.get(offset + 1));
                     git.getRepository().getConfig().save();
                     return operation(true, "Configuração Git salva.");
                 }
@@ -307,7 +307,7 @@ public class NpsharpGitPlugin extends Plugin {
     }
 
     private File resolve(String requested, boolean create) throws Exception {
-        if (requested.startsWith("android-tree-")) throw new IllegalArgumentException("Git exige um workspace NPSharp no armazenamento do app; pastas externas escolhidas pelo Android ainda não expõem um caminho nativo.");
+        if (requested.startsWith("android-tree-")) throw new IllegalArgumentException("Git exige um workspace Sharp-OSS no armazenamento do app; pastas externas escolhidas pelo Android ainda não expõem um caminho nativo.");
         File root = documentsRoot();
         String relative = requested.replace('\\', '/').replaceFirst("^/+", "");
         if (relative.contains("..")) throw new IllegalArgumentException("Caminho Git inválido.");

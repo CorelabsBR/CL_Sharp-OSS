@@ -234,7 +234,7 @@ export function configureMonaco(): typeof monaco {
     if (language) registerLanguageSnippets(language, source);
   }
 
-  monaco.editor.defineTheme("npsharp-dark", {
+  monaco.editor.defineTheme("sharp-dark", {
     base: "vs-dark",
     inherit: true,
     rules: [
@@ -254,7 +254,7 @@ export function configureMonaco(): typeof monaco {
       "editor.foreground": "#d4d4d4"
     }
   });
-  monaco.editor.setTheme("npsharp-dark");
+  monaco.editor.setTheme("sharp-dark");
 
   return monaco;
 }

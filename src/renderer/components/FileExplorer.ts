@@ -3,7 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import type { WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
-import { initialContentForNewNPSharpFile } from "../../core/easterEggs";
+import { initialContentForNewSharpFile } from "../../core/easterEggs";
 import { api, platform } from "../services/api";
 import { buttonIcon, contextMenu, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
@@ -63,7 +63,7 @@ export class FileExplorer {
     this.disposeRemoteStatus = api.remote.onStatusChanged(state => { this.remoteConnected = state.status === "connected"; });
     void api.remote.getStatus().then(state => { this.remoteConnected = state.status === "connected"; });
     api.remote.onEvent(value => {
-      if (this.root?.startsWith("npsharp-remote://") && value.event.startsWith("fs.")) this.handleWorkspaceChange({ root: this.root, eventType: "change", path: this.root });
+      if (this.root?.startsWith("sharp-remote://") && value.event.startsWith("fs.")) this.handleWorkspaceChange({ root: this.root, eventType: "change", path: this.root });
     });
   }
 
@@ -97,7 +97,7 @@ export class FileExplorer {
 
   async openFolder(folder: string, displayName?: string, location?: string): Promise<void> {
     if (this.disposed) return;
-    if (this.remoteConnected && !folder.startsWith("npsharp-remote://")) {
+    if (this.remoteConnected && !folder.startsWith("sharp-remote://")) {
       this.updateStatus("Uma sessão remota está ativa; escolha uma pasta no host remoto.");
       await this.openRemoteFolder?.();
       return;
@@ -460,7 +460,7 @@ export class FileExplorer {
       else await api.fs.createFileInWorkspace({
         workspace: pending.workspace,
         path: target,
-        initialContent: initialContentForNewNPSharpFile(name)
+        initialContent: initialContentForNewSharpFile(name)
       });
       if (this.disposed) return;
       this.expandPath(dirname(target));
@@ -657,7 +657,7 @@ export class FileExplorer {
     if (this.disposed) return;
     if (!this.root || !samePath(event.root, this.root)) return;
     if (event.error) {
-      console.warn(`[NPSharp explorer] Workspace watcher reported an error (${event.root})`, event.error);
+      console.warn(`[Sharp-OSS explorer] Workspace watcher reported an error (${event.root})`, event.error);
     }
     if (this.refreshTimer !== undefined) window.clearTimeout(this.refreshTimer);
     this.refreshTimer = window.setTimeout(() => {

@@ -14,7 +14,6 @@ export class TokenCounter {
     if (this.estimate(text) <= maximum) return { text, truncated: false };
     const ratio = maximum / Math.max(1, this.estimate(text));
     const length = Math.max(0, Math.floor(text.length * ratio * 0.95));
-    return { text: `${text.slice(0, length)}\n…[context truncated by NPSharp]`, truncated: true };
+    return { text: `${text.slice(0, length)}\n…[context truncated by Sharp-OSS]`, truncated: true };
   }
 }
-

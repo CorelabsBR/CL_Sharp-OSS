@@ -15,9 +15,9 @@ import type { CodexAccountState, CodexChatGptLoginResult } from "../../../shared
 export class ProviderManager {
   private readonly providers = new Map<AIProviderId, AIProvider>();
 
-  constructor(private readonly settingsService: AISettingsService, npsharpExtensionsRoot?: string) {
+  constructor(private readonly settingsService: AISettingsService, sharpExtensionsRoot?: string) {
     this.register(new OpenAIProvider("openai"));
-    this.register(new CodexAppServerProvider(npsharpExtensionsRoot));
+    this.register(new CodexAppServerProvider(sharpExtensionsRoot));
     this.register(new GeminiProvider());
     this.register(new OpenRouterProvider());
     this.register(new OllamaProvider());

@@ -1,10 +1,10 @@
-# Codex no NPSharp
+# Codex no Sharp-OSS
 
-O NPSharp desktop integra o Codex pelo `codex app-server`, o mesmo protocolo criado para clientes ricos como a extensao do VS Code. A autenticacao pertence ao proprio Codex: o NPSharp abre o login oficial do ChatGPT no navegador e nunca recebe nem armazena os tokens da conta.
+O Sharp-OSS desktop integra o Codex pelo `codex app-server`, o mesmo protocolo criado para clientes ricos como a extensao do VS Code. A autenticacao pertence ao proprio Codex: o Sharp-OSS abre o login oficial do ChatGPT no navegador e nunca recebe nem armazena os tokens da conta.
 
 ## Requisitos
 
-O executavel `codex` pode vir do `PATH`, da extensao oficial `openai.chatgpt` instalada no NPSharp, VS Code, VS Code Insiders, VSCodium, Cursor ou Windsurf, ou do caminho definido em `NPSHARP_CODEX_PATH`.
+O executavel `codex` pode vir do `PATH`, da extensao oficial `openai.chatgpt` instalada no Sharp-OSS, VS Code, VS Code Insiders, VSCodium, Cursor ou Windsurf, ou do caminho definido em `SHARP_CODEX_PATH`.
 
 ## Uso
 

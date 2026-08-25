@@ -11,7 +11,7 @@ export interface AppInfo {
   platform: NodeJS.Platform | string;
   userDataPath: string;
   appPath: string;
-  npsharpHome: string;
+  sharpHome: string;
   architecture: string;
   isPackaged: boolean;
   runtime: {
@@ -741,7 +741,7 @@ export interface AIConversationUpdate {
   messages?: AIMessage[];
 }
 
-export interface NpsharpApi {
+export interface SharpApi {
   appInfo(): Promise<AppInfo>;
   startup: {
     mark(stage: "renderer-rendered" | "editor-interactive"): Promise<void>;
@@ -920,7 +920,7 @@ export interface NpsharpApi {
 
 declare global {
   interface Window {
-    npsharp?: NpsharpApi;
-    npsharpApi?: NpsharpApi;
+    sharp?: SharpApi;
+    sharpApi?: SharpApi;
   }
 }

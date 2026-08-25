@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import type { AIContextItem, AIMessage } from "../../../shared/types";
 
-const CONTEXT_HEADER = "The following NPSharp editor context was explicitly selected by the user.";
+const CONTEXT_HEADER = "The following Sharp-OSS editor context was explicitly selected by the user.";
 
 export class PromptBuilder {
   build(messages: readonly AIMessage[], contexts: readonly AIContextItem[]): AIMessage[] {
@@ -28,4 +28,3 @@ export class PromptBuilder {
     return clean;
   }
 }
-

@@ -17,7 +17,7 @@ const DEFAULT_AI_SETTINGS: AISettings = {
   temperature: 0.2,
   maxTokens: 8192,
   streaming: true,
-  systemPrompt: "You are NPSharp Codex, a precise coding agent. Use the open workspace and the editor context selected by the user. Inspect the relevant files, make requested changes directly when tools are available, keep edits scoped to the workspace, verify the result, and report what changed without claiming actions you did not perform.",
+  systemPrompt: "You are Sharp-OSS Codex, a precise coding agent. Use the open workspace and the editor context selected by the user. Inspect the relevant files, make requested changes directly when tools are available, keep edits scoped to the workspace, verify the result, and report what changed without claiming actions you did not perform.",
   contextSize: 128000,
   ollamaBaseUrl: "http://127.0.0.1:11434",
   apiKeyConfigured: false
@@ -53,7 +53,7 @@ export class AISettingsService {
         this.sessionKeys.delete(request.provider);
       } else {
         this.sessionKeys.set(request.provider, suppliedKey);
-        console.warn("[NPSharp AI] OS-backed encryption is unavailable; the API key will remain in memory for this session only.");
+        console.warn("[Sharp-OSS AI] OS-backed encryption is unavailable; the API key will remain in memory for this session only.");
       }
     }
     const next: PersistedAISettings = {
@@ -84,7 +84,7 @@ export class AISettingsService {
     try {
       return safeStorage.decryptString(Buffer.from(encrypted, "base64"));
     } catch (error) {
-      console.warn(`[NPSharp AI] Failed to decrypt the ${provider} API key.`, error);
+      console.warn(`[Sharp-OSS AI] Failed to decrypt the ${provider} API key.`, error);
       return undefined;
     }
   }
@@ -100,7 +100,7 @@ export class AISettingsService {
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        console.warn(`[NPSharp AI] Failed to load AI settings from ${this.settingsPath}.`, error);
+        console.warn(`[Sharp-OSS AI] Failed to load AI settings from ${this.settingsPath}.`, error);
       }
       return { ...withoutApiFlag(DEFAULT_AI_SETTINGS), encryptedKeys: {} };
     }

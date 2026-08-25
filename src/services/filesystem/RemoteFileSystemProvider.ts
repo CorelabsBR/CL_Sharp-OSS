@@ -28,7 +28,7 @@ export class RemoteFileSystemProvider implements FileSystemProvider {
 
   private path(uri: string): string {
     const parsed = new URL(uri);
-    if (parsed.protocol !== "npsharp-remote:" || parsed.hostname !== this.hostId) throw new Error("REMOTE_INVALID_PATH");
+    if (parsed.protocol !== "sharp-remote:" || parsed.hostname !== this.hostId) throw new Error("REMOTE_INVALID_PATH");
     return decodeURIComponent(parsed.pathname);
   }
 }
