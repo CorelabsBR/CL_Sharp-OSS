@@ -103,10 +103,6 @@ import type {
   LanguageRuntimeConfig,
   LiveServerRequest,
   OpenVsxExtension,
-  RemoteCommandRequest,
-  RemoteFileRequest,
-  RemoteHostConfig,
-  RemoteListRequest,
   ReplaceAllRequest,
   AppUpdateStatus,
   DiscordPresenceContext,
@@ -788,17 +784,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle("liveServer:stopAll", () => stopAllLiveServers());
   ipcMain.handle("templates:apply", (_event, request: TemplateApplyRequest) => applyTemplate(resourcesRoot(app.getAppPath(), app.isPackaged), request));
 
-  ipcMain.handle("remote:loadHosts", () => loadHosts());
-  ipcMain.handle("remote:saveHosts", (_event, hosts: RemoteHostConfig[]) => saveHosts(hosts));
-  ipcMain.handle("remote:test", (_event, request: RemoteCommandRequest) => testRemote(request));
-  ipcMain.handle("remote:list", (_event, request: RemoteListRequest) => listRemote(request));
-  ipcMain.handle("remote:readFile", (_event, request: RemoteFileRequest) => readRemoteFile(request));
-  ipcMain.handle("remote:writeFile", (_event, request: RemoteFileRequest) => writeRemoteFile(request));
-  ipcMain.handle("remote:mkdir", (_event, request: RemoteFileRequest) => mkdirRemote(request));
-  ipcMain.handle("remote:touch", (_event, request: RemoteFileRequest) => touchRemote(request));
-  ipcMain.handle("remote:rename", (_event, request: RemoteFileRequest & { newPath: string }) => renameRemote(request));
-  ipcMain.handle("remote:delete", (_event, request: RemoteFileRequest) => deleteRemote(request));
-  ipcMain.handle("remote:execute", (_event, request: RemoteCommandRequest) => executeRemote(request));
   ipcMain.handle("remote:connect", (_event, hostId: string, password?: string) => remoteHostManager!.connect(hostId, password));
   ipcMain.handle("remote:disconnect", (_event, sessionId: string) => remoteHostManager!.disconnect(sessionId));
   ipcMain.handle("remote:reconnect", (_event, sessionId: string) => remoteHostManager!.reconnect(sessionId));
