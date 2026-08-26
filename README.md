@@ -1,15 +1,16 @@
 # Sharp-OSS — Editor de Código Aberto e Independente
 
-[![Feature Requests](https://img.shields.io/github/issues/girellidev/sharp/feature-request.svg)](https://github.com/corelabsbr/cl_sharp-oss/issues?q=is%3Aopen+is%3Aissue+label%3Aaprimoramento+sort%3Areactions-%2B1-desc)
-[![Bugs](https://img.shields.io/github/issues/girellidev/sharp/bug.svg)](https://github.com/corelabsbr/cl_sharp-oss/issues?q=is%3Aopen+is%3Aissue+label%3Abug)
+[![Feature Requests](https://img.shields.io/github/issues/CoreLabsBR/CL_Sharp-OSS/feature-request.svg)](https://github.com/CoreLabsBR/CL_Sharp-OSS/issues?q=is%3Aopen+is%3Aissue+label%3Aaprimoramento+sort%3Areactions-%2B1-desc)
+[![Bugs](https://img.shields.io/github/issues/CoreLabsBR/CL_Sharp-OSS/bug.svg)](https://github.com/CoreLabsBR/CL_Sharp-OSS/issues?q=is%3Aopen+is%3Aissue+label%3Abug)
+[![Latest Release](https://img.shields.io/github/v/release/CoreLabsBR/CL_Sharp-OSS)](https://github.com/CoreLabsBR/CL_Sharp-OSS/releases/latest)
 
 O **Sharp-OSS** é um editor de código aberto desenvolvido pela Corelabs, construído sobre o projeto **NPSharp** e focado em oferecer uma experiência moderna, rápida e totalmente controlada pelo desenvolvedor.
 
 O objetivo do projeto é disponibilizar um ambiente de desenvolvimento independente, transparente e auditável, eliminando dependências desnecessárias e permitindo que toda a evolução do editor aconteça de forma aberta.
 
-🌐 Site oficial: https://npsharp.corelabs.dev.br
+🌐 Repositório oficial: https://github.com/CoreLabsBR/CL_Sharp-OSS
 
-📄 Licença: https://npsharp.corelabs.dev.br/license/
+📄 Licença: [LICENSE.txt](LICENSE.txt)
 A motivação do SHARP é simples e direta: criar um editor que seja **realmente independente**, **controlado pelo desenvolvedor**, **aberto ao público**, e que permita evolução contínua sem depender de decisões corporativas ou licenças restritivas.
 O que está aqui é o ponto de partida. É o esqueleto, o motor cru, a base verificável.
 
@@ -66,25 +67,23 @@ O projeto utiliza uma **licença personalizada**, permitindo:
 - Proibição de uso da marca “SHARP” sem permissão
 - Obrigatoriedade de manter créditos originais
 
-O texto completo da licença está no arquivo LICENSE e deve ser respeitado integralmente.
+O texto completo da licença está no arquivo [`LICENSE.txt`](LICENSE.txt) e deve ser respeitado integralmente.
 
 ## Contribuindo
 
 Existem várias formas de participar do desenvolvimento do SHARP:
 
-* Reportar bugs e sugerir novas funcionalidades na aba de Issues do repositório.
+* [Reportar bugs e sugerir novas funcionalidades](https://github.com/CoreLabsBR/CL_Sharp-OSS/issues) na aba de Issues do repositório.
 * Revisar mudanças no código enviadas por outros contribuidores.
 * Ajudar a melhorar a documentação com correções, melhorias ou novos conteúdos.
 
 Se você deseja contribuir diretamente para o código-fonte,
 consulte o guia completo de contribuição deste projeto:
 
-* [Como compilar e executar a partir do código-fonte](https://sharp.corelabs.dev.br)
-* [Fluxo de desenvolvimento: depuração, testes e organização interna](https://sharp.corelabs.dev.br)
-* [Diretrizes de codificação usadas neste projeto](https://sharp.corelabs.dev.br)
-* [Como enviar Pull Requests para revisão](https://sharp.corelabs.dev.br)
-* [Onde encontrar tarefas e pontos do projeto que precisam de ajuda](https://sharp.corelabs.dev.br)
-* [Como contribuir com traduções da interface](https://sharp.corelabs.dev.br)
+* [Como compilar e executar a partir do código-fonte](BUILDING.md)
+* [Documentação técnica do projeto](docs/)
+* [Como enviar Pull Requests para revisão](https://github.com/CoreLabsBR/CL_Sharp-OSS/pulls)
+* [Onde encontrar tarefas e pontos do projeto que precisam de ajuda](https://github.com/CoreLabsBR/CL_Sharp-OSS/issues)
 
 O SHARP é um projeto independente.
 Toda contribuição é bem-vinda, desde que siga as diretrizes e respeite a filosofia do editor:
@@ -99,5 +98,5 @@ O projeto suporta:
 - Modificações diretas sem patch reverso
 - Ambientes controlados e previsíveis
 
-Instruções detalhadas estão em `BUILDING.md`.
+Instruções detalhadas estão em [`BUILDING.md`](BUILDING.md).
 Pronto para colocar no GitHub.

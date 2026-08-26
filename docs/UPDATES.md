@@ -1,6 +1,6 @@
 # Atualizações do Sharp-OSS
 
-O Sharp-OSS usa GitHub Releases do repositório `CoreLabsBR/Sharp-OSS` e o `electron-updater`. A verificação é feita depois de a IDE abrir e nunca usa Git, tokens ou acesso direto do renderer ao sistema.
+O Sharp-OSS usa GitHub Releases do repositório `CoreLabsBR/CL_Sharp-OSS` e o `electron-updater`. A verificação é feita depois de a IDE abrir e nunca usa Git, tokens ou acesso direto do renderer ao sistema.
 
 ## Formatos suportados
 

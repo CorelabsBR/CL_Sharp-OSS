@@ -7,7 +7,7 @@ Type: Refactor / Fix
 Description:
 - Reinicia a versão pública do Sharp-OSS como `1.0.0`, mantendo sincronizados os metadados do aplicativo, pacotes e Android.
 - Adiciona um script `.bat` interativo para escolher, sincronizar e validar a versão antes de enviar alterações.
-- Corrige o workflow de release para publicar sempre no repositório que executou a action e alinha os metadados ao `CoreLabsBR/CL_Sharp-OSS`.
+- Corrige o workflow de release para publicar sempre no repositório que executou a action e alinha os metadados e links da documentação ao `CoreLabsBR/CL_Sharp-OSS`.
 
 ## 26.8.52 - 2026-08-26
 
