@@ -158,16 +158,14 @@
         "label": "Operacional",
         "uiTheme": "vs-dark",
         "cat": "DEFAULT DARK",
-        "path": "./operacional.json",
-        "welcomeLogo": "./welcomelogos/operacional.png"
+        "path": "./operacional.json"
       },
        {
         "id": "christmas",
         "label": "Christmas Frost",
         "uiTheme": "vs-dark",
         "cat": "SAZONAIS",
-        "path": "./christmas.json",
-        "welcomeLogo": "./welcomelogos/sakura.png"
+        "path": "./christmas.json"
       }
     ],
     "specialThemes": [
@@ -179,9 +177,7 @@
         "path": "./sakura.json",
         "categories": [
           "Special Themes"
-        ],
-        "preview": "./previews/sakura.png",
-        "welcomeLogo": "./welcomelogos/sakura.png"
+        ]
       },
       {
         "id": "crimson_screen",
@@ -191,8 +187,7 @@
         "path": "./crimson_screen.json",
         "categories": [
           "Special Themes"
-        ],
-        "preview": "./previews/crimson_screen.png"
+        ]
       }
     ],
     "iconThemes": [
@@ -205,6 +200,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/girellidev/sharp.git"
-  }
+    "url": "https://github.com/corelabsbr/cl_sharp-oss"
+}
 }

@@ -85,19 +85,6 @@ import {
   resizeTerminal,
   writeTerminal
 } from "../services/node/terminalService";
-import {
-  deleteRemote,
-  executeRemote,
-  listRemote,
-  loadHosts,
-  mkdirRemote,
-  readRemoteFile,
-  renameRemote,
-  saveHosts,
-  testRemote,
-  touchRemote,
-  writeRemoteFile
-} from "../services/node/remoteService";
 import { RemoteHostConnectionManager } from "../services/node/remote/RemoteHostConnectionManager";
 import { DiscordRichPresenceManager } from "./discord/DiscordRichPresenceManager";
 import type {

@@ -1,11 +1,12 @@
 # CHANGELOG
 
-## 26.8.52 - 2026-08-25
+## 26.8.52 - 2026-08-26
 
-Type: Refactor
+Type: Refactor / Fix
 
 Description:
 - Substitui integralmente a identidade anterior por Sharp-OSS, usando `sharp` em identificadores técnicos incompatíveis com hífen.
+- Remove os controles funcionais de Remote Host da interface OSS e informa que o recurso não está acessível nessa versão.
 
 ## 26.8.51 - 2026-08-20
 

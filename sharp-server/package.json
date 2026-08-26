@@ -1,9 +1,0 @@
-{
-  "name": "sharp-server",
-  "private": true,
-  "type": "module",
-  "version": "26.8.52",
-  "main": "dist/index.js",
-  "dependencies": { "ws": "8.18.3" },
-  "optionalDependencies": { "node-pty": "1.1.0" }
-}

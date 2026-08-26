@@ -1,15 +1,15 @@
 # Sharp-OSS — Editor de Código Aberto e Independente
 
-[![Feature Requests](https://img.shields.io/github/issues/girellidev/sharp/feature-request.svg)](https://github.com/girellidev/sharp/issues?q=is%3Aopen+is%3Aissue+label%3Aaprimoramento+sort%3Areactions-%2B1-desc)
-[![Bugs](https://img.shields.io/github/issues/girellidev/sharp/bug.svg)](https://github.com/girellidev/sharp/issues?q=is%3Aopen+is%3Aissue+label%3Abug)
+[![Feature Requests](https://img.shields.io/github/issues/girellidev/sharp/feature-request.svg)](https://github.com/corelabsbr/cl_sharp-oss/issues?q=is%3Aopen+is%3Aissue+label%3Aaprimoramento+sort%3Areactions-%2B1-desc)
+[![Bugs](https://img.shields.io/github/issues/girellidev/sharp/bug.svg)](https://github.com/corelabsbr/cl_sharp-oss/issues?q=is%3Aopen+is%3Aissue+label%3Abug)
 
-O **Sharp-OSS** é um editor de código aberto desenvolvido pela Corelabs, construído sobre o projeto **Sharp-OSS FX** e focado em oferecer uma experiência moderna, rápida e totalmente controlada pelo desenvolvedor.
+O **Sharp-OSS** é um editor de código aberto desenvolvido pela Corelabs, construído sobre o projeto **NPSharp** e focado em oferecer uma experiência moderna, rápida e totalmente controlada pelo desenvolvedor.
 
 O objetivo do projeto é disponibilizar um ambiente de desenvolvimento independente, transparente e auditável, eliminando dependências desnecessárias e permitindo que toda a evolução do editor aconteça de forma aberta.
 
-🌐 Site oficial: https://sharp.corelabs.dev.br
+🌐 Site oficial: https://npsharp.corelabs.dev.br
 
-📄 Licença: https://sharp.corelabs.dev.br/license/
+📄 Licença: https://npsharp.corelabs.dev.br/license/
 A motivação do SHARP é simples e direta: criar um editor que seja **realmente independente**, **controlado pelo desenvolvedor**, **aberto ao público**, e que permita evolução contínua sem depender de decisões corporativas ou licenças restritivas.
 O que está aqui é o ponto de partida. É o esqueleto, o motor cru, a base verificável.
 
@@ -21,12 +21,12 @@ Este repositório contém:
 - Código-fonte do Sharp-OSS com ajustes necessários para permitir identidade própria.
 - Configurações, patches e modificações essenciais para manter compatibilidade e independência.
 - Ambiente pronto para contribuições, testes e builds limpos.
-- A fundação do editor **SHARP Clean**, usado como base de desenvolvimento.
+- A fundação do editor **NPSharp Clean**, usado como base de desenvolvimento.
 
 Este repositório **não** é a versão distribuída no site sharp.girelli.dev.br.
 
 ## O que NÃO é este repositório
-A versão oferecida no [site](https://sharp.corelabs.dev.br)
+A versão oferecida no [site](https://npsharp.corelabs.dev.br)
 
 É outro software. Compartilha origem, mas segue caminho próprio.
 

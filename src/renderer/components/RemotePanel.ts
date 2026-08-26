@@ -10,6 +10,7 @@ import { basename } from "../utils/path";
 import { showInputDialog } from "../utils/inputDialog";
 
 export class RemotePanel {
+  private static readonly OSS_UNAVAILABLE_MESSAGE = "O REMOTE HOST NÃO ESTÁ ACESSIVEL NA VERSÃO OSS";
   readonly element = el("div", { className: "panel remote-panel" });
   private readonly hostsBox = el("div", { className: "remote-hosts" });
   private readonly tree = el("div", { className: "remote-tree" });
@@ -33,49 +34,31 @@ export class RemotePanel {
   }
 
   async refresh(): Promise<void> {
-    this.hosts = await api.remote.loadHosts();
-    this.renderHosts();
+    this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE);
   }
 
   async connectSavedHost(): Promise<void> {
-    await this.refresh();
-    if (!this.hosts.length) { this.updateStatus("Nenhum Remote Host configurado"); return; }
-    const selected = await showInputDialog(`Remote Host: Connect — ${this.hosts.map(host => host.name || host.host).join(", ")}`, this.hosts[0]?.name ?? "");
-    const host = this.hosts.find(item => selected === item.name || selected === item.host);
-    if (!host) { this.updateStatus("Host remoto não encontrado"); return; }
-    await this.connect(host);
+    this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE);
   }
 
-  async disconnect(): Promise<void> { if (!this.sessionId) return; await api.remote.disconnect(this.sessionId); this.sessionId = undefined; this.watcherId = undefined; this.remoteShell = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
-  async reconnect(): Promise<void> { if (!this.sessionId) return; const session = await api.remote.reconnect(this.sessionId); this.sessionId = session.id; await this.openRemoteFolder(); }
-  async openRemoteFolder(): Promise<void> { if (!this.sessionId || !this.active) return; const selected = await this.pickRemoteFolder(this.currentPath); if (!selected) return; await this.activateRemoteFolder(selected); }
-  async showLogs(): Promise<void> { const logs = await api.remote.getLogs(); this.updateStatus(logs.slice(-20).map(entry => `${entry.timestamp} [${entry.scope}] ${entry.message}`).join("\n") || "Sem logs remotos"); }
-  async addNewHost(): Promise<void> { await this.addHost(); }
-  async editSelectedHost(): Promise<void> { const host = this.active ?? this.hosts[0]; if (host) await this.editHost(host); }
-  async removeSelectedHost(): Promise<void> { const host = this.active ?? this.hosts[0]; if (host) await this.deleteHost(host); }
-  async uninstallServer(): Promise<void> { if (!this.sessionId || !confirm("Desinstalar esta versão do Sharp-OSS Server no host remoto?")) return; await api.remote.uninstallServer(this.sessionId); this.sessionId = undefined; this.active = undefined; this.tree.replaceChildren(); this.renderHosts(); }
+  async disconnect(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async reconnect(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async openRemoteFolder(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async showLogs(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async addNewHost(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async editSelectedHost(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async removeSelectedHost(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
+  async uninstallServer(): Promise<void> { this.updateStatus(RemotePanel.OSS_UNAVAILABLE_MESSAGE); }
 
   connection(): { sessionId: string; hostName: string; cwd: string; shell?: string } | undefined {
-    return this.sessionId && this.active ? { sessionId: this.sessionId, hostName: this.active.name || this.active.host, cwd: this.currentPath, shell: this.remoteShell } : undefined;
+    return undefined;
   }
 
   private build(): void {
-    const toolbar = el("div", { className: "panel-toolbar" });
-    toolbar.append(
-      buttonIcon("add", "Add Host", () => void this.addHost()),
-      buttonIcon("refresh", "Atualizar", () => void this.refresh()),
-      buttonIcon("terminal", "Execute", () => void this.executeCommand())
-    );
-    this.command.addEventListener("keydown", event => {
-      if (event.key === "Enter") void this.executeCommand();
-    });
-    this.element.append(toolbar, this.hostsBox, this.command, this.tree);
-    this.disposeStatus = api.remote.onStatusChanged(state => this.updateStatus(state.message));
-    api.remote.onEvent(value => {
-      const payload = value.payload as { watcherId?: string };
-      if (value.sessionId === this.sessionId && payload.watcherId === this.watcherId && value.event.startsWith("fs.")) void this.list(this.currentPath);
-    });
-    void this.refresh();
+    this.element.append(el("div", {
+      className: "empty-state",
+      text: RemotePanel.OSS_UNAVAILABLE_MESSAGE
+    }));
   }
 
   private renderHosts(): void {
