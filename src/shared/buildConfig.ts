@@ -11,7 +11,7 @@ export const BUILD_CONFIG = {
   "copyrightOwner": "CoreLabs",
   "applicationId": "br.com.corelabs.sharp",
   "protocol": "sharp",
-  "homepage": "https://github.com/CoreLabsBR/Sharp-OSS",
+  "homepage": "https://github.com/CoreLabsBR/CL_Sharp-OSS",
   "dataDirectoryName": ".sharp",
   "mobileDataDirectoryName": "Sharp-OSS"
 } as const;

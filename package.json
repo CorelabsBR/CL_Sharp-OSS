@@ -5,10 +5,10 @@
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
   "author": "CoreLabs",
-  "homepage": "https://github.com/CoreLabsBR/Sharp-OSS",
+  "homepage": "https://github.com/CoreLabsBR/CL_Sharp-OSS",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CoreLabsBR/Sharp-OSS.git"
+    "url": "https://github.com/CoreLabsBR/CL_Sharp-OSS.git"
   },
   "license": "SEE LICENSE IN ../Sharp-OSS/LICENSE.txt",
   "scripts": {

@@ -224,30 +224,28 @@ jobs:
         shell: bash
         run: |
           version="$(node -e 'process.stdout.write(require("./config.json").application.version)')"
-          repository="$(node -e 'const repo = require("./config.json").application.repository; process.stdout.write(`${repo.owner}/${repo.name}`)')"
           title="$(node -e 'process.stdout.write(require("./config.json").application.displayName)')"
           printf 'value=v%s\n' "$version" >> "$GITHUB_OUTPUT"
-          printf 'repository=%s\n' "$repository" >> "$GITHUB_OUTPUT"
           printf 'title=%s\n' "$title" >> "$GITHUB_OUTPUT"
 
       - name: Create or update the release and tag
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
         run: |
           release_tag="${{ steps.release_tag.outputs.value }}"
-          repository="${{ steps.release_tag.outputs.repository }}"
           release_title="${{ steps.release_tag.outputs.title }}"
           mapfile -t assets < <(find release-assets -type f | sort)
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No updater artifacts were generated."
             exit 1
           fi
-          if gh release view "${release_tag}" --repo "${repository}" >/dev/null 2>&1; then
-            gh release upload "${release_tag}" "${assets[@]}" --repo "${repository}" --clobber
+          if gh release view "${release_tag}" --repo "${RELEASE_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${release_tag}" "${assets[@]}" --repo "${RELEASE_REPOSITORY}" --clobber
           else
             gh release create "${release_tag}" "${assets[@]}" \
-              --repo "${repository}" \
+              --repo "${RELEASE_REPOSITORY}" \
               --target "${GITHUB_SHA}" \
               --title "${release_title} ${release_tag}" \
               --generate-notes
