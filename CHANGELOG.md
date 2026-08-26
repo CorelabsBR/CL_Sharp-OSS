@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 1.2.1 - 2026-08-26
+
+Type: Refactor / Fix
+
+Description:
+- Rework visual completo dos painéis Explorer, Search, Source Control, Runtime, Extensões e áreas secundárias para seguir a linguagem visual do VS Code, com superfícies, separadores, hover, seleção e foco alinhados ao design system sem alterar o comportamento funcional.
+- Consolida a consistência visual de toolbars, cards, listas, badges, summaries e rows usando tokens semânticos e reduz o uso de estilos redundantes e cores hardcoded.
+- Mantém compatibilidade entre desktop/web/mobile e preserva APIs, eventos e contratos dos componentes.
+- Corrige o fundo do visualizador de imagem para manter o background normal quando a imagem não tem transparência e reaproveitar o padrão de checkerboard somente quando a imagem realmente contém alpha.
+
 ## 1.2.0 - 2026-08-26
 
 Type: Feature / Refactor
