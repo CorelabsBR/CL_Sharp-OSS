@@ -23,11 +23,12 @@ interface BrandHighlightRule {
 }
 
 const FIXED_BRAND_HIGHLIGHTS: BrandHighlightRule[] = [
-  { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
-  { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
-  { terms: ["corelabs","Sharp","Sharp-OSS"], className: "brand-highlight-red" },
-  { terms: ["ESPERA O SPOILER"], className: "brand-highlight-special" },
-  { terms: ["PRF","Policia Rodoviaria Federal"], className: "brand-highlight-police" }
+  // { terms: ["girellidev", "girelli"], className: "brand-highlight-red" },
+  // { terms: ["arcaridev", "arcari"], className: "brand-highlight-yellow" },
+  // { terms: ["corelabs","Sharp","Sharp-OSS"], className: "brand-highlight-red" },
+  // { terms: ["ESPERA O SPOILER"], className: "brand-highlight-special" },
+  // { terms: ["PRF","Policia Rodoviaria Federal"], className: "brand-highlight-police" }
+  //utilizado apenas no npsharp normal, ative se quiser, só deixa coloridinho
 ];
 
 const MAX_BRAND_HIGHLIGHTS = 2000;
@@ -1107,10 +1108,14 @@ export class EditorTabs {
     for (const tab of this.tabs) {
       const shell = el("div", { className: "tab-shell" });
       const button = el("button", {
-        className: `tab ${tab.id === this.activeId ? "active" : ""}`,
-        title: tab.path ?? tab.virtualUri ?? tab.title
+        className: `tab ${tab.id === this.activeId ? "active" : ""} ${tab.dirty ? "is-dirty" : ""}`.trim(),
+        title: tab.path ?? tab.virtualUri ?? tab.title,
+        attrs: {
+          type: "button",
+          "aria-selected": String(tab.id === this.activeId)
+        }
       });
-      button.append(fileIcon(tab.title, false), el("span", { text: `${tab.dirty ? "● " : ""}${tab.title}` }));
+      button.append(fileIcon(tab.title, false), el("span", { text: tab.title }));
       button.addEventListener("click", () => this.selectTab(tab.id));
       shell.append(
         button,

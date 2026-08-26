@@ -27,11 +27,18 @@ export function normalizeLocale(locale: unknown): AppLocale {
 const EN_US: Record<string, string> = {
   "Arquivo": "File",
   "Novo": "New",
+  "Novo arquivo": "New File",
   "Abrir...": "Open...",
+  "Abrir arquivo": "Open File",
+  "Abrir pasta": "Open Folder",
+  "Abrir pasta do dispositivo": "Open Folder from Device",
+  "Fechar pasta": "Close Folder",
   "Salvar": "Save",
-  "Salvar Como...": "Save As...",
+  "Salvar como": "Save As",
   "Salvar Tudo": "Save All",
-  "Fechar Editor": "Close Editor",
+  "Reverter arquivo": "Revert File",
+  "Fechar editor": "Close Editor",
+  "Fechar todos os editores": "Close All Editors",
   "Reabrir Editor Fechado": "Reopen Closed Editor",
   "Fechar Todos os Editores": "Close All Editors",
   "Abrir pasta...": "Open Folder...",
@@ -44,6 +51,15 @@ const EN_US: Record<string, string> = {
   "Colar": "Paste",
   "Localizar": "Find",
   "Substituir": "Replace",
+  "Selecionar tudo": "Select All",
+  "Selecionar próxima ocorrência": "Select Next Occurrence",
+  "Selecionar todas as ocorrências": "Select All Occurrences",
+  "Duplicar linha": "Duplicate Line",
+  "Excluir linha": "Delete Line",
+  "Mover linha para cima": "Move Line Up",
+  "Mover linha para baixo": "Move Line Down",
+  "Copiar linha para cima": "Copy Line Up",
+  "Copiar linha para baixo": "Copy Line Down",
   "Localizar nos arquivos": "Find in Files",
   "Substituir nos arquivos": "Replace in Files",
   "Comentar linha": "Comment Line",
@@ -54,6 +70,9 @@ const EN_US: Record<string, string> = {
   "Ir para o fim": "Go to End",
   "Formatar documento": "Format Document",
   "Exibir": "View",
+  "Abertura rápida": "Quick Open",
+  "Alternar barra lateral": "Toggle Side Bar",
+  "Alternar terminal": "Toggle Terminal",
   "Explorador": "Explorer",
   "Pesquisar": "Search",
   "Controle de código-fonte": "Source Control",
@@ -64,6 +83,15 @@ const EN_US: Record<string, string> = {
   "Saída": "Output",
   "Atalhos de teclado": "Keyboard Shortcuts",
   "Extensões": "Extensions",
+  "Paleta de comandos": "Command Palette",
+  "Mostrar arquivo atual": "Show Current File",
+  "Baixar imports Python e preparar .venv": "Download Python imports and prepare .venv",
+  "Caminhos dos runtimes": "Runtime Paths",
+  "Verificar atualizações": "Check for Updates",
+  "Tema de cores": "Color Theme",
+  "Papel de parede": "Wallpaper",
+  "Limpar papel de parede": "Clear Wallpaper",
+  "Sobre o Sharp-OSS": "About Sharp-OSS",
   "Ampliar": "Zoom In",
   "Reduzir": "Zoom Out",
   "Redefinir zoom": "Reset Zoom",
@@ -81,11 +109,8 @@ const EN_US: Record<string, string> = {
   "Encerrar processo": "Terminate Process",
   "Fechar terminal": "Close Terminal",
   "Mais": "More",
-  "Paleta de comandos": "Command Palette",
   "Central de comandos": "Command Center",
-  "Verificar atualizações": "Check for Updates",
   "Instalar extensão de VSIX": "Install VSIX Extension",
-  "Sobre o Sharp-OSS": "About Sharp-OSS",
   "Idioma": "Language",
   "Escolha o idioma da interface. A aplicação será recarregada.": "Choose the interface language. The application will reload.",
   "Configurações": "Settings",
@@ -94,219 +119,266 @@ const EN_US: Record<string, string> = {
   "Resultados da pesquisa": "Search results",
   "Aparência": "Appearance",
   "Editor": "Editor",
+  "Busca global aberta": "Global search opened",
+  "Substituição global aberta": "Global replace opened",
+  "Central de comandos aberta": "Command Center opened",
+  "Saída aberta": "Output opened",
+  "Extensões instaladas": "Extensions installed",
+  "Recarregar extensão": "Reload Extension",
+  "Ativar extensão": "Enable Extension",
+  "Desativar extensão": "Disable Extension",
+  "Atalhos de teclado fechados": "Keyboard shortcuts closed",
+  "Palette fechada": "Palette closed",
+  "Command Center fechado": "Command Center closed",
+  "Busca fechada": "Search closed",
+  "Sugestões de trechos abertas": "Snippet suggestions opened",
+  "Atividade do Discord removida": "Discord activity removed",
+  "Configurações redefinidas": "Settings reset",
+  "Wallpaper removido": "Wallpaper removed",
+  "ErrorLens ativado": "ErrorLens enabled",
+  "ErrorLens desativado": "ErrorLens disabled",
+  "Quebra automática ativada": "Auto wrap enabled",
+  "Quebra automática desativada": "Auto wrap disabled",
+  "Papel de parede aplicado. Formatos aceitos: PNG, JPG, JPEG, JFIF, WebP, GIF e BMP.": "Wallpaper applied. Accepted formats: PNG, JPG, JPEG, JFIF, WebP, GIF, and BMP.",
+  "Seletor nativo de wallpaper disponivel apenas no desktop.": "Native wallpaper picker is available on desktop only.",
+  "Nenhum problema encontrado no workspace.": "No problems found in the workspace.",
+  "Ativar Rich Presence": "Enable Rich Presence",
+  "Mostrar nome do arquivo": "Show File Name",
+  "Mostrar projeto": "Show Project",
+  "Mostrar linguagem": "Show Language",
+  "Mostrar host remoto": "Show Remote Host",
+  "Mostrar tempo decorrido": "Show Elapsed Time",
+  "Mostrar tipo de workspace": "Show Workspace Type",
+  "Barra de status visível": "Status Bar Visible",
+  "Barra de atividades visível": "Activity Bar Visible",
+  "Barra lateral visível": "Side Bar Visible",
+  "Confirmar exclusão": "Confirm Delete",
+  "Restaurar último workspace ao iniciar": "Restore Last Workspace on Startup",
+  "Reconectar ao Discord": "Reconnect to Discord",
+  "Limpar atividade": "Clear Activity",
+  "Copiar diagnóstico": "Copy Diagnostics",
+  "AMBIENTE DE DESENVOLVIMENTO": "DEVELOPMENT ENVIRONMENT",
+  "Código sem distrações. Ferramentas locais e remotas em um único workspace.": "Distraction-free code. Local and remote tools in a single workspace.",
+  "Licenciado sob MIT · Feito por desenvolvedores, para desenvolvedores.": "Licensed under MIT · Made by developers for developers.",
+  "Gerenciar": "Manage",
+  "EXPLORADOR": "EXPLORER",
+  "PESQUISAR": "SEARCH",
+  "CONTROLE DE CÓDIGO-FONTE": "SOURCE CONTROL",
+  "EXECUTAR E DEPURAR": "RUN AND DEBUG",
+  "EXTENSÕES": "EXTENSIONS",
+  "HOST REMOTO": "REMOTE HOST",
+  "ARDUINO": "ARDUINO",
+  "CONVERSA COM IA": "AI CHAT",
+  "PROBLEMAS": "PROBLEMS",
   "Diagnósticos": "Diagnostics",
   "Compilação": "Build",
-  "Área de trabalho": "Workbench"
-  ,"Abrir": "Open"
-  ,"Atualizar": "Refresh"
-  ,"Cancelar": "Cancel"
-  ,"Confirmar": "Confirm"
-  ,"Configurar": "Configure"
-  ,"Excluir": "Delete"
-  ,"Executar": "Run"
-  ,"Fechar": "Close"
-  ,"Parar": "Stop"
-  ,"Recarregar": "Reload"
-  ,"Redefinir": "Reset"
-  ,"Remover": "Remove"
-  ,"Repositório": "Repository"
-  ,"Substituir tudo": "Replace All"
-  ,"Gerenciar": "Manage"
-  ,"Adicionar atalho": "Add Keybinding"
-  ,"Remover atalho personalizado": "Remove Custom Keybinding"
-  ,"Novo atalho": "New Keybinding"
-  ,"Nenhum atalho encontrado.": "No keybindings found."
-  ,"Pesquisar...": "Search..."
-  ,"Procurar...": "Browse..."
-  ,"Digite para pesquisar": "Type to search"
-  ,"Pesquisar configurações": "Search settings"
-  ,"Pesquisar extensões": "Search extensions"
-  ,"Pesquisar conversas": "Search conversations"
-  ,"Pesquisar por comando, categoria ou teclas": "Search by command, category, or keys"
-  ,"Pesquisa rápida de arquivos": "Quick file search"
-  ,"Incluir: *.ts, src/**": "Include: *.ts, src/**"
-  ,"Excluir: node_modules, dist/**": "Exclude: node_modules, dist/**"
-  ,"Diferenciar maiúsculas/minúsculas": "Match case"
-  ,"Palavra inteira": "Whole word"
-  ,"Aparencia": "Appearance"
-  ,"Paleta de comandos...": "Command Palette..."
-  ,"Tema de cores...": "Color Theme..."
-  ,"Selecionar tema de cores": "Select Color Theme"
-  ,"Escolher": "Choose"
-  ,"Wallpaper...": "Wallpaper..."
-  ,"Escolher papel de parede": "Choose Wallpaper"
-  ,"Remover papel de parede": "Remove Wallpaper"
-  ,"Ativar ErrorLens": "Enable ErrorLens"
-  ,"Desativar ErrorLens": "Disable ErrorLens"
-  ,"Backup e sincronização de configurações...": "Settings Backup and Sync..."
-  ,"Baixar atualização (1)": "Download Update (1)"
-  ,"Tema": "Theme"
-  ,"Tema visual da interface.": "Interface color theme."
-  ,"Tema de ícones": "Icon Theme"
-  ,"Default preserva as cores dos ícones; Monocromático usa a cor definida abaixo.": "Default preserves icon colors; Monochrome uses the color defined below."
-  ,"Padrão": "Default"
-  ,"Monocromático": "Monochrome"
-  ,"Cor dos ícones": "Icon Color"
-  ,"Cor CSS usada pelo tema de ícones monocromático, por exemplo #c5c5c5.": "CSS color used by the monochrome icon theme, for example #c5c5c5."
-  ,"Caminho do papel de parede": "Wallpaper Path"
-  ,"Caminho da imagem de fundo.": "Background image path."
-  ,"Opacidade do papel de parede": "Wallpaper Opacity"
-  ,"Opacidade da imagem de fundo.": "Background image opacity."
-  ,"Fonte": "Font"
-  ,"Fonte do editor": "Editor Font"
-  ,"Fonte usada no editor.": "Font used in the editor."
-  ,"Tamanho da fonte": "Font Size"
-  ,"Tamanho usado no editor.": "Font size used in the editor."
-  ,"Tamanho do tab": "Tab Size"
-  ,"Largura de cada tabulação no editor.": "Width of each tab in the editor."
-  ,"Quebra automática": "Word Wrap"
-  ,"Quebra linhas longas.": "Wraps long lines."
-  ,"Números de linha": "Line Numbers"
-  ,"Mostra os números das linhas.": "Shows line numbers."
-  ,"Salvar automaticamente": "Auto Save"
-  ,"Salva automaticamente.": "Saves automatically."
-  ,"Formatar ao salvar": "Format on Save"
-  ,"Formata ao salvar.": "Formats files when saving."
-  ,"Nome especial da marca": "Special Brand Name"
-  ,"Destaque personalizado da marca em rosa.": "Custom brand highlight in pink."
-  ,"Terminal ativado": "Terminal Enabled"
-  ,"Ativa o terminal integrado.": "Enables the integrated terminal."
-  ,"Shell do Windows": "Windows Shell"
-  ,"Shell padrão no Windows.": "Default shell on Windows."
-  ,"Shell do Linux/macOS": "Linux/macOS Shell"
-  ,"Shell padrão no Linux e macOS.": "Default shell on Linux and macOS."
-  ,"Diretório inicial": "Initial Directory"
-  ,"Diretório inicial do terminal.": "Terminal initial directory."
-  ,"Diagnósticos ativados": "Diagnostics Enabled"
-  ,"Ativa diagnósticos.": "Enables diagnostics."
-  ,"ErrorLens ativado": "ErrorLens Enabled"
-  ,"Mostra diagnósticos na linha.": "Shows inline diagnostics."
-  ,"Mostra diagnósticos na linha no editor.": "Shows inline diagnostics in the editor."
-  ,"Compilar ao salvar": "Compile on Save"
-  ,"Compila Java ao salvar.": "Compiles Java when saving."
-  ,"Abrir problemas automaticamente": "Open Problems Automatically"
-  ,"Abre Problemas quando os diagnósticos falham.": "Opens Problems when diagnostics fail."
-  ,"Comando de compilação": "Build Command"
-  ,"Comando usado para compilar.": "Command used to build."
-  ,"Comando usado para compilar o projeto.": "Command used to build the project."
-  ,"Pular testes": "Skip Tests"
-  ,"Pula testes durante a compilação.": "Skips tests during the build."
-  ,"Ativar Rich Presence": "Enable Rich Presence"
-  ,"Publica o contexto da IDE no Discord Desktop.": "Publishes IDE context to Discord Desktop."
-  ,"ID da aplicação criada no Discord Developer Portal. Vazio mantém a integração inativa.": "Application ID created in the Discord Developer Portal. Leave empty to disable the integration."
-  ,"Mostrar nome do arquivo": "Show File Name"
-  ,"Publica apenas o nome, nunca o caminho completo.": "Publishes only the name, never the full path."
-  ,"Mostrar projeto": "Show Project"
-  ,"Publica o nome do workspace atual.": "Publishes the current workspace name."
-  ,"Mostrar linguagem": "Show Language"
-  ,"Publica a linguagem do arquivo ativo.": "Publishes the active file language."
-  ,"Mostrar host remoto": "Show Remote Host"
-  ,"Publica o alias do Remote Host conectado.": "Publishes the connected Remote Host alias."
-  ,"Mostrar tempo decorrido": "Show Elapsed Time"
-  ,"Exibe há quanto tempo o Sharp-OSS está aberto.": "Shows how long Sharp-OSS has been open."
-  ,"Mostrar tipo de workspace": "Show Workspace Type"
-  ,"Identifica workspaces locais e remotos.": "Identifies local and remote workspaces."
-  ,"Imagem principal": "Large Image"
-  ,"Asset key configurada no Discord Developer Portal.": "Asset key configured in the Discord Developer Portal."
-  ,"Texto da imagem principal": "Large Image Text"
-  ,"Texto exibido ao passar o mouse sobre a imagem.": "Text shown when hovering over the image."
-  ,"Botão — rótulo": "Button — Label"
-  ,"Rótulo opcional do primeiro botão (máximo de dois no protocolo).": "Optional label for the first button (maximum of two in the protocol)."
-  ,"Botão — URL HTTPS": "Button — HTTPS URL"
-  ,"Somente URLs HTTPS válidas são publicadas.": "Only valid HTTPS URLs are published."
-  ,"Reconectar ao Discord": "Reconnect to Discord"
-  ,"Limpar atividade": "Clear Activity"
-  ,"Barra de status visível": "Status Bar Visible"
-  ,"Mostra a barra de status inferior.": "Shows the bottom status bar."
-  ,"Barra de atividades visível": "Activity Bar Visible"
-  ,"Mostra a barra de atividades.": "Shows the activity bar."
-  ,"Barra lateral visível": "Side Bar Visible"
-  ,"Mostra o painel lateral.": "Shows the side panel."
-  ,"Restaurar último workspace ao iniciar": "Restore Last Workspace on Startup"
-  ,"Reabre automaticamente o workspace que estava aberto ao fechar o Sharp-OSS.": "Automatically reopens the workspace that was open when Sharp-OSS closed."
-  ,"Confirmar exclusão": "Confirm Delete"
-  ,"Pede confirmação antes de excluir arquivos e pastas no Explorer.": "Asks for confirmation before deleting files and folders in Explorer."
-  ,"CENTRAL DE COMANDOS": "COMMAND CENTER"
-  ,"Centro de Comando": "Command Center"
-  ,"Abra, rode e organize seu workspace sem sair do editor.": "Open, run, and organize your workspace without leaving the editor."
-  ,"Projetos recentes": "Recent Projects"
-  ,"Ultimos workspaces": "Recent Workspaces"
-  ,"Atalhos recentes": "Recent Shortcuts"
-  ,"Nenhum projeto recente ainda.": "No recent projects yet."
-  ,"Abra uma pasta para iniciar o historico.": "Open a folder to start your history."
-  ,"EXPLORADOR": "EXPLORER"
-  ,"PROBLEMAS": "PROBLEMS"
-  ,"SAÍDA": "OUTPUT"
-  ,"CONSOLE DE DEPURAÇÃO": "DEBUG CONSOLE"
-  ,"PORTAS": "PORTS"
-  ,"TERMINAL": "TERMINAL"
-  ,"Ambientes de execução": "Runtime Environments"
-  ,"Configurações de IA": "AI Settings"
-  ,"Chat de IA": "AI Chat"
-  ,"Enviar mensagem": "Send Message"
-  ,"Mensagem do chat": "Chat Message"
-  ,"Modelo de IA": "AI Model"
-  ,"Provedor de IA": "AI Provider"
-  ,"Nova conversa": "New Conversation"
-  ,"Enviar": "Send"
-  ,"Geração interrompida": "Generation Stopped"
-  ,"Copiar resposta": "Copy Response"
-  ,"Remover contexto": "Remove Context"
-  ,"Carregando modelos…": "Loading models…"
-  ,"Verificando a conta Codex…": "Checking Codex account…"
-  ,"Entrar com ChatGPT": "Sign in with ChatGPT"
-  ,"Sair da conta": "Sign Out"
-  ,"Nenhum problema encontrado no workspace.": "No problems found in the workspace."
-  ,"Nenhuma extensão encontrada na Open VSX.": "No extensions found on Open VSX."
-  ,"A instalação local de VSIX requer o backend Electron de desktop.": "Local VSIX installation requires the desktop Electron backend."
-  ,"Desinstalar": "Uninstall"
-  ,"Pronto": "Ready"
-  ,"Configurações abertas": "Settings opened"
-  ,"Configurações fechadas": "Settings closed"
-  ,"Configurações redefinidas": "Settings reset"
-  ,"Atalhos de teclado abertos": "Keyboard Shortcuts opened"
-  ,"Atalho cancelado": "Keybinding canceled"
-  ,"+ Contexto": "+ Context"
-  ,"Abrir pasta no host remoto": "Open Folder on Remote Host"
-  ,"Abrir pasta remota": "Open Remote Folder"
-  ,"AMBIENTE DE DESENVOLVIMENTO": "DEVELOPMENT ENVIRONMENT"
-  ,"Arquivos HTML podem usar preview interno. Outras linguagens dependem de backend nativo futuro.": "HTML files can use the built-in preview. Other languages depend on a future native backend."
-  ,"Árvore de trabalho limpa": "Working tree clean"
-  ,"Baixar imports Python (.venv)": "Download Python Imports (.venv)"
-  ,"Caminho do sketch": "Sketch Path"
-  ,"Carregando runtimes...": "Loading runtimes..."
-  ,"Código sem distrações. Ferramentas locais e remotas em um único workspace.": "Distraction-free code. Local and remote tools in a single workspace."
-  ,"Código, controle e domínio": "Code, Control, and Ownership"
-  ,"Comando": "Command"
-  ,"Comando remoto": "Remote Command"
-  ,"Copiar detalhes": "Copy Details"
-  ,"Copiar diagnóstico": "Copy Diagnostics"
-  ,"Cria ou reutiliza o .venv do projeto e instala os imports do arquivo Python atual": "Creates or reuses the project's .venv and installs imports from the current Python file"
-  ,"Detecção automática": "Automatic Detection"
-  ,"Digite um caminho ou escolha uma pasta abaixo.": "Enter a path or choose a folder below."
-  ,"Entrada do programa...": "Program input..."
-  ,"Esta ação removerá o item do disco.": "This action will remove the item from disk."
-  ,"Ex.: Ctrl+Alt+K": "E.g.: Ctrl+Alt+K"
-  ,"Licenciado sob MIT · Feito por desenvolvedores, para desenvolvedores.": "Licensed under MIT · Made by developers, for developers."
-  ,"Mensagem do commit": "Commit Message"
-  ,"Não foi possível iniciar o Sharp-OSS": "Sharp-OSS Could Not Start"
-  ,"Nenhum repositório": "No Repository"
-  ,"Novo arquivo": "New File"
-  ,"O arquivo é grande demais para ser incorporado com segurança. A prévia hexadecimal abaixo permite inspecioná-lo.": "The file is too large to embed safely. The hexadecimal preview below lets you inspect it."
-  ,"O Chat de IA não pôde ser inicializado.": "AI Chat could not be initialized."
-  ,"Os caminhos dos executáveis são armazenados em language-runtimes.json.": "Executable paths are stored in language-runtimes.json."
-  ,"Parar geração": "Stop Generation"
-  ,"Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)": "Ask Sharp-OSS AI… (Ctrl+Enter to send)"
-  ,"Pergunte sobre o seu código, anexe contexto do editor ou use uma ação de IA no menu de contexto do editor.": "Ask about your code, attach editor context, or use an AI action from the editor context menu."
-  ,"Permitir commit vazio": "Allow Empty Commit"
-  ,"Preferências do Sharp-OSS": "Sharp-OSS Preferences"
-  ,"Selecione a placa": "Select a Board"
-  ,"Selecione a porta": "Select a Port"
-  ,"Seu nome nos commits": "Your name in commits"
-  ,"seu-email@exemplo.com": "your-email@example.com"
-  ,"Token pessoal; mantido somente nesta sessão": "Personal token; kept only for this session"
-  ,"Usuário do GitHub, GitLab ou servidor Git": "GitHub, GitLab, or Git server username"
-  ,"Validar": "Validate"
+  "Área de trabalho": "Workbench",
+  "Abrir": "Open",
+  "Atualizar": "Refresh",
+  "Cancelar": "Cancel",
+  "Confirmar": "Confirm",
+  "Configurar": "Configure",
+  "Excluir": "Delete",
+  "Executar": "Run",
+  "Recarregar": "Reload",
+  "Remover": "Remove",
+  "Substituir tudo": "Replace All",
+  "Adicionar atalho": "Add Keybinding",
+  "Remover atalho personalizado": "Remove Custom Keybinding",
+  "Novo atalho": "New Keybinding",
+  "Nenhum atalho encontrado.": "No keybindings found.",
+  "Pesquisar...": "Search...",
+  "Procurar...": "Browse...",
+  "Digite para pesquisar": "Type to search",
+  "Pesquisar configurações": "Search settings",
+  "Pesquisar extensões": "Search extensions",
+  "Pesquisar por comando, categoria ou teclas": "Search by command, category, or keys",
+  "Pesquisa rápida de arquivos": "Quick file search",
+  "Incluir: *.ts, src/**": "Include: *.ts, src/**",
+  "Excluir: node_modules, dist/**": "Exclude: node_modules, dist/**",
+  "Diferenciar maiúsculas/minúsculas": "Match case",
+  "Palavra inteira": "Whole word",
+  "Paleta de comandos...": "Command Palette...",
+  "Tema de cores...": "Color Theme...",
+  "Selecionar tema de cores": "Select Color Theme",
+  "Escolher": "Choose",
+  "Wallpaper...": "Wallpaper...",
+  "Trechos": "Snippets",
+  "Tarefas": "Tasks",
+  "Backup e sincronização de configurações...": "Settings Backup and Sync...",
+  "Baixar atualização (1)": "Download Update (1)",
+  "Escolher papel de parede": "Choose Wallpaper",
+  "Remover papel de parede": "Remove Wallpaper",
+  "Ativar ErrorLens": "Enable ErrorLens",
+  "Desativar ErrorLens": "Disable ErrorLens",
+  "Tema": "Theme",
+  "Tema visual da interface.": "Interface color theme.",
+  "Tema de ícones": "Icon Theme",
+  "Default preserva as cores dos ícones; Monocromático usa a cor definida abaixo.": "Default preserves icon colors; Monochrome uses the color defined below.",
+  "Padrão": "Default",
+  "Monocromático": "Monochrome",
+  "Cor dos ícones": "Icon Color",
+  "Cor CSS usada pelo tema de ícones monocromático, por exemplo #c5c5c5.": "CSS color used by the monochrome icon theme, for example #c5c5c5.",
+  "Caminho do papel de parede": "Wallpaper Path",
+  "Caminho da imagem de fundo.": "Background image path.",
+  "Opacidade do papel de parede": "Wallpaper Opacity",
+  "Opacidade da imagem de fundo.": "Background image opacity.",
+  "Fonte": "Font",
+  "Fonte do editor": "Editor Font",
+  "Fonte usada no editor.": "Font used in the editor.",
+  "Tamanho da fonte": "Font Size",
+  "Tamanho usado no editor.": "Font size used in the editor.",
+  "Tamanho do tab": "Tab Size",
+  "Largura de cada tabulação no editor.": "Width of each tab in the editor.",
+  "Quebra automática": "Word Wrap",
+  "Quebra linhas longas.": "Wraps long lines.",
+  "Números de linha": "Line Numbers",
+  "Mostra os números das linhas.": "Shows line numbers.",
+  "Salvar automaticamente": "Auto Save",
+  "Salva automaticamente.": "Saves automatically.",
+  "Formatar ao salvar": "Format on Save",
+  "Formata ao salvar.": "Formats files when saving.",
+  "Nome especial da marca": "Special Brand Name",
+  "Destaque personalizado da marca em rosa.": "Custom brand highlight in pink.",
+  "Terminal ativado": "Terminal Enabled",
+  "Ativa o terminal integrado.": "Enables the integrated terminal.",
+  "Shell do Windows": "Windows Shell",
+  "Shell padrão no Windows.": "Default shell on Windows.",
+  "Shell do Linux/macOS": "Linux/macOS Shell",
+  "Shell padrão no Linux e macOS.": "Default shell on Linux and macOS.",
+  "Diretório inicial": "Initial Directory",
+  "Diretório inicial do terminal.": "Terminal initial directory.",
+  "Diagnósticos ativados": "Diagnostics Enabled",
+  "Ativa diagnósticos.": "Enables diagnostics.",
+  "Mostra diagnósticos na linha.": "Shows inline diagnostics.",
+  "Mostra diagnósticos na linha no editor.": "Shows inline diagnostics in the editor.",
+  "Compilar ao salvar": "Compile on Save",
+  "Compila Java ao salvar.": "Compiles Java when saving.",
+  "Abrir problemas automaticamente": "Open Problems Automatically",
+  "Abre Problemas quando os diagnósticos falham.": "Opens Problems when diagnostics fail.",
+  "Comando de compilação": "Build Command",
+  "Comando usado para compilar.": "Command used to build.",
+  "Comando usado para compilar o projeto.": "Command used to build the project.",
+  "Pular testes": "Skip Tests",
+  "Pula testes durante a compilação.": "Skips tests during the build.",
+  "Publica o contexto da IDE no Discord Desktop.": "Publishes IDE context to Discord Desktop.",
+  "ID da aplicação criada no Discord Developer Portal. Vazio mantém a integração inativa.": "Application ID created in the Discord Developer Portal. Leave empty to disable the integration.",
+  "Publica apenas o nome, nunca o caminho completo.": "Publishes only the name, never the full path.",
+  "Publica o nome do workspace atual.": "Publishes the current workspace name.",
+  "Publica a linguagem do arquivo ativo.": "Publishes the active file language.",
+  "Publica o alias do Remote Host conectado.": "Publishes the connected Remote Host alias.",
+  "Exibe há quanto tempo o Sharp-OSS está aberto.": "Shows how long Sharp-OSS has been open.",
+  "Identifica workspaces locais e remotos.": "Identifies local and remote workspaces.",
+  "Imagem principal": "Large Image",
+  "Asset key configurada no Discord Developer Portal.": "Asset key configured in the Discord Developer Portal.",
+  "Texto da imagem principal": "Large Image Text",
+  "Texto exibido ao passar o mouse sobre a imagem.": "Text shown when hovering over the image.",
+  "Botão — rótulo": "Button — Label",
+  "Rótulo opcional do primeiro botão (máximo de dois no protocolo).": "Optional label for the first button (maximum of two in the protocol).",
+  "Botão — URL HTTPS": "Button — HTTPS URL",
+  "Somente URLs HTTPS válidas são publicadas.": "Only valid HTTPS URLs are published.",
+  "Mostra a barra de status inferior.": "Shows the bottom status bar.",
+  "Mostra a barra de atividades.": "Shows the activity bar.",
+  "Mostra o painel lateral.": "Shows the side panel.",
+  "Reabre automaticamente o workspace que estava aberto ao fechar o Sharp-OSS.": "Automatically reopens the workspace that was open when Sharp-OSS closed.",
+  "Pede confirmação antes de excluir arquivos e pastas no Explorer.": "Asks for confirmation before deleting files and folders in Explorer.",
+  "CENTRAL DE COMANDOS": "COMMAND CENTER",
+  "Centro de Comando": "Command Center",
+  "Abra, rode e organize seu workspace sem sair do editor.": "Open, run, and organize your workspace without leaving the editor.",
+  "Projetos recentes": "Recent Projects",
+  "Ultimos workspaces": "Recent Workspaces",
+  "Atalhos recentes": "Recent Shortcuts",
+  "Nenhum projeto recente ainda.": "No recent projects yet.",
+  "Abra uma pasta para iniciar o historico.": "Open a folder to start your history.",
+  "SAÍDA": "OUTPUT",
+  "CONSOLE DE DEPURAÇÃO": "DEBUG CONSOLE",
+  "PORTAS": "PORTS",
+  "TERMINAL": "TERMINAL",
+  "Ambientes de execução": "Runtime Environments",
+  "Configurações de IA": "AI Settings",
+  "Chat de IA": "AI Chat",
+  "Enviar mensagem": "Send Message",
+  "Mensagem do chat": "Chat Message",
+  "Modelo de IA": "AI Model",
+  "Provedor de IA": "AI Provider",
+  "Nova conversa": "New Conversation",
+  "Renomear conversa": "Rename conversation",
+  "Excluir conversa": "Delete conversation",
+  "Enviar": "Send",
+  "Parar geração": "Stop generation",
+  "Geração interrompida": "Generation Stopped",
+  "Copiar resposta": "Copy Response",
+  "Remover contexto": "Remove Context",
+  "Carregando modelos…": "Loading models…",
+  "+ Contexto": "+ Context",
+  "Arquivo atual": "Current file",
+  "Texto selecionado": "Selected text",
+  "Editores abertos": "Open editors",
+  "Árvore do workspace": "Workspace tree",
+  "Arquivos relevantes do workspace": "Relevant workspace files",
+  "Saída do terminal": "Terminal output",
+  "Saída da build": "Build output",
+  "Diff do Git": "Git diff",
+  "Área de transferência": "Clipboard",
+  "Arquivos arrastados": "Dropped files",
+  "Nome da conversa": "Conversation name",
+  "Falha ao criar a conversa de IA": "Failed to create the AI conversation",
+  "Falha ao salvar as configurações de IA": "Failed to save AI settings",
+  "Falha ao anexar {file}": "Failed to attach {file}",
+  "Configure a chave da API do {provider} para enviar mensagens.": "Configure the API key for {provider} to send messages.",
+  "Entre pela sua conta ChatGPT. Nenhuma chave de API será solicitada.": "Sign in with your ChatGPT account. No API key will be requested.",
+  "Abrindo o navegador para entrar no ChatGPT…": "Opening the browser to sign in to ChatGPT…",
+  "Trocar conta ChatGPT": "Switch ChatGPT account",
+  "Conectado": "Connected",
+  "Saindo da conta Codex…": "Signing out of Codex…",
+  "O Codex pode ler e editar o workspace aberto.": "Codex can read and edit the open workspace.",
+  "Uma chave está armazenada com segurança para este provedor.": "A key is stored securely for this provider.",
+  "Nenhuma chave de API está armazenada para este provedor.": "No API key is stored for this provider.",
+  "Limpar chave de API salva": "Clear saved API key",
+  "Configurações de IA salvas": "AI settings saved",
+  "Verificando a conta Codex…": "Checking Codex account…",
+  "Sair da conta": "Sign Out",
+  "Nenhuma extensão encontrada na Open VSX.": "No extensions found on Open VSX.",
+  "A instalação local de VSIX requer o backend Electron de desktop.": "Local VSIX installation requires the desktop Electron backend.",
+  "Desinstalar": "Uninstall",
+  "Pronto": "Ready",
+  "Configurações abertas": "Settings opened",
+  "Configurações fechadas": "Settings closed",
+  "Atalhos de teclado abertos": "Keyboard Shortcuts opened",
+  "Atalho cancelado": "Keybinding canceled",
+  "Abrir pasta no host remoto": "Open Folder on Remote Host",
+  "Abrir pasta remota": "Open Remote Folder",
+  "Arquivos HTML podem usar preview interno. Outras linguagens dependem de backend nativo futuro.": "HTML files can use the built-in preview. Other languages depend on a future native backend.",
+  "Árvore de trabalho limpa": "Working tree clean",
+  "Baixar imports Python (.venv)": "Download Python Imports (.venv)",
+  "Caminho do sketch": "Sketch Path",
+  "Carregando runtimes...": "Loading runtimes...",
+  "Código, controle e domínio": "Code, Control, and Ownership",
+  "Comando": "Command",
+  "Comando remoto": "Remote Command",
+  "Copiar detalhes": "Copy Details",
+  "Detecção automática": "Automatic Detection",
+  "Digite um caminho ou escolha uma pasta abaixo.": "Enter a path or choose a folder below.",
+  "Entrada do programa...": "Program input...",
+  "Esta ação removerá o item do disco.": "This action will remove the item from disk.",
+  "Ex.: Ctrl+Alt+K": "E.g.: Ctrl+Alt+K",
+  "Mensagem do commit": "Commit Message",
+  "Não foi possível iniciar o Sharp-OSS": "Sharp-OSS Could Not Start",
+  "Nenhum repositório": "No Repository",
+  "O arquivo é grande demais para ser incorporado com segurança. A prévia hexadecimal abaixo permite inspecioná-lo.": "The file is too large to embed safely. The hexadecimal preview below lets you inspect it.",
+  "O Chat de IA não pôde ser initialized.": "AI Chat could not be initialized.",
+  "Os caminhos dos executáveis são armazenados em language-runtimes.json.": "Executable paths are stored in language-runtimes.json.",
+  "Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)": "Ask Sharp-OSS AI… (Ctrl+Enter to send)",
+  "Pergunte sobre o seu código, anexe contexto do editor ou use uma ação de IA no menu de contexto do editor.": "Ask about your code, attach editor context, or use an AI action from the editor context menu.",
+  "Permitir commit vazio": "Allow Empty Commit",
+  "Preferências do Sharp-OSS": "Sharp-OSS Preferences",
+  "Selecione a placa": "Select a Board",
+  "Selecione a porta": "Select a Port",
+  "Seu nome nos commits": "Your name in commits",
+  "seu-email@exemplo.com": "your-email@example.com",
+  "Token pessoal; mantido somente nesta sessão": "Personal token; kept only for this session",
+  "Usuário do GitHub, GitLab ou servidor Git": "GitHub, GitLab, or Git server username",
+  "Validar": "Validate"
 };
 
 export function t(locale: AppLocale, portuguese: string): string {

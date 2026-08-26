@@ -22,6 +22,7 @@ export class ImageViewer {
     this.canvas.append(this.image, this.meta);
     this.image.src = file.imageDataUrl ?? "";
     this.image.addEventListener("load", () => {
+      this.applyBackgroundMode();
       this.fit();
       this.meta.textContent = `${file.name} · ${this.image.naturalWidth} × ${this.image.naturalHeight} · ${formatBytes(file.size)} · ${file.type}`;
       this.onStatus(this.meta.textContent);
@@ -89,6 +90,29 @@ export class ImageViewer {
   }
 
   private render(): void { this.image.style.transform = `translate(${this.offsetX}px, ${this.offsetY}px) scale(${this.scale})`; }
+
+  private applyBackgroundMode(): void {
+    const hasAlpha = this.detectTransparency();
+    this.canvas.classList.toggle("image-transparent", hasAlpha);
+  }
+
+  private detectTransparency(): boolean {
+    const width = this.image.naturalWidth;
+    const height = this.image.naturalHeight;
+    if (!width || !height) return false;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return false;
+    context.clearRect(0, 0, width, height);
+    context.drawImage(this.image, 0, 0, width, height);
+    const data = context.getImageData(0, 0, width, height).data;
+    for (let index = 3; index < data.length; index += 4) {
+      if (data[index] < 255) return true;
+    }
+    return false;
+  }
 }
 
 function formatBytes(size: number): string {

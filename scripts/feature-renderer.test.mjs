@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const { CommandRegistry, fuzzyScore } = require("../dist-electron/renderer/commands/commandRegistry.js");
 const { parseQuickOpenQuery } = require("../dist-electron/renderer/commands/quickOpen.js");
 const { emmetAbbreviationAt, emmetLanguageConfig } = require("../dist-electron/editor/emmet.js");
+const { buildTaskMenuItems } = require("../dist-electron/shared/taskMenu.js");
 const { t } = require("../dist-electron/shared/i18n.js");
 
 test("Command Registry registra, executa e remove comandos", async () => {
@@ -38,6 +39,26 @@ test("Emmet oferece autocomplete nos dialetos de markup e estilos", () => {
   assert.match(emmetAbbreviationAt("div.card", { type: "markup", syntax: "jsx" }).snippet, /className="card"/);
   assert.match(emmetAbbreviationAt("m10", { type: "stylesheet", syntax: "css" }).snippet, /margin: 10px/);
   assert.match(emmetAbbreviationAt("node>child", { type: "markup", syntax: "xml" }).snippet, /<child>\$1<\/child>/);
+});
+
+test("menu de tarefas expõe ações reais do editor e do workspace", () => {
+  let runProject = 0;
+  let buildProject = 0;
+  const tasks = buildTaskMenuItems({
+    runProject: () => { runProject++; },
+    buildProject: () => { buildProject++; },
+    openTerminal: () => {},
+    openNotes: () => {},
+    runDebug: () => {}
+  });
+  assert.ok(tasks.some(item => item.label === "Executar projeto"));
+  assert.ok(tasks.some(item => item.label === "Compilar projeto"));
+  assert.ok(tasks.some(item => item.label === "Executar e depurar"));
+  assert.equal(tasks.length >= 4, true);
+  tasks[0].run();
+  tasks[1].run();
+  assert.equal(runProject, 1);
+  assert.equal(buildProject, 1);
 });
 
 test("catálogo em inglês cobre configurações e ações principais", () => {

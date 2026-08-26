@@ -292,10 +292,25 @@ export class FileExplorer {
 
   private renderNode(nodePath: string, depth: number): HTMLElement {
     const node = this.nodes.get(nodePath)!;
-    const row = el("div", { className: `tree-row ui-list-item${samePath(this.selectedPath ?? "", nodePath) ? " selected" : ""}`, attrs: { "data-path": nodePath } });
-    row.style.paddingLeft = `${depth * 14 + 6}px`;
+    const isSelected = samePath(this.selectedPath ?? "", nodePath);
+    const row = el("div", {
+      className: `tree-row ui-list-item${isSelected ? " selected" : ""}`,
+      attrs: {
+        "data-path": nodePath,
+        role: "treeitem",
+        "aria-selected": String(isSelected),
+        "aria-level": String(depth + 1),
+        "aria-expanded": node.entry.directory ? String(node.expanded) : "false",
+        title: node.entry.path,
+        tabindex: isSelected ? "0" : "-1"
+      }
+    });
+    row.style.paddingLeft = `${depth * 12 + 4}px`;
     const twisty = el("span", { className: "tree-twisty", text: node.entry.directory ? (node.expanded ? "▾" : "▸") : "" });
-    row.append(twisty, fileIcon(node.entry.name, node.entry.directory, node.expanded), el("span", { className: "tree-label", text: node.entry.name }));
+    twisty.setAttribute("aria-hidden", "true");
+    const icon = fileIcon(node.entry.name, node.entry.directory, node.expanded);
+    const label = el("span", { className: "tree-label", text: node.entry.name });
+    row.append(twisty, icon, label);
 
     row.addEventListener("click", () => {
       this.selectedPath = node.entry.path;

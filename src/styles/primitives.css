@@ -81,10 +81,10 @@
 
 .ui-icon-button,
 .icon-button {
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
   padding: 0;
   border-color: transparent;
   background: transparent;
@@ -153,12 +153,13 @@ select.ui-field {
 .panel-toolbar,
 .ai-toolbar,
 .runtime-config-toolbar {
-  min-height: 32px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px var(--space-1);
+  padding: 1px 4px;
   border-bottom: 1px solid var(--line-subtle);
+  background: color-mix(in srgb, var(--surface-panel) 96%, transparent);
 }
 
 .ui-panel-header {

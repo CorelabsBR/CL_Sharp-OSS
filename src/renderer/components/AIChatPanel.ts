@@ -19,6 +19,7 @@ import { api } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { showInputDialog } from "../utils/inputDialog";
+import { uiText } from "../../shared/i18n";
 
 export interface AIChatEditorActions {
   insertBelow(code: string): void;
@@ -28,49 +29,49 @@ export interface AIChatEditorActions {
 }
 
 const CONTEXT_OPTIONS: Array<{ source: AIContextSource; label: string }> = [
-  { source: "currentFile", label: "Arquivo atual" },
-  { source: "selection", label: "Texto selecionado" },
-  { source: "openEditors", label: "Editores abertos" },
-  { source: "workspaceTree", label: "Árvore do workspace" },
-  { source: "workspaceFiles", label: "Arquivos relevantes do workspace" },
-  { source: "terminal", label: "Saída do terminal" },
-  { source: "buildOutput", label: "Saída da build" },
-  { source: "gitDiff", label: "Diff do Git" },
-  { source: "diagnostics", label: "Diagnósticos" },
-  { source: "problems", label: "Problemas" },
-  { source: "clipboard", label: "Área de transferência" },
-  { source: "files", label: "Arquivos arrastados" }
+  { source: "currentFile", label: uiText("Arquivo atual") },
+  { source: "selection", label: uiText("Texto selecionado") },
+  { source: "openEditors", label: uiText("Editores abertos") },
+  { source: "workspaceTree", label: uiText("Árvore do workspace") },
+  { source: "workspaceFiles", label: uiText("Arquivos relevantes do workspace") },
+  { source: "terminal", label: uiText("Saída do terminal") },
+  { source: "buildOutput", label: uiText("Saída da build") },
+  { source: "gitDiff", label: uiText("Diff do Git") },
+  { source: "diagnostics", label: uiText("Diagnósticos") },
+  { source: "problems", label: uiText("Problemas") },
+  { source: "clipboard", label: uiText("Área de transferência") },
+  { source: "files", label: uiText("Arquivos arrastados") }
 ];
 
 const ACTION_PROMPTS: Record<string, string> = {
-  ask: "Me ajude com o código selecionado.",
-  explain: "Explique o código selecionado com clareza, incluindo o comportamento e os principais casos extremos.",
-  refactor: "Refatore o código selecionado para melhorar clareza, manutenção e corretude. Retorne a substituição completa em um bloco de código.",
-  optimize: "Otimize o código selecionado sem alterar o comportamento. Explique os tradeoffs e retorne a substituição em um bloco de código.",
-  docs: "Gere documentação adequada para o código selecionado. Retorne a versão documentada em um bloco de código.",
-  tests: "Gere testes unitários abrangentes para o código selecionado usando as convenções existentes do projeto.",
-  fix: "Encontre e corrija os erros no código selecionado. Explique a causa raiz e retorne o código corrigido.",
-  convert: "Converta o código selecionado para a linguagem que eu especificar, preservando o comportamento. Pergunte qual linguagem usar se isso não estiver claro.",
-  review: "Revise o código selecionado quanto a corretude, segurança, desempenho e manutenção. Priorize achados concretos.",
-  rename: "Sugira um nome melhor para o símbolo na seleção, explique o motivo e mostre as mudanças de código necessárias.",
-  commit: "Gere uma mensagem de commit convencional e concisa a partir do diff Git anexado. Retorne apenas a mensagem de commit."
+  ask: "Help me with the selected code.",
+  explain: "Explain the selected code clearly, including behavior and the main edge cases.",
+  refactor: "Refactor the selected code to improve clarity, maintainability, and correctness. Return the full replacement in a code block.",
+  optimize: "Optimize the selected code without changing behavior. Explain tradeoffs and return the replacement in a code block.",
+  docs: "Generate appropriate documentation for the selected code. Return the documented version in a code block.",
+  tests: "Generate comprehensive unit tests for the selected code using the project's existing conventions.",
+  fix: "Find and fix the errors in the selected code. Explain the root cause and return the corrected code.",
+  convert: "Convert the selected code to the language I specify while preserving behavior. Ask which language to use if it is not clear.",
+  review: "Review the selected code for correctness, security, performance, and maintainability. Prioritize concrete findings.",
+  rename: "Suggest a better name for the symbol in the selection, explain why, and show the required code changes.",
+  commit: "Generate a concise conventional commit message from the attached Git diff. Return only the commit message."
 };
 
 export class AIChatPanel {
-  readonly element = el("div", { className: "panel ai-chat-panel ui-panel", attrs: { "aria-label": "Chat de IA" } });
+  readonly element = el("div", { className: "panel ai-chat-panel ui-panel", attrs: { "aria-label": uiText("Chat de IA") } });
   private readonly history = new HistoryManager();
   private readonly collector: ContextCollector;
   private readonly markdown: MarkdownRenderer;
-  private readonly conversationSearch = el("input", { className: "panel-input ai-history-search ui-field ui-search-field", attrs: { placeholder: "Pesquisar conversas", "aria-label": "Pesquisar conversas" } });
+  private readonly conversationSearch = el("input", { className: "panel-input ai-history-search ui-field ui-search-field", attrs: { placeholder: uiText("Pesquisar conversas"), "aria-label": uiText("Pesquisar conversas") } });
   private readonly conversationList = el("div", { className: "ai-conversation-list ui-list", attrs: { role: "list" } });
   private readonly messages = el("div", { className: "ai-messages", attrs: { role: "log", "aria-live": "polite" } });
-  private readonly input = el("textarea", { className: "ai-input ui-field", attrs: { placeholder: "Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)", rows: "3", "aria-label": "Mensagem do chat" } });
-  private readonly providerSelect = el("select", { className: "ai-provider-select ui-field ui-select", title: "Provedor de IA", attrs: { "aria-label": "Provedor de IA" } });
-  private readonly modelSelect = el("select", { className: "ai-model-select ui-field ui-select", title: "Modelo de IA", attrs: { "aria-label": "Modelo de IA" } });
+  private readonly input = el("textarea", { className: "ai-input ui-field", attrs: { placeholder: uiText("Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)"), rows: "3", "aria-label": uiText("Mensagem do chat") } });
+  private readonly providerSelect = el("select", { className: "ai-provider-select ui-field ui-select", title: uiText("Provedor de IA"), attrs: { "aria-label": uiText("Provedor de IA") } });
+  private readonly modelSelect = el("select", { className: "ai-model-select ui-field ui-select", title: uiText("Modelo de IA"), attrs: { "aria-label": uiText("Modelo de IA") } });
   private readonly contextMenu = el("div", { className: "ai-context-menu", attrs: { role: "menu" } });
   private readonly contextChips = el("div", { className: "ai-context-chips" });
-  private readonly sendButton = el("button", { className: "ai-send-button ui-button ui-button-primary", text: "Enviar", attrs: { "aria-label": "Enviar mensagem" } });
-  private readonly stopButton = el("button", { className: "ai-stop-button ui-button ui-button-danger", text: "Parar", attrs: { "aria-label": "Parar geração" } });
+  private readonly sendButton = el("button", { className: "ai-send-button ui-button ui-button-primary", text: uiText("Enviar"), attrs: { "aria-label": uiText("Enviar mensagem") } });
+  private readonly stopButton = el("button", { className: "ai-stop-button ui-button ui-button-danger", text: uiText("Parar"), attrs: { "aria-label": uiText("Parar geração") } });
   private conversations: AIConversation[] = [];
   private current?: AIConversation;
   private settings?: AISettings;
@@ -121,7 +122,7 @@ export class AIChatPanel {
       this.renderHistory();
       this.input.focus();
     } catch (error) {
-      reportError(error, this.updateStatus, "Falha ao criar a conversa de IA");
+      reportError(error, this.updateStatus, uiText("Falha ao criar a conversa de IA"));
     }
   }
 
@@ -154,17 +155,17 @@ export class AIChatPanel {
   private build(): void {
     const toolbar = el("div", { className: "ai-toolbar ui-toolbar" });
     toolbar.append(
-      buttonIcon("add", "Nova conversa", () => void this.newConversation()),
-      buttonIcon("edit", "Renomear conversa", () => void this.renameConversation()),
-      buttonIcon("trash", "Excluir conversa", () => void this.deleteConversation()),
-      buttonIcon("settings-gear", "Configurações de IA", () => this.openSettings())
+      buttonIcon("add", uiText("Nova conversa"), () => void this.newConversation()),
+      buttonIcon("edit", uiText("Renomear conversa"), () => void this.renameConversation()),
+      buttonIcon("trash", uiText("Excluir conversa"), () => void this.deleteConversation()),
+      buttonIcon("settings-gear", uiText("Configurações de IA"), () => this.openSettings())
     );
     const history = el("section", { className: "ai-history" });
     history.append(this.conversationSearch, this.conversationList);
     const selector = el("div", { className: "ai-provider-row" });
     selector.append(this.providerSelect, this.modelSelect);
     const composer = el("section", { className: "ai-composer" });
-    const contextButton = el("button", { className: "ai-context-button ui-button ui-button-compact", text: "+ Contexto", attrs: { "aria-haspopup": "menu", "aria-expanded": "false" } });
+    const contextButton = el("button", { className: "ai-context-button ui-button ui-button-compact", text: uiText("+ Contexto"), attrs: { "aria-haspopup": "menu", "aria-expanded": "false" } });
     contextButton.addEventListener("click", () => {
       const visible = this.contextMenu.hidden;
       this.contextMenu.hidden = !visible;
@@ -214,8 +215,8 @@ export class AIChatPanel {
       else await this.newConversation();
       this.renderHistory();
     } catch (error) {
-      reportError(error, this.updateStatus, "Falha ao inicializar o Chat de IA");
-      this.messages.replaceChildren(el("div", { className: "ai-empty ui-empty-state", text: "O Chat de IA não pôde ser inicializado." }));
+      reportError(error, this.updateStatus, uiText("Falha ao inicializar o Chat de IA"));
+      this.messages.replaceChildren(el("div", { className: "ai-empty ui-empty-state", text: uiText("O Chat de IA não pôde ser inicializado.") }));
     }
   }
 
@@ -242,7 +243,7 @@ export class AIChatPanel {
 
   private async renderModels(): Promise<void> {
     if (!this.settings) return;
-    this.modelSelect.replaceChildren(el("option", { text: "Carregando modelos…", attrs: { value: this.settings.model } }));
+    this.modelSelect.replaceChildren(el("option", { text: uiText("Carregando modelos…"), attrs: { value: this.settings.model } }));
     try {
       const models = await api.ai.listModels(this.settings.provider);
       const ids = models.some(model => model.id === this.settings?.model)
@@ -252,7 +253,7 @@ export class AIChatPanel {
         el("option", { text: model.displayName, attrs: { value: model.id, ...(model.id === this.settings?.model ? { selected: "true" } : {}) } })
       ));
     } catch (error) {
-      console.warn("[Sharp-OSS AI] Falha ao descobrir modelos; mantendo o modelo configurado.", error);
+      console.warn("[Sharp-OSS AI] " + uiText("Falha ao descobrir modelos; mantendo o modelo configurado."), error);
       this.modelSelect.replaceChildren(el("option", { text: this.settings.model, attrs: { value: this.settings.model } }));
     }
   }
@@ -278,7 +279,7 @@ export class AIChatPanel {
     if (!this.current?.messages.length) {
       this.messages.append(el("div", {
         className: "ai-empty ui-empty-state",
-        text: "Pergunte sobre o seu código, anexe contexto do editor ou use uma ação de IA no menu de contexto do editor."
+        text: uiText("Pergunte sobre o seu código, anexe contexto do editor ou use uma ação de IA no menu de contexto do editor.")
       }));
       return;
     }
@@ -286,23 +287,23 @@ export class AIChatPanel {
       const article = el("article", { className: `ai-message ai-message-${message.role} ui-card`, attrs: { "data-message-id": message.id } });
       const header = el("header", { className: "ai-message-header" });
       header.append(
-        el("strong", { text: message.role === "user" ? "Você" : "Sharp-OSS AI" }),
+        el("strong", { text: message.role === "user" ? uiText("Você") : "Sharp-OSS AI" }),
         el("time", { text: new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
       );
       const body = message.role === "assistant"
-        ? this.markdown.render(message.content || (this.activeAssistantId === message.id ? "Gerando…" : ""))
+        ? this.markdown.render(message.content || (this.activeAssistantId === message.id ? uiText("Gerando…") : ""))
         : el("div", { className: "ai-user-content", text: message.content });
       article.append(header, body);
       if (message.contexts?.length) {
         article.append(el("div", { className: "ai-message-context", text: message.contexts.map(context => context.label).join(" · ") }));
       }
       if (message.error) article.append(el("div", { className: "ai-message-error", text: message.error }));
-      if (message.stopped) article.append(el("div", { className: "ai-message-stopped", text: "Geração interrompida" }));
+      if (message.stopped) article.append(el("div", { className: "ai-message-stopped", text: uiText("Geração interrompida") }));
       if (message.role === "assistant") {
         const actions = el("footer", { className: "ai-message-actions" });
-        const copy = el("button", { className: "ui-button ui-button-compact", text: "Copiar resposta" });
+        const copy = el("button", { className: "ui-button ui-button-compact", text: uiText("Copiar resposta") });
         copy.addEventListener("click", () => void navigator.clipboard.writeText(message.content));
-        const retry = el("button", { className: "ui-button ui-button-compact", text: message.error ? "Tentar novamente" : "Regenerar" });
+        const retry = el("button", { className: "ui-button ui-button-compact", text: message.error ? uiText("Tentar novamente") : uiText("Regenerar") });
         retry.addEventListener("click", () => void this.regenerate(message.id));
         actions.append(copy, retry);
         article.append(actions);
@@ -316,7 +317,7 @@ export class AIChatPanel {
     this.contextChips.replaceChildren();
     const labels = new Map(CONTEXT_OPTIONS.map(option => [option.source, option.label]));
     for (const source of this.selectedSources) {
-      const chip = el("button", { className: "ai-context-chip ui-badge", text: `${labels.get(source) ?? source} ×`, title: "Remover contexto" });
+      const chip = el("button", { className: "ai-context-chip ui-badge", text: `${labels.get(source) ?? source} ×`, title: uiText("Remover contexto") });
       chip.addEventListener("click", () => {
         this.selectedSources.delete(source);
         const checkbox = this.contextMenu.querySelector<HTMLInputElement>(`[data-source="${source}"]`);
@@ -346,7 +347,8 @@ export class AIChatPanel {
     if (!content || this.activeRequestId || !this.settings) return;
     const provider = this.providers.find(item => item.id === this.settings?.provider);
     if (provider?.requiresApiKey && !this.settings.apiKeyConfigured) {
-      this.updateStatus(`Configure a chave da API do ${provider.displayName} para enviar mensagens.`);
+      const statusText = uiText("Configure a chave da API do {provider} para enviar mensagens.").replace("{provider}", provider.displayName);
+      this.updateStatus(statusText);
       this.openSettings();
       return;
     }
@@ -369,7 +371,7 @@ export class AIChatPanel {
       this.renderContextChips();
     } catch (error) {
       this.setGenerating(false);
-      reportError(error, this.updateStatus, "Falha na requisição de IA");
+      reportError(error, this.updateStatus, uiText("Falha na requisição de IA"));
     }
   }
 
@@ -382,7 +384,7 @@ export class AIChatPanel {
       timestamp: new Date().toISOString()
     };
     const latestUser = [...messages].reverse().find(message => message.role === "user");
-    const title = this.current.title === "Nova conversa"
+    const title = this.current.title === uiText("Nova conversa")
       ? titleFromMessage(latestUser?.content ?? "")
       : this.current.title;
     this.current = await api.ai.updateConversation({
@@ -422,7 +424,7 @@ export class AIChatPanel {
       this.renderMessages();
       return;
     }
-    if (event.type === "error") assistant.error = event.message ?? "O provedor de IA falhou.";
+    if (event.type === "error") assistant.error = event.message ?? uiText("O provedor de IA falhou.");
     if (event.type === "cancelled") assistant.stopped = true;
     if (event.type === "complete" || event.type === "error" || event.type === "cancelled") {
       const completedConversation = this.current;
@@ -452,7 +454,7 @@ export class AIChatPanel {
       await this.generate(messages, user.contexts ?? []);
     } catch (error) {
       this.setGenerating(false);
-      reportError(error, this.updateStatus, "Falha ao regenerar a resposta");
+      reportError(error, this.updateStatus, uiText("Falha ao regenerar a resposta"));
     }
   }
 
@@ -485,27 +487,27 @@ export class AIChatPanel {
     if (!this.settings) return;
     document.querySelector(".ai-settings-overlay")?.remove();
     const overlay = el("div", { className: "ai-settings-overlay" });
-    const dialog = el("form", { className: "ai-settings-dialog", attrs: { role: "dialog", "aria-modal": "true", "aria-label": "Configurações de IA" } });
-    const provider = selectField("Provedor", this.providers.map(item => [item.id, item.displayName]), this.settings.provider);
-    const key = textField("Chave da API", "", "password", "Deixe em branco para manter a chave salva");
-    const model = textField("Modelo", this.settings.model);
-    const temperature = numberField("Temperatura", this.settings.temperature, 0, 2, 0.1);
-    const maxTokens = numberField("Máximo de tokens", this.settings.maxTokens, 1, 128000, 1);
-    const contextSize = numberField("Tamanho do contexto", this.settings.contextSize, 1024, 1_050_000, 1024);
-    const streaming = checkboxField("Streaming", this.settings.streaming);
-    const systemPrompt = textareaField("Prompt do sistema", this.settings.systemPrompt);
-    const ollamaUrl = textField("URL do Ollama", this.settings.ollamaBaseUrl);
-    const keyStatus = el("div", { className: "ai-key-status", text: this.settings.apiKeyConfigured ? "Uma chave está armazenada com segurança para este provedor." : "Nenhuma chave de API está armazenada para este provedor." });
-    const chatGptLogin = el("button", { className: "primary ui-button ui-button-primary", text: "Entrar com ChatGPT", attrs: { type: "button" } });
-    const chatGptLogout = el("button", { className: "ui-button", text: "Sair da conta", attrs: { type: "button" } });
-    const chatGptStatus = el("div", { className: "ai-key-status", text: "Verificando a conta Codex…" });
-    const clearKey = checkboxField("Limpar chave de API salva", false);
+    const dialog = el("form", { className: "ai-settings-dialog", attrs: { role: "dialog", "aria-modal": "true", "aria-label": uiText("Configurações de IA") } });
+    const provider = selectField(uiText("Provedor"), this.providers.map(item => [item.id, item.displayName]), this.settings.provider);
+    const key = textField(uiText("Chave da API"), "", "password", uiText("Deixe em branco para manter a chave salva"));
+    const model = textField(uiText("Modelo"), this.settings.model);
+    const temperature = numberField(uiText("Temperatura"), this.settings.temperature, 0, 2, 0.1);
+    const maxTokens = numberField(uiText("Máximo de tokens"), this.settings.maxTokens, 1, 128000, 1);
+    const contextSize = numberField(uiText("Tamanho do contexto"), this.settings.contextSize, 1024, 1_050_000, 1024);
+    const streaming = checkboxField(uiText("Streaming"), this.settings.streaming);
+    const systemPrompt = textareaField(uiText("Prompt do sistema"), this.settings.systemPrompt);
+    const ollamaUrl = textField(uiText("URL do Ollama"), this.settings.ollamaBaseUrl);
+    const keyStatus = el("div", { className: "ai-key-status", text: this.settings.apiKeyConfigured ? uiText("Uma chave está armazenada com segurança para este provedor.") : uiText("Nenhuma chave de API está armazenada para este provedor.") });
+    const chatGptLogin = el("button", { className: "primary ui-button ui-button-primary", text: uiText("Entrar com ChatGPT"), attrs: { type: "button" } });
+    const chatGptLogout = el("button", { className: "ui-button", text: uiText("Sair da conta"), attrs: { type: "button" } });
+    const chatGptStatus = el("div", { className: "ai-key-status", text: uiText("Verificando a conta Codex…") });
+    const clearKey = checkboxField(uiText("Limpar chave de API salva"), false);
     const actions = el("div", { className: "ai-settings-actions" });
-    const cancel = el("button", { className: "ui-button", text: "Cancelar", attrs: { type: "button" } });
-    const save = el("button", { className: "primary ui-button ui-button-primary", text: "Salvar", attrs: { type: "submit" } });
+    const cancel = el("button", { className: "ui-button", text: uiText("Cancelar"), attrs: { type: "button" } });
+    const save = el("button", { className: "primary ui-button ui-button-primary", text: uiText("Salvar"), attrs: { type: "submit" } });
     actions.append(cancel, save);
     dialog.append(
-      el("h2", { text: "Configurações de IA" }),
+      el("h2", { text: uiText("Configurações de IA") }),
       provider.row, chatGptLogin, chatGptLogout, chatGptStatus, key.row, keyStatus, model.row, temperature.row, maxTokens.row,
       contextSize.row, streaming.row, systemPrompt.row, ollamaUrl.row, clearKey.row, actions
     );
@@ -527,14 +529,14 @@ export class AIChatPanel {
     const renderAccount = (account: { signedIn: boolean; email?: string; planType?: string }): void => {
       chatGptLogout.dataset.signedIn = String(account.signedIn);
       chatGptLogout.hidden = provider.input.value !== "codex" || !account.signedIn;
-      chatGptLogin.textContent = account.signedIn ? "Trocar conta ChatGPT" : "Entrar com ChatGPT";
+      chatGptLogin.textContent = account.signedIn ? uiText("Trocar conta ChatGPT") : uiText("Entrar com ChatGPT");
       chatGptStatus.textContent = account.signedIn
-        ? `Conectado${account.email ? ` como ${account.email}` : ""}${account.planType ? ` (${account.planType})` : ""}. O Codex pode ler e editar o workspace aberto.`
-        : "Entre pela sua conta ChatGPT. Nenhuma chave de API será solicitada.";
+        ? `${uiText("Conectado")}${account.email ? ` como ${account.email}` : ""}${account.planType ? ` (${account.planType})` : ""}. ${uiText("O Codex pode ler e editar o workspace aberto.")}`
+        : uiText("Entre pela sua conta ChatGPT. Nenhuma chave de API será solicitada.");
     };
     chatGptLogin.addEventListener("click", () => {
       chatGptLogin.disabled = true;
-      chatGptStatus.textContent = "Abrindo o navegador para entrar no ChatGPT…";
+      chatGptStatus.textContent = uiText("Abrindo o navegador para entrar no ChatGPT…");
       void api.ai.loginWithChatGpt().then(async result => {
         if (!result.success) throw new Error(result.error ?? "Não foi possível concluir o login do ChatGPT.");
         this.settings = await api.ai.saveSettings({ ...settingsRequest(this.settings!), provider: "codex", model: model.input.value });
@@ -549,7 +551,7 @@ export class AIChatPanel {
     });
     chatGptLogout.addEventListener("click", () => {
       chatGptLogout.disabled = true;
-      chatGptStatus.textContent = "Saindo da conta Codex…";
+      chatGptStatus.textContent = uiText("Saindo da conta Codex…");
       void api.ai.logoutCodex().then(() => {
         renderAccount({ signedIn: false });
       }).catch(error => {
@@ -576,8 +578,8 @@ export class AIChatPanel {
         this.renderProviders();
         await this.renderModels();
         overlay.remove();
-        this.updateStatus("Configurações de IA salvas");
-      }).catch(error => reportError(error, this.updateStatus, "Falha ao salvar as configurações de IA"));
+        this.updateStatus(uiText("Configurações de IA salvas"));
+      }).catch(error => reportError(error, this.updateStatus, uiText("Falha ao salvar as configurações de IA")));
     });
     provider.input.addEventListener("change", () => {
       const descriptor = this.providers.find(item => item.id === provider.input.value);
@@ -602,7 +604,7 @@ export class AIChatPanel {
   }
 
   private async deleteConversation(): Promise<void> {
-    if (!this.current || !confirm(`Excluir "${this.current.title}"?`)) return;
+    if (!this.current || !confirm(`${uiText("Excluir")} "${this.current.title}"?`)) return;
     const id = this.current.id;
     if (this.activeRequestId) await this.stop();
     await api.ai.deleteConversation(id);
@@ -621,7 +623,7 @@ export class AIChatPanel {
       try {
         this.collector.addDroppedFile(file.name, await file.text(), browserFilePath(file));
       } catch (error) {
-        reportError(error, this.updateStatus, `Falha ao anexar ${file.name}`);
+        reportError(error, this.updateStatus, uiText("Falha ao anexar {file}").replace("{file}", file.name));
       }
     }
     if (files.length) this.selectedSources.add("files");
@@ -655,12 +657,12 @@ export class AIChatPanel {
 }
 
 function titleFromMessage(message: string): string {
-  return message.replace(/\s+/gu, " ").trim().slice(0, 60) || "Nova conversa";
+  return message.replace(/\s+/gu, " ").trim().slice(0, 60) || uiText("Nova conversa");
 }
 
 function formatRelativeTime(value: string): string {
   const delta = Date.now() - new Date(value).getTime();
-  if (delta < 60_000) return "agora";
+  if (delta < 60_000) return "now";
   if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m`;
   if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h`;
   return new Date(value).toLocaleDateString();

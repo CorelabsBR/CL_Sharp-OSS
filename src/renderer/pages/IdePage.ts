@@ -34,6 +34,7 @@ import { basename, dirname, extname, fileUri, isSubPath, joinPath, relativePath 
 import type { CommandAction } from "../components/CommandPalette";
 import { CommandRegistry } from "../commands/commandRegistry";
 import { ExtensionContributions } from "../extensions/ExtensionContributions";
+import { buildTaskMenuItems } from "../../shared/taskMenu";
 
 type PanelId = "explorer" | "search" | "source" | "run" | "extensions" | "remote" | "arduino" | "ai" | "settings" | "problems";
 type SettingsCategory = "Appearance" | "Editor" | "Terminal" | "Diagnostics" | "Build" | "Workbench" | "Discord";
@@ -76,12 +77,12 @@ export class IdePage {
   private readonly titleBar = el("header", { className: "title-bar" });
   private readonly activityBar = el("nav", { className: "activity-bar" });
   private readonly sideBar = el("aside", { className: "side-bar" });
-  private readonly sideTitle = el("div", { className: "side-title", text: "EXPLORADOR" });
+  private readonly sideTitle = el("div", { className: "side-title", text: uiText("EXPLORADOR") });
   private readonly sideContent = el("div", { className: "side-content" });
   private readonly workbench = el("section", { className: "workbench" });
   private readonly editorStack = el("section", { className: "editor-stack" });
   private readonly aiDock = el("aside", { className: "ai-dock", attrs: { "aria-label": "Codex" } });
-  private readonly statusLeft = el("span", { text: "Pronto" });
+  private readonly statusLeft = el("span", { text: uiText("Pronto") });
   private readonly statusBranch = el("button", { className: "status-item status-branch", text: "Git" });
   private readonly statusAuthor = el("span", { className: "status-meta status-author", text: "" });
   private readonly statusType = el("span", { className: "status-meta", text: "" });
@@ -269,100 +270,100 @@ export class IdePage {
     const logo = el("div", { className: "title-logo" });
     logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: BUILD_CONFIG.displayName } }), el("span", { text: BUILD_CONFIG.displayName }));
     const menus = el("div", { className: "title-menus" });
-    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta";
+    const openWorkspaceLabel = platform.isMobile ? uiText("Abrir pasta do dispositivo") : uiText("Abrir pasta");
     menus.append(
-      menuButton("Arquivo", [
-        ["Novo arquivo", "Ctrl+N", () => this.editor.newTab()],
-        ["Abrir arquivo", "Ctrl+O", () => void this.editor.openFileFromDialog()],
+      menuButton(uiText("Arquivo"), [
+        [uiText("Novo arquivo"), "Ctrl+N", () => this.editor.newTab()],
+        [uiText("Abrir arquivo"), "Ctrl+O", () => void this.editor.openFileFromDialog()],
         [openWorkspaceLabel, "Ctrl+K Ctrl+O", () => void this.explorer.openFolderFromDialog()],
-        ["Fechar pasta", "", () => this.explorer.clearFolder()],
-        ["Salvar", "Ctrl+S", () => void this.editor.saveCurrentFile()],
-        ["Salvar como", "Ctrl+Shift+S", () => void this.editor.saveCurrentFileAs()],
-        ["Salvar tudo", "", () => void this.editor.saveAll()],
-        ["Reverter arquivo", "", () => void this.editor.revertCurrentFile()],
-        ["Fechar editor", "Ctrl+W", () => this.editor.closeCurrentTab()],
-        ["Fechar todos os editores", "Ctrl+Shift+W", () => this.editor.closeAllTabs()]
+        [uiText("Fechar pasta"), "", () => this.explorer.clearFolder()],
+        [uiText("Salvar"), "Ctrl+S", () => void this.editor.saveCurrentFile()],
+        [uiText("Salvar como"), "Ctrl+Shift+S", () => void this.editor.saveCurrentFileAs()],
+        [uiText("Salvar Tudo"), "", () => void this.editor.saveAll()],
+        [uiText("Reverter arquivo"), "", () => void this.editor.revertCurrentFile()],
+        [uiText("Fechar editor"), "Ctrl+W", () => this.editor.closeCurrentTab()],
+        [uiText("Fechar todos os editores"), "Ctrl+Shift+W", () => this.editor.closeAllTabs()]
       ]),
-      menuButton("Editar", [
-        ["Desfazer", "Ctrl+Z", () => this.editor.undo()],
-        ["Refazer", "Ctrl+Y", () => this.editor.redo()],
-        ["Recortar", "Ctrl+X", () => this.editor.cut()],
-        ["Copiar", "Ctrl+C", () => this.editor.copy()],
-        ["Colar", "Ctrl+V", () => this.editor.paste()],
-        ["Localizar", "Ctrl+F", () => this.editor.find()],
-        ["Substituir", "Ctrl+H", () => this.editor.replace()],
-        ["Comentar linha", "Ctrl+/", () => this.editor.addLineComment()],
+      menuButton(uiText("Editar"), [
+        [uiText("Desfazer"), "Ctrl+Z", () => this.editor.undo()],
+        [uiText("Refazer"), "Ctrl+Y", () => this.editor.redo()],
+        [uiText("Recortar"), "Ctrl+X", () => this.editor.cut()],
+        [uiText("Copiar"), "Ctrl+C", () => this.editor.copy()],
+        [uiText("Colar"), "Ctrl+V", () => this.editor.paste()],
+        [uiText("Localizar"), "Ctrl+F", () => this.editor.find()],
+        [uiText("Substituir"), "Ctrl+H", () => this.editor.replace()],
+        [uiText("Comentar linha"), "Ctrl+/", () => this.editor.addLineComment()],
         // ["Uncomment Line", "Ctrl+Shift+/", () => this.editor.removeLineComment()],
         // ["Comment Block", "Ctrl+Shift+/", () => this.editor.toggleBlockComment()],
-        ["Ir para a linha", "Ctrl+G", () => this.editor.goToLine()],
-        ["Ir para o início", "Ctrl+Home", () => this.editor.goToStartOfFile()],
-        ["Ir para o fim", "Ctrl+End", () => this.editor.goToEndOfFile()],
-        ["Formatar documento", "Shift+Alt+F", () => this.editor.formatDocument()]
+        [uiText("Ir para a linha"), "Ctrl+G", () => this.editor.goToLine()],
+        [uiText("Ir para o início"), "Ctrl+Home", () => this.editor.goToStartOfFile()],
+        [uiText("Ir para o fim"), "Ctrl+End", () => this.editor.goToEndOfFile()],
+        [uiText("Formatar documento"), "Shift+Alt+F", () => this.editor.formatDocument()]
       ]),
-      menuButton("Seleção", [
-        ["Selecionar tudo", "Ctrl+A", () => this.editor.selectAll()],
-        ["Selecionar próxima ocorrência", "Ctrl+D", () => this.editor.selectNextOccurrence()],
-        ["Selecionar todas as ocorrências", "Ctrl+Shift+L", () => this.editor.selectAllOccurrences()],
-        ["Duplicar linha", "", () => this.editor.duplicateCurrentLine()],
-        ["Excluir linha", "Ctrl+Shift+K", () => this.editor.deleteCurrentLine()],
-        ["Mover linha para cima", "Alt+Up", () => this.editor.moveLineUp()],
-        ["Mover linha para baixo", "Alt+Down", () => this.editor.moveLineDown()],
-        ["Copiar linha para cima", "Shift+Alt+Up", () => this.editor.copyLineUp()],
-        ["Copiar linha para baixo", "Shift+Alt+Down", () => this.editor.copyLineDown()]
+      menuButton(uiText("Seleção"), [
+        [uiText("Selecionar tudo"), "Ctrl+A", () => this.editor.selectAll()],
+        [uiText("Selecionar próxima ocorrência"), "Ctrl+D", () => this.editor.selectNextOccurrence()],
+        [uiText("Selecionar todas as ocorrências"), "Ctrl+Shift+L", () => this.editor.selectAllOccurrences()],
+        [uiText("Duplicar linha"), "", () => this.editor.duplicateCurrentLine()],
+        [uiText("Excluir linha"), "Ctrl+Shift+K", () => this.editor.deleteCurrentLine()],
+        [uiText("Mover linha para cima"), "Alt+Up", () => this.editor.moveLineUp()],
+        [uiText("Mover linha para baixo"), "Alt+Down", () => this.editor.moveLineDown()],
+        [uiText("Copiar linha para cima"), "Shift+Alt+Up", () => this.editor.copyLineUp()],
+        [uiText("Copiar linha para baixo"), "Shift+Alt+Down", () => this.editor.copyLineDown()]
       ]),
-      menuButton("Exibir", [
-        ["Paleta de comandos", "Ctrl+Shift+P", () => this.palette.showCommands()],
-        ["Abertura rápida", "Ctrl+P", () => this.palette.showQuickOpen()],
-        ["Explorador", "Ctrl+Shift+E", () => this.showPanel("explorer")],
-        ["Pesquisar", "Ctrl+Shift+F", () => this.showPanel("search")],
-        ["Controle de código-fonte", "Ctrl+Shift+G", () => this.showPanel("source")],
-        ["Executar e depurar", "Ctrl+Shift+D", () => this.showPanel("run")],
+      menuButton(uiText("Exibir"), [
+        [uiText("Paleta de comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
+        [uiText("Abertura rápida"), "Ctrl+P", () => this.palette.showQuickOpen()],
+        [uiText("Explorador"), "Ctrl+Shift+E", () => this.showPanel("explorer")],
+        [uiText("Pesquisar"), "Ctrl+Shift+F", () => this.showPanel("search")],
+        [uiText("Controle de código-fonte"), "Ctrl+Shift+G", () => this.showPanel("source")],
+        [uiText("Executar e depurar"), "Ctrl+Shift+D", () => this.showPanel("run")],
         ["Arduino", "", () => this.showPanel("arduino")],
-        ["Problemas", "F8", () => this.showPanel("problems")],
-        ["Saída", "Ctrl+Shift+U", () => this.showOutput()],
-        ["Atalhos de teclado", "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
-        ["Extensões", "Ctrl+Shift+X", () => this.showPanel("extensions")],
-        ["Alternar barra lateral", "Ctrl+B", () => this.toggleSidebar()],
-        ["Alternar terminal", "Ctrl+`", () => this.toggleTerminal()],
-        ["Alternar painel", "Ctrl+J", () => this.toggleTerminal()]
+        [uiText("Problemas"), "F8", () => this.showPanel("problems")],
+        [uiText("Saída"), "Ctrl+Shift+U", () => this.showOutput()],
+        [uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
+        [uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions")],
+        [uiText("Alternar barra lateral"), "Ctrl+B", () => this.toggleSidebar()],
+        [uiText("Alternar terminal"), "Ctrl+`", () => this.toggleTerminal()],
+        [uiText("Alternar painel"), "Ctrl+J", () => this.toggleTerminal()]
       ]),
-      menuButton("Executar", [
-        ["Depurar arquivo atual", "F5", () => void this.runCurrentFile(true)],
-        ["Executar sem depuração", "Ctrl+F5", () => void this.runWithoutDebug()],
-        ["Baixar imports Python e preparar .venv", "", () => void this.installCurrentPythonDependencies()],
-        ["Compilar projeto", "Ctrl+Shift+B", () => void this.buildProject()],
+      menuButton(uiText("Executar"), [
+        [uiText("Depurar arquivo atual"), "F5", () => void this.runCurrentFile(true)],
+        [uiText("Executar sem depuração"), "Ctrl+F5", () => void this.runWithoutDebug()],
+        [uiText("Baixar imports Python e preparar .venv"), "", () => void this.installCurrentPythonDependencies()],
+        [uiText("Compilar projeto"), "Ctrl+Shift+B", () => void this.buildProject()],
         ["Arduino", "", () => this.showPanel("arduino")],
-        ["Caminhos dos runtimes", "", () => void this.showLanguageRuntimes()]
+        [uiText("Caminhos dos runtimes"), "", () => void this.showLanguageRuntimes()]
       ]),
-      menuButton("Terminal", [
-        ["Novo terminal", "Ctrl+Shift+`", () => this.showTerminal(true)],
-        ["Saída", "", () => this.terminal.showOutputPanel()],
-        ["Problemas", "", () => this.terminal.showProblemsPanel()],
-        ["Console de depuração", "", () => this.terminal.showDebugConsole()],
-        ["Portas", "", () => this.terminal.showPortsPanel()],
+      menuButton(uiText("Terminal"), [
+        [uiText("Novo terminal"), "Ctrl+Shift+`", () => this.showTerminal(true)],
+        [uiText("Saída"), "", () => this.terminal.showOutputPanel()],
+        [uiText("Problemas"), "", () => this.terminal.showProblemsPanel()],
+        [uiText("Console de depuração"), "", () => this.terminal.showDebugConsole()],
+        [uiText("Portas"), "", () => this.terminal.showPortsPanel()],
         ["Git", "", () => this.terminal.showGitPanel()],
-        ["Limpar", "", () => this.terminal.clearCurrentTerminal()],
-        ["Encerrar processo", "", () => this.terminal.killCurrentTerminal()],
-        ["Fechar terminal", "", () => this.terminal.closeCurrentTerminal()]
+        [uiText("Limpar terminal"), "", () => this.terminal.clearCurrentTerminal()],
+        [uiText("Encerrar processo"), "", () => this.terminal.killCurrentTerminal()],
+        [uiText("Fechar terminal"), "", () => this.terminal.closeCurrentTerminal()]
       ]),
-      menuButton("Preferências", [
-        ["Paleta de comandos", "Ctrl+Shift+P", () => this.palette.showCommands()],
-        ["Configurações", "Ctrl+,", () => this.showSettings()],
-        ["Verificar atualizações", "", () => void this.checkForUpdates()],
-        ["Configurar runtimes de linguagem", "", () => void this.showLanguageRuntimes()],
-        ["Tema de cores", "", event => void this.showThemePicker(event.shiftKey)],
-        ["Papel de parede", "", () => void this.chooseWallpaper()],
-        ["Limpar papel de parede", "", () => void this.clearWallpaper()],
-        ["Alternar ErrorLens", "", () => this.toggleErrorLens()],
-        ["Sobre o Sharp-OSS", "", () => this.about()]
+      menuButton(uiText("Preferências"), [
+        [uiText("Paleta de comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
+        [uiText("Configurações"), "Ctrl+,", () => this.showSettings()],
+        [uiText("Verificar atualizações"), "", () => void this.checkForUpdates()],
+        [uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes()],
+        [uiText("Tema de cores"), "", event => void this.showThemePicker(event.shiftKey)],
+        [uiText("Papel de parede"), "", () => void this.chooseWallpaper()],
+        [uiText("Limpar papel de parede"), "", () => void this.clearWallpaper()],
+        [uiText("Alternar ErrorLens"), "", () => this.toggleErrorLens()],
+        [uiText("Sobre o Sharp-OSS"), "", () => this.about()]
       ])
     );
     this.commandBar.addEventListener("click", () => this.palette.showQuickOpen(this.commandBar.value));
     const nav = el("div", { className: "title-nav" });
     nav.append(
-      buttonIcon("arrow-left", "Voltar para o arquivo anterior", () => this.editor.navigateBack()),
-      buttonIcon("arrow-right", "Avançar para o próximo arquivo", () => this.editor.navigateForward()),
-      buttonIcon("play", "Executar arquivo atual", () => void this.runCurrentFile()),
+      buttonIcon("arrow-left", uiText("Voltar para o arquivo anterior"), () => this.editor.navigateBack()),
+      buttonIcon("arrow-right", uiText("Avançar para o próximo arquivo"), () => this.editor.navigateForward()),
+      buttonIcon("play", uiText("Executar arquivo atual"), () => void this.runCurrentFile()),
       // el("button", {
       //   className: "title-run-dependencies",
       //   text: "Baixar imports Python (.venv)",
@@ -380,9 +381,9 @@ export class IdePage {
     const windowButtons = el("div", { className: "window-buttons" });
     if (platform.isDesktop) {
       windowButtons.append(
-        titleIcon("chrome-minimize", "Minimizar", () => void api.window.minimize()),
-        titleIcon("chrome-maximize", "Maximizar", () => void api.window.maximize()),
-        titleIcon("chrome-close", "Fechar", () => void api.window.close(), "close")
+        titleIcon("chrome-minimize", uiText("Minimizar"), () => void api.window.minimize()),
+        titleIcon("chrome-maximize", uiText("Maximizar"), () => void api.window.maximize()),
+        titleIcon("chrome-close", uiText("Fechar"), () => void api.window.close(), "close")
       );
     }
     this.titleBar.append(logo, menus, nav, this.commandBar, windowButtons);
@@ -390,15 +391,15 @@ export class IdePage {
 
   private buildActivityBar(): void {
     this.activityBar.append(
-      this.activityButton("explorer", "files", "Explorador"),
-      this.activityButton("search", "search", "Pesquisar"),
-      this.activityButton("source", "source-control", "Controle de código-fonte"),
-      this.activityButton("run", "debug-alt", "Executar e depurar"),
-      this.activityButton("extensions", "extensions-large", "Extensões"),
-      this.activityButton("remote", "remote", "Host remoto"),
+      this.activityButton("explorer", "files", uiText("Explorador")),
+      this.activityButton("search", "search", uiText("Pesquisar")),
+      this.activityButton("source", "source-control", uiText("Controle de código-fonte")),
+      this.activityButton("run", "debug-alt", uiText("Executar e depurar")),
+      this.activityButton("extensions", "extensions-large", uiText("Extensões")),
+      this.activityButton("remote", "remote", uiText("Host remoto")),
       this.activityButton("arduino", "circuit-board", "Arduino"),
       // this.activityButton("ai", "copilot-large", "AI Chat"),
-      this.activityButton("problems", "warning", "Problemas"),
+      this.activityButton("problems", "warning", uiText("Problemas")),
       el("div", { className: "activity-spacer" }),
       this.settingsActivityButton()
     );
@@ -426,9 +427,9 @@ export class IdePage {
       this.showPanel("source");
       void this.refreshStatusGit();
     });
-    const run = el("button", { className: "status-item", text: "Executar" });
+    const run = el("button", { className: "status-item", text: uiText("Executar") });
     run.addEventListener("click", () => void this.runCurrentFile());
-    const terminal = el("button", { className: "status-item", text: "Terminal" });
+    const terminal = el("button", { className: "status-item", text: uiText("Terminal") });
     terminal.addEventListener("click", () => this.toggleTerminal());
     this.statusEncoding.addEventListener("click", event => this.showEncodingMenu(event));
     left.append(this.statusBranch, run, terminal, this.statusLeft);
@@ -797,7 +798,7 @@ export class IdePage {
   private openGlobalSearch(): void {
     this.showPanel("search");
     this.search.focus();
-    this.updateStatus("Busca global aberta");
+    this.updateStatus(uiText("Busca global aberta"));
   }
 
   private openAIChat(): void {
@@ -813,7 +814,7 @@ export class IdePage {
   private openGlobalReplace(): void {
     this.showPanel("search");
     this.search.focusReplace();
-    this.updateStatus("Substituição global aberta");
+    this.updateStatus(uiText("Substituição global aberta"));
   }
 
   private showKeyboardShortcuts(): void {
@@ -826,18 +827,41 @@ export class IdePage {
   private openCommandCenter(): void {
     this.commandCenterForced = true;
     this.updateCommandCenter();
-    this.updateStatus("Central de comandos aberta");
+    this.updateStatus(uiText("Central de comandos aberta"));
   }
 
   private showOutput(): void {
     this.setTerminalVisible(true);
     this.terminal.showOutputPanel();
-    this.updateStatus("Saída aberta");
+    this.updateStatus(uiText("Saída aberta"));
   }
 
   private async showLanguageRuntimes(): Promise<void> {
     await this.languageRuntimes.show();
-    this.updateStatus("Configurar runtimes de linguagem");
+    this.updateStatus(uiText("Configurar runtimes de linguagem"));
+  }
+
+  private triggerSnippetSuggestions(): void {
+    this.editor.focus();
+    this.editor.runMonacoAction("editor.action.triggerSuggest", uiText("Sugestões de trechos abertas"));
+  }
+
+  private showTaskPicker(): void {
+    const items = buildTaskMenuItems({
+      runProject: () => void this.runCurrentFile(),
+      buildProject: () => void this.buildProject(),
+      runDebug: () => void this.runCurrentFile(true),
+      openTerminal: () => this.toggleTerminal(),
+      openNotes: () => void this.openNotes()
+    }).map(item => ({
+      label: uiText(item.label),
+      hint: uiText(item.hint),
+      run: async () => {
+        this.updateStatus(uiText(item.label));
+        await item.run();
+      }
+    }));
+    this.palette.showPicker(uiText("Tarefas"), items);
   }
 
   private async installExtensionFromVsix(): Promise<void> {
@@ -849,7 +873,7 @@ export class IdePage {
     this.showPanel("extensions");
     await this.extensions.refresh();
     this.extensions.focusSearch();
-    this.updateStatus("Extensões instaladas");
+    this.updateStatus(uiText("Extensões instaladas"));
   }
 
   private async reloadExtensionsCommand(): Promise<void> {
@@ -859,7 +883,7 @@ export class IdePage {
       await this.extensions.reload();
       return;
     }
-    this.palette.showPicker("Recarregar extensão", [
+    this.palette.showPicker(uiText("Recarregar extensão"), [
       { label: "Extensões: Recarregar todas", hint: `${installed.length} instaladas`, run: async () => { await this.extensions.reload(); } },
       ...installed.map(extension => ({
         label: extension.displayName,
@@ -875,10 +899,10 @@ export class IdePage {
     const installed = await api.extensions.list();
     const candidates = installed.filter(extension => extension.enabled !== enabled);
     if (!candidates.length) {
-      this.updateStatus(enabled ? "Não há extensões desativadas" : "Não há extensões ativadas");
+      this.updateStatus(enabled ? uiText("Não há extensões desativadas") : uiText("Não há extensões ativadas"));
       return;
     }
-    this.palette.showPicker(enabled ? "Ativar extensão" : "Desativar extensão", candidates.map(extension => ({
+    this.palette.showPicker(enabled ? uiText("Ativar extensão") : uiText("Desativar extensão"), candidates.map(extension => ({
       label: extension.displayName,
       hint: extension.id,
       keywords: extension.description,
@@ -901,23 +925,23 @@ export class IdePage {
     }
     if (this.keyboardShortcuts.visible) {
       this.keyboardShortcuts.close();
-      this.updateStatus("Atalhos de teclado fechados");
+      this.updateStatus(uiText("Atalhos de teclado fechados"));
       return;
     }
     if (document.querySelector(".palette-overlay")) {
       this.palette.close();
-      this.updateStatus("Palette fechada");
+      this.updateStatus(uiText("Palette fechada"));
       return;
     }
     if (this.commandCenterForced) {
       this.commandCenterForced = false;
       this.updateCommandCenter();
-      this.updateStatus("Command Center fechado");
+      this.updateStatus(uiText("Command Center fechado"));
       return;
     }
     if (this.activePanel === "search" && !this.sideBar.hidden) {
       this.showPanel("explorer");
-      this.updateStatus("Busca fechada");
+      this.updateStatus(uiText("Busca fechada"));
     }
   }
 
@@ -928,8 +952,8 @@ export class IdePage {
     const dialog = el("section", { className: "settings-dialog", attrs: { "aria-label": "Configurações" } });
     const header = el("header", { className: "settings-dialog-header" });
     header.append(
-      el("div", { children: [el("h2", { text: "Configurações" }), el("span", { text: "Preferências do Sharp-OSS" })] }),
-      el("button", { className: "icon-button", text: "×", attrs: { title: "Fechar" } })
+      el("div", { children: [el("h2", { text: uiText("Configurações") }), el("span", { text: uiText("Preferências do Sharp-OSS") })] }),
+      el("button", { className: "icon-button", text: "×", attrs: { title: uiText("Fechar") } })
     );
     const close = header.querySelector<HTMLButtonElement>("button")!;
     close.addEventListener("click", () => this.closeSettingsDialog());
@@ -946,14 +970,14 @@ export class IdePage {
     this.settingsDialog = overlay;
     this.settingsDialogPanel = panel;
     void this.renderSettings(panel);
-    this.updateStatus("Configurações abertas");
+    this.updateStatus(uiText("Configurações abertas"));
   }
 
   private closeSettingsDialog(): void {
     this.settingsDialog?.remove();
     this.settingsDialog = undefined;
     this.settingsDialogPanel = undefined;
-    this.updateStatus("Configurações fechadas");
+    this.updateStatus(uiText("Configurações fechadas"));
   }
 
   private activityButton(panelId: PanelId, iconName: string, title: string): HTMLButtonElement {
@@ -966,7 +990,7 @@ export class IdePage {
   }
 
   private settingsActivityButton(): HTMLButtonElement {
-    const button = el("button", { className: "activity-button", title: "Gerenciar", children: [icon("settings-gear", "Gerenciar")] });
+    const button = el("button", { className: "activity-button", title: uiText("Gerenciar"), children: [icon("settings-gear", uiText("Gerenciar"))] });
     button.addEventListener("click", event => {
       event.stopPropagation();
       this.showSettingsMenu(button);
@@ -997,18 +1021,18 @@ export class IdePage {
       return row;
     };
 
-    addRow("Paleta de comandos...", "Ctrl+Shift+P", () => this.palette.showCommands());
-    addRow("Configurações", "Ctrl+,", () => this.showSettings());
-    addRow("Configurar runtimes de linguagem", "", () => void this.showLanguageRuntimes());
-    addRow("Extensões", "Ctrl+Shift+X", () => this.showPanel("extensions"));
-    addRow("Atalhos de teclado", "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
-    addRow("Trechos", "", () => this.updateStatus("Trechos"));
-    addRow("Tarefas", "", () => this.updateStatus("Tarefas"));
+    addRow(uiText("Paleta de comandos..."), "Ctrl+Shift+P", () => this.palette.showCommands());
+    addRow(uiText("Configurações"), "Ctrl+,", () => this.showSettings());
+    addRow(uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes());
+    addRow(uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions"));
+    addRow(uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
+    addRow(uiText("Trechos"), "", () => this.triggerSnippetSuggestions());
+    addRow(uiText("Tarefas"), "", () => this.showTaskPicker());
     addSeparator();
 
     const appearance = el("div", { className: "manage-submenu" });
     appearance.hidden = true;
-    const appearanceRow = addRow("Aparencia", ">", undefined);
+    const appearanceRow = addRow(uiText("Aparencia"), ">", undefined);
     appearanceRow.disabled = false;
     appearanceRow.addEventListener("click", event => {
       event.stopPropagation();
@@ -1023,15 +1047,15 @@ export class IdePage {
       });
       appearance.append(row);
     };
-    addAppearanceRow("Tema de cores...", "Escolher", event => void this.showThemePicker(event.shiftKey));
-    addAppearanceRow("Wallpaper...", "Escolher", () => void this.chooseWallpaper());
-    addAppearanceRow("Remover papel de parede", "", () => void this.clearWallpaper());
+    addAppearanceRow(uiText("Tema de cores..."), uiText("Escolher"), event => void this.showThemePicker(event.shiftKey));
+    addAppearanceRow(uiText("Wallpaper..."), uiText("Escolher"), () => void this.chooseWallpaper());
+    addAppearanceRow(uiText("Remover papel de parede"), "", () => void this.clearWallpaper());
     menu.append(appearance);
 
-    addRow(this.settings.errorLensEnabled ? "Desativar ErrorLens" : "Ativar ErrorLens", "", () => this.toggleErrorLens());
+    addRow(this.settings.errorLensEnabled ? uiText("Desativar ErrorLens") : uiText("Ativar ErrorLens"), "", () => this.toggleErrorLens());
     addSeparator();
-    addRow("Backup e sincronização de configurações...", "", () => this.updateStatus("Backup e sincronização de configurações"));
-    addRow("Baixar atualização (1)");
+    addRow(uiText("Backup e sincronização de configurações..."), "", () => this.updateStatus(uiText("Backup e sincronização de configurações...")));
+    addRow(uiText("Baixar atualização (1)"), "", () => this.checkForUpdates());
 
     document.body.append(menu);
     close = installContextMenuDismiss(menu);
@@ -1052,14 +1076,14 @@ export class IdePage {
 
     const search = el("input", {
       className: "settings-search panel-input",
-      attrs: { placeholder: "Pesquisar configurações", value: this.settingsQuery }
+      attrs: { placeholder: uiText("Pesquisar configurações"), value: this.settingsQuery }
     });
     const layout = el("div", { className: "settings-view" });
     const categories = el("div", { className: "settings-categories" });
     const page = el("div", { className: "settings-page" });
     const categoryNames: SettingsCategory[] = ["Appearance", "Editor", "Terminal", "Diagnostics", "Build", "Workbench", "Discord"];
     const categoryLabels: Record<SettingsCategory, string> = {
-      Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho", Discord: "Discord Rich Presence"
+      Appearance: uiText("Aparência"), Editor: uiText("Editor"), Terminal: uiText("Terminal"), Diagnostics: uiText("Diagnósticos"), Build: uiText("Compilação"), Workbench: uiText("Área de trabalho"), Discord: "Discord Rich Presence"
     };
 
     for (const category of categoryNames) {
@@ -1090,12 +1114,12 @@ export class IdePage {
       const themes = await listThemes();
       const visibleThemes = themes.filter(theme => includeSpecial || !theme.special)
         .sort((left, right) => compareThemeGroups(themeGroup(left), themeGroup(right)) || left.name.localeCompare(right.name));
-      this.palette.showPicker("Selecionar tema de cores", visibleThemes.map(theme => {
+      this.palette.showPicker(uiText("Selecionar tema de cores"), visibleThemes.map(theme => {
         const active = theme.id === this.settings.theme || theme.name === this.settings.theme;
         return {
           label: theme.name,
           group: themeGroup(theme),
-          hint: active ? "Atual" : theme.special ? "Especial" : theme.uiTheme === "vs" ? "Claro" : "Escuro",
+          hint: active ? uiText("Atual") : theme.special ? uiText("Especial") : theme.uiTheme === "vs" ? uiText("Claro") : uiText("Escuro"),
           active,
           swatch: theme.colors["--accent"],
           run: () => this.updateSettings({ ...this.settings, theme: theme.id })
@@ -1116,7 +1140,7 @@ export class IdePage {
       .map(theme => ({ value: theme.id, label: theme.name, group: themeGroup(theme) }));
 
     if (query) {
-      page.append(el("h2", { className: "settings-page-title", text: "Resultados da pesquisa" }));
+      page.append(el("h2", { className: "settings-page-title", text: uiText("Resultados da pesquisa") }));
       const beforeCount = page.childElementCount;
       this.appendSearchSetting(page, query, "theme appearance color", () =>
         settingSelect("Tema", "Tema visual da interface.", this.settings.theme, themeOptions, value => void this.updateSettings({ ...this.settings, theme: value }))
@@ -1148,11 +1172,11 @@ export class IdePage {
       this.appendSearchSetting(page, query, "build command maven", () =>
         settingText("Comando de compilação", "Comando usado para compilar.", this.settings.buildCommand, value => void this.updateSettings({ ...this.settings, buildCommand: value.trim() || "mvn -q -DskipTests compile" }))
       );
-      if (page.childElementCount === beforeCount) page.append(el("div", { className: "muted-row", text: "Nenhuma configuração encontrada." }));
+      if (page.childElementCount === beforeCount) page.append(el("div", { className: "muted-row", text: uiText("Nenhuma configuração encontrada.") }));
       return;
     }
 
-    page.append(el("h2", { className: "settings-page-title", text: ({ Appearance: "Aparência", Editor: "Editor", Terminal: "Terminal", Diagnostics: "Diagnósticos", Build: "Compilação", Workbench: "Área de trabalho", Discord: "Discord Rich Presence" } as Record<SettingsCategory, string>)[this.settingsCategory] }));
+    page.append(el("h2", { className: "settings-page-title", text: ({ Appearance: uiText("Aparência"), Editor: uiText("Editor"), Terminal: uiText("Terminal"), Diagnostics: uiText("Diagnósticos"), Build: uiText("Compilação"), Workbench: uiText("Área de trabalho"), Discord: "Discord Rich Presence" } as Record<SettingsCategory, string>)[this.settingsCategory] }));
 
     if (this.settingsCategory === "Appearance") {
       const languages = await api.i18n.availableLanguages();
@@ -1182,9 +1206,9 @@ export class IdePage {
       page.append(settingText("Caminho do papel de parede", "Caminho da imagem de fundo.", this.settings.wallpaperPath, value => void this.updateSettings({ ...this.settings, wallpaperPath: value.trim() })));
       page.append(settingNumber("Opacidade do papel de parede", "Opacidade da imagem de fundo.", this.settings.wallpaperOpacity, 0, 1, 0.05, value => void this.updateSettings({ ...this.settings, wallpaperOpacity: value })));
       const actions = el("div", { className: "settings-inline-actions" });
-      const choose = el("button", { className: "wide-action", text: "Escolher papel de parede" });
+      const choose = el("button", { className: "wide-action", text: uiText("Escolher papel de parede") });
       choose.addEventListener("click", () => void this.chooseWallpaper());
-      const clear = el("button", { className: "wide-action", text: "Remover papel de parede" });
+      const clear = el("button", { className: "wide-action", text: uiText("Remover papel de parede") });
       clear.addEventListener("click", () => void this.clearWallpaper());
       actions.append(choose, clear);
       page.append(actions);
@@ -1249,10 +1273,10 @@ export class IdePage {
       page.append(settingText("Botão — rótulo", "Rótulo opcional do primeiro botão (máximo de dois no protocolo).", firstButton.label, label => update({ buttons: label.trim() || firstButton.url ? [{ ...firstButton, label: label.trim() }] : [] })));
       page.append(settingText("Botão — URL HTTPS", "Somente URLs HTTPS válidas são publicadas.", firstButton.url, url => update({ buttons: firstButton.label || url.trim() ? [{ ...firstButton, url: url.trim() }] : [] })));
       const actions = el("div", { className: "settings-inline-actions" });
-      const reconnect = el("button", { className: "wide-action", text: "Reconectar ao Discord" });
+      const reconnect = el("button", { className: "wide-action", text: uiText("Reconectar ao Discord") });
       reconnect.addEventListener("click", () => void api.discordPresence.reconnect().then(state => this.updateStatus(state.message)));
-      const clear = el("button", { className: "wide-action", text: "Limpar atividade" });
-      clear.addEventListener("click", () => void api.discordPresence.clear().then(() => this.updateStatus("Atividade do Discord removida")));
+      const clear = el("button", { className: "wide-action", text: uiText("Limpar atividade") });
+      clear.addEventListener("click", () => void api.discordPresence.clear().then(() => this.updateStatus(uiText("Atividade do Discord removida"))));
       actions.append(reconnect, clear); page.append(actions);
       void api.discordPresence.status().then(state => page.append(el("div", { className: "muted-row", text: state.message })));
       return;
@@ -1307,24 +1331,24 @@ export class IdePage {
     this.settings = await api.settings.reset();
     this.refreshShortcuts();
     await this.applySettingsEffects();
-    this.updateStatus("Configurações redefinidas");
+    this.updateStatus(uiText("Configurações redefinidas"));
   }
 
   private async clearWallpaper(): Promise<void> {
     await this.updateSettings({ ...this.settings, wallpaperPath: "" });
-    this.updateStatus("Wallpaper removido");
+    this.updateStatus(uiText("Wallpaper removido"));
   }
 
   private toggleErrorLens(): void {
     const next = !this.settings.errorLensEnabled;
     void this.updateSettings({ ...this.settings, errorLensEnabled: next });
-    this.updateStatus(next ? "ErrorLens ativado" : "ErrorLens desativado");
+    this.updateStatus(next ? uiText("ErrorLens ativado") : uiText("ErrorLens desativado"));
   }
 
   private toggleEditorWordWrap(): void {
     const next = !this.settings.editorWordWrap;
     void this.updateSettings({ ...this.settings, editorWordWrap: next });
-    this.updateStatus(next ? "Quebra automática ativada" : "Quebra automática desativada");
+    this.updateStatus(next ? uiText("Quebra automática ativada") : uiText("Quebra automática desativada"));
   }
 
   private async applySettingsEffects(): Promise<void> {
@@ -1356,14 +1380,14 @@ export class IdePage {
 
   private async chooseWallpaper(): Promise<void> {
     if (!platform.isDesktop) {
-      this.updateStatus("Seletor nativo de wallpaper disponivel apenas no desktop.");
+      this.updateStatus(uiText("Seletor nativo de wallpaper disponivel apenas no desktop."));
       return;
     }
     try {
       const result = await api.dialog.chooseWallpaper();
       if (!result.canceled && result.paths[0]) {
         await this.updateSettings({ ...this.settings, wallpaperPath: result.paths[0] });
-        this.updateStatus("Papel de parede aplicado. Formatos aceitos: PNG, JPG, JPEG, JFIF, WebP, GIF e BMP.");
+        this.updateStatus(uiText("Papel de parede aplicado. Formatos aceitos: PNG, JPG, JPEG, JFIF, WebP, GIF e BMP."));
       }
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha ao escolher papel de parede");
@@ -2394,26 +2418,26 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
     const logo = el("img", { className: "about-logo", attrs: { src: DEFAULT_LOGO_URL, alt: "" } });
     const identity = el("div", { className: "about-identity" });
     identity.append(
-      el("span", { className: "about-kicker", text: "AMBIENTE DE DESENVOLVIMENTO" }),
+      el("span", { className: "about-kicker", text: uiText("AMBIENTE DE DESENVOLVIMENTO") }),
       el("h2", { text: BUILD_CONFIG.displayName, attrs: { id: "about-title" } }),
-      el("p", { text: "Código sem distrações. Ferramentas locais e remotas em um único workspace." }),
+      el("p", { text: uiText("Código sem distrações. Ferramentas locais e remotas em um único workspace.") }),
       el("div", { className: "about-badges", children: [
         el("span", { text: `v${info.version}` }),
-        el("span", { text: info.isPackaged ? "Instalado" : "Desenvolvimento" }),
+        el("span", { text: info.isPackaged ? uiText("Instalado") : uiText("Desenvolvimento") }),
         el("span", { text: `${friendlyPlatform(info.platform)} · ${info.architecture}` })
       ] })
     );
     const hero = el("header", { className: "about-hero", children: [logo, identity] });
     const details = el("div", { className: "about-details" });
     const addDetail = (label: string, value: string) => details.append(el("div", { className: "about-detail", children: [el("span", { text: label }), el("strong", { text: value || "—", attrs: { title: value || "—" } })] }));
-    addDetail("Aplicativo", `${info.name} ${info.version}`);
-    addDetail("Electron", info.runtime.electron ?? "Não aplicável");
+    addDetail(uiText("Aplicativo"), `${info.name} ${info.version}`);
+    addDetail("Electron", info.runtime.electron ?? uiText("Não aplicável"));
     addDetail("Chromium", info.runtime.chromium ?? navigator.userAgent);
-    addDetail("Node.js", info.runtime.node ?? "Não aplicável");
-    addDetail("V8", info.runtime.v8 ?? "Não informado");
-    addDetail("Sistema", `${friendlyPlatform(info.platform)} (${info.architecture})`);
+    addDetail("Node.js", info.runtime.node ?? uiText("Não aplicável"));
+    addDetail("V8", info.runtime.v8 ?? uiText("Não informado"));
+    addDetail(uiText("Sistema"), `${friendlyPlatform(info.platform)} (${info.architecture})`);
     addDetail("Application ID", BUILD_CONFIG.applicationId);
-    addDetail("Dados do Sharp-OSS", info.sharpHome);
+    addDetail(uiText("Dados do Sharp-OSS"), info.sharpHome);
     const diagnostic = [
       `${info.name} ${info.version} (${info.isPackaged ? "installed" : "development"})`,
       `Platform: ${info.platform} ${info.architecture}`,
@@ -2427,13 +2451,13 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
     ].join("\n");
     const footerCopy = el("div", { className: "about-footer-copy", children: [
       el("strong", { text: `© ${new Date().getFullYear()} ${BUILD_CONFIG.copyrightOwner}` }),
-      el("span", { text: "Licenciado sob MIT · Feito por desenvolvedores, para desenvolvedores." })
+      el("span", { text: uiText("Licenciado sob MIT · Feito por desenvolvedores, para desenvolvedores.") })
     ] });
-    const copy = el("button", { className: "wide-action", text: "Copiar diagnóstico" });
-    copy.addEventListener("click", () => void navigator.clipboard.writeText(diagnostic).then(() => { copy.textContent = "Copiado"; window.setTimeout(() => copy.textContent = "Copiar diagnóstico", 1600); }).catch(error => reportError(error, text => this.updateStatus(text), "Não foi possível copiar")));
-    const repository = el("button", { className: "wide-action", text: "Repositório" });
+    const copy = el("button", { className: "wide-action", text: uiText("Copiar diagnóstico") });
+    copy.addEventListener("click", () => void navigator.clipboard.writeText(diagnostic).then(() => { copy.textContent = uiText("Copiado"); window.setTimeout(() => copy.textContent = uiText("Copiar diagnóstico"), 1600); }).catch(error => reportError(error, text => this.updateStatus(text), uiText("Não foi possível copiar"))));
+    const repository = el("button", { className: "wide-action", text: uiText("Repositório") });
     repository.addEventListener("click", () => window.open(BUILD_CONFIG.homepage, "_blank", "noopener,noreferrer"));
-    const done = el("button", { className: "primary", text: "Fechar" });
+    const done = el("button", { className: "primary", text: uiText("Fechar") });
     done.addEventListener("click", close);
     const actions = el("div", { className: "about-actions", children: [copy, repository, done] });
     dialog.append(hero, details, el("footer", { className: "about-footer", children: [footerCopy, actions] }));
@@ -2528,7 +2552,7 @@ function panelTitle(panel: PanelId): string {
     settings: "CONFIGURAÇÕES",
     problems: "PROBLEMAS"
   };
-  return titles[panel];
+  return uiText(titles[panel]);
 }
 
 function extensionForAILanguage(language: string): string {
