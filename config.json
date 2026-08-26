@@ -3,8 +3,8 @@
   "application": {
     "packageName": "Sharp-OSS",
     "displayName": "Sharp-OSS",
-    "version": "1.0.0",
-    "versionCode": 10000,
+    "version": "1.2.0",
+    "versionCode": 10200,
     "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",

@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## 1.2.0 - 2026-08-26
+
+Type: Feature / Refactor
+
+Description:
+- Extrai primitivas visuais reutilizáveis para botões, icon buttons, campos, selects, tabs, badges, toolbars, headers, listas, cards, divisores, tooltips e estados de feedback.
+- Migra progressivamente Explorer, Source Control, Extensions, runtimes, Arduino e áreas de IA para as primitivas sem alterar eventos, comandos, APIs ou contratos dos componentes.
+- Consolida estados hover, active, selected, focus, disabled, loading e error, incluindo alvos touch e movimento reduzido.
+- Remove estilos redundantes do chat e regras substituídas de extensões e runtimes, além de eliminar o uso da variável CSS inexistente `--panel`.
+- Adiciona o token temático `--success`, status acessíveis com `aria-live` e tooltips localizáveis para controles somente com ícone.
+
+## 1.1.0 - 2026-08-26
+
+Type: Feature / Refactor
+
+Description:
+- Documenta a auditoria visual, a direção industrial/utilitária e o design system progressivo da interface desktop.
+- Introduz tokens semânticos compatíveis com temas existentes para superfícies, texto, interação, foco, geometria, elevação e movimento.
+- Refina chrome, painéis, Command Center, configurações, diálogos e estados interativos sem alterar comportamento, DOM ou contratos dos componentes.
+- Padroniza foco visível, seleção, controles desabilitados, scrollbars e suporte global a movimento reduzido.
+
+## 1.0.1 - 2026-08-26
+
+Type: Fix
+
+Description:
+- Amplia o catálogo `en-US` para traduzir configurações, menus, painéis, diálogos, botões e ações principais que permaneciam em português após a troca de idioma.
+- Aplica a localização também às mensagens da barra de status e adiciona cobertura automatizada para traduções essenciais da interface.
+
 ## 1.0.0 - 2026-08-26
 
 Type: Refactor / Fix

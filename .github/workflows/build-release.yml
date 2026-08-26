@@ -96,13 +96,14 @@ jobs:
         with:
           name: windows-updater-artifacts
           if-no-files-found: error
+          retention-days: 3
           path: |
             release/*.exe
             release/*-Portable-Fast-*.zip
             release/*.blockmap
             release/SHA256SUMS.txt
             release/latest.yml
-
+     
   package-linux:
     name: Package Linux AppImage updater artifacts
     runs-on: ubuntu-latest
@@ -145,6 +146,7 @@ jobs:
         with:
           name: linux-updater-artifacts
           if-no-files-found: error
+          retention-days: 3
           path: |
             release/*.AppImage
             release/*.deb
@@ -199,6 +201,7 @@ jobs:
         with:
           name: android-artifacts
           if-no-files-found: error
+          retention-days: 3
           path: android/app/build/outputs/apk/**/*.apk
 
   release:
