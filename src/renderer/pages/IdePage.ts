@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import type { AppInfo, AppSettings, AppUpdateStatus, CustomShortcutBinding, EditorDiagnostic, PersistedSession, TextEncoding } from "../../shared/types";
 import type { AppLocale } from "../../shared/i18n";
-import { setUiLocale } from "../../shared/i18n";
+import { setUiLocale, uiText } from "../../shared/i18n";
 import { BUILD_CONFIG } from "../../shared/buildConfig";
 import { PortugolInterpreter } from "../../core/portugol/interpreter";
 import { ArduinoPanel } from "../components/ArduinoPanel";
@@ -2321,7 +2321,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   private updateStatus(text: string): void {
     if (this.disposed) return;
-    this.statusLeft.textContent = text;
+    this.statusLeft.textContent = uiText(text);
   }
 
   private updateEditorStatus(status: EditorStatusInfo): void {

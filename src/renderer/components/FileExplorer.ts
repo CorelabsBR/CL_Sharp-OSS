@@ -28,11 +28,11 @@ interface PendingCreate {
 }
 
 export class FileExplorer {
-  readonly element = el("div", { className: "panel explorer-panel" });
-  private readonly toolbar = el("div", { className: "panel-toolbar" });
-  private readonly location = el("div", { className: "explorer-location" });
-  private readonly tree = el("div", { className: "file-tree" });
-  private readonly empty = el("div", { className: "empty-state" });
+  readonly element = el("div", { className: "panel explorer-panel ui-panel" });
+  private readonly toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
+  private readonly location = el("div", { className: "explorer-location ui-panel-header" });
+  private readonly tree = el("div", { className: "file-tree ui-list" });
+  private readonly empty = el("div", { className: "empty-state ui-empty-state" });
   private root?: string;
   private rootName?: string;
   private rootLocation?: string;
@@ -237,7 +237,7 @@ export class FileExplorer {
       className: "empty-subtitle",
       text: platform.isMobile ? "Escolha uma pasta real do dispositivo para usá-la como workspace." : "Abra uma pasta para exibir os arquivos no Explorer."
     });
-    const open = el("button", { className: "primary", text: platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta" });
+    const open = el("button", { className: "primary ui-button ui-button-primary", text: platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta" });
     open.addEventListener("click", () => void this.openFolderFromDialog());
     this.empty.append(title, subtitle, open);
     this.element.append(this.toolbar, this.location, this.tree, this.empty);
@@ -292,7 +292,7 @@ export class FileExplorer {
 
   private renderNode(nodePath: string, depth: number): HTMLElement {
     const node = this.nodes.get(nodePath)!;
-    const row = el("div", { className: `tree-row${samePath(this.selectedPath ?? "", nodePath) ? " selected" : ""}`, attrs: { "data-path": nodePath } });
+    const row = el("div", { className: `tree-row ui-list-item${samePath(this.selectedPath ?? "", nodePath) ? " selected" : ""}`, attrs: { "data-path": nodePath } });
     row.style.paddingLeft = `${depth * 14 + 6}px`;
     const twisty = el("span", { className: "tree-twisty", text: node.entry.directory ? (node.expanded ? "▾" : "▸") : "" });
     row.append(twisty, fileIcon(node.entry.name, node.entry.directory, node.expanded), el("span", { className: "tree-label", text: node.entry.name }));
@@ -398,7 +398,7 @@ export class FileExplorer {
 
   private renderCreateInput(depth: number): HTMLElement {
     const pending = this.pendingCreate!;
-    const row = el("div", { className: `tree-row tree-create-row${pending.error ? " has-error" : ""}` });
+    const row = el("div", { className: `tree-row tree-create-row ui-list-item${pending.error ? " has-error" : ""}` });
     row.style.paddingLeft = `${depth * 14 + 6}px`;
     const twisty = el("span", { className: "tree-twisty" });
     const input = el("input", {
@@ -553,8 +553,8 @@ export class FileExplorer {
     const remember = el("input", { attrs: { type: "checkbox" } }) as HTMLInputElement;
     const rememberLabel = el("label", { className: "file-delete-remember", children: [remember, " Não perguntar novamente"] });
     const error = el("div", { className: "file-delete-error", attrs: { role: "alert", "aria-live": "polite" } });
-    const cancel = el("button", { className: "secondary", text: "Cancelar", attrs: { type: "button" } });
-    const submit = el("button", { className: "danger", text: "Excluir", attrs: { type: "button" } });
+    const cancel = el("button", { className: "secondary ui-button", text: "Cancelar", attrs: { type: "button" } });
+    const submit = el("button", { className: "danger ui-button ui-button-danger", text: "Excluir", attrs: { type: "button" } });
     const actions = el("div", { className: "file-delete-actions", children: [cancel, submit] });
     dialog.append(title, description, rememberLabel, error, actions);
     overlay.append(dialog);

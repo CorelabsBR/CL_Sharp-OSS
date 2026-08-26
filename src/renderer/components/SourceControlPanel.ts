@@ -9,9 +9,9 @@ import { reportError } from "../utils/errors";
 import { showInputDialog } from "../utils/inputDialog";
 
 export class SourceControlPanel {
-  readonly element = el("div", { className: "panel scm-panel" });
-  private readonly summary = el("div", { className: "panel-summary", text: "Nenhum repositório" });
-  private readonly commitInput = el("input", { className: "panel-input", attrs: { placeholder: "Mensagem do commit" } });
+  readonly element = el("div", { className: "panel scm-panel ui-panel" });
+  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: "Nenhum repositório", attrs: { role: "status", "aria-live": "polite" } });
+  private readonly commitInput = el("input", { className: "panel-input ui-field", attrs: { placeholder: "Mensagem do commit" } });
   private readonly allowEmpty = el("input", { attrs: { type: "checkbox" } });
   private readonly amend = el("input", { attrs: { type: "checkbox" } });
   private readonly list = el("div", { className: "scm-list" });
@@ -79,7 +79,7 @@ export class SourceControlPanel {
   }
 
   private build(): void {
-    const toolbar = el("div", { className: "panel-toolbar" });
+    const toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
     const refresh = buttonIcon("refresh", "Atualizar", () => void this.refresh());
     const stageAll = buttonIcon("add", "Preparar tudo", () => void this.stageAll());
     const unstageAll = buttonIcon("remove", "Remover tudo da preparação", () => void this.unstageAll());
@@ -108,8 +108,8 @@ export class SourceControlPanel {
     this.summary.textContent = this.repos.length === 0 ? "Nenhum repositório Git encontrado" : `${this.repos.length} repositório(s), ${changes} alteração(ões)`;
     this.list.replaceChildren();
     for (const repo of this.repos) {
-      const repoBlock = el("section", { className: "scm-repo" });
-      const header = el("div", { className: "scm-repo-header" });
+      const repoBlock = el("section", { className: "scm-repo ui-panel-section" });
+      const header = el("div", { className: "scm-repo-header ui-panel-header" });
       header.append(
         el("strong", { text: repo.name }),
         el("span", { text: repo.branch }),
@@ -128,7 +128,7 @@ export class SourceControlPanel {
       ];
       for (const [label, files] of groups) {
         if (!files.length) continue;
-        repoBlock.append(el("div", { className: "scm-group-title", text: `${label} (${files.length})` }));
+        repoBlock.append(el("div", { className: "scm-group-title ui-section-label", text: `${label} (${files.length})` }));
         for (const file of files) repoBlock.append(this.fileRow(repo, file));
       }
       this.list.append(repoBlock);
@@ -163,20 +163,21 @@ export class SourceControlPanel {
   }
 
   private fileRow(repo: GitRepositoryStatus, file: GitFileStatus): HTMLElement {
-    const row = el("div", { className: "scm-file" });
+    const row = el("div", { className: "scm-file ui-list-item" });
     row.append(
       fileIcon(file.path, false),
       el("span", { className: `scm-kind ${file.kind}`, text: labelFor(file) }),
       el("span", { className: "scm-path", text: file.path })
     );
     const actions = el("div", { className: "row-actions" });
+    const resolveConflict = buttonIcon("debug-breakpoint-conditional", "Resolver conflito", () => void this.resolveConflict(repo, file));
+    resolveConflict.hidden = !file.conflicted;
     actions.append(
       buttonIcon(file.staged ? "remove" : "add", file.staged ? "Remover da preparação" : "Preparar", () => void this.stageToggle(repo, file)),
       buttonIcon("diff", "Diff", () => void this.showDiff(repo, file)),
-      buttonIcon("debug-breakpoint-conditional", "Resolver conflito", () => void this.resolveConflict(repo, file)),
+      resolveConflict,
       buttonIcon("discard", "Descartar", () => void this.discard(repo, file))
     );
-    actions.querySelector<HTMLButtonElement>('[title="Resolver conflito"]')!.hidden = !file.conflicted;
     row.append(actions);
     return row;
   }

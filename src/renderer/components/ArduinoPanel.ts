@@ -12,14 +12,14 @@ import { basename } from "../utils/path";
 const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 115200, 230400, 250000];
 
 export class ArduinoPanel {
-  readonly element = el("div", { className: "panel arduino-panel" });
-  private readonly summary = el("div", { className: "panel-summary", text: "Arduino" });
+  readonly element = el("div", { className: "panel arduino-panel ui-panel" });
+  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: "Arduino", attrs: { role: "status", "aria-live": "polite" } });
   private readonly form = el("div", { className: "arduino-form" });
-  private readonly cliPath = el("input", { className: "panel-input", attrs: { placeholder: "arduino-cli" } });
-  private readonly sketchPath = el("input", { className: "panel-input", attrs: { placeholder: "Caminho do sketch" } });
-  private readonly boardSelect = el("select", { className: "panel-input" });
-  private readonly portSelect = el("select", { className: "panel-input" });
-  private readonly baudSelect = el("select", { className: "panel-input" });
+  private readonly cliPath = el("input", { className: "panel-input ui-field", attrs: { placeholder: "arduino-cli" } });
+  private readonly sketchPath = el("input", { className: "panel-input ui-field", attrs: { placeholder: "Caminho do sketch" } });
+  private readonly boardSelect = el("select", { className: "panel-input ui-field ui-select" });
+  private readonly portSelect = el("select", { className: "panel-input ui-field ui-select" });
+  private readonly baudSelect = el("select", { className: "panel-input ui-field ui-select" });
   private readonly output = el("pre", { className: "arduino-output" });
   private config: ArduinoConfig = { baudRate: 9600 };
   private boards: ArduinoBoard[] = [];
@@ -70,7 +70,7 @@ export class ArduinoPanel {
   }
 
   private build(): void {
-    const toolbar = el("div", { className: "panel-toolbar" });
+    const toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
     toolbar.append(
       buttonIcon("refresh", "Detect Arduino CLI", () => void this.refresh()),
       buttonIcon("add", "Criar sketch", () => void this.createSketch()),

@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const { CommandRegistry, fuzzyScore } = require("../dist-electron/renderer/commands/commandRegistry.js");
 const { parseQuickOpenQuery } = require("../dist-electron/renderer/commands/quickOpen.js");
 const { emmetAbbreviationAt, emmetLanguageConfig } = require("../dist-electron/editor/emmet.js");
+const { t } = require("../dist-electron/shared/i18n.js");
 
 test("Command Registry registra, executa e remove comandos", async () => {
   const registry = new CommandRegistry();
@@ -37,4 +38,13 @@ test("Emmet oferece autocomplete nos dialetos de markup e estilos", () => {
   assert.match(emmetAbbreviationAt("div.card", { type: "markup", syntax: "jsx" }).snippet, /className="card"/);
   assert.match(emmetAbbreviationAt("m10", { type: "stylesheet", syntax: "css" }).snippet, /margin: 10px/);
   assert.match(emmetAbbreviationAt("node>child", { type: "markup", syntax: "xml" }).snippet, /<child>\$1<\/child>/);
+});
+
+test("catálogo em inglês cobre configurações e ações principais", () => {
+  assert.equal(t("en-US", "Configurações"), "Settings");
+  assert.equal(t("en-US", "Tema de ícones"), "Icon Theme");
+  assert.equal(t("en-US", "Escolher papel de parede"), "Choose Wallpaper");
+  assert.equal(t("en-US", "Barra lateral visível"), "Side Bar Visible");
+  assert.equal(t("en-US", "Confirmar"), "Confirm");
+  assert.equal(t("pt-BR", "Confirmar"), "Confirmar");
 });

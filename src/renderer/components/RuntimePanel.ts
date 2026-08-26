@@ -8,9 +8,9 @@ import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
 
 export class RuntimePanel {
-  readonly element = el("div", { className: "panel runtime-panel" });
-  private readonly summary = el("div", { className: "panel-summary", text: "Ambientes de execução" });
-  private readonly list = el("div", { className: "runtime-list" });
+  readonly element = el("div", { className: "panel runtime-panel ui-panel" });
+  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: "Ambientes de execução", attrs: { role: "status", "aria-live": "polite" } });
+  private readonly list = el("div", { className: "runtime-list ui-list" });
 
   constructor(
     private readonly runCurrentFile: () => Promise<void>,
@@ -18,7 +18,7 @@ export class RuntimePanel {
     private readonly updateStatus: (text: string) => void,
     private readonly configureLanguageRuntimes: () => void
   ) {
-    const toolbar = el("div", { className: "panel-toolbar" });
+    const toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
     toolbar.append(
       buttonIcon("play", "Executar arquivo atual", () => void this.runCurrentFile()),
       buttonIcon("cloud-download", "Baixar imports do arquivo Python no .venv do projeto", () => void this.installDependencies()),
@@ -44,13 +44,13 @@ export class RuntimePanel {
     this.summary.textContent = `${runtimes.length} runtime(s) registrado(s)`;
     this.list.replaceChildren();
     for (const runtime of runtimes) {
-      const row = el("div", { className: "runtime-row" });
+      const row = el("div", { className: "runtime-row ui-list-item" });
       row.append(
         el("strong", { text: runtime.language.displayName }),
         el("span", { text: runtime.version }),
         el("code", { text: runtime.executablePath })
       );
-      const configure = el("button", { className: "mini-action", text: "Configurar" });
+      const configure = el("button", { className: "mini-action ui-button ui-button-compact", text: "Configurar" });
       configure.addEventListener("click", () => this.configureLanguageRuntimes());
       row.append(configure);
       this.list.append(row);

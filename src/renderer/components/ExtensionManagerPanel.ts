@@ -9,13 +9,13 @@ import { reportError } from "../utils/errors";
 import { fileUri } from "../utils/path";
 
 export class ExtensionManagerPanel {
-  readonly element = el("div", { className: "panel extensions-panel" });
+  readonly element = el("div", { className: "panel extensions-panel ui-panel" });
   private readonly search = el("input", {
-    className: "panel-input extensions-search",
+    className: "panel-input extensions-search ui-field ui-search-field",
     attrs: { placeholder: "Pesquisar extensões" }
   });
-  private readonly summary = el("div", { className: "panel-summary", text: "Extensões" });
-  private readonly list = el("div", { className: "extensions-list" });
+  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: "Extensões", attrs: { role: "status", "aria-live": "polite" } });
+  private readonly list = el("div", { className: "extensions-list ui-list" });
   private installed: InstalledExtension[] = [];
   private marketplace: OpenVsxExtension[] = [];
   private marketplaceLoading = false;
@@ -25,7 +25,7 @@ export class ExtensionManagerPanel {
   private activationStates = new Map<string, { state: "active" | "error"; message?: string }>();
 
   constructor(private readonly updateStatus: (text: string) => void, private readonly onChanged: () => void | Promise<void> = () => undefined) {
-    const toolbar = el("div", { className: "panel-toolbar extensions-toolbar" });
+    const toolbar = el("div", { className: "panel-toolbar extensions-toolbar ui-toolbar" });
     toolbar.append(
       buttonIcon("cloud-download", "Instalar de VSIX", () => void this.installFromVsix()),
       buttonIcon("refresh", "Recarregar extensões", () => void this.reload())
@@ -126,7 +126,11 @@ export class ExtensionManagerPanel {
     }
 
     if (query) {
-      const heading = el("div", { className: "extensions-marketplace-title", text: this.marketplaceLoading ? "Pesquisando na Open VSX..." : "Open VSX Registry" });
+      const heading = el("div", {
+        className: "extensions-marketplace-title ui-section-label ui-divider",
+        text: this.marketplaceLoading ? "Pesquisando na Open VSX..." : "Open VSX Registry",
+        attrs: { "aria-busy": String(this.marketplaceLoading) }
+      });
       this.list.append(heading);
       if (!this.marketplaceLoading && this.marketplaceQuery === query && !this.marketplace.length) {
         this.list.append(el("div", { className: "muted-row", text: "Nenhuma extensão encontrada na Open VSX." }));
@@ -144,7 +148,7 @@ export class ExtensionManagerPanel {
   }
 
   private extensionRow(extension: InstalledExtension): HTMLElement {
-    const row = el("section", { className: `extension-row ${extension.enabled ? "enabled" : "disabled"}` });
+    const row = el("section", { className: `extension-row ui-card ${extension.enabled ? "enabled" : "disabled"}` });
     const extensionIcon = this.createExtensionIcon(extension.displayName, extension.iconPath ? fileUri(extension.iconPath) : undefined);
     const title = el("div", { className: "extension-title" });
     title.append(
@@ -161,18 +165,18 @@ export class ExtensionManagerPanel {
     const description = el("p", { className: "extension-description", text: extension.description || "Sem descrição." });
     const categories = el("div", { className: "extension-categories" });
     for (const category of extension.categories.slice(0, 4)) {
-      categories.append(el("span", { text: category }));
+      categories.append(el("span", { className: "ui-badge", text: category }));
     }
 
     const copy = el("div", { className: "extension-copy" });
     copy.append(title, meta, description, categories);
 
     const actions = el("div", { className: "extension-actions" });
-    const toggle = el("button", { className: "mini-action", text: extension.enabled ? "Desabilitar" : "Habilitar" });
+    const toggle = el("button", { className: "mini-action ui-button ui-button-compact", text: extension.enabled ? "Desabilitar" : "Habilitar" });
     toggle.addEventListener("click", () => void this.toggle(extension));
-    const reload = el("button", { className: "mini-action", text: "Recarregar" });
+    const reload = el("button", { className: "mini-action ui-button ui-button-compact", text: "Recarregar" });
     reload.addEventListener("click", () => void this.reload(extension.id));
-    const uninstall = el("button", { className: "mini-action danger", text: "Desinstalar" });
+    const uninstall = el("button", { className: "mini-action danger ui-button ui-button-compact ui-button-danger", text: "Desinstalar" });
     uninstall.addEventListener("click", () => void this.uninstall(extension));
     actions.append(toggle, reload, uninstall);
 
@@ -183,14 +187,14 @@ export class ExtensionManagerPanel {
   private marketplaceRow(extension: OpenVsxExtension): HTMLElement {
     const id = `${extension.namespace}.${extension.name}`.toLowerCase();
     const installed = this.installed.some(item => item.id.toLowerCase() === id);
-    const row = el("section", { className: "extension-row marketplace-extension" });
+    const row = el("section", { className: "extension-row marketplace-extension ui-card" });
     const extensionIcon = this.createExtensionIcon(extension.displayName, extension.iconUrl);
     const title = el("div", { className: "extension-title" });
     title.append(el("strong", { text: extension.displayName }), el("span", { text: id }));
     const meta = el("div", { className: "extension-meta", text: `${extension.version}${extension.downloads ? ` · ${extension.downloads.toLocaleString()} downloads` : ""}` });
     const copy = el("div", { className: "extension-copy" });
     copy.append(title, meta, el("p", { className: "extension-description", text: extension.description || "Sem descrição." }));
-    const install = el("button", { className: "mini-action", text: installed ? "Instalada" : "Instalar" });
+    const install = el("button", { className: "mini-action ui-button ui-button-compact", text: installed ? "Instalada" : "Instalar" });
     install.disabled = installed;
     install.addEventListener("click", () => void this.installFromOpenVsx(extension));
     row.append(extensionIcon, copy, el("div", { className: "extension-actions", children: [install] }));

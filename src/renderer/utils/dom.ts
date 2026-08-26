@@ -25,7 +25,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, options: Eleme
   if (options.text !== undefined) node.textContent = uiText(options.text);
   if (options.title) node.title = uiText(options.title);
   for (const [key, value] of Object.entries(options.attrs ?? {})) {
-    node.setAttribute(key, key === "placeholder" || key === "title" || key === "aria-label" ? uiText(value) : value);
+    node.setAttribute(key, key === "placeholder" || key === "title" || key === "aria-label" || key === "data-tooltip" ? uiText(value) : value);
   }
   for (const child of options.children ?? []) {
     if (child == null) continue;
@@ -40,8 +40,8 @@ export function localizeElementTree(root: ParentNode): void {
   const nodes: Text[] = [];
   while (walker.nextNode()) nodes.push(walker.currentNode as Text);
   for (const node of nodes) node.data = uiText(node.data);
-  root.querySelectorAll<HTMLElement>("[title], [placeholder], [aria-label]").forEach(node => {
-    for (const name of ["title", "placeholder", "aria-label"]) {
+  root.querySelectorAll<HTMLElement>("[title], [placeholder], [aria-label], [data-tooltip]").forEach(node => {
+    for (const name of ["title", "placeholder", "aria-label", "data-tooltip"]) {
       const value = node.getAttribute(name);
       if (value) node.setAttribute(name, uiText(value));
     }
@@ -64,7 +64,11 @@ const iconName = directory
 }
 
 export function buttonIcon(iconName: string, title: string, action: () => void): HTMLButtonElement {
-  const button = el("button", { className: "icon-button", title, children: [icon(iconName, title)] });
+  const button = el("button", {
+    className: "icon-button ui-button ui-icon-button ui-tooltip",
+    attrs: { "aria-label": title, "data-tooltip": title },
+    children: [icon(iconName, "")]
+  });
   button.addEventListener("click", event => {
     event.stopPropagation();
     action();

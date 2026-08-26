@@ -57,20 +57,20 @@ const ACTION_PROMPTS: Record<string, string> = {
 };
 
 export class AIChatPanel {
-  readonly element = el("div", { className: "panel ai-chat-panel", attrs: { "aria-label": "Chat de IA" } });
+  readonly element = el("div", { className: "panel ai-chat-panel ui-panel", attrs: { "aria-label": "Chat de IA" } });
   private readonly history = new HistoryManager();
   private readonly collector: ContextCollector;
   private readonly markdown: MarkdownRenderer;
-  private readonly conversationSearch = el("input", { className: "panel-input ai-history-search", attrs: { placeholder: "Pesquisar conversas", "aria-label": "Pesquisar conversas" } });
-  private readonly conversationList = el("div", { className: "ai-conversation-list", attrs: { role: "list" } });
+  private readonly conversationSearch = el("input", { className: "panel-input ai-history-search ui-field ui-search-field", attrs: { placeholder: "Pesquisar conversas", "aria-label": "Pesquisar conversas" } });
+  private readonly conversationList = el("div", { className: "ai-conversation-list ui-list", attrs: { role: "list" } });
   private readonly messages = el("div", { className: "ai-messages", attrs: { role: "log", "aria-live": "polite" } });
-  private readonly input = el("textarea", { className: "ai-input", attrs: { placeholder: "Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)", rows: "3", "aria-label": "Mensagem do chat" } });
-  private readonly providerSelect = el("select", { className: "ai-provider-select", title: "Provedor de IA", attrs: { "aria-label": "Provedor de IA" } });
-  private readonly modelSelect = el("select", { className: "ai-model-select", title: "Modelo de IA", attrs: { "aria-label": "Modelo de IA" } });
+  private readonly input = el("textarea", { className: "ai-input ui-field", attrs: { placeholder: "Pergunte ao Sharp-OSS AI… (Ctrl+Enter para enviar)", rows: "3", "aria-label": "Mensagem do chat" } });
+  private readonly providerSelect = el("select", { className: "ai-provider-select ui-field ui-select", title: "Provedor de IA", attrs: { "aria-label": "Provedor de IA" } });
+  private readonly modelSelect = el("select", { className: "ai-model-select ui-field ui-select", title: "Modelo de IA", attrs: { "aria-label": "Modelo de IA" } });
   private readonly contextMenu = el("div", { className: "ai-context-menu", attrs: { role: "menu" } });
   private readonly contextChips = el("div", { className: "ai-context-chips" });
-  private readonly sendButton = el("button", { className: "ai-send-button", text: "Enviar", attrs: { "aria-label": "Enviar mensagem" } });
-  private readonly stopButton = el("button", { className: "ai-stop-button", text: "Parar", attrs: { "aria-label": "Parar geração" } });
+  private readonly sendButton = el("button", { className: "ai-send-button ui-button ui-button-primary", text: "Enviar", attrs: { "aria-label": "Enviar mensagem" } });
+  private readonly stopButton = el("button", { className: "ai-stop-button ui-button ui-button-danger", text: "Parar", attrs: { "aria-label": "Parar geração" } });
   private conversations: AIConversation[] = [];
   private current?: AIConversation;
   private settings?: AISettings;
@@ -152,7 +152,7 @@ export class AIChatPanel {
   }
 
   private build(): void {
-    const toolbar = el("div", { className: "ai-toolbar" });
+    const toolbar = el("div", { className: "ai-toolbar ui-toolbar" });
     toolbar.append(
       buttonIcon("add", "Nova conversa", () => void this.newConversation()),
       buttonIcon("edit", "Renomear conversa", () => void this.renameConversation()),
@@ -164,7 +164,7 @@ export class AIChatPanel {
     const selector = el("div", { className: "ai-provider-row" });
     selector.append(this.providerSelect, this.modelSelect);
     const composer = el("section", { className: "ai-composer" });
-    const contextButton = el("button", { className: "ai-context-button", text: "+ Contexto", attrs: { "aria-haspopup": "menu", "aria-expanded": "false" } });
+    const contextButton = el("button", { className: "ai-context-button ui-button ui-button-compact", text: "+ Contexto", attrs: { "aria-haspopup": "menu", "aria-expanded": "false" } });
     contextButton.addEventListener("click", () => {
       const visible = this.contextMenu.hidden;
       this.contextMenu.hidden = !visible;
@@ -215,7 +215,7 @@ export class AIChatPanel {
       this.renderHistory();
     } catch (error) {
       reportError(error, this.updateStatus, "Falha ao inicializar o Chat de IA");
-      this.messages.replaceChildren(el("div", { className: "ai-empty", text: "O Chat de IA não pôde ser inicializado." }));
+      this.messages.replaceChildren(el("div", { className: "ai-empty ui-empty-state", text: "O Chat de IA não pôde ser inicializado." }));
     }
   }
 
@@ -261,7 +261,7 @@ export class AIChatPanel {
     this.conversationList.replaceChildren();
     for (const conversation of this.history.filter(this.conversations, this.conversationSearch.value)) {
       const button = el("button", {
-        className: `ai-conversation-row ${conversation.id === this.current?.id ? "active" : ""}`,
+        className: `ai-conversation-row ui-list-item ${conversation.id === this.current?.id ? "active" : ""}`,
         attrs: { role: "listitem" }
       });
       button.append(
@@ -277,13 +277,13 @@ export class AIChatPanel {
     this.messages.replaceChildren();
     if (!this.current?.messages.length) {
       this.messages.append(el("div", {
-        className: "ai-empty",
+        className: "ai-empty ui-empty-state",
         text: "Pergunte sobre o seu código, anexe contexto do editor ou use uma ação de IA no menu de contexto do editor."
       }));
       return;
     }
     for (const message of this.current.messages) {
-      const article = el("article", { className: `ai-message ai-message-${message.role}`, attrs: { "data-message-id": message.id } });
+      const article = el("article", { className: `ai-message ai-message-${message.role} ui-card`, attrs: { "data-message-id": message.id } });
       const header = el("header", { className: "ai-message-header" });
       header.append(
         el("strong", { text: message.role === "user" ? "Você" : "Sharp-OSS AI" }),
@@ -300,9 +300,9 @@ export class AIChatPanel {
       if (message.stopped) article.append(el("div", { className: "ai-message-stopped", text: "Geração interrompida" }));
       if (message.role === "assistant") {
         const actions = el("footer", { className: "ai-message-actions" });
-        const copy = el("button", { text: "Copiar resposta" });
+        const copy = el("button", { className: "ui-button ui-button-compact", text: "Copiar resposta" });
         copy.addEventListener("click", () => void navigator.clipboard.writeText(message.content));
-        const retry = el("button", { text: message.error ? "Tentar novamente" : "Regenerar" });
+        const retry = el("button", { className: "ui-button ui-button-compact", text: message.error ? "Tentar novamente" : "Regenerar" });
         retry.addEventListener("click", () => void this.regenerate(message.id));
         actions.append(copy, retry);
         article.append(actions);
@@ -316,7 +316,7 @@ export class AIChatPanel {
     this.contextChips.replaceChildren();
     const labels = new Map(CONTEXT_OPTIONS.map(option => [option.source, option.label]));
     for (const source of this.selectedSources) {
-      const chip = el("button", { className: "ai-context-chip", text: `${labels.get(source) ?? source} ×`, title: "Remover contexto" });
+      const chip = el("button", { className: "ai-context-chip ui-badge", text: `${labels.get(source) ?? source} ×`, title: "Remover contexto" });
       chip.addEventListener("click", () => {
         this.selectedSources.delete(source);
         const checkbox = this.contextMenu.querySelector<HTMLInputElement>(`[data-source="${source}"]`);
@@ -326,7 +326,7 @@ export class AIChatPanel {
       this.contextChips.append(chip);
     }
     for (const label of this.collector.droppedFileLabels()) {
-      this.contextChips.append(el("span", { className: "ai-context-chip", text: label }));
+      this.contextChips.append(el("span", { className: "ai-context-chip ui-badge", text: label }));
     }
   }
 
@@ -496,13 +496,13 @@ export class AIChatPanel {
     const systemPrompt = textareaField("Prompt do sistema", this.settings.systemPrompt);
     const ollamaUrl = textField("URL do Ollama", this.settings.ollamaBaseUrl);
     const keyStatus = el("div", { className: "ai-key-status", text: this.settings.apiKeyConfigured ? "Uma chave está armazenada com segurança para este provedor." : "Nenhuma chave de API está armazenada para este provedor." });
-    const chatGptLogin = el("button", { className: "primary", text: "Entrar com ChatGPT", attrs: { type: "button" } });
-    const chatGptLogout = el("button", { text: "Sair da conta", attrs: { type: "button" } });
+    const chatGptLogin = el("button", { className: "primary ui-button ui-button-primary", text: "Entrar com ChatGPT", attrs: { type: "button" } });
+    const chatGptLogout = el("button", { className: "ui-button", text: "Sair da conta", attrs: { type: "button" } });
     const chatGptStatus = el("div", { className: "ai-key-status", text: "Verificando a conta Codex…" });
     const clearKey = checkboxField("Limpar chave de API salva", false);
     const actions = el("div", { className: "ai-settings-actions" });
-    const cancel = el("button", { text: "Cancelar", attrs: { type: "button" } });
-    const save = el("button", { className: "primary", text: "Salvar", attrs: { type: "submit" } });
+    const cancel = el("button", { className: "ui-button", text: "Cancelar", attrs: { type: "button" } });
+    const save = el("button", { className: "primary ui-button ui-button-primary", text: "Salvar", attrs: { type: "submit" } });
     actions.append(cancel, save);
     dialog.append(
       el("h2", { text: "Configurações de IA" }),
@@ -687,12 +687,12 @@ function extensionForLanguage(language: string): string {
 }
 
 function textField(label: string, value: string, type = "text", placeholder = ""): { row: HTMLElement; input: HTMLInputElement } {
-  const input = el("input", { attrs: { type, value, placeholder } });
+  const input = el("input", { className: "ui-field", attrs: { type, value, placeholder } });
   return { row: fieldRow(label, input), input };
 }
 
 function numberField(label: string, value: number, min: number, max: number, step: number): { row: HTMLElement; input: HTMLInputElement } {
-  const input = el("input", { attrs: { type: "number", value: String(value), min: String(min), max: String(max), step: String(step) } });
+  const input = el("input", { className: "ui-field", attrs: { type: "number", value: String(value), min: String(min), max: String(max), step: String(step) } });
   return { row: fieldRow(label, input), input };
 }
 
@@ -702,12 +702,12 @@ function checkboxField(label: string, value: boolean): { row: HTMLElement; input
 }
 
 function textareaField(label: string, value: string): { row: HTMLElement; input: HTMLTextAreaElement } {
-  const input = el("textarea", { text: value, attrs: { rows: "5" } });
+  const input = el("textarea", { className: "ui-field", text: value, attrs: { rows: "5" } });
   return { row: fieldRow(label, input), input };
 }
 
 function selectField(label: string, options: Array<[string, string]>, value: string): { row: HTMLElement; input: HTMLSelectElement } {
-  const input = el("select");
+  const input = el("select", { className: "ui-field ui-select" });
   input.append(...options.map(([id, name]) => el("option", { text: name, attrs: { value: id, ...(id === value ? { selected: "true" } : {}) } })));
   return { row: fieldRow(label, input), input };
 }

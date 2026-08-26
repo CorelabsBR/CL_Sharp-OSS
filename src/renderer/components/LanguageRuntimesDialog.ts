@@ -9,8 +9,8 @@ import { reportError } from "../utils/errors";
 
 export class LanguageRuntimesDialog {
   private overlay?: HTMLElement;
-  private readonly list = el("div", { className: "runtime-config-list" });
-  private readonly summary = el("div", { className: "panel-summary", text: "Carregando runtimes..." });
+  private readonly list = el("div", { className: "runtime-config-list ui-list" });
+  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: "Carregando runtimes...", attrs: { role: "status", "aria-live": "polite" } });
   private states: LanguageRuntimeState[] = [];
 
   constructor(private readonly updateStatus: (text: string) => void) {}
@@ -27,15 +27,15 @@ export class LanguageRuntimesDialog {
 
     const overlay = el("div", { className: "runtime-config-overlay", attrs: { tabindex: "-1" } });
     const dialog = el("section", { className: "runtime-config-dialog", attrs: { "aria-label": "Configurar runtimes de linguagem" } });
-    const header = el("header", { className: "runtime-config-header" });
+    const header = el("header", { className: "runtime-config-header ui-panel-header" });
     const title = el("div", { className: "runtime-config-title" });
     title.append(
       el("h2", { text: "Configurar runtimes de linguagem" }),
       el("span", { text: "Os caminhos dos executáveis são armazenados em language-runtimes.json." })
     );
     header.append(title, buttonIcon("close", "Fechar", () => this.close()));
-    const toolbar = el("div", { className: "runtime-config-toolbar" });
-    const refresh = el("button", { className: "wide-action", text: "Atualizar" });
+    const toolbar = el("div", { className: "runtime-config-toolbar ui-toolbar" });
+    const refresh = el("button", { className: "wide-action ui-button", text: "Atualizar" });
     refresh.addEventListener("click", () => void this.refresh());
     toolbar.append(this.summary, refresh);
     dialog.append(header, toolbar, this.list);
@@ -76,13 +76,13 @@ export class LanguageRuntimesDialog {
   }
 
   private runtimeRow(state: LanguageRuntimeState): HTMLElement {
-    const row = el("section", { className: `runtime-config-row ${state.status}` });
-    const status = el("span", { className: `runtime-status ${state.status}`, text: statusLabel(state.status) });
+    const row = el("section", { className: `runtime-config-row ui-card ${state.status}` });
+    const status = el("span", { className: `runtime-status ui-badge ${state.status}`, text: statusLabel(state.status) });
     const name = el("div", { className: "runtime-config-name" });
     name.append(el("strong", { text: state.language.displayName }), el("span", { text: state.message }));
 
     const input = el("input", {
-      className: "panel-input runtime-path-input",
+      className: "panel-input runtime-path-input ui-field",
       attrs: {
         value: state.config.autoDetect ? state.detectedPath ?? state.config.path : state.config.path,
         placeholder: state.language.executableCandidates.join(", ")
@@ -99,9 +99,9 @@ export class LanguageRuntimesDialog {
     const version = el("span", { className: "runtime-version", text: state.version ?? "--" });
 
     const actions = el("div", { className: "runtime-config-actions" });
-    const browse = el("button", { className: "mini-action", text: "Procurar..." });
+    const browse = el("button", { className: "mini-action ui-button ui-button-compact", text: "Procurar..." });
     browse.addEventListener("click", () => void this.browse(state));
-    const validate = el("button", { className: "mini-action", text: "Validar" });
+    const validate = el("button", { className: "mini-action ui-button ui-button-compact", text: "Validar" });
     validate.addEventListener("click", () => void this.validate(state, input.value, row));
     actions.append(browse, validate);
 

@@ -8,6 +8,8 @@
   --accent: #007acc;
   --status: #007acc;
   --danger: #f14c4c;
+  --success: #73c991;
+  --warning: #cca700;
   --input-bg: #1e1e1e;
   --button-bg: #0e639c;
   --button-fg: #ffffff;
@@ -16,6 +18,34 @@
   --welcome-logo-url: none;
   --editor-font-family: "JetBrains Mono", "Cascadia Code", monospace;
   --editor-font-size: 14px;
+  --font-ui: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--editor-font-family), "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  --text-primary: var(--fg);
+  --text-secondary: color-mix(in srgb, var(--muted) 92%, var(--fg));
+  --text-disabled: color-mix(in srgb, var(--muted) 68%, transparent);
+  --surface-workbench: var(--bg);
+  --surface-panel: color-mix(in srgb, var(--bg-2) 96%, var(--bg));
+  --surface-raised: color-mix(in srgb, var(--bg-2) 90%, var(--fg) 10%);
+  --surface-sunken: color-mix(in srgb, var(--input-bg) 94%, #000 6%);
+  --interactive-hover: color-mix(in srgb, var(--hover-bg) 88%, var(--fg) 12%);
+  --interactive-active: color-mix(in srgb, var(--accent) 22%, var(--bg-2));
+  --line-subtle: color-mix(in srgb, var(--border) 68%, transparent);
+  --line-strong: color-mix(in srgb, var(--border) 82%, var(--fg) 18%);
+  --focus-ring: color-mix(in srgb, var(--accent) 58%, transparent);
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --shadow-popover: 0 10px 30px color-mix(in srgb, var(--shadow, #00000052) 88%, transparent);
+  --shadow-dialog: 0 24px 72px color-mix(in srgb, var(--shadow, #00000052) 96%, transparent);
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   color-scheme: dark;
 }
 
@@ -31,7 +61,7 @@ body,
   overflow: hidden;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
 }
 
@@ -43,6 +73,44 @@ select {
 
 button {
   color: inherit;
+}
+
+button,
+input,
+select,
+textarea,
+[tabindex] {
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--text-primary);
+}
+
+* {
+  scrollbar-color: color-mix(in srgb, var(--muted) 52%, transparent) transparent;
+  scrollbar-width: thin;
 }
 
 [hidden] {
@@ -537,18 +605,6 @@ button {
   border-color: var(--accent);
   background: var(--button-bg);
   color: var(--button-fg);
-}
-
-.ai-chat-panel button:focus-visible,
-.ai-chat-panel input:focus-visible,
-.ai-chat-panel select:focus-visible,
-.ai-chat-panel textarea:focus-visible,
-.ai-settings-dialog button:focus-visible,
-.ai-settings-dialog input:focus-visible,
-.ai-settings-dialog select:focus-visible,
-.ai-settings-dialog textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 @media (max-width: 700px) {
@@ -1621,15 +1677,6 @@ button {
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 10px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--panel) 82%, var(--bg));
-  transition: border-color 120ms ease, background-color 120ms ease;
-}
-
-.extension-row:hover {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
 }
 
 .extension-row.disabled {
@@ -1713,11 +1760,6 @@ button {
 
 .extension-categories span {
   max-width: 100%;
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 999px;
-  padding: 1px 6px;
-  color: var(--muted);
-  font-size: 11px;
 }
 
 .extension-actions {
@@ -2833,9 +2875,6 @@ button {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--bg) 62%, transparent);
 }
 
 .runtime-status {
@@ -3169,6 +3208,363 @@ button {
   background: #ffffff;
 }
 
+/* Interface system — phase 1: semantic surfaces and interaction states. */
+.app-shell {
+  background: var(--surface-workbench);
+}
+
+.title-bar {
+  gap: var(--space-2);
+  border-bottom-color: var(--line-strong);
+  background: var(--surface-panel);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.title-logo {
+  color: var(--text-primary);
+  font-size: 12px;
+  letter-spacing: 0.015em;
+}
+
+.title-menu,
+.title-run-dependencies,
+.title-update-action,
+.title-icon,
+.icon-button {
+  border-radius: var(--radius-sm);
+}
+
+.command-bar {
+  border-color: var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+.command-bar:hover {
+  border-color: var(--line-strong);
+  color: var(--text-primary);
+}
+
+.title-menu:hover,
+.title-icon:hover,
+.title-run-dependencies:hover,
+.title-update-action:hover,
+.icon-button:hover,
+.activity-button:hover,
+.status-item:hover,
+.tab:hover,
+.tab-action:hover,
+.panel-tab:hover,
+.terminal-tab:hover,
+.tree-row:hover,
+.remote-entry:hover,
+.search-result:hover,
+.theme-row:hover,
+.palette-row:hover,
+.menu-row:hover {
+  background: var(--interactive-hover);
+}
+
+.activity-bar {
+  border-right-color: var(--line-strong);
+  background: color-mix(in srgb, var(--bg-3) 88%, var(--bg));
+}
+
+.activity-button {
+  position: relative;
+  border-left: 0;
+  color: var(--text-secondary);
+}
+
+.activity-button::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  transform: scaleY(0.35);
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
+
+.activity-button.active {
+  border-left-color: transparent;
+  color: var(--active-fg, #fff);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.activity-button.active::before {
+  background: var(--accent);
+  transform: scaleY(1);
+}
+
+.side-bar {
+  border-right-color: var(--line-strong);
+  background: var(--surface-panel);
+}
+
+.side-title {
+  border-bottom: 1px solid var(--line-subtle);
+  color: var(--text-secondary);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel {
+  padding: var(--space-2);
+}
+
+.panel-input,
+.terminal-input,
+.palette-input,
+.setting-row input:not([type="checkbox"]),
+.setting-row select,
+.ai-provider-select,
+.ai-model-select,
+.terminal-shell-select {
+  border-color: var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.panel-input:hover,
+.terminal-input:hover,
+.palette-input:hover,
+.setting-row input:not([type="checkbox"]):hover,
+.setting-row select:hover,
+.ai-provider-select:hover,
+.ai-model-select:hover,
+.terminal-shell-select:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line-strong));
+}
+
+.panel-input:focus,
+.terminal-input:focus,
+.palette-input:focus,
+.setting-row input:not([type="checkbox"]):focus,
+.setting-row select:focus,
+.ai-provider-select:focus,
+.ai-model-select:focus,
+.terminal-shell-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.panel-summary,
+.muted-row,
+.empty-subtitle {
+  color: var(--text-secondary);
+}
+
+.tree-row.selected {
+  box-shadow: inset 2px 0 var(--accent);
+  background: var(--interactive-active);
+}
+
+.editor-shell,
+.terminal-panel {
+  border-color: var(--line-strong);
+  background: var(--surface-workbench);
+}
+
+.panel-tab.active,
+.terminal-tab.active {
+  position: relative;
+  color: var(--active-fg, #fff);
+  background: var(--interactive-active);
+}
+
+.panel-tab.active::after,
+.terminal-tab.active::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: -3px;
+  left: 7px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+}
+
+.command-center {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 16%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(color-mix(in srgb, var(--border) 12%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
+    color-mix(in srgb, var(--surface-workbench) 98%, transparent);
+}
+
+.command-center-shell {
+  gap: var(--space-5);
+  padding-top: clamp(28px, 5vh, 56px);
+}
+
+.command-center-header {
+  position: relative;
+  max-width: 760px;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+}
+
+.command-center-header::before {
+  content: "";
+  position: absolute;
+  inset: 2px auto 2px 0;
+  width: 3px;
+  background: var(--accent);
+}
+
+.command-center-kicker,
+.command-section h2 {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.command-center-header h1 {
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 680;
+  letter-spacing: -0.035em;
+}
+
+.command-action {
+  position: relative;
+  min-height: 76px;
+  overflow: hidden;
+  border-color: var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 4%, transparent);
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.command-action:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent), var(--shadow-popover);
+}
+
+.command-action-icon {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.command-recent-row,
+.command-compact-row {
+  border-radius: var(--radius-sm);
+}
+
+.status-bar {
+  border-top: 1px solid color-mix(in srgb, var(--status-fg, #fff) 18%, transparent);
+  color: var(--status-fg, #fff);
+}
+
+.settings-view {
+  grid-template-columns: minmax(132px, 160px) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.settings-categories {
+  gap: 2px;
+  padding-right: var(--space-2);
+  border-right: 1px solid var(--line-subtle);
+}
+
+.settings-category {
+  position: relative;
+  min-height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.settings-category.active {
+  color: var(--text-primary);
+  background: var(--interactive-active);
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.settings-page-title {
+  margin-bottom: var(--space-3);
+  font-size: 18px;
+  letter-spacing: -0.015em;
+}
+
+.setting-row {
+  min-height: 56px;
+  border-bottom-color: var(--line-subtle);
+}
+
+.setting-copy strong {
+  color: var(--text-primary);
+  font-weight: 620;
+}
+
+.setting-copy span {
+  color: var(--text-secondary);
+}
+
+.settings-category:hover,
+.theme-row:hover {
+  background: var(--interactive-hover);
+}
+
+.theme-row.active {
+  outline: 0;
+  box-shadow: inset 2px 0 var(--accent);
+  background: var(--interactive-active);
+}
+
+.palette,
+.context-menu,
+.settings-dialog,
+.file-delete-dialog,
+.runtime-config-dialog,
+.ai-settings-dialog {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-dialog);
+}
+
+.context-menu {
+  box-shadow: var(--shadow-popover);
+}
+
+.settings-dialog,
+.file-delete-dialog,
+.runtime-config-dialog,
+.ai-settings-dialog {
+  border-radius: var(--radius-lg);
+}
+
+.settings-overlay,
+.keyboard-shortcuts-overlay,
+.file-delete-overlay,
+.runtime-config-overlay,
+.ai-settings-overlay,
+.palette-overlay {
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .command-action:not(:disabled):hover {
+    transform: none;
+  }
+}
+
 @media (max-width: 1024px) {
   .activity-bar {
     flex-basis: 44px;
@@ -3235,6 +3631,17 @@ button {
   .activity-button.active {
     border-top-color: var(--accent);
     border-left-color: transparent;
+  }
+
+  .activity-button::before {
+    inset: auto 10px 0;
+    width: auto;
+    height: 2px;
+    transform: scaleX(0.35);
+  }
+
+  .activity-button.active::before {
+    transform: scaleX(1);
   }
 
   .activity-spacer {
