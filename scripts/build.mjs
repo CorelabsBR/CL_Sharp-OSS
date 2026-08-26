@@ -30,7 +30,6 @@ await fs.rm(path.join(root, "dist-electron"), { recursive: true, force: true });
 await run(npm, ["run", "typecheck"]);
 await run(npm, ["run", "build:renderer"]);
 await run(npm, ["run", "build:electron"]);
-await run(npm, ["run", "build:server"]);
 
 const args = [];
 if (target === "linux") args.push("--linux");

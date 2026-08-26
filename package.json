@@ -1,6 +1,6 @@
 {
   "name": "Sharp-OSS",
-  "version": "26.8.52",
+  "version": "1.0.0",
   "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -18,14 +18,12 @@
     "dev:renderer": "npm run config:sync && vite",
     "build:renderer": "npm run config:sync && vite build",
     "build:electron": "npm run config:sync && tsc -p tsconfig.electron.json",
-    "build:server": "tsc -p sharp-server/tsconfig.json",
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
-    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p sharp-server/tsconfig.json",
+    "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "lint": "npm run config:sync && eslint .",
-    "test": "npm run test:easter-egg && npm run test:updater && npm run test:remote && npm run test:discord && npm run test:features",
+    "test": "npm run test:easter-egg && npm run test:updater && npm run test:discord && npm run test:features",
     "test:features": "npm run build:electron && tsc -p tsconfig.features.json && node --test dist-electron/services/node/featureInfrastructure.test.js dist-electron/services/node/ai/CodexAppServerProvider.test.js && node --test scripts/feature-renderer.test.mjs",
     "test:discord": "npm run build:electron && node --test dist-electron/main/discord/DiscordRichPresenceBuilder.test.js",
-    "test:remote": "npm run build:electron && npm run build:server && node dist-electron/services/node/remote/remoteProtocol.test.js && node --test sharp-server/dist/security/PathGuard.test.js && node scripts/remote-server-smoke.test.mjs",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
     "test:updater": "npm run build:electron && node dist-electron/services/node/updateSemver.test.js && node dist-electron/services/node/updateService.test.js && node dist-electron/services/node/updateIpc.test.js",
     "build": "node scripts/build.mjs",
@@ -85,14 +83,6 @@
       "package.json"
     ],
     "extraResources": [
-      {
-        "from": "sharp-server",
-        "to": "sharp-server",
-        "filter": [
-          "dist/**/*",
-          "package.json"
-        ]
-      },
       {
         "from": "resources",
         "to": "resources",

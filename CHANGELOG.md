@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.0.0 - 2026-08-26
+
+Type: Refactor
+
+Description:
+- Reinicia a versão pública do Sharp-OSS como `1.0.0`, mantendo sincronizados os metadados do aplicativo, pacotes e Android.
+- Adiciona um script `.bat` interativo para escolher, sincronizar e validar a versão antes de enviar alterações.
+
 ## 26.8.52 - 2026-08-26
 
 Type: Refactor / Fix
@@ -7,6 +15,8 @@ Type: Refactor / Fix
 Description:
 - Substitui integralmente a identidade anterior por Sharp-OSS, usando `sharp` em identificadores técnicos incompatíveis com hífen.
 - Remove os controles funcionais de Remote Host da interface OSS e informa que o recurso não está acessível nessa versão.
+- Ajusta o workflow de build e release para executar automaticamente em cada push na branch `main`.
+- Remove o Sharp Server inexistente das etapas de typecheck, testes, build, empacotamento e release.
 
 ## 26.8.51 - 2026-08-20
 

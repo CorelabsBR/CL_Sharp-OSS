@@ -3,8 +3,8 @@
   "application": {
     "packageName": "Sharp-OSS",
     "displayName": "Sharp-OSS",
-    "version": "26.8.52",
-    "versionCode": 260852,
+    "version": "1.0.0",
+    "versionCode": 10000,
     "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",
@@ -71,14 +71,11 @@
     ],
     "extraResources": [
       {
-        "from": "sharp-server",
-        "to": "sharp-server",
-        "filter": ["dist/**/*", "package.json"]
-      },
-      {
         "from": "resources",
         "to": "resources",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "npmRebuild": true,
@@ -90,7 +87,10 @@
       "node_modules/cpu-features/**/*"
     ],
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "icon.png",
       "category": "Development",
       "maintainer": "CoreLabs",
@@ -98,7 +98,10 @@
       "description": "Sharp-OSS is a fast, modern and developer-first IDE powered by Electron, React and Monaco Editor."
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "icon.ico"
     },
     "mac": {
@@ -128,7 +131,9 @@
     "deb": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "afterInstall": "build/linux-after-install.sh",
-      "fpm": ["--deb-no-default-config-files"],
+      "fpm": [
+        "--deb-no-default-config-files"
+      ],
       "depends": [
         "libgtk-3-0",
         "libnotify4",
