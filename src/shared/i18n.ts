@@ -1979,6 +1979,10 @@ const TRANSLATIONS: Partial<
   "zh-CN": ZH_CN,
 };
 
+let uiLocale: AppLocale = DEFAULT_LOCALE;
+
+const localeListeners = new Set<(locale: AppLocale) => void>();
+
 export function t(locale: AppLocale, portuguese: string): string {
   if (locale === "pt-BR") {
     return portuguese;
@@ -1987,13 +1991,38 @@ export function t(locale: AppLocale, portuguese: string): string {
   return TRANSLATIONS[locale]?.[portuguese] ?? portuguese;
 }
 
-let uiLocale: AppLocale = DEFAULT_LOCALE;
-
-/** Configura a tradução usada pelos componentes DOM do renderer. */
 export function setUiLocale(locale: unknown): void {
-  uiLocale = normalizeLocale(locale);
+  const nextLocale = normalizeLocale(locale);
+
+  if (uiLocale === nextLocale) {
+    return;
+  }
+
+  uiLocale = nextLocale;
+
+  for (const listener of [...localeListeners]) {
+    try {
+      listener(uiLocale);
+    } catch (error) {
+      console.error("[i18n] Falha ao atualizar componente:", error);
+    }
+  }
+}
+
+export function getUiLocale(): AppLocale {
+  return uiLocale;
 }
 
 export function uiText(portuguese: string): string {
   return t(uiLocale, portuguese);
+}
+
+export function onUiLocaleChange(
+  listener: (locale: AppLocale) => void
+): () => void {
+  localeListeners.add(listener);
+
+  return () => {
+    localeListeners.delete(listener);
+  };
 }
