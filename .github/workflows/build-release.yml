@@ -95,7 +95,6 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
-      - run: npm run build:server
       - name: Build Windows Setup, Portable and Portable Fast
         shell: pwsh
         run: |
@@ -151,7 +150,6 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
-      - run: npm run build:server
       - name: Build Linux artifacts and updater metadata
         run: |
           for attempt in 1 2 3; do
