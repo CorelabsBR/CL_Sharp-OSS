@@ -602,22 +602,6 @@ export class EditorTabs {
       reportError(error, this.onStatus, `Save failed (${tab.title})`);
     }
   }
-
-  async saveCurrentFileAs(): Promise<void> {
-    if (this.disposed) return;
-    const tab = this.activeTab;
-    if (!tab) return;
-    if (this.fileViewers.has(tab.id)) {
-      this.onStatus("Imagens abertas no visualizador nao podem ser salvas como texto");
-      return;
-    }
-    try {
-      await this.saveTab(tab, true);
-    } catch (error) {
-      reportError(error, this.onStatus, `Save As failed (${tab.title})`);
-    }
-  }
-
   async saveAll(): Promise<void> {
     if (this.disposed) return;
     for (const tab of this.tabs) {
