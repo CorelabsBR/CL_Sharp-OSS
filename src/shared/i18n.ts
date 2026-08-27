@@ -1019,6 +1019,7 @@ const ES_ES: Record<string, string> = {
   "Nenhuma pasta aberta": "Ninguna carpeta abierta",
   "O REMOTE HOST NÃO ESTÁ ACESSIVEL NA VERSÃO OSS": "EL HOST REMOTO NO ESTÁ DISPONIBLE EN LA VERSIÓN OSS",
   "Arduino CLI nao encontrado no PATH. Instale arduino-cli ou configure o caminho.": "Arduino CLI no se encontró en PATH. Instala arduino-cli o configura la ruta.",
+  
 };
 
 const RU_RU: Record<string, string> = {
