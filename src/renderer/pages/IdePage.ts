@@ -2196,7 +2196,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   const run = (action: () => void): void => {
     event.preventDefault();
-    event.stopImmediatePropagation();
+    event.stopPropagation();
     this.pendingChord = undefined;
     if (this.pendingChordTimer !== undefined) {
       window.clearTimeout(this.pendingChordTimer);
@@ -2224,7 +2224,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   if (key === "Ctrl+K") {
     event.preventDefault();
-    event.stopImmediatePropagation();
+    event.stopPropagation();
 
     this.pendingChord = "Ctrl+K";
     this.updateStatus("Ctrl+K...");

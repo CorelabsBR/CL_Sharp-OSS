@@ -254,7 +254,7 @@ Type: Feature
 
 Description:
 - Substitui o workspace virtual do Android pelo seletor nativo de pastas (Storage Access Framework), com permissão persistente para ler e gravar diretamente no local escolhido pelo usuário.
-- Exibe no Explorer a localização da pasta escolhida e restaura o nome e a URI do workspace ao reabrir o aplicativo.
+- Exibe no Explorer a localização da pasta escolhida e restaura o nome e a URI do workspace ao re o aplicativo.
 
 ## 26.8.36 - 2026-07-28
 
@@ -527,7 +527,7 @@ Description:
 Type: Fix
 
 Description:
-- Adiciona abertura universal de arquivos: inspetor hexadecimal/ASCII para binários, visualizadores de mídia e PDF, índice de ZIP/JAR/APK/VSIX e leitura estruturada de NBT (inclusive comprimido). Arquivos desconhecidos deixam de abrir em um diálogo sem utilidade.
+- Adiciona abertura universal de arquivos: inspetor hexadecimal/ASCII para binários, visualizadores de mídia e PDF, índice de ZIP/JAR/APK/VSIX e leitura estruturada de NBT (inclusive comprimido). Arquivos desconhecidos deixam de  em um diálogo sem utilidade.
 
 - Torna a barra de status útil: mostra branch Git, último autor do arquivo, linguagem, fim de linha, codificação e posição do cursor. A codificação pode ser alterada entre UTF-8 e UTF-8 com BOM diretamente pela barra e é preservada ao salvar.
 
@@ -549,14 +549,14 @@ Description:
 - Conclui a tradução para português do Brasil dos textos visíveis restantes em Controle de Código-Fonte, Host Remoto, Terminal, Runtimes, Extensões, menus e paleta de comandos.
 - Carrega explicitamente a contribuição Find do Monaco e executa a ação `actions.find` na instância ativa para corrigir Ctrl+F/Cmd+F.
 - Exibe Configurações em uma janela modal própria, organiza o painel de Problemas e permite criar arquivos e pastas aninhados pelo caminho relativo informado.
-- Cria novos projetos em uma pasta escolhida, inicializa `.sharp` e executa `git init` antes de abrir o workspace.
+- Cria novos projetos em uma pasta escolhida, inicializa `.sharp` e executa `git init` antes de  o workspace.
 
 ## 26.6.5 - 2026-07-27
 
 Type: Fix
 
 Description:
-- Corrige a pesquisa rápida da barra superior para indexar e abrir arquivos reais do workspace, com filtro progressivo por nome ou caminho e exclusão de diretórios de dependências e build.
+- Corrige a pesquisa rápida da barra superior para indexar e  arquivos reais do workspace, com filtro progressivo por nome ou caminho e exclusão de diretórios de dependências e build.
 - Corrige a abertura da busca do Monaco no arquivo ativo e torna as operações da árvore de arquivos seguras, persistentes e sincronizadas com o filesystem.
 - Traduz os menus principais, a barra de título e o painel de pesquisa para português do Brasil.
 
@@ -595,7 +595,7 @@ Description:
 Type: Feature
 
 Description:
-- Adiciona resolucao centralizada de arquivos por conteudo e extensao, evitando abrir imagens no Monaco e avisando antes de abrir binarios como texto.
+- Adiciona resolucao centralizada de arquivos por conteudo e extensao, evitando  imagens no Monaco e avisando antes de  binarios como texto.
 - Adiciona Image Viewer em abas com zoom por roda/Ctrl+roda, arraste, ajuste a janela, tamanho real, fundo de transparencia e metadados do arquivo.
 - Adiciona decodificacao textual com fallback UTF-8, UTF-16 e Latin-1 e persistencia da opcao de nao perguntar novamente por tipo binario.
 

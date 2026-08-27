@@ -1,7 +1,7 @@
-  /*---------------------------------------------------------------------------------------------
-  - Copyright (c) CorelabsBR. All rights reserved.
-  - Licensed under the MIT License. See License.txt in the project root for license information.
-  *--------------------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------------
+- Copyright (c) CorelabsBR. All rights reserved.
+- Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
   import { monaco } from "../../editor/monacoSetup";
   import type { AppSettings } from "../../shared/types";
   import { cssUrl, DEFAULT_LOGO_URL, resourceUrl } from "../utils/assets";
