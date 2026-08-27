@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.4.1 - 2026-08-27
+
+Type: Fix
+
+Description:
+- Corrige os textos remanescentes do Git, Explorer e Search que ainda não passavam pelo sistema de i18n, garantindo que a interface inteira siga o locale ativo em desktop, web e mobile.
+- Completa o catálogo de traduções para os estados limitados do Source Control e inclui entradas faltantes para histórico, amend, workspace local e mensagens de bloqueio do Git.
+- Mantém a UI consistente em todos os idiomas suportados e evita que rótulos e status voltem para strings hardcoded em português.
+
 ## 1.4.0 - 2026-08-26
 
 Type: Feature / Refactor / Fix

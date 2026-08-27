@@ -127,7 +127,7 @@ Os temas continuam responsáveis por `--bg`, `--bg-2`, `--bg-3`, `--fg`,
 
 ### Fase 3 — validação e redução de dívida
 
-- Em `1.4.0`, Search, Source Control e Chat de IA passam a compartilhar a
+- Em `1.4.1`, Search, Source Control e Chat de IA passam a compartilhar a
   mesma cadência visual do workbench: cabeçalhos compactos, superfícies
   silenciosas, trilhos de contexto, resultados densos e composer destacado.
 - Textos gerados após o carregamento inicial devem usar `uiText` diretamente;
