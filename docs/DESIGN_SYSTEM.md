@@ -127,6 +127,20 @@ Os temas continuam responsáveis por `--bg`, `--bg-2`, `--bg-3`, `--fg`,
 
 ### Fase 3 — validação e redução de dívida
 
+- Em `1.4.0`, Search, Source Control e Chat de IA passam a compartilhar a
+  mesma cadência visual do workbench: cabeçalhos compactos, superfícies
+  silenciosas, trilhos de contexto, resultados densos e composer destacado.
+- Textos gerados após o carregamento inicial devem usar `uiText` diretamente;
+  a localização posterior da árvore DOM cobre apenas conteúdo já renderizado.
+
+- Refina o chrome desktop em `1.3.0`: barra superior de 38 px, Command Center
+  centralizado, navegação lateral mais silenciosa, abas com contexto ativo e
+  status bar compacta. A composição se aproxima de editores contemporâneos sem
+  acoplar a interface a um tema específico.
+- Preserva densidade e comportamento nos layouts mobile existentes; o novo
+  chrome é aplicado apenas acima de 768 px e possui uma faixa intermediária
+  própria para notebooks e janelas estreitas.
+
 - Adicionar testes visuais automatizados dos temas padrão, OLED e temas de
   extensão em tamanhos desktop, compacto e touch.
 - Revisar navegação por teclado da File Tree e dos itens de Source Control, que

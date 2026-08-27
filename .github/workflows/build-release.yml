@@ -2,7 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -24,232 +24,239 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint --if-present
+      - run: npm test
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint when configured
-        run: npm run lint --if-present
-
-      - name: Run tests
-        run: npm test
-
-  package-windows:
-    name: Package Windows NSIS updater artifacts
-    runs-on: windows-latest
+  metadata:
+    name: Resolve release metadata
+    runs-on: ubuntu-latest
     needs: verify
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      tag: ${{ steps.metadata.outputs.tag }}
+      repository: ${{ steps.metadata.outputs.repository }}
+      repository_name: ${{ steps.metadata.outputs.repository_name }}
+      title: ${{ steps.metadata.outputs.title }}
     steps:
       - uses: actions/checkout@v4
+      - id: metadata
+        name: Read and validate config.json
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const app = require("./config.json").application;
+          if (!app?.version || !app?.repository?.owner || !app?.repository?.name || !app?.displayName) throw new Error("Missing release metadata in config.json.");
+          const values = { version: app.version, tag: `v${app.version}`, repository: `${app.repository.owner}/${app.repository.name}`, repository_name: app.repository.name, title: app.displayName };
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(values).map(([key, value]) => `${key}=${value}\n`).join(""));
+          NODE
 
+  prepare-release:
+    name: Prepare private GitHub release
+    runs-on: ubuntu-latest
+    needs: metadata
+    steps:
+      - name: Create or validate draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
+          TITLE: ${{ needs.metadata.outputs.title }}
+        run: |
+          if json="$(gh release view "$TAG" --repo "$REPOSITORY" --json isDraft 2>/dev/null)"; then
+            test "$(jq -r .isDraft <<<"$json")" = true || { echo "Release $TAG is already published; refusing to modify it."; exit 1; }
+            echo "Reusing draft release $TAG."
+          else
+            gh release create "$TAG" --repo "$REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE $TAG" --generate-notes --draft
+          fi
+
+  package-windows:
+    name: Package and upload Windows artifacts
+    runs-on: windows-latest
+    needs: [metadata, prepare-release]
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
-      - name: Restore Electron packaging cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
             ${{ env.ELECTRON_BUILDER_CACHE }}
           key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-x64-
-
+          restore-keys: electron-${{ runner.os }}-x64-
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
+      - run: npm run build:server
       - name: Build Windows Setup, Portable and Portable Fast
         shell: pwsh
         run: |
-          $attempts = 3
-          for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
             npx electron-builder --win nsis portable dir --x64 --publish never
-            if ($LASTEXITCODE -eq 0) { exit 0 }
-            if ($attempt -eq $attempts) { exit $LASTEXITCODE }
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq 3) { exit $LASTEXITCODE }
             Write-Warning "electron-builder failed on attempt $attempt; retrying in 10 seconds."
             Start-Sleep -Seconds 10
           }
-      - name: Create Portable Fast archive
-        run: node scripts/package-portable-fast.mjs
-      - name: Validate Windows artifacts
+      - run: node scripts/package-portable-fast.mjs
+      - name: Validate and checksum Windows artifacts
         shell: bash
         run: |
           test -n "$(find release -maxdepth 1 -name '*-Setup-*-x64.exe' -print -quit)"
           test -n "$(find release -maxdepth 1 -name '*-Portable-*-x64.exe' -print -quit)"
           test -n "$(find release -maxdepth 1 -name '*-Portable-Fast-*-x64.zip' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*.blockmap' -print -quit)"
           test -f release/latest.yml
-      - name: Generate Windows checksums
+          find release -maxdepth 1 -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' \) -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS.txt
+      - name: Upload Windows artifacts directly
         shell: bash
+        env:
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
+          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
         run: |
-          find release -maxdepth 1 -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' \) -print0 \
-            | sort -z | xargs -0 sha256sum > release/SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-updater-artifacts
-          if-no-files-found: error
-          retention-days: 3
-          path: |
-            release/*.exe
-            release/*-Portable-Fast-*.zip
-            release/*.blockmap
-            release/SHA256SUMS.txt
-            release/latest.yml
-     
+          mapfile -d '' -t assets < <(find release -maxdepth 1 -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' -o -name 'SHA256SUMS.txt' \) -print0)
+          upload_args=(); for asset in "${assets[@]}"; do upload_args+=(--file "$asset"); done
+          node scripts/upload-cdn-release.mjs upload --repository "$REPOSITORY_NAME" --version "$TAG" --platform windows "${upload_args[@]}"
+          gh release upload "$TAG" "${assets[@]}" --repo "$REPOSITORY" --clobber
+
   package-linux:
-    name: Package Linux AppImage updater artifacts
+    name: Package and upload Linux artifacts
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [metadata, prepare-release]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
-      - name: Restore Electron packaging cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
             ${{ env.ELECTRON_BUILDER_CACHE }}
           key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-x64-
-
+          restore-keys: electron-${{ runner.os }}-x64-
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
+      - run: npm run build:server
       - name: Build Linux artifacts and updater metadata
-        shell: bash
         run: |
           for attempt in 1 2 3; do
-            if npx electron-builder --linux AppImage deb --x64 --publish never; then
-              exit 0
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              exit 1
-            fi
-            echo "electron-builder failed on attempt $attempt; retrying in 10 seconds."
-            sleep 10
+            if npx electron-builder --linux AppImage deb --x64 --publish never; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "electron-builder failed on attempt $attempt; retrying in 10 seconds."; sleep 10
           done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-updater-artifacts
-          if-no-files-found: error
-          retention-days: 3
-          path: |
-            release/*.AppImage
-            release/*.deb
-            release/*.blockmap
-            release/latest-linux.yml
+      - name: Validate and checksum Linux artifacts
+        run: |
+          test -n "$(find release -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$(find release -maxdepth 1 -name '*.blockmap' -print -quit)"
+          test -f release/latest-linux.yml
+          find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.blockmap' -o -name 'latest-linux.yml' \) -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS-linux.txt
+      - name: Upload Linux artifacts directly
+        env:
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
+          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
+        run: |
+          mapfile -d '' -t assets < <(find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.blockmap' -o -name 'latest-linux.yml' -o -name 'SHA256SUMS-linux.txt' \) -print0)
+          upload_args=(); for asset in "${assets[@]}"; do upload_args+=(--file "$asset"); done
+          node scripts/upload-cdn-release.mjs upload --repository "$REPOSITORY_NAME" --version "$TAG" --platform linux "${upload_args[@]}"
+          gh release upload "$TAG" "${assets[@]}" --repo "$REPOSITORY" --clobber
 
   package-android:
-    name: Package Android APKs
+    name: Package and upload Android APKs
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [metadata, prepare-release]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
-
       - uses: android-actions/setup-android@v3
-
-      - name: Resolve Android SDK versions from config
-        id: android_config
-        shell: bash
+      - id: android_config
         run: |
-          platform="$(node -e 'process.stdout.write(`android-${require("./config.json").android.compileSdkVersion}`)')"
-          build_tools="$(node -e 'process.stdout.write(require("./config.json").android.buildToolsVersion)')"
-          printf 'platform=%s\n' "$platform" >> "$GITHUB_OUTPUT"
-          printf 'build_tools=%s\n' "$build_tools" >> "$GITHUB_OUTPUT"
-
-      - name: Install Android SDK packages
-        shell: bash
-        run: |
-          sdkmanager --licenses
+          echo "platform=android-$(node -p 'require("./config.json").android.compileSdkVersion')" >> "$GITHUB_OUTPUT"
+          echo "build_tools=$(node -p 'require("./config.json").android.buildToolsVersion')" >> "$GITHUB_OUTPUT"
+      - run: |
+          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;${{ steps.android_config.outputs.platform }}" "build-tools;${{ steps.android_config.outputs.build_tools }}"
-
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run cap:sync
-      - name: Build APKs
+      - name: Test and build APKs
         working-directory: android
-        shell: bash
         run: |
           chmod +x ./gradlew
           ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-artifacts
-          if-no-files-found: error
-          retention-days: 3
-          path: android/app/build/outputs/apk/**/*.apk
+      - name: Validate and checksum Android APKs
+        run: |
+          test -n "$(find android/app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)"
+          test -n "$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          find android/app/build/outputs/apk -type f -name '*.apk' -print0 | sort -z | xargs -0 sha256sum > android/app/build/outputs/apk/SHA256SUMS-android.txt
+      - name: Upload Android artifacts directly
+        env:
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
+          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
+        run: |
+          mapfile -d '' -t assets < <(find android/app/build/outputs/apk -type f \( -name '*.apk' -o -name 'SHA256SUMS-android.txt' \) -print0)
+          test "${#assets[@]}" -ge 3
+          upload_args=(); for asset in "${assets[@]}"; do upload_args+=(--file "$asset"); done
+          node scripts/upload-cdn-release.mjs upload --repository "$REPOSITORY_NAME" --version "$TAG" --platform android "${upload_args[@]}"
+          gh release upload "$TAG" "${assets[@]}" --repo "$REPOSITORY" --clobber
 
-  release:
-    name: Publish GitHub Release
+  finalize-cdn:
+    name: Finalize CDN and publish private GitHub release
     runs-on: ubuntu-latest
-    needs:
-      - package-windows
-      - package-linux
-      - package-android
+    needs: [metadata, package-windows, package-linux, package-android]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-
-      - name: Resolve release metadata from config
-        id: release_tag
-        shell: bash
-        run: |
-          version="$(node -e 'process.stdout.write(require("./config.json").application.version)')"
-          title="$(node -e 'process.stdout.write(require("./config.json").application.displayName)')"
-          printf 'value=v%s\n' "$version" >> "$GITHUB_OUTPUT"
-          printf 'title=%s\n' "$title" >> "$GITHUB_OUTPUT"
-
-      - name: Create or update the release and tag
-        shell: bash
+      - name: Read release notes
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_REPOSITORY: ${{ github.repository }}
-        run: |
-          release_tag="${{ steps.release_tag.outputs.value }}"
-          release_title="${{ steps.release_tag.outputs.title }}"
-          mapfile -t assets < <(find release-assets -type f | sort)
-          if [ "${#assets[@]}" -eq 0 ]; then
-            echo "No updater artifacts were generated."
-            exit 1
-          fi
-          if gh release view "${release_tag}" --repo "${RELEASE_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload "${release_tag}" "${assets[@]}" --repo "${RELEASE_REPOSITORY}" --clobber
-          else
-            gh release create "${release_tag}" "${assets[@]}" \
-              --repo "${RELEASE_REPOSITORY}" \
-              --target "${GITHUB_SHA}" \
-              --title "${release_title} ${release_tag}" \
-              --generate-notes
-          fi
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
+        run: gh release view "$TAG" --repo "$REPOSITORY" --json body --jq .body > release-notes.md
+      - name: Finalize CDN release
+        env:
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
+          TITLE: ${{ needs.metadata.outputs.title }}
+        run: node scripts/upload-cdn-release.mjs finalize --repository "$REPOSITORY_NAME" --tag "$TAG" --commit-sha "$GITHUB_SHA" --title "$TITLE $TAG" --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --notes-file release-notes.md
+      - name: Publish private GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
+        run: gh release edit "$TAG" --repo "$REPOSITORY" --draft=false --latest
