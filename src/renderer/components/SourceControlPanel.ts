@@ -7,11 +7,12 @@ import { api, platform } from "../services/api";
 import { buttonIcon, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { showInputDialog } from "../utils/inputDialog";
+import { uiText } from "../../shared/i18n";
 
 export class SourceControlPanel {
   readonly element = el("div", { className: "panel scm-panel ui-panel" });
-  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: "Nenhum repositório", attrs: { role: "status", "aria-live": "polite" } });
-  private readonly commitInput = el("input", { className: "panel-input ui-field", attrs: { placeholder: "Mensagem do commit" } });
+  private readonly summary = el("div", { className: "panel-summary ui-panel-summary", text: uiText("Nenhum repositório"), attrs: { role: "status", "aria-live": "polite" } });
+  private readonly commitInput = el("input", { className: "panel-input ui-field", attrs: { placeholder: uiText("Mensagem do commit") } });
   private readonly allowEmpty = el("input", { attrs: { type: "checkbox" } });
   private readonly amend = el("input", { attrs: { type: "checkbox" } });
   private readonly list = el("div", { className: "scm-list" });
@@ -40,15 +41,15 @@ export class SourceControlPanel {
       return;
     }
     if (!this.workspace) {
-      this.summary.textContent = "Abra uma pasta para usar o controle de código-fonte";
+      this.summary.textContent = uiText("Abra uma pasta para usar o controle de código-fonte");
       return;
     }
     try {
-      this.summary.textContent = "Verificando repositórios...";
+      this.summary.textContent = uiText("Verificando repositórios...");
       this.repos = await api.git.status(this.workspace);
       this.render();
     } catch (error) {
-      this.summary.textContent = reportError(error, this.updateStatus, "Falha ao atualizar o controle de código-fonte");
+      this.summary.textContent = reportError(error, this.updateStatus, uiText("Falha ao atualizar o controle de código-fonte"));
     }
   }
 
@@ -80,32 +81,41 @@ export class SourceControlPanel {
 
   private build(): void {
     const toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
-    const refresh = buttonIcon("refresh", "Atualizar", () => void this.refresh());
-    const stageAll = buttonIcon("add", "Preparar tudo", () => void this.stageAll());
-    const unstageAll = buttonIcon("remove", "Remover tudo da preparação", () => void this.unstageAll());
+    const refresh = buttonIcon("refresh", uiText("Atualizar"), () => void this.refresh());
+    const stageAll = buttonIcon("add", uiText("Preparar tudo"), () => void this.stageAll());
+    const unstageAll = buttonIcon("remove", uiText("Remover tudo da preparação"), () => void this.unstageAll());
     const commit = buttonIcon("check", "Commit", () => void this.commitAll());
+    commit.classList.add("scm-commit-action");
     const pull = buttonIcon("repo-pull", "Pull", () => void this.runOnFirstRepo(["pull"]));
     const push = buttonIcon("repo-push", "Push", () => void this.runOnFirstRepo(["push"]));
     const fetch = buttonIcon("repo-fetch", "Fetch", () => void this.runOnFirstRepo(["fetch"]));
     const stash = buttonIcon("archive", "Stash", () => void this.runOnFirstRepo(["stash", "push"]));
     const stashPop = buttonIcon("restore", "Stash pop", () => void this.runOnFirstRepo(["stash", "pop"]));
     this.gitActions.push(stageAll, unstageAll, commit, pull, push, fetch, stash, stashPop);
-    toolbar.append(refresh, stageAll, unstageAll, commit, pull, push, fetch, stash, stashPop);
+    toolbar.append(refresh, stageAll, unstageAll, pull, push, fetch, stash, stashPop);
     this.commitInput.addEventListener("keydown", event => {
       if (event.key === "Enter") void this.commitAll();
     });
     const allowEmptyRow = el("label", { className: "check-row" });
-    allowEmptyRow.append(this.allowEmpty, el("span", { text: "Permitir commit vazio" }));
+    allowEmptyRow.append(this.allowEmpty, el("span", { text: uiText("Permitir commit vazio") }));
     const amendRow = el("label", { className: "check-row" });
     amendRow.append(this.amend, el("span", { text: "Amend" }));
-    this.element.append(toolbar, this.summary, this.commitInput, allowEmptyRow, amendRow, this.list);
+    const compose = el("section", { className: "scm-compose", attrs: { "aria-label": uiText("Criar commit") } });
+    const commitRow = el("div", { className: "scm-commit-row" });
+    commitRow.append(this.commitInput, commit);
+    const commitOptions = el("div", { className: "scm-commit-options" });
+    commitOptions.append(allowEmptyRow, amendRow);
+    compose.append(commitRow, commitOptions);
+    const changesHeader = el("div", { className: "scm-changes-header" });
+    changesHeader.append(el("span", { text: uiText("Alterações") }), this.summary);
+    this.element.append(toolbar, compose, changesHeader, this.list);
     this.applyCapabilityState();
   }
 
   private render(): void {
     this.applyCapabilityState();
     const changes = this.repos.reduce((sum, repo) => sum + repo.files.length, 0);
-    this.summary.textContent = this.repos.length === 0 ? "Nenhum repositório Git encontrado" : `${this.repos.length} repositório(s), ${changes} alteração(ões)`;
+    this.summary.textContent = this.repos.length === 0 ? uiText("Nenhum repositório Git encontrado") : uiText("{repos} repositório(s), {changes} alteração(ões)").replace("{repos}", String(this.repos.length)).replace("{changes}", String(changes));
     this.list.replaceChildren();
     for (const repo of this.repos) {
       const repoBlock = el("section", { className: "scm-repo ui-panel-section" });
@@ -114,17 +124,17 @@ export class SourceControlPanel {
         el("strong", { text: repo.name }),
         el("span", { text: repo.branch }),
         el("span", { text: repo.ahead || repo.behind ? `↑${repo.ahead} ↓${repo.behind}` : "" }),
-        buttonIcon("git-branch", "Branch", () => void this.chooseBranch(repo)),
-        buttonIcon("trash", "Excluir branch", () => void this.deleteBranch(repo)),
+        buttonIcon("git-branch", uiText("Branch"), () => void this.chooseBranch(repo)),
+        buttonIcon("trash", uiText("Excluir branch"), () => void this.deleteBranch(repo)),
         buttonIcon("history", "History", () => void this.showHistory(repo))
       );
       repoBlock.append(header);
-      if (repo.clean) repoBlock.append(el("div", { className: "muted-row", text: "Árvore de trabalho limpa" }));
+      if (repo.clean) repoBlock.append(el("div", { className: "muted-row scm-clean", text: uiText("Árvore de trabalho limpa") }));
       const groups: Array<[string, GitFileStatus[]]> = [
-        ["Conflicts", repo.files.filter(file => file.conflicted)],
-        ["Staged Changes", repo.files.filter(file => file.staged && !file.conflicted)],
-        ["Changes", repo.files.filter(file => !file.staged && !file.conflicted && file.kind !== "untracked" && !file.ignored)],
-        ["Untracked", repo.files.filter(file => file.kind === "untracked")]
+        [uiText("Conflitos"), repo.files.filter(file => file.conflicted)],
+        [uiText("Alterações preparadas"), repo.files.filter(file => file.staged && !file.conflicted)],
+        [uiText("Alterações"), repo.files.filter(file => !file.staged && !file.conflicted && file.kind !== "untracked" && !file.ignored)],
+        [uiText("Não rastreados"), repo.files.filter(file => file.kind === "untracked")]
       ];
       for (const [label, files] of groups) {
         if (!files.length) continue;
@@ -170,13 +180,13 @@ export class SourceControlPanel {
       el("span", { className: "scm-path", text: file.path })
     );
     const actions = el("div", { className: "row-actions" });
-    const resolveConflict = buttonIcon("debug-breakpoint-conditional", "Resolver conflito", () => void this.resolveConflict(repo, file));
+    const resolveConflict = buttonIcon("debug-breakpoint-conditional", uiText("Resolver conflito"), () => void this.resolveConflict(repo, file));
     resolveConflict.hidden = !file.conflicted;
     actions.append(
-      buttonIcon(file.staged ? "remove" : "add", file.staged ? "Remover da preparação" : "Preparar", () => void this.stageToggle(repo, file)),
+      buttonIcon(file.staged ? "remove" : "add", file.staged ? uiText("Remover da preparação") : uiText("Preparar"), () => void this.stageToggle(repo, file)),
       buttonIcon("diff", "Diff", () => void this.showDiff(repo, file)),
       resolveConflict,
-      buttonIcon("discard", "Descartar", () => void this.discard(repo, file))
+      buttonIcon("discard", uiText("Descartar"), () => void this.discard(repo, file))
     );
     row.append(actions);
     return row;
@@ -215,13 +225,13 @@ export class SourceControlPanel {
 
   private async stageToggle(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
     if (!platform.canUseGit) return this.renderLimitedMode();
-    await this.runOperation(file.staged ? "Removendo do stage..." : "Adicionando ao stage...", () => file.staged ? api.git.unstage(repo.repo, file) : api.git.stage(repo.repo, file));
+    await this.runOperation(file.staged ? uiText("Removendo da preparação...") : uiText("Adicionando à preparação..."), () => file.staged ? api.git.unstage(repo.repo, file) : api.git.stage(repo.repo, file));
   }
 
   private async discard(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
     if (!platform.canUseGit) return this.renderLimitedMode();
     if (!confirm(`Discard changes in ${file.path}?`)) return;
-    await this.runOperation("Descartando alterações...", () => api.git.discard(repo.repo, file));
+    await this.runOperation(uiText("Descartando alterações..."), () => api.git.discard(repo.repo, file));
   }
 
   private async commitAll(): Promise<void> {
@@ -231,15 +241,15 @@ export class SourceControlPanel {
     if (!repo || !message) return;
     this.busy = true;
     this.applyCapabilityState();
-    this.updateStatus(this.amend.checked ? "Alterando último commit..." : "Criando commit...");
+    this.updateStatus(this.amend.checked ? uiText("Alterando último commit...") : uiText("Criando commit..."));
     try {
       const result = this.amend.checked
         ? await api.git.run(repo.repo, ["commit", "--amend", "-m", message])
         : await api.git.commit(repo.repo, message, this.allowEmpty.checked);
-      this.updateStatus(result.output || (result.success ? "Commit criado" : "Falha no commit"));
+      this.updateStatus(result.output || (result.success ? uiText("Commit criado") : uiText("Falha no commit")));
       if (result.success) this.commitInput.value = "";
     } catch (error) {
-      reportError(error, this.updateStatus, "Falha no commit");
+      reportError(error, this.updateStatus, uiText("Falha no commit"));
     } finally {
       this.busy = false;
       await this.refresh();
@@ -256,9 +266,9 @@ export class SourceControlPanel {
     this.updateStatus(label);
     try {
       const result = await operation();
-      this.updateStatus(result.output || (result.success ? "Operação Git concluída" : "Falha ao executar Git"));
+      this.updateStatus(result.output || (result.success ? uiText("Operação Git concluída") : uiText("Falha ao executar Git")));
     } catch (error) {
-      reportError(error, this.updateStatus, "Falha ao executar Git");
+      reportError(error, this.updateStatus, uiText("Falha ao executar Git"));
     } finally {
       this.busy = false;
       await this.refresh();
@@ -273,7 +283,7 @@ export class SourceControlPanel {
         return;
       }
       const diff = await api.git.diff(repo.repo, file, file.staged);
-      this.openVirtualFile(`${file.path}.diff`, `git:${repo.repo}:${file.path}:${file.staged}`, diff || "Nenhuma diferença disponível");
+      this.openVirtualFile(`${file.path}.diff`, `git:${repo.repo}:${file.path}:${file.staged}`, diff || uiText("Nenhuma diferença disponível"));
     } catch (error) {
       reportError(error, this.updateStatus, `Git diff failed (${file.path})`);
     }
@@ -292,15 +302,15 @@ export class SourceControlPanel {
       ? await api.git.checkout(repo.repo, branch)
       : confirm(`Create branch "${branch}" from ${repo.branch}?`)
         ? await api.git.createBranch(repo.repo, branch)
-        : { success: false, output: "Operação de branch cancelada" };
-    this.updateStatus(result.output || (result.success ? "Operação de branch concluída" : "Falha na operação de branch"));
+        : { success: false, output: uiText("Operação de branch cancelada") };
+    this.updateStatus(result.output || (result.success ? uiText("Operação de branch concluída") : uiText("Falha na operação de branch")));
     await this.refresh();
   }
 
   private async deleteBranch(repo: GitRepositoryStatus): Promise<void> {
-    const branch = (await showInputDialog("Excluir branch local", "", { placeholder: repo.branches.filter(item => item !== repo.branch).join(", ") }))?.trim();
+    const branch = (await showInputDialog(uiText("Excluir branch local"), "", { placeholder: repo.branches.filter(item => item !== repo.branch).join(", ") }))?.trim();
     if (!branch || branch === repo.branch || !repo.branches.includes(branch)) {
-      this.updateStatus(branch === repo.branch ? "Não é possível excluir a branch atual." : "Branch inválida.");
+      this.updateStatus(branch === repo.branch ? uiText("Não é possível excluir a branch atual.") : uiText("Branch inválida."));
       return;
     }
     if (!confirm(`Excluir a branch local "${branch}"?`)) return;
@@ -318,16 +328,16 @@ export class SourceControlPanel {
       return;
     }
     if (choice !== "current" && choice !== "incoming") {
-      this.updateStatus("Resolução de conflito cancelada");
+      this.updateStatus(uiText("Resolução de conflito cancelada"));
       return;
     }
     const checkout = await api.git.run(repo.repo, ["checkout", choice === "current" ? "--ours" : "--theirs", "--", file.path]);
     if (!checkout.success) {
-      this.updateStatus(checkout.output || "Falha ao resolver o conflito");
+      this.updateStatus(checkout.output || uiText("Falha ao resolver o conflito"));
       return;
     }
     const add = await api.git.stage(repo.repo, file);
-    this.updateStatus(add.output || (add.success ? "Conflito resolvido e preparado" : "Falha ao resolver o conflito"));
+    this.updateStatus(add.output || (add.success ? uiText("Conflito resolvido e preparado") : uiText("Falha ao resolver o conflito")));
     await this.refresh();
   }
 }
@@ -346,7 +356,7 @@ function labelFor(file: GitFileStatus): string {
 }
 
 function formatHistory(commits: GitCommit[]): string {
-  if (commits.length === 0) return "Nenhum commit encontrado";
+  if (commits.length === 0) return uiText("Nenhum commit encontrado");
   return commits
     .map(commit => [
       `${commit.hash.slice(0, 10)} ${commit.subject}`,

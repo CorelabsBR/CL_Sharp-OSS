@@ -6,7 +6,7 @@
 export const BUILD_CONFIG = {
   "packageName": "Sharp-OSS",
   "displayName": "Sharp-OSS",
-  "version": "1.2.1",
+  "version": "1.4.0",
   "author": "CoreLabs",
   "copyrightOwner": "CoreLabs",
   "applicationId": "br.com.corelabs.sharp",

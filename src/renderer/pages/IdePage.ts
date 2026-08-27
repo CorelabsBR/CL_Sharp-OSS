@@ -75,22 +75,23 @@ export class IdePage {
   readonly element = el("main", { className: "app-shell" });
   private readonly wallpaper = el("div", { className: "wallpaper" });
   private readonly titleBar = el("header", { className: "title-bar" });
-  private readonly activityBar = el("nav", { className: "activity-bar" });
+  private readonly activityBar = el("nav", { className: "activity-bar", attrs: { "aria-label": uiText("Navegação principal") } });
   private readonly sideBar = el("aside", { className: "side-bar" });
+  private readonly sideScrim = el("button", { className: "side-scrim", attrs: { type: "button", "aria-label": uiText("Fechar barra lateral") } });
   private readonly sideTitle = el("div", { className: "side-title", text: uiText("EXPLORADOR") });
   private readonly sideContent = el("div", { className: "side-content" });
   private readonly workbench = el("section", { className: "workbench" });
   private readonly editorStack = el("section", { className: "editor-stack" });
   private readonly aiDock = el("aside", { className: "ai-dock", attrs: { "aria-label": "Codex" } });
-  private readonly statusLeft = el("span", { text: uiText("Pronto") });
-  private readonly statusBranch = el("button", { className: "status-item status-branch", text: "Git" });
+  private readonly statusLeft = el("span", { className: "status-context", text: uiText("Pronto"), attrs: { role: "status", "aria-live": "polite" } });
+  private readonly statusBranch = el("button", { className: "status-item status-branch", text: "Git", attrs: { type: "button" } });
   private readonly statusAuthor = el("span", { className: "status-meta status-author", text: "" });
   private readonly statusType = el("span", { className: "status-meta", text: "" });
   private readonly statusLineEnding = el("span", { className: "status-meta status-line-ending", text: "" });
-  private readonly statusEncoding = el("button", { className: "status-item status-encoding", text: "UTF-8" });
+  private readonly statusEncoding = el("button", { className: "status-item status-encoding", text: "UTF-8", attrs: { type: "button" } });
   private readonly statusPosition = el("span", { className: "status-meta", text: "Ln 1, Col 1" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
-  private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: "Pesquisar...", "aria-label": "Pesquisa rápida de arquivos" } });
+  private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: uiText("Pesquisar..."), "aria-label": uiText("Pesquisa rápida de arquivos"), autocomplete: "off", spellcheck: "false" } });
   private readonly commandCenter = new CommandCenter(workspace => void this.openRecentWorkspace(workspace));
   private readonly editor = new EditorTabs(text => this.updateStatus(text));
   private readonly explorer: FileExplorer = new FileExplorer(
@@ -139,6 +140,7 @@ export class IdePage {
   private readonly problemsPanel = el("div", { className: "panel problems-panel" });
   private settingsDialog?: HTMLElement;
   private settingsDialogPanel?: HTMLElement;
+  private settingsReturnFocus?: HTMLElement;
   private readonly panels = new Map<PanelId, HTMLElement>();
   private shortcuts: ShortcutBinding[] = [];
   private shortcutController?: GlobalShortcutController;
@@ -260,10 +262,12 @@ export class IdePage {
     this.editorStack.append(this.editor.element, this.terminal.element);
     this.setTerminalVisible(this.session.terminalVisible, false);
     this.aiDock.hidden = true;
-    center.append(this.activityBar, this.sideBar, this.editorStack, this.aiDock);
+    this.sideScrim.hidden = true;
+    this.sideScrim.addEventListener("click", () => this.setSidebarVisible(false));
+    center.append(this.activityBar, this.sideBar, this.sideScrim, this.editorStack, this.aiDock);
     this.workbench.append(center);
     this.element.append(this.titleBar, this.workbench, this.statusBar());
-    this.showPanel((this.session.sidePanel as PanelId) || "explorer");
+    this.showPanel((this.session.sidePanel as PanelId) || "explorer", !isCompactViewport());
   }
 
   private buildTitleBar(): void {
@@ -386,7 +390,13 @@ export class IdePage {
         titleIcon("chrome-close", uiText("Fechar"), () => void api.window.close(), "close")
       );
     }
-    this.titleBar.append(logo, menus, nav, this.commandBar, windowButtons);
+    const commandBarShell = el("label", { className: "command-bar-shell" });
+    commandBarShell.append(
+      icon("search", uiText("Pesquisa rápida de arquivos")),
+      this.commandBar,
+      el("kbd", { text: "Ctrl+P", attrs: { "aria-hidden": "true" } })
+    );
+    this.titleBar.append(logo, menus, nav, commandBarShell, windowButtons);
   }
 
   private buildActivityBar(): void {
@@ -398,7 +408,7 @@ export class IdePage {
       this.activityButton("extensions", "extensions-large", uiText("Extensões")),
       this.activityButton("remote", "remote", uiText("Host remoto")),
       this.activityButton("arduino", "circuit-board", "Arduino"),
-      // this.activityButton("ai", "copilot-large", "AI Chat"),
+      this.activityButton("ai", "copilot-large", uiText("Chat de IA")),
       this.activityButton("problems", "warning", uiText("Problemas")),
       el("div", { className: "activity-spacer" }),
       this.settingsActivityButton()
@@ -423,13 +433,16 @@ export class IdePage {
     const status = this.statusBarElement;
     const left = el("div", { className: "status-left" });
     const right = el("div", { className: "status-right" });
+    this.resetStatusBranch();
     this.statusBranch.addEventListener("click", () => {
       this.showPanel("source");
       void this.refreshStatusGit();
     });
-    const run = el("button", { className: "status-item", text: uiText("Executar") });
+    const run = el("button", { className: "status-item status-run", attrs: { type: "button", "aria-label": uiText("Executar arquivo atual") } });
+    run.append(icon("play", uiText("Executar arquivo atual")), el("span", { text: uiText("Executar") }));
     run.addEventListener("click", () => void this.runCurrentFile());
-    const terminal = el("button", { className: "status-item", text: uiText("Terminal") });
+    const terminal = el("button", { className: "status-item status-terminal", attrs: { type: "button", "aria-label": uiText("Alternar terminal") } });
+    terminal.append(icon("terminal", uiText("Terminal")), el("span", { text: uiText("Terminal") }));
     terminal.addEventListener("click", () => this.toggleTerminal());
     this.statusEncoding.addEventListener("click", event => this.showEncodingMenu(event));
     left.append(this.statusBranch, run, terminal, this.statusLeft);
@@ -483,9 +496,20 @@ export class IdePage {
     });
     const handleError = (event: ErrorEvent) => this.updateStatus(`Error: ${errorMessage(event.error ?? event.message)}`);
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => this.updateStatus(`Error: ${errorMessage(event.reason)}`);
+    let compactViewport = isCompactViewport();
+    const handleViewportChange = () => {
+      const nextCompactViewport = isCompactViewport();
+      if (nextCompactViewport !== compactViewport) {
+        compactViewport = nextCompactViewport;
+        this.setSidebarVisible(!nextCompactViewport && this.settings.sideBarVisible);
+      } else {
+        this.syncSidebarScrim();
+      }
+    };
     window.addEventListener("keydown", this.handleShortcut, true);
     window.addEventListener("error", handleError);
     window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("resize", handleViewportChange);
     window.addEventListener("beforeunload", this.dispose, { once: true });
     window.addEventListener("pagehide", this.dispose, { once: true });
     const disposeRemoteStatus = api.remote.onStatusChanged(state => {
@@ -499,6 +523,7 @@ export class IdePage {
       () => window.removeEventListener("keydown", this.handleShortcut, true),
       () => window.removeEventListener("error", handleError),
       () => window.removeEventListener("unhandledrejection", handleUnhandledRejection),
+      () => window.removeEventListener("resize", handleViewportChange),
       () => window.removeEventListener("beforeunload", this.dispose),
       () => window.removeEventListener("pagehide", this.dispose),
       disposeRemoteStatus
@@ -761,7 +786,7 @@ export class IdePage {
       if (this.disposed) return;
       await this.editor.restoreFiles(this.session.openFiles, this.session.activeFile);
       if (this.disposed) return;
-      this.showPanel((this.session.sidePanel as PanelId) || "explorer");
+      this.showPanel((this.session.sidePanel as PanelId) || "explorer", !isCompactViewport());
       this.setTerminalVisible(this.session.terminalVisible, false);
       this.updateCommandCenter();
     } catch (error) {
@@ -769,19 +794,21 @@ export class IdePage {
     }
   }
 
-  private showPanel(panelId: PanelId): void {
+  private showPanel(panelId: PanelId, revealSidebar = true): void {
     this.commandCenterForced = false;
     this.activePanel = panelId;
     const showAiDock = panelId === "ai";
     this.aiDock.hidden = !showAiDock;
     if (showAiDock) this.aiDock.replaceChildren(this.aiChat.element);
-    this.sideBar.hidden = false;
+    this.setSidebarVisible(showAiDock && isCompactViewport() ? false : revealSidebar && this.settings.sideBarVisible);
     if (!showAiDock) {
       this.sideContent.replaceChildren(this.panels.get(panelId) ?? this.explorer.element);
       this.sideTitle.textContent = panelTitle(panelId);
     }
     for (const button of this.activityBar.querySelectorAll<HTMLElement>(".activity-button")) {
-      button.classList.toggle("active", button.dataset.panel === panelId);
+      const active = button.dataset.panel === panelId;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
     }
     if (panelId === "search") this.search.focus();
     if (panelId === "source") void this.source.refresh();
@@ -915,7 +942,7 @@ export class IdePage {
   }
 
   private canCloseTransient(): boolean {
-    return Boolean(this.settingsDialog?.isConnected) || this.keyboardShortcuts.visible || Boolean(document.querySelector(".palette-overlay")) || this.commandCenterForced || (this.activePanel === "search" && !this.sideBar.hidden);
+    return Boolean(this.settingsDialog?.isConnected) || this.keyboardShortcuts.visible || Boolean(document.querySelector(".palette-overlay")) || this.commandCenterForced || (isCompactViewport() && (!this.sideBar.hidden || !this.aiDock.hidden)) || (this.activePanel === "search" && !this.sideBar.hidden);
   }
 
   private closeTransient(): void {
@@ -939,6 +966,15 @@ export class IdePage {
       this.updateStatus(uiText("Command Center fechado"));
       return;
     }
+    if (isCompactViewport() && !this.aiDock.hidden) {
+      this.showPanel("explorer", false);
+      return;
+    }
+    if (isCompactViewport() && !this.sideBar.hidden) {
+      this.setSidebarVisible(false);
+      this.updateStatus(uiText("Barra lateral oculta"));
+      return;
+    }
     if (this.activePanel === "search" && !this.sideBar.hidden) {
       this.showPanel("explorer");
       this.updateStatus(uiText("Busca fechada"));
@@ -948,49 +984,79 @@ export class IdePage {
   private showSettings(category?: SettingsCategory): void {
     if (category) this.settingsCategory = category;
     this.closeSettingsDialog();
-    const overlay = el("div", { className: "settings-overlay" });
-    const dialog = el("section", { className: "settings-dialog", attrs: { "aria-label": "Configurações" } });
+    this.settingsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    const overlay = el("div", { className: "settings-overlay", attrs: { role: "presentation" } });
+    const dialog = el("section", {
+      className: "settings-dialog",
+      attrs: { role: "dialog", "aria-modal": "true", "aria-labelledby": "sharp-settings-title", tabindex: "-1" }
+    });
     const header = el("header", { className: "settings-dialog-header" });
-    header.append(
-      el("div", { children: [el("h2", { text: uiText("Configurações") }), el("span", { text: uiText("Preferências do Sharp-OSS") })] }),
-      el("button", { className: "icon-button", text: "×", attrs: { title: uiText("Fechar") } })
+    const identity = el("div", { className: "settings-dialog-identity" });
+    identity.append(
+      el("span", { className: "settings-dialog-icon", children: [icon("settings-gear", uiText("Configurações"))] }),
+      el("span", { className: "settings-dialog-copy", children: [
+        el("h2", { text: uiText("Configurações"), attrs: { id: "sharp-settings-title" } }),
+        el("span", { text: uiText("Preferências do Sharp-OSS") })
+      ] })
     );
-    const close = header.querySelector<HTMLButtonElement>("button")!;
-    close.addEventListener("click", () => this.closeSettingsDialog());
+    const version = el("span", { className: "settings-version", text: `v${BUILD_CONFIG.version}` });
+    const close = buttonIcon("close", uiText("Fechar"), () => this.closeSettingsDialog());
+    close.classList.add("settings-dialog-close");
+    header.append(identity, el("span", { className: "settings-dialog-actions", children: [version, close] }));
     const panel = this.settingsPanel();
     overlay.addEventListener("click", event => {
       if (event.target === overlay) this.closeSettingsDialog();
     });
     overlay.addEventListener("keydown", event => {
-      if (event.key === "Escape") this.closeSettingsDialog();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.closeSettingsDialog();
+      } else {
+        trapDialogFocus(event, dialog);
+      }
     });
     dialog.append(header, panel);
     overlay.append(dialog);
     document.body.append(overlay);
     this.settingsDialog = overlay;
     this.settingsDialogPanel = panel;
-    void this.renderSettings(panel);
+    requestAnimationFrame(() => panel.querySelector<HTMLInputElement>(".settings-search")?.focus());
     this.updateStatus(uiText("Configurações abertas"));
   }
 
   private closeSettingsDialog(): void {
+    if (!this.settingsDialog) return;
     this.settingsDialog?.remove();
     this.settingsDialog = undefined;
     this.settingsDialogPanel = undefined;
+    const returnFocus = this.settingsReturnFocus;
+    this.settingsReturnFocus = undefined;
+    if (returnFocus?.isConnected) returnFocus.focus();
     this.updateStatus(uiText("Configurações fechadas"));
   }
 
   private activityButton(panelId: PanelId, iconName: string, title: string): HTMLButtonElement {
-    const button = el("button", { className: "activity-button", title, attrs: { "data-panel": panelId }, children: [icon(iconName, title)] });
+    const button = el("button", {
+      className: "activity-button",
+      title,
+      attrs: { type: "button", "data-panel": panelId, "aria-label": title, "aria-pressed": "false" },
+      children: [icon(iconName, title)]
+    });
     button.addEventListener("click", () => {
-      if (this.activePanel === panelId && !this.sideBar.hidden) this.toggleSidebar();
+      if (panelId === "ai" && this.activePanel === "ai" && !this.aiDock.hidden) this.showPanel("explorer", !isCompactViewport());
+      else if (this.activePanel === panelId && !this.sideBar.hidden) this.toggleSidebar();
       else this.showPanel(panelId);
     });
     return button;
   }
 
   private settingsActivityButton(): HTMLButtonElement {
-    const button = el("button", { className: "activity-button", title: uiText("Gerenciar"), children: [icon("settings-gear", uiText("Gerenciar"))] });
+    const button = el("button", {
+      className: "activity-button activity-more",
+      title: uiText("Gerenciar"),
+      attrs: { type: "button", "aria-label": uiText("Gerenciar"), "aria-haspopup": "menu" },
+      children: [icon("settings-gear", uiText("Gerenciar"))]
+    });
     button.addEventListener("click", event => {
       event.stopPropagation();
       this.showSettingsMenu(button);
@@ -1001,13 +1067,13 @@ export class IdePage {
   private showSettingsMenu(anchor: HTMLElement): void {
     closeContextMenus();
     const rect = anchor.getBoundingClientRect();
-    const menu = el("div", { className: "context-menu manage-menu" });
+    const menu = el("div", { className: "context-menu manage-menu", attrs: { role: "menu", "aria-label": uiText("Gerenciar") } });
     menu.addEventListener("click", event => event.stopPropagation());
 
     let close = () => menu.remove();
     const addSeparator = () => menu.append(el("div", { className: "menu-separator" }));
     const addRow = (label: string, shortcut = "", action?: MenuAction, className = ""): HTMLButtonElement => {
-      const row = el("button", { className: `menu-row ${className}`.trim() });
+      const row = el("button", { className: `menu-row ${className}`.trim(), attrs: { type: "button", role: "menuitem" } });
       row.append(el("span", { text: label }), el("span", { className: "menu-shortcut", text: shortcut }));
       if (action) {
         row.addEventListener("click", event => {
@@ -1026,20 +1092,26 @@ export class IdePage {
     addRow(uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes());
     addRow(uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions"));
     addRow(uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
+    addSeparator();
+    addRow(uiText("Chat de IA"), "Ctrl+Alt+I", () => this.showPanel("ai"));
+    addRow(uiText("Host remoto"), "", () => this.showPanel("remote"));
+    addRow("Arduino", "", () => this.showPanel("arduino"));
+    addRow(uiText("Problemas"), "F8", () => this.showPanel("problems"));
+    addSeparator();
     addRow(uiText("Trechos"), "", () => this.triggerSnippetSuggestions());
     addRow(uiText("Tarefas"), "", () => this.showTaskPicker());
     addSeparator();
 
     const appearance = el("div", { className: "manage-submenu" });
     appearance.hidden = true;
-    const appearanceRow = addRow(uiText("Aparencia"), ">", undefined);
+    const appearanceRow = addRow(uiText("Aparência"), ">", undefined);
     appearanceRow.disabled = false;
     appearanceRow.addEventListener("click", event => {
       event.stopPropagation();
       appearance.hidden = !appearance.hidden;
     });
     const addAppearanceRow = (label: string, shortcut: string, action: MenuAction) => {
-      const row = el("button", { className: "menu-row submenu-row" });
+      const row = el("button", { className: "menu-row submenu-row", attrs: { type: "button", role: "menuitem" } });
       row.append(el("span", { text: label }), el("span", { className: "menu-shortcut", text: shortcut }));
       row.addEventListener("click", event => {
         close();
@@ -1058,7 +1130,10 @@ export class IdePage {
     addRow(uiText("Baixar atualização (1)"), "", () => this.checkForUpdates());
 
     document.body.append(menu);
-    close = installContextMenuDismiss(menu);
+    const dismiss = installContextMenuDismiss(menu);
+    close = () => {
+      dismiss();
+    };
     const left = Math.min(rect.right + 2, window.innerWidth - menu.offsetWidth - 8);
     const top = Math.min(rect.top, window.innerHeight - menu.offsetHeight - 8);
     menu.style.left = `${Math.max(8, left)}px`;
@@ -1067,7 +1142,9 @@ export class IdePage {
 
   private settingsPanel(): HTMLElement {
     const panel = el("div", { className: "panel settings-panel" });
-    void this.renderSettings(panel);
+    void this.renderSettings(panel).then(() => {
+      if (panel === this.settingsDialogPanel) panel.querySelector<HTMLInputElement>(".settings-search")?.focus();
+    });
     return panel;
   }
 
@@ -1076,18 +1153,28 @@ export class IdePage {
 
     const search = el("input", {
       className: "settings-search panel-input",
-      attrs: { placeholder: uiText("Pesquisar configurações"), value: this.settingsQuery }
+      attrs: { placeholder: uiText("Pesquisar configurações"), value: this.settingsQuery, "aria-label": uiText("Pesquisar configurações"), "aria-controls": "sharp-settings-page" }
     });
+    const searchShell = el("label", { className: "settings-search-shell" });
+    searchShell.append(icon("search", uiText("Pesquisar configurações")), search);
     const layout = el("div", { className: "settings-view" });
-    const categories = el("div", { className: "settings-categories" });
-    const page = el("div", { className: "settings-page" });
+    const categories = el("div", { className: "settings-categories", attrs: { role: "tablist", "aria-label": uiText("Categorias de configurações") } });
+    const page = el("div", { className: "settings-page", attrs: { id: "sharp-settings-page", role: "tabpanel", tabindex: "0", "aria-labelledby": `sharp-settings-tab-${this.settingsCategory.toLowerCase()}` } });
     const categoryNames: SettingsCategory[] = ["Appearance", "Editor", "Terminal", "Diagnostics", "Build", "Workbench", "Discord"];
     const categoryLabels: Record<SettingsCategory, string> = {
       Appearance: uiText("Aparência"), Editor: uiText("Editor"), Terminal: uiText("Terminal"), Diagnostics: uiText("Diagnósticos"), Build: uiText("Compilação"), Workbench: uiText("Área de trabalho"), Discord: "Discord Rich Presence"
     };
+    const categoryIcons: Record<SettingsCategory, string> = {
+      Appearance: "paintcan", Editor: "code", Terminal: "terminal", Diagnostics: "pulse", Build: "tools", Workbench: "layout", Discord: "broadcast"
+    };
 
     for (const category of categoryNames) {
-      const button = el("button", { className: `settings-category ${category === this.settingsCategory ? "active" : ""}`, text: categoryLabels[category] });
+      const active = category === this.settingsCategory;
+      const button = el("button", {
+        className: `settings-category ${active ? "active" : ""}`,
+        attrs: { id: `sharp-settings-tab-${category.toLowerCase()}`, type: "button", role: "tab", "aria-selected": String(active), "aria-controls": "sharp-settings-page" },
+        children: [icon(categoryIcons[category], categoryLabels[category]), el("span", { text: categoryLabels[category] })]
+      });
       button.addEventListener("click", () => {
         this.settingsCategory = category;
         this.settingsQuery = "";
@@ -1102,7 +1189,7 @@ export class IdePage {
     });
 
     layout.append(categories, page);
-    panel.append(search, layout, settingsFooter(
+    panel.append(searchShell, layout, settingsFooter(
       () => void this.resetSettings(),
       () => this.updateStatus("Configurações salvas")
     ));
@@ -1372,9 +1459,11 @@ export class IdePage {
     this.statusBarElement.hidden = !this.settings.statusBarVisible;
     this.activityBar.hidden = !this.settings.activityBarVisible;
     if (!this.settings.sideBarVisible) {
-      this.sideBar.hidden = true;
-    } else if (this.activePanel) {
-      this.sideBar.hidden = false;
+      this.setSidebarVisible(false);
+    } else if (this.activePanel && !isCompactViewport()) {
+      this.setSidebarVisible(true);
+    } else {
+      this.syncSidebarScrim();
     }
   }
 
@@ -1673,7 +1762,7 @@ export class IdePage {
     if (this.focusMode) {
       this.terminalVisibleBeforeFocus = !this.terminal.element.hidden;
       this.sidebarHiddenBeforeFocus = this.sideBar.hidden;
-      this.sideBar.hidden = true;
+      this.setSidebarVisible(false);
       this.activityBar.hidden = true;
       this.statusBarElement.hidden = true;
       this.setTerminalVisible(false, false);
@@ -1681,7 +1770,7 @@ export class IdePage {
       return;
     }
     this.applyLayoutSettings();
-    this.sideBar.hidden = this.sidebarHiddenBeforeFocus || !this.settings.sideBarVisible;
+    this.setSidebarVisible(!this.sidebarHiddenBeforeFocus && this.settings.sideBarVisible && !isCompactViewport());
     this.setTerminalVisible(this.terminalVisibleBeforeFocus, false);
     this.updateStatus("Modo Foco desativado");
   }
@@ -2049,8 +2138,18 @@ export class IdePage {
   }
 
   private toggleSidebar(): void {
-    this.sideBar.hidden = !this.sideBar.hidden;
+    this.setSidebarVisible(this.sideBar.hidden);
     this.updateStatus(this.sideBar.hidden ? "Barra lateral oculta" : panelTitle(this.activePanel));
+  }
+
+  private setSidebarVisible(visible: boolean): void {
+    this.sideBar.hidden = !visible;
+    this.syncSidebarScrim();
+  }
+
+  private syncSidebarScrim(): void {
+    this.sideScrim.hidden = this.sideBar.hidden || !isCompactViewport();
+    this.element.classList.toggle("sidebar-drawer-open", !this.sideBar.hidden && isCompactViewport());
   }
 
   private terminalCwd(): string {
@@ -2367,7 +2466,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   private async refreshStatusGit(workspace = this.explorer.workspace, filePath = this.editor.getCurrentFile()): Promise<void> {
     const request = ++this.statusGitRequest;
-    this.statusBranch.textContent = "Git";
+    this.resetStatusBranch();
     this.statusAuthor.textContent = "";
     if (!workspace || !platform.canUseGit) return;
     try {
@@ -2386,8 +2485,13 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       this.statusAuthor.textContent = author ? `Última alteração: ${author}` : "Sem histórico Git";
       this.statusAuthor.title = this.statusAuthor.textContent;
     } catch {
-      if (!this.disposed && request === this.statusGitRequest) this.statusBranch.textContent = "Git";
+      if (!this.disposed && request === this.statusGitRequest) this.resetStatusBranch();
     }
+  }
+
+  private resetStatusBranch(): void {
+    this.statusBranch.replaceChildren(icon("git-branch", "Git"), el("span", { text: "Git" }));
+    this.statusBranch.title = "Git";
   }
 
   private commandLabel(): string {
@@ -2578,9 +2682,9 @@ function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
   const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/Sharp-OSS/settings.json" : "~/.sharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
-  const save = el("button", { className: "wide-action", text: "Salvar" });
+  const save = el("button", { className: "wide-action settings-save", text: uiText("Salvar"), attrs: { type: "button" } });
   save.addEventListener("click", onSave);
-  const reset = el("button", { className: "wide-action", text: "Redefinir" });
+  const reset = el("button", { className: "wide-action settings-reset", text: uiText("Redefinir"), attrs: { type: "button" } });
   reset.addEventListener("click", onReset);
   footer.append(path, spacer, save, reset);
   return footer;
@@ -2641,6 +2745,32 @@ function settingRow(label: string, description: string, control: HTMLElement): H
   labels.append(el("strong", { text: label }), el("span", { text: description }));
   row.append(labels, control);
   return row;
+}
+
+function isCompactViewport(): boolean {
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
+function trapDialogFocus(event: KeyboardEvent, dialog: HTMLElement): void {
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+    "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])"
+  )).filter(element => !element.hidden && element.getAttribute("aria-hidden") !== "true" && element.getClientRects().length > 0);
+  if (!focusable.length) {
+    event.preventDefault();
+    dialog.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || !dialog.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function clampNumber(value: number, min: number, max: number, fallback: number): number {

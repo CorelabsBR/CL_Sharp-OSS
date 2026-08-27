@@ -160,8 +160,8 @@ export class AIChatPanel {
       buttonIcon("trash", uiText("Excluir conversa"), () => void this.deleteConversation()),
       buttonIcon("settings-gear", uiText("Configurações de IA"), () => this.openSettings())
     );
-    const history = el("section", { className: "ai-history" });
-    history.append(this.conversationSearch, this.conversationList);
+    const history = el("aside", { className: "ai-history", attrs: { "aria-label": uiText("Conversas") } });
+    history.append(el("span", { className: "ai-rail-label", text: uiText("Conversas") }), this.conversationSearch, this.conversationList);
     const selector = el("div", { className: "ai-provider-row" });
     selector.append(this.providerSelect, this.modelSelect);
     const composer = el("section", { className: "ai-composer" });
@@ -177,7 +177,11 @@ export class AIChatPanel {
     this.stopButton.hidden = true;
     composerActions.append(contextButton, this.contextMenu, el("span", { className: "ai-composer-spacer" }), this.stopButton, this.sendButton);
     composer.append(this.contextChips, this.input, composerActions);
-    this.element.append(toolbar, history, selector, this.messages, composer);
+    const main = el("section", { className: "ai-chat-main" });
+    main.append(selector, this.messages, composer);
+    const body = el("div", { className: "ai-chat-layout" });
+    body.append(history, main);
+    this.element.append(toolbar, body);
 
     this.conversationSearch.addEventListener("input", () => this.renderHistory());
     this.providerSelect.addEventListener("change", () => void this.providerChanged());
@@ -434,7 +438,7 @@ export class AIChatPanel {
       this.renderMessages();
       void api.ai.updateConversation({ id: completedConversation.id, messages: completedConversation.messages })
         .then(saved => this.replaceConversation(saved))
-        .catch(error => reportError(error, this.updateStatus, "Falha ao salvar a conversa de IA"));
+        .catch(error => reportError(error, this.updateStatus, uiText("Falha ao salvar a conversa de IA")));
     }
   }
 
@@ -538,7 +542,7 @@ export class AIChatPanel {
       chatGptLogin.disabled = true;
       chatGptStatus.textContent = uiText("Abrindo o navegador para entrar no ChatGPT…");
       void api.ai.loginWithChatGpt().then(async result => {
-        if (!result.success) throw new Error(result.error ?? "Não foi possível concluir o login do ChatGPT.");
+        if (!result.success) throw new Error(result.error ?? uiText("Não foi possível concluir o login do ChatGPT."));
         this.settings = await api.ai.saveSettings({ ...settingsRequest(this.settings!), provider: "codex", model: model.input.value });
         this.renderProviders();
         await this.renderModels();
@@ -596,7 +600,7 @@ export class AIChatPanel {
 
   private async renameConversation(): Promise<void> {
     if (!this.current) return;
-    const title = await showInputDialog("Nome da conversa", this.current.title);
+    const title = await showInputDialog(uiText("Nome da conversa"), this.current.title);
     if (title === undefined) return;
     this.current = await api.ai.updateConversation({ id: this.current.id, title });
     this.replaceConversation(this.current);

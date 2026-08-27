@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 1.4.0 - 2026-08-26
+
+Type: Feature / Refactor / Fix
+
+Description:
+- Redesenha Search, Source Control e Chat de IA com hierarquia, densidade, estados ativos, superfícies e composição visual alinhados ao chrome moderno do editor.
+- Corrige textos dinâmicos que permaneciam em português no modo inglês, incluindo busca, substituição, operações Git, conflitos, estados do chat e Central de Comandos.
+- Corrige a chave inglesa do estado de falha na inicialização do Chat de IA e preserva acessibilidade, temas e comportamento responsivo.
+- Reestrutura de fato o layout dos três painéis: Search separa consulta, substituição, filtros e resultados; Source Control separa sincronização, composição do commit e alterações; Chat de IA usa navegação lateral de conversas e área principal independente.
+
+## 1.3.0 - 2026-08-26
+
+Type: Feature / Refactor
+
+Description:
+- Moderniza o chrome desktop do Sharp-OSS com barra superior mais equilibrada, Command Center centralizado, controles de janela integrados e busca global com estados de foco mais claros.
+- Refina a hierarquia entre activity bar, sidebar, abas, editor e status bar com superfícies mais silenciosas e contexto ativo mais legível, mantendo compatibilidade com todos os temas.
+- Adiciona adaptação específica para notebooks e janelas estreitas sem alterar a navegação touch/mobile nem o comportamento funcional dos componentes.
+
 ## 1.2.1 - 2026-08-26
 
 Type: Refactor / Fix

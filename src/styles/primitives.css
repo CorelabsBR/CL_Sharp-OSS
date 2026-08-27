@@ -81,10 +81,10 @@
 
 .ui-icon-button,
 .icon-button {
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
-  min-height: 30px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
   border-color: transparent;
   background: transparent;
@@ -398,11 +398,15 @@ select.ui-field {
 }
 
 /* Source control */
-.scm-panel.ui-panel,
 .runtime-panel.ui-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.scm-panel.ui-panel {
+  display: grid;
+  gap: 0;
 }
 
 .scm-list,
@@ -569,21 +573,21 @@ select.ui-field {
   .primary,
   .secondary,
   .danger {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .ui-icon-button,
   .icon-button {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
-    min-height: 40px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 
   .ui-field,
   .panel-input,
   .palette-input {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .scm-file .row-actions {

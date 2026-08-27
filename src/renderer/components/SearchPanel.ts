@@ -4,21 +4,22 @@
  *--------------------------------------------------------------------------------------------*/
 import type { SearchResult } from "../../shared/types";
 import { api, platform } from "../services/api";
-import { el } from "../utils/dom";
+import { el, icon } from "../utils/dom";
 import { reportError } from "../utils/errors";
 import { basename } from "../utils/path";
+import { uiText } from "../../shared/i18n";
 
 export class SearchPanel {
   readonly element = el("div", { className: "panel search-panel" });
-  private readonly query = el("input", { className: "panel-input", attrs: { placeholder: "Pesquisar" } });
-  private readonly replace = el("input", { className: "panel-input", attrs: { placeholder: "Substituir" } });
+  private readonly query = el("input", { className: "panel-input", attrs: { placeholder: uiText("Pesquisar"), "aria-label": uiText("Pesquisar"), autocomplete: "off" } });
+  private readonly replace = el("input", { className: "panel-input", attrs: { placeholder: uiText("Substituir"), "aria-label": uiText("Substituir"), autocomplete: "off" } });
   private readonly useRegex = el("input", { attrs: { type: "checkbox" } });
   private readonly caseSensitive = el("input", { attrs: { type: "checkbox" } });
   private readonly wholeWord = el("input", { attrs: { type: "checkbox" } });
-  private readonly include = el("input", { className: "panel-input", attrs: { placeholder: "Incluir: *.ts, src/**" } });
-  private readonly exclude = el("input", { className: "panel-input", attrs: { placeholder: "Excluir: node_modules, dist/**" } });
-  private readonly summary = el("div", { className: "panel-summary", text: "Digite para pesquisar" });
-  private readonly list = el("div", { className: "search-results" });
+  private readonly include = el("input", { className: "panel-input", attrs: { placeholder: uiText("Incluir: *.ts, src/**"), "aria-label": uiText("Arquivos para incluir") } });
+  private readonly exclude = el("input", { className: "panel-input", attrs: { placeholder: uiText("Excluir: node_modules, dist/**"), "aria-label": uiText("Arquivos para excluir") } });
+  private readonly summary = el("div", { className: "panel-summary", text: uiText("Digite para pesquisar"), attrs: { role: "status", "aria-live": "polite" } });
+  private readonly list = el("div", { className: "search-results", attrs: { role: "list" } });
   private workspace?: string;
   private debounce?: number;
   private requestVersion = 0;
@@ -68,7 +69,7 @@ export class SearchPanel {
     this.exclude.addEventListener("input", () => this.scheduleSearch());
     this.query.addEventListener("keydown", event => {
       if (event.key === "Enter" && !(event.ctrlKey || event.metaKey || event.altKey)) {
-        this.list.querySelector<HTMLButtonElement>(".search-result")?.click();
+        this.list.querySelector<HTMLElement>(".search-result")?.click();
       }
     });
     this.element.addEventListener("keydown", event => this.handleShortcut(event));
@@ -76,12 +77,23 @@ export class SearchPanel {
     this.caseSensitive.addEventListener("change", () => void this.runSearch());
     this.wholeWord.addEventListener("change", () => void this.runSearch());
 
-    const replaceAll = el("button", { className: "wide-action", text: "Substituir tudo" });
+    const replaceAll = el("button", { className: "wide-action search-replace-all", text: uiText("Substituir tudo") });
     replaceAll.addEventListener("click", () => void this.replaceAll());
 
     const options = el("div", { className: "search-options" });
-    options.append(labelled(this.useRegex, "Regex"), labelled(this.caseSensitive, "Diferenciar maiúsculas/minúsculas"), labelled(this.wholeWord, "Palavra inteira"));
-    this.element.append(this.query, this.replace, replaceAll, options, this.include, this.exclude, this.summary, this.list);
+    options.append(labelled(this.useRegex, "Regex"), labelled(this.caseSensitive, uiText("Diferenciar maiúsculas/minúsculas")), labelled(this.wholeWord, uiText("Palavra inteira")));
+    const queryBlock = el("section", { className: "search-query-block", attrs: { "aria-label": uiText("Pesquisar") } });
+    const queryRow = el("div", { className: "search-query-row" });
+    queryRow.append(this.query);
+    const replaceRow = el("div", { className: "search-replace-row" });
+    replaceRow.append(this.replace, replaceAll);
+    queryBlock.append(queryRow, replaceRow, options);
+
+    const filters = el("section", { className: "search-filter-block", attrs: { "aria-label": uiText("Filtros de arquivos") } });
+    filters.append(el("span", { className: "search-filter-label", text: uiText("Arquivos para incluir e excluir") }), this.include, this.exclude);
+    const resultsHeader = el("div", { className: "search-results-header" });
+    resultsHeader.append(el("span", { text: uiText("Resultados") }), this.summary);
+    this.element.append(queryBlock, filters, resultsHeader, this.list);
   }
 
   private scheduleSearch(): void {
@@ -100,21 +112,21 @@ export class SearchPanel {
     this.activeRequestId = undefined;
     const text = this.query.value;
     if (!text) {
-      this.summary.textContent = "Digite para pesquisar";
+      this.summary.textContent = uiText("Digite para pesquisar");
       this.list.replaceChildren();
       return;
     }
     if (!this.workspace) {
       this.summary.textContent = platform.isMobile
-        ? "Abra um workspace mobile para pesquisar"
-        : "Abra uma pasta para pesquisar";
+        ? uiText("Abra um workspace mobile para pesquisar")
+        : uiText("Abra uma pasta para pesquisar");
       return;
     }
     const requestId = crypto.randomUUID();
     this.activeRequestId = requestId;
 
     try {
-      this.summary.textContent = "Pesquisando...";
+      this.summary.textContent = uiText("Pesquisando...");
       const results = await api.search.workspace({
         workspace: this.workspace,
         text,
@@ -127,10 +139,10 @@ export class SearchPanel {
       });
       if (this.disposed || version !== this.requestVersion) return;
       this.renderResults(results);
-      this.summary.textContent = `${results.length} resultado(s) em ${basename(this.workspace)}`;
+      this.summary.textContent = uiText("{count} resultado(s) em {workspace}").replace("{count}", String(results.length)).replace("{workspace}", basename(this.workspace));
     } catch (error) {
       if (this.disposed || version !== this.requestVersion) return;
-      this.summary.textContent = reportError(error, this.updateStatus, "Falha na pesquisa");
+      this.summary.textContent = reportError(error, this.updateStatus, uiText("Falha na pesquisa"));
     } finally {
       if (this.activeRequestId === requestId) this.activeRequestId = undefined;
     }
@@ -140,21 +152,21 @@ export class SearchPanel {
     if (this.disposed) return;
     const text = this.query.value;
     if (!text) {
-      this.summary.textContent = "Nada para substituir";
+      this.summary.textContent = uiText("Nada para substituir");
       return;
     }
     if (!this.workspace) {
       this.summary.textContent = platform.isMobile
-        ? "Abra um workspace mobile para substituir nos arquivos"
-        : "Abra uma pasta para substituir nos arquivos";
+        ? uiText("Abra um workspace mobile para substituir nos arquivos")
+        : uiText("Abra uma pasta para substituir nos arquivos");
       return;
     }
-    if (!confirm(`Substituir "${text}" em ${basename(this.workspace)}?`)) {
-      this.summary.textContent = "Substituição cancelada";
+    if (!confirm(uiText('Substituir "{text}" em {workspace}?').replace("{text}", text).replace("{workspace}", basename(this.workspace)))) {
+      this.summary.textContent = uiText("Substituição cancelada");
       return;
     }
     try {
-      this.summary.textContent = "Substituindo...";
+      this.summary.textContent = uiText("Substituindo...");
       const result = await api.search.replaceAll({
         workspace: this.workspace,
         text,
@@ -166,17 +178,28 @@ export class SearchPanel {
         exclude: this.exclude.value
       });
       if (this.disposed) return;
-      this.summary.textContent = `${result.replacements} ocorrência(s) substituída(s)`;
+      this.summary.textContent = uiText("{count} ocorrência(s) substituída(s)").replace("{count}", String(result.replacements));
       await this.runSearch();
     } catch (error) {
       if (this.disposed) return;
-      this.summary.textContent = reportError(error, this.updateStatus, "Falha ao substituir");
+      this.summary.textContent = reportError(error, this.updateStatus, uiText("Falha ao substituir"));
     }
   }
 
   private renderResults(results: SearchResult[]): void {
     if (this.disposed) return;
     this.list.replaceChildren();
+    if (!results.length) {
+      this.list.append(el("div", {
+        className: "search-empty ui-empty-state",
+        children: [
+          el("span", { className: "search-empty-icon", children: [icon("search", uiText("Pesquisar"))] }),
+          el("strong", { text: uiText("Nenhum resultado encontrado") }),
+          el("span", { text: uiText("Tente ajustar a busca ou os filtros de arquivo.") })
+        ]
+      }));
+      return;
+    }
     const grouped = new Map<string, SearchResult[]>();
     for (const result of results) {
       const key = result.relativePath || result.filePath;
@@ -187,16 +210,24 @@ export class SearchPanel {
       const group = el("section", { className: "search-file-group" });
       group.append(el("div", { className: "search-file-title", text: `${file} (${fileResults.length})` }));
       for (const result of fileResults) {
-        const row = el("button", { className: "search-result" });
-        const title = el("div", { className: "search-title", text: `Lin ${result.line}, Col ${result.column}` });
+        const title = el("div", { className: "search-title", text: uiText("Ln {line}, Col {column}").replace("{line}", String(result.line)).replace("{column}", String(result.column)) });
         const preview = el("div", { className: "search-preview", text: result.preview });
-        const replaceOne = el("button", { className: "mini-action", text: "Substituir" });
+        const row = el("div", {
+          className: "search-result",
+          attrs: { role: "button", tabindex: "0", "aria-label": `${title.textContent}: ${result.preview}` }
+        });
+        const replaceOne = el("button", { className: "mini-action", text: uiText("Substituir"), attrs: { type: "button" } });
         replaceOne.addEventListener("click", event => {
           event.stopPropagation();
           void this.replaceSingle(result);
         });
         row.append(title, preview, replaceOne);
         row.addEventListener("click", () => this.openResult(result));
+        row.addEventListener("keydown", event => {
+          if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
+          event.preventDefault();
+          this.openResult(result);
+        });
         group.append(row);
       }
       this.list.append(group);
@@ -210,16 +241,16 @@ export class SearchPanel {
       if (this.disposed) return;
       const content = file.content;
       if (result.start < 0 || result.end <= result.start || result.end > content.length) {
-        this.summary.textContent = "Posição de resultado inválida";
+        this.summary.textContent = uiText("Posição de resultado inválida");
         return;
       }
       await api.fs.writeFile(result.filePath, content.slice(0, result.start) + this.replace.value + content.slice(result.end));
       if (this.disposed) return;
-      this.summary.textContent = "1 ocorrência substituída";
+      this.summary.textContent = uiText("1 ocorrência substituída");
       await this.runSearch();
     } catch (error) {
       if (this.disposed) return;
-      this.summary.textContent = reportError(error, this.updateStatus, "Falha ao substituir");
+      this.summary.textContent = reportError(error, this.updateStatus, uiText("Falha ao substituir"));
     }
   }
 
