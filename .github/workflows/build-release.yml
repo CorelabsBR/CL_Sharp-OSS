@@ -119,7 +119,7 @@ jobs:
       - name: Upload Windows artifacts directly
         shell: bash
         env:
-          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_URL: ${{ secrets.CDN_UPLOAD_URL }}
           CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
@@ -168,7 +168,7 @@ jobs:
           find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.blockmap' -o -name 'latest-linux.yml' \) -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS-linux.txt
       - name: Upload Linux artifacts directly
         env:
-          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_URL: ${{ secrets.CDN_UPLOAD_URL }}
           CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
@@ -218,7 +218,7 @@ jobs:
           find android/app/build/outputs/apk -type f -name '*.apk' -print0 | sort -z | xargs -0 sha256sum > android/app/build/outputs/apk/SHA256SUMS-android.txt
       - name: Upload Android artifacts directly
         env:
-          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_URL: ${{ secrets.CDN_UPLOAD_URL }}
           CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
@@ -248,7 +248,7 @@ jobs:
         run: gh release view "$TAG" --repo "$REPOSITORY" --json body --jq .body > release-notes.md
       - name: Finalize CDN release
         env:
-          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          CDN_UPLOAD_URL: ${{ secrets.CDN_UPLOAD_URL }}
           CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
           TAG: ${{ needs.metadata.outputs.tag }}
           REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
