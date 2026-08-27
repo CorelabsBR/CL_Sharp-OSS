@@ -263,8 +263,8 @@ function deleteRemotePath(sftp: SFTPWrapper, remotePath: string): Promise<void> 
 }
 
 function validateRequest(config: RemoteHostConfig, password: string | undefined): string | undefined {
-  if (!config) return "Configuracao de host remoto invalida.";
-  if (!config.host) return "Informe o host remoto.";
+  if (!config) return "Configuracao de Host Remoto invalida.";
+  if (!config.host) return "Informe o Host Remoto.";
   if (!config.username) return "Informe o usuario remoto.";
   if (config.port <= 0 || config.port > 65535) return "Porta SSH invalida.";
   if (config.authMethod === "password" && password === undefined) return "Senha obrigatoria para autenticacao por senha.";
@@ -304,10 +304,10 @@ function friendly(error: unknown): string {
     return "Conexao recusada. Confira host, porta e servico SSH.";
   }
   if (lower.includes("getaddrinfo") || lower.includes("unknown host")) {
-    return "Host remoto nao encontrado.";
+    return "Host Remoto nao encontrado.";
   }
   if (lower.includes("permission")) {
-    return "Permissao negada no host remoto.";
+    return "Permissao negada no Host Remoto.";
   }
   if (lower.includes("no such file") || lower.includes("not found")) {
     return "Caminho remoto invalido ou inexistente.";

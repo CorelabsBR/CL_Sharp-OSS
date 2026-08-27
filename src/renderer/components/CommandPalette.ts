@@ -271,7 +271,7 @@ function translateCommandLabel(label: string): string {
   const translations: Record<string, string> = {
     "File: New File": "Arquivo: novo arquivo",
     "File: Open File": "Arquivo: abrir arquivo",
-    "File: Open Folder": "Arquivo: abrir pasta",
+    "File: Open Folder": "Arquivo: Abrir Pasta",
     "File: Save": "Arquivo: salvar",
     "File: Save As": "Arquivo: salvar como",
     "File: Save All": "Arquivo: salvar tudo",
@@ -288,7 +288,7 @@ function translateCommandLabel(label: string): string {
     "View: Extensions": "Exibir: extensões",
     "View: Arduino": "Exibir: Arduino",
     "View: Problems": "Exibir: problemas",
-    "View: Command Palette": "Exibir: paleta de comandos",
+    "View: Command Palette": "Exibir: Paleta de Comandos",
     "View: Quick Open": "Exibir: abertura rápida",
     "View: Toggle Sidebar": "Exibir: alternar barra lateral",
     "Terminal: Toggle Terminal": "Terminal: alternar terminal",

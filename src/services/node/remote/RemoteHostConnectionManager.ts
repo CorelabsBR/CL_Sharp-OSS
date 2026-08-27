@@ -60,7 +60,7 @@ export class RemoteHostConnectionManager {
       this.transition("resolving-host", "Localizando host...");
       const hosts = await loadHosts();
       const host = hosts.find(item => item.id === hostId);
-      if (!host) throw coded("REMOTE_HOST_NOT_FOUND", "Host remoto não encontrado.");
+      if (!host) throw coded("REMOTE_HOST_NOT_FOUND", "Host Remoto não encontrado.");
       const secret = password ?? (host.id ? await this.credentials.get(host.id) : undefined);
       if (password && host.id) await this.credentials.set(host.id, password);
       this.transition("connecting", `Conectando a ${host.host}:${host.port}...`, host.id);
@@ -68,7 +68,7 @@ export class RemoteHostConnectionManager {
       this.transition("detecting-platform", "Detectando plataforma remota...", host.id);
       const platform = await detectPlatform(ssh);
       if (platform.platform !== "linux" || !["x64", "arm64"].includes(platform.architecture)) throw coded("REMOTE_PLATFORM_UNSUPPORTED", `${platform.platform}-${platform.architecture} não é suportado.`);
-      if (!platform.hasNode) throw coded("REMOTE_PLATFORM_UNSUPPORTED", "O artefato atual requer Node.js no host remoto.");
+      if (!platform.hasNode) throw coded("REMOTE_PLATFORM_UNSUPPORTED", "O artefato atual requer Node.js no Host Remoto.");
       this.log("info", "ssh", "Plataforma detectada", { platform: platform.platform, architecture: platform.architecture, nodeVersion: platform.nodeVersion });
       this.transition("checking-server", `Verificando Sharp-OSS Server ${BUILD_CONFIG.version}...`, host.id);
       const install = remotePaths(platform.homeDirectory, BUILD_CONFIG.version, crypto.randomUUID()); installation = install;

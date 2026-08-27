@@ -1162,7 +1162,7 @@ function createSearchApi(fs: FsApi): SharpApi["search"] {
 function createRemoteFallbackApi(fs: FsApi): RemoteApi {
   const unavailable = (): GitOperationResult => ({
     success: false,
-    output: "Host remoto depende do backend Node/Electron neste ambiente."
+    output: "Host Remoto depende do backend Node/Electron neste ambiente."
   });
   return {
     loadHosts: () => readJsonFile<RemoteHostConfig[]>(fs, REMOTE_HOSTS_PATH, []),

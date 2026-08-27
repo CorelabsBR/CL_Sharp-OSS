@@ -104,7 +104,8 @@
         "AppImage",
         "deb"
       ],
-      "icon": "icon.png",
+      "icon": "logo",
+      "syncDesktopName": true,
       "category": "Development",
       "maintainer": "CoreLabs",
       "synopsis": "Sharp-OSS IDE",
@@ -115,10 +116,10 @@
         "nsis",
         "portable"
       ],
-      "icon": "icon.ico"
+      "icon": "logo"
     },
     "mac": {
-      "icon": "icon.icns",
+      "icon": "logo",
       "category": "public.app-category.developer-tools"
     },
     "appImage": {
@@ -180,5 +181,6 @@
     "node-pty@1.1.0": true,
     "ssh2@1.17.0": true,
     "electron-winstaller@5.4.0": true
-  }
+  },
+  "desktopName": "Sharp-OSS"
 }

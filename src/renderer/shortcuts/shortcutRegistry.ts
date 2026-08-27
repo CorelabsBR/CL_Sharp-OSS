@@ -65,7 +65,7 @@ const DEFINITIONS: ShortcutDefinition[] = [
   shortcut("editor.toggleWordWrap", "Editor: Alternar Quebra de Linha", "Alterna a quebra de linhas longas.", ["Alt+Z"], "Editor", "editor.toggleWordWrap", { scope: "editor" }),
 
   shortcut("view.quickOpen", "Visualizar: Abertura Rápida", "Abre um arquivo pelo nome a partir dos arquivos abertos e recentes.", ["Ctrl+P"], "Visualizar", "view.quickOpen", { allowInInput: true }),
-  shortcut("view.commandPalette", "Visualizar: Paleta de Comandos", "Abre a paleta de comandos.", ["Ctrl+Shift+P"], "Visualizar", "view.commandPalette", { allowInInput: true }),
+  shortcut("view.commandPalette", "Visualizar: Paleta de Comandos", "Abre a Paleta de Comandos.", ["Ctrl+Shift+P"], "Visualizar", "view.commandPalette", { allowInInput: true }),
   shortcut("view.toggleTerminal", "Visualizar: Alternar Terminal", "Mostra ou oculta o painel do terminal integrado.", ["Ctrl+`"], "Visualizar", "view.toggleTerminal"),
   shortcut("view.toggleSidebar", "Visualizar: Alternar Barra Lateral", "Mostra ou oculta a barra lateral.", ["Ctrl+B"], "Visualizar", "view.toggleSidebar"),
   shortcut("view.toggleBottomPanel", "Visualizar: Alternar Painel Inferior", "Mostra ou oculta o painel inferior.", ["Ctrl+J"], "Visualizar", "view.toggleBottomPanel"),

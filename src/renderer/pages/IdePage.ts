@@ -274,7 +274,7 @@ export class IdePage {
     const logo = el("div", { className: "title-logo" });
     logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: BUILD_CONFIG.displayName } }), el("span", { text: BUILD_CONFIG.displayName }));
     const menus = el("div", { className: "title-menus" });
-    const openWorkspaceLabel = platform.isMobile ? uiText("Abrir pasta do dispositivo") : uiText("Abrir pasta");
+    const openWorkspaceLabel = platform.isMobile ? uiText("Abrir Pasta do dispositivo") : uiText("Abrir Pasta");
     menus.append(
       menuButton(uiText("Arquivo"), [
         [uiText("Novo arquivo"), "Ctrl+N", () => this.editor.newTab()],
@@ -316,7 +316,7 @@ export class IdePage {
         [uiText("Copiar linha para baixo"), "Shift+Alt+Down", () => this.editor.copyLineDown()]
       ]),
       menuButton(uiText("Exibir"), [
-        [uiText("Paleta de comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
+        [uiText("Paleta de Comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
         [uiText("Abertura rápida"), "Ctrl+P", () => this.palette.showQuickOpen()],
         [uiText("Explorador"), "Ctrl+Shift+E", () => this.showPanel("explorer")],
         [uiText("Pesquisar"), "Ctrl+Shift+F", () => this.showPanel("search")],
@@ -325,7 +325,7 @@ export class IdePage {
         ["Arduino", "", () => this.showPanel("arduino")],
         [uiText("Problemas"), "F8", () => this.showPanel("problems")],
         [uiText("Saída"), "Ctrl+Shift+U", () => this.showOutput()],
-        [uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
+        [uiText("Atalhos de Teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
         [uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions")],
         [uiText("Alternar barra lateral"), "Ctrl+B", () => this.toggleSidebar()],
         [uiText("Alternar terminal"), "Ctrl+`", () => this.toggleTerminal()],
@@ -351,7 +351,7 @@ export class IdePage {
         [uiText("Fechar terminal"), "", () => this.terminal.closeCurrentTerminal()]
       ]),
       menuButton(uiText("Preferências"), [
-        [uiText("Paleta de comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
+        [uiText("Paleta de Comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
         [uiText("Configurações"), "Ctrl+,", () => this.showSettings()],
         [uiText("Verificar atualizações"), "", () => void this.checkForUpdates()],
         [uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes()],
@@ -406,7 +406,7 @@ export class IdePage {
       this.activityButton("source", "source-control", uiText("Controle de código-fonte")),
       this.activityButton("run", "debug-alt", uiText("Executar e depurar")),
       this.activityButton("extensions", "extensions-large", uiText("Extensões")),
-      this.activityButton("remote", "remote", uiText("Host remoto")),
+      this.activityButton("remote", "remote", uiText("Host Remoto")),
       this.activityButton("arduino", "circuit-board", "Arduino"),
       this.activityButton("ai", "copilot-large", uiText("Chat de IA")),
       this.activityButton("problems", "warning", uiText("Problemas")),
@@ -539,7 +539,7 @@ export class IdePage {
     const commands: CommandAction[] = [
       { label: "Arquivo: Novo arquivo", shortcut: "Ctrl+N", run: () => this.editor.newTab() },
       { label: "Arquivo: Abrir arquivo", shortcut: "Ctrl+O", run: () => this.editor.openFileFromDialog() },
-      { label: "Arquivo: Abrir pasta", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
+      { label: "Arquivo: Abrir Pasta", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
       { label: "Remote Host: Connect", run: () => this.remote.connectSavedHost() },
       { label: "Remote Host: Disconnect", run: () => this.remote.disconnect() },
       { label: "Remote Host: Reconnect", run: () => this.remote.reconnect() },
@@ -610,7 +610,7 @@ export class IdePage {
       // { label: "Editor: Remove Line Comment", shortcut: "Ctrl+K Ctrl+U", run: () => this.editor.removeLineComment() },
       // { label: "Editor: Toggle Block Comment", shortcut: "Shift+Alt+A", run: () => this.editor.toggleBlockComment() },
 
-      { label: "Exibir: Paleta de comandos", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
+      { label: "Exibir: Paleta de Comandos", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
       { label: "Exibir: Abertura rápida", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
       { label: "Exibir: Explorador", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
       { label: "Exibir: Controle de código-fonte", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
@@ -952,7 +952,7 @@ export class IdePage {
     }
     if (this.keyboardShortcuts.visible) {
       this.keyboardShortcuts.close();
-      this.updateStatus(uiText("Atalhos de teclado fechados"));
+      this.updateStatus(uiText("Atalhos de Teclado fechados"));
       return;
     }
     if (document.querySelector(".palette-overlay")) {
@@ -1087,14 +1087,14 @@ export class IdePage {
       return row;
     };
 
-    addRow(uiText("Paleta de comandos..."), "Ctrl+Shift+P", () => this.palette.showCommands());
+    addRow(uiText("Paleta de Comandos..."), "Ctrl+Shift+P", () => this.palette.showCommands());
     addRow(uiText("Configurações"), "Ctrl+,", () => this.showSettings());
     addRow(uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes());
     addRow(uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions"));
-    addRow(uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
+    addRow(uiText("Atalhos de Teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
     addSeparator();
     addRow(uiText("Chat de IA"), "Ctrl+Alt+I", () => this.showPanel("ai"));
-    addRow(uiText("Host remoto"), "", () => this.showPanel("remote"));
+    addRow(uiText("Host Remoto"), "", () => this.showPanel("remote"));
     addRow("Arduino", "", () => this.showPanel("arduino"));
     addRow(uiText("Problemas"), "F8", () => this.showPanel("problems"));
     addSeparator();
@@ -1351,7 +1351,7 @@ export class IdePage {
       page.append(settingToggle("Mostrar nome do arquivo", "Publica apenas o nome, nunca o caminho completo.", current.showFileName, showFileName => update({ showFileName })));
       page.append(settingToggle("Mostrar projeto", "Publica o nome do workspace atual.", current.showProjectName, showProjectName => update({ showProjectName })));
       page.append(settingToggle("Mostrar linguagem", "Publica a linguagem do arquivo ativo.", current.showLanguage, showLanguage => update({ showLanguage })));
-      page.append(settingToggle("Mostrar host remoto", "Publica o alias do Remote Host conectado.", current.showRemoteHost, showRemoteHost => update({ showRemoteHost })));
+      page.append(settingToggle("Mostrar Host Remoto", "Publica o alias do Remote Host conectado.", current.showRemoteHost, showRemoteHost => update({ showRemoteHost })));
       page.append(settingToggle("Mostrar tempo decorrido", "Exibe há quanto tempo o Sharp-OSS está aberto.", current.showElapsedTime, showElapsedTime => update({ showElapsedTime })));
       page.append(settingToggle("Mostrar tipo de workspace", "Identifica workspaces locais e remotos.", current.showWorkspaceType, showWorkspaceType => update({ showWorkspaceType })));
       page.append(settingText("Imagem principal", "Asset key configurada no Discord Developer Portal.", current.largeImageKey, largeImageKey => update({ largeImageKey: largeImageKey.trim() })));
@@ -1844,7 +1844,7 @@ export class IdePage {
         const command = remoteRunCommand(decodeURIComponent(new URL(filePath).pathname));
         if (!command) throw new Error(`Execução remota não configurada para ${basename(filePath)}.`);
         await this.terminal.runCommand(command);
-        this.updateStatus("Execução iniciada no host remoto");
+        this.updateStatus("Execução iniciada no Host Remoto");
         return;
       }
 
@@ -2052,7 +2052,7 @@ export class IdePage {
     const hasRunnableTarget = platform.canUseNodeBackend
       ? Boolean(this.editor.getCurrentFile() || this.explorer.workspace)
       : Boolean(this.editor.getCurrentFile());
-    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta";
+    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir Pasta";
     const openWorkspaceDetail = platform.isMobile ? "Usar diretamente a pasta escolhida no seletor do Android." : "Escolher um workspace local.";
     return [
       { id: "open-folder", label: openWorkspaceLabel, detail: openWorkspaceDetail, iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
@@ -2066,7 +2066,7 @@ export class IdePage {
       { id: "notes", label: "Abrir notas", detail: platform.isMobile ? "Abrir ou criar Documents/Sharp-OSS/notes.nps.md." : "Abrir ou criar .sharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
       { id: "theme-lab", label: "Abrir laboratório de temas", detail: "Abrir o seletor de temas, incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
-      { id: "keyboard-shortcuts", label: "Atalhos de teclado", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
+      { id: "keyboard-shortcuts", label: "Atalhos de Teclado", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
       { id: "run", label: "Executar projeto", detail: hasRunnableTarget ? (platform.canUseNodeBackend ? "Executar o arquivo/projeto atual." : "Prévia HTML ou alternativa de runtime.") : "Abra um arquivo primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
       { id: "git-status", label: "Controle de código-fonte", detail: platform.canUseGit ? (hasProject ? "Abrir o controle de código-fonte do workspace." : "Abra um workspace primeiro.") : "Abrir o controle de código-fonte em modo limitado.", iconName: "source-control", disabled: platform.canUseGit && !hasProject, run: () => this.showPanel("source") }
     ];
@@ -2650,7 +2650,7 @@ function panelTitle(panel: PanelId): string {
     source: "CONTROLE DE CÓDIGO-FONTE",
     run: "EXECUTAR E DEPURAR",
     extensions: "EXTENSÕES",
-    remote: "HOST REMOTO",
+    remote: "Host Remoto",
     arduino: "ARDUINO",
     ai: "CONVERSA COM IA",
     settings: "CONFIGURAÇÕES",
