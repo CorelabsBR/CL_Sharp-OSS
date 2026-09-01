@@ -162,6 +162,7 @@ export class IdePage {
   private pendingChord: string | undefined;
   private pendingChordTimer?: number;
   private updateButton?: HTMLButtonElement;
+  private updateState: AppUpdateStatus = { state: "idle", message: "Atualizações ainda não foram verificadas." };
   private statusGitRequest = 0;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
@@ -1127,7 +1128,14 @@ export class IdePage {
     addRow(this.settings.errorLensEnabled ? uiText("Desativar ErrorLens") : uiText("Ativar ErrorLens"), "", () => this.toggleErrorLens());
     addSeparator();
     addRow(uiText("Backup e sincronização de configurações..."), "", () => this.updateStatus(uiText("Backup e sincronização de configurações...")));
-    addRow(uiText("Baixar atualização (1)"), "", () => this.checkForUpdates());
+    const updateLabel = this.updateState.state === "available"
+      ? `${uiText("Baixar atualização")}${this.updateState.version ? ` v${this.updateState.version}` : ""}`
+      : this.updateState.state === "downloaded"
+        ? uiText("Reiniciar e instalar")
+        : this.updateState.state === "downloading"
+          ? `${uiText("Baixando atualização")}: ${this.updateState.percent ?? 0}%`
+          : uiText("Verificar atualizações");
+    addRow(updateLabel, "", () => void this.handleUpdateButton(), this.updateState.state === "downloading" ? "muted" : "");
 
     document.body.append(menu);
     const dismiss = installContextMenuDismiss(menu);
@@ -1659,15 +1667,16 @@ export class IdePage {
 
   private renderUpdateStatus(status: AppUpdateStatus): void {
     if (this.disposed) return;
+    this.updateState = status;
     const button = this.updateButton;
     if (!button) return;
     const visible = status.state === "available" || status.state === "downloading" || status.state === "downloaded";
     button.hidden = !visible;
     button.disabled = status.state === "downloading";
     button.title = status.message;
-    if (status.state === "available") button.textContent = `Atualizar Sharp-OSS para v${status.version}`;
-    else if (status.state === "downloading") button.textContent = `Baixando atualização: ${status.percent ?? 0}%`;
-    else if (status.state === "downloaded") button.textContent = "Reiniciar e instalar";
+    if (status.state === "available") button.textContent = `${uiText("Baixar atualização")} v${status.version}`;
+    else if (status.state === "downloading") button.textContent = `${uiText("Baixando atualização")}: ${status.percent ?? 0}%`;
+    else if (status.state === "downloaded") button.textContent = uiText("Reiniciar e instalar");
     else button.textContent = "";
     if (status.state !== "idle" && status.state !== "unsupported") this.updateStatus(status.message);
   }
@@ -1676,6 +1685,7 @@ export class IdePage {
     try {
       const status = await api.update.check();
       this.renderUpdateStatus(status);
+      if (status.state === "unsupported" || status.state === "idle") this.updateStatus(status.message);
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha ao verificar atualizações");
     }
@@ -1684,11 +1694,22 @@ export class IdePage {
   private async handleUpdateButton(): Promise<void> {
     try {
       const status = await api.update.status();
+      this.renderUpdateStatus(status);
       if (status.state === "downloaded") {
+        this.renderUpdateStatus({ ...status, message: "Reiniciando para instalar a atualização…" });
         await api.update.install();
         return;
       }
-      if (status.state === "available") this.renderUpdateStatus(await api.update.download());
+      if (status.state === "available") {
+        this.renderUpdateStatus({ ...status, state: "downloading", percent: 0, message: "Preparando download da atualização…" });
+        this.renderUpdateStatus(await api.update.download());
+        return;
+      }
+      if (status.state === "downloading") {
+        this.updateStatus(status.message);
+        return;
+      }
+      await this.checkForUpdates();
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha ao atualizar o Sharp-OSS");
     }

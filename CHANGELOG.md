@@ -5,6 +5,7 @@
 Type: Fix
 
 Description:
+- Corrige o botão de atualização para sempre responder ao clique, iniciar o download quando houver uma versão disponível e compartilhar a mesma ação funcional com o menu Gerenciar.
 - Corrige a ação "Novo terminal" para sempre criar uma nova sessão, inclusive após alternar para o painel Remote Host, e aplica o foco quando a criação assíncrona termina.
 - Corrige o upload de artefatos para a CDN ao enviar o nome do arquivo no campo multipart obrigatório `filename`, evitando a resposta HTTP 400 em Windows, Linux e Android.
 - Configura a etapa final da release com `CDN_FINALIZE_URL`, alinhando o workflow ao endpoint de finalização exigido pelo cliente de CDN.
