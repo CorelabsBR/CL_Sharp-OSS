@@ -1,10 +1,13 @@
 # CHANGELOG
 
-## 1.4.1 - 2026-08-27
+## 1.4.1 - 2026-09-01
 
 Type: Fix
 
 Description:
+- Corrige a ação "Novo terminal" para sempre criar uma nova sessão, inclusive após alternar para o painel Remote Host, e aplica o foco quando a criação assíncrona termina.
+- Corrige o upload de artefatos para a CDN ao enviar o nome do arquivo no campo multipart obrigatório `filename`, evitando a resposta HTTP 400 em Windows, Linux e Android.
+- Configura a etapa final da release com `CDN_FINALIZE_URL`, alinhando o workflow ao endpoint de finalização exigido pelo cliente de CDN.
 - Corrige os textos remanescentes do Git, Explorer e Search que ainda não passavam pelo sistema de i18n, garantindo que a interface inteira siga o locale ativo em desktop, web e mobile.
 - Completa o catálogo de traduções para os estados limitados do Source Control e inclui entradas faltantes para histórico, amend, workspace local e mensagens de bloqueio do Git.
 - Mantém a UI consistente em todos os idiomas suportados e evita que rótulos e status voltem para strings hardcoded em português.

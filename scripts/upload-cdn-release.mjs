@@ -8,6 +8,7 @@ import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { buildUploadRequestArgs } from "./upload-cdn-request.mjs";
 
 const [command, ...args] = process.argv.slice(2);
 const uploadKey = requireEnvironment("CDN_UPLOAD_KEY");
@@ -46,13 +47,7 @@ async function uploadFile({ uploadUrl, repository, version, platform, file }) {
 
   const sha256 = await hashFile(filePath);
   const size = statSync(filePath).size;
-  const response = curlJson(uploadUrl, [
-    "--form-string", `repository=${repository}`,
-    "--form-string", `version=${version}`,
-    "--form-string", `platform=${platform}`,
-    "--form-string", `sha256=${sha256}`,
-    "--form", `file=@${filePath}`,
-  ]);
+  const response = curlJson(uploadUrl, buildUploadRequestArgs({ repository, version, platform, sha256, filePath }));
 
   validateResponse(response, `upload ${basename(filePath)}`);
   const serverHash = response.sha256 ?? response.hash;

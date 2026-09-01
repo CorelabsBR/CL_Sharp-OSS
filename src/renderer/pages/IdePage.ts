@@ -340,7 +340,7 @@ export class IdePage {
         [uiText("Caminhos dos runtimes"), "", () => void this.showLanguageRuntimes()]
       ]),
       menuButton(uiText("Terminal"), [
-        [uiText("Novo terminal"), "Ctrl+Shift+`", () => this.showTerminal(true)],
+        [uiText("Novo terminal"), "Ctrl+Shift+`", () => this.newTerminal()],
         [uiText("Saída"), "", () => this.terminal.showOutputPanel()],
         [uiText("Problemas"), "", () => this.terminal.showProblemsPanel()],
         [uiText("Console de depuração"), "", () => this.terminal.showDebugConsole()],
@@ -583,7 +583,7 @@ export class IdePage {
       { label: "IA: Renomear símbolos", run: () => this.runAIAction("rename") },
       { label: "Exibir: Problemas", shortcut: "F8", run: () => this.showPanel("problems") },
       { label: "Terminal: Alternar terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
-      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.newTerminal() },
       { label: "Terminal: Saída", run: () => this.terminal.showOutputPanel() },
       { label: "Terminal: Console de depuração", run: () => this.terminal.showDebugConsole() },
       { label: "Office: Editar arquivo atual no LibreOffice", keywords: "word excel calc writer docx odt ods planilha formatação", run: () => void this.editor.openActiveInOffice() },
@@ -618,7 +618,7 @@ export class IdePage {
       { label: "Exibir: Problemas", shortcut: "Ctrl+Shift+M", run: () => this.showPanel("problems") },
       { label: "Exibir: Alternar barra lateral", shortcut: "Ctrl+B", run: () => this.toggleSidebar() },
       { label: "Terminal: Alternar terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
-      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.newTerminal() },
       { label: "Terminal: Limpar", shortcut: "Ctrl+Alt+K", run: () => this.terminal.clearCurrentTerminal() },
       { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
       { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
@@ -2105,16 +2105,26 @@ export class IdePage {
     }
   }
 
-  private showTerminal(focus = false): void {
+  private newTerminal(): void {
     this.setTerminalVisible(true);
-    if (!this.terminal.hasTerminal()) this.terminal.newTerminal();
+    this.terminal.newTerminal();
     if (!platform.canUseTerminal) {
       this.terminal.showOutputPanel();
       this.terminal.appendOutput(platform.isMobile
         ? "O shell Android integrado não está disponível neste dispositivo. Saída e registro de comandos ativos."
         : "O terminal real não está disponível no modo web. Saída e registro de comandos ativos.");
-    } else if (focus) {
-      this.terminal.focusCurrentTerminal();
+    }
+  }
+
+  private showTerminal(focus = false): void {
+    this.setTerminalVisible(true);
+    if (!this.terminal.hasTerminal()) this.terminal.newTerminal(focus);
+    else if (focus) this.terminal.focusCurrentTerminal();
+    if (!platform.canUseTerminal) {
+      this.terminal.showOutputPanel();
+      this.terminal.appendOutput(platform.isMobile
+        ? "O shell Android integrado não está disponível neste dispositivo. Saída e registro de comandos ativos."
+        : "O terminal real não está disponível no modo web. Saída e registro de comandos ativos.");
     }
   }
 
@@ -2414,7 +2424,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "extensions:enable": () => void this.toggleExtensionCommand(true),
       "extensions:disable": () => void this.toggleExtensionCommand(false),
       "extensions:showInstalled": () => void this.showInstalledExtensions(),
-      "terminal:new": () => this.showTerminal(true),
+      "terminal:new": () => this.newTerminal(),
       "terminal:output": () => this.terminal.showOutputPanel(),
       "terminal:problems": () => this.terminal.showProblemsPanel(),
       "terminal:debug": () => this.terminal.showDebugConsole(),
