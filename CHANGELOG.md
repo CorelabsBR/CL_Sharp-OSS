@@ -5,6 +5,8 @@
 Type: Fix
 
 Description:
+- Corrige o comando de sugestões do editor ao registrar explicitamente o SuggestController do Monaco 0.56 e evita disparar comandos inexistentes quando uma contribuição não está disponível.
+- Adiciona confirmação persistente e acessível ao salvar configurações, com estados "Salvando" e "Salvo", além de hover, foco e contraste reforçados em todos os temas.
 - Corrige o botão de atualização para sempre responder ao clique, iniciar o download quando houver uma versão disponível e compartilhar a mesma ação funcional com o menu Gerenciar.
 - Corrige a ação "Novo terminal" para sempre criar uma nova sessão, inclusive após alternar para o painel Remote Host, e aplica o foco quando a criação assíncrona termina.
 - Corrige o upload de artefatos para a CDN ao enviar o nome do arquivo no campo multipart obrigatório `filename`, evitando a resposta HTTP 400 em Windows, Linux e Android.

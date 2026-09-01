@@ -1199,7 +1199,15 @@ export class IdePage {
     layout.append(categories, page);
     panel.append(searchShell, layout, settingsFooter(
       () => void this.resetSettings(),
-      () => this.updateStatus("Configurações salvas")
+      async () => {
+        try {
+          this.settings = await api.settings.save(this.settings);
+          this.updateStatus("Configurações salvas");
+        } catch (error) {
+          reportError(error, text => this.updateStatus(text), "Falha ao salvar as configurações");
+          throw error;
+        }
+      }
     ));
     await this.renderSettingsPage(page);
   }
@@ -2709,15 +2717,49 @@ function statusEncodingLabel(encoding: TextEncoding): string {
   return encoding === "utf8bom" ? "UTF-8 com BOM" : encoding === "utf8" ? "UTF-8" : encoding.toUpperCase();
 }
 
-function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
+function settingsFooter(onReset: () => void, onSave: () => Promise<void> | void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
   const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/Sharp-OSS/settings.json" : "~/.sharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
-  const save = el("button", { className: "wide-action settings-save", text: uiText("Salvar"), attrs: { type: "button" } });
-  save.addEventListener("click", onSave);
+  const feedback = el("span", { className: "settings-save-status", attrs: { role: "status", "aria-live": "polite" } });
+  const save = el("button", { className: "wide-action settings-save", text: uiText("Salvar"), attrs: { type: "button", "aria-label": uiText("Salvar") } });
+  let resetTimer: number | undefined;
+  save.addEventListener("click", async () => {
+    if (save.disabled) return;
+    if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+    save.disabled = true;
+    save.classList.remove("is-saved", "is-error");
+    save.classList.add("is-saving");
+    save.setAttribute("aria-busy", "true");
+    save.textContent = uiText("Salvando…");
+    feedback.className = "settings-save-status is-visible";
+    feedback.textContent = uiText("Salvando…");
+    try {
+      await onSave();
+      save.classList.remove("is-saving");
+      save.classList.add("is-saved");
+      save.textContent = uiText("Salvo");
+      feedback.className = "settings-save-status is-visible is-success";
+      feedback.textContent = uiText("Configurações salvas");
+    } catch (error) {
+      save.classList.remove("is-saving");
+      save.classList.add("is-error");
+      save.textContent = uiText("Salvar");
+      feedback.className = "settings-save-status is-visible is-error";
+      feedback.textContent = errorMessage(error);
+    } finally {
+      save.disabled = false;
+      save.removeAttribute("aria-busy");
+    }
+    resetTimer = window.setTimeout(() => {
+      if (!save.isConnected) return;
+      save.classList.remove("is-saved", "is-error");
+      save.textContent = uiText("Salvar");
+    }, 1800);
+  });
   const reset = el("button", { className: "wide-action settings-reset", text: uiText("Redefinir"), attrs: { type: "button" } });
   reset.addEventListener("click", onReset);
-  footer.append(path, spacer, save, reset);
+  footer.append(path, spacer, feedback, save, reset);
   return footer;
 }
 
