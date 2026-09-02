@@ -2,6 +2,8 @@
 - Copyright (c) CorelabsBR. All rights reserved.
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { uiText } from "../../shared/i18n";
+
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -9,7 +11,7 @@ export function errorMessage(error: unknown): string {
 }
 
 export function reportError(error: unknown, updateStatus: (text: string) => void, context: string): string {
-  const message = `${context}: ${errorMessage(error)}`;
+  const message = `${context}: ${uiText(errorMessage(error))}`;
   console.error(message, error);
   updateStatus(message);
   return message;

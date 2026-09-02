@@ -803,10 +803,18 @@ export class IdePage {
     this.activePanel = panelId;
     const showAiDock = panelId === "ai";
     this.aiDock.hidden = !showAiDock;
-    if (showAiDock) this.aiDock.replaceChildren(this.aiChat.element);
+    if (showAiDock) {
+      localizeElementTree(this.aiChat.element);
+      this.aiDock.replaceChildren(this.aiChat.element);
+    }
     this.setSidebarVisible(showAiDock && isCompactViewport() ? false : revealSidebar && this.settings.sideBarVisible);
     if (!showAiDock) {
-      this.sideContent.replaceChildren(this.panels.get(panelId) ?? this.explorer.element);
+      const panel = this.panels.get(panelId) ?? this.explorer.element;
+      // Os painéis são construídos antes do carregamento assíncrono das preferências
+      // e ficam desconectados do DOM até serem abertos. Traduza a árvore escolhida
+      // somente depois que o catálogo do usuário já estiver ativo.
+      localizeElementTree(panel);
+      this.sideContent.replaceChildren(panel);
       this.sideTitle.textContent = panelTitle(panelId);
     }
     for (const button of this.activityBar.querySelectorAll<HTMLElement>(".activity-button")) {

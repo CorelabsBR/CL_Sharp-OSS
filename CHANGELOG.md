@@ -1,5 +1,59 @@
 # CHANGELOG
 
+## 1.7.3 - 2026-09-02
+
+Type: Fix
+
+Description:
+- Corrige o painel Arduino para traduzir pelo catálogo JSON a mensagem de detecção retornada pelo backend, os campos, tooltips, estados, validações e resultados das operações.
+- Localiza mensagens conhecidas recebidas dos serviços sem modificar saídas externas do Arduino CLI que não possuam uma chave correspondente.
+- Centraliza a tradução de erros conhecidos exibidos pela interface e adiciona testes que impedem o painel Arduino de voltar a escrever mensagens literais diretamente no status.
+
+## 1.7.2 - 2026-09-02
+
+Type: Fix
+
+Description:
+- Remove valores de fallback em português que ainda apareciam no diálogo Sobre e no menu de preferências ao usar inglês, espanhol, russo ou chinês simplificado.
+- Completa as traduções de identificação do aplicativo, ambiente, sistema, dados, repositório, fechamento e estados auxiliares do diálogo.
+- Adiciona teste de regressão com os valores esperados nos quatro catálogos para impedir que essas áreas voltem a misturar idiomas.
+
+## 1.7.1 - 2026-09-02
+
+Type: Fix
+
+Description:
+- Corrige a tradução dos painéis laterais e do Chat de IA que eram construídos antes do carregamento assíncrono do idioma e permaneciam no português ao serem abertos.
+- Garante que cada painel desconectado seja relocalizado com o catálogo JSON ativo no momento em que entra na interface.
+- Adiciona cobertura de regressão para o painel de pesquisa em russo, chinês e para a etapa de localização dos painéis.
+
+## 1.7.0 - 2026-09-02
+
+Type: Refactor
+
+Description:
+- Substitui os dicionários de tradução embutidos no TypeScript por catálogos JSON independentes para português, inglês, espanhol, russo e chinês simplificado.
+- Seleciona o catálogo ativo de acordo com o idioma salvo pelo usuário, preservando fallback seguro para a chave original e o mesmo comportamento no Electron, web e Android.
+- Uniformiza os catálogos com as mesmas 599 chaves e adiciona testes que impedem idiomas com cobertura divergente, valores vazios ou strings literais de interface ausentes no JSON base.
+
+## 1.6.0 - 2026-09-02
+
+Type: Fix / Refactor
+
+Description:
+- Corrige a interface em telefones ao detectar o ambiente mobile independentemente da largura em pixels, evitando que aparelhos em landscape recebam o layout desktop.
+- Introduz um workspace horizontal próprio para touch, com navegação vertical rolável, sidebar em drawer, editor e terminal redimensionáveis, áreas seguras, diálogos adaptados e alvos de toque acessíveis.
+- Trava o aplicativo Android em `sensorLandscape`, permitindo as duas posições horizontais, e ajusta o viewport para recortes de tela e teclado virtual.
+
+## 1.5.0 - 2026-09-02
+
+Type: Feature / Refactor
+
+Description:
+- Torna o Discord Rich Presence uma integração oficial configurada de fábrica, com Application ID, identidade visual e conteúdo definidos internamente pelo Sharp-OSS.
+- Reduz as preferências do Rich Presence a um único controle para ligar ou desligar o recurso, removendo da interface a edição de identificador, conteúdo, imagens, botões e ações auxiliares.
+- Migra configurações anteriores preservando somente o estado ligado/desligado e descarta campos legados ou adulterados para impedir identidades alternativas.
+
 ## 1.4.1 - 2026-09-01
 
 Type: Fix

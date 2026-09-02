@@ -3,6 +3,7 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import type { ArduinoBoard, ArduinoBoardPort, ArduinoConfig } from "../../shared/types";
+import { uiText } from "../../shared/i18n";
 import { api, platform } from "../services/api";
 import { buttonIcon, el } from "../utils/dom";
 import { reportError } from "../utils/errors";
@@ -48,7 +49,7 @@ export class ArduinoPanel {
       const info = await api.arduino.detect({ cliPath: this.config.cliPath });
       this.summary.textContent = info.available
         ? `Arduino CLI: ${info.path ?? "arduino-cli"}`
-        : info.message;
+        : uiText(info.message);
 
       if (info.available) {
         const request = { workspace: this.workspaceSupplier(), cliPath: this.config.cliPath };
@@ -64,7 +65,7 @@ export class ArduinoPanel {
       }
       this.renderSelects();
     } catch (error) {
-      this.summary.textContent = reportError(error, this.updateStatus, "Falha ao atualizar Arduino");
+      this.summary.textContent = reportError(error, this.updateStatus, uiText("Falha ao atualizar Arduino"));
       this.renderSelects();
     }
   }
@@ -72,11 +73,11 @@ export class ArduinoPanel {
   private build(): void {
     const toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
     toolbar.append(
-      buttonIcon("refresh", "Detect Arduino CLI", () => void this.refresh()),
-      buttonIcon("add", "Criar sketch", () => void this.createSketch()),
-      buttonIcon("build", "Compile", () => void this.compile()),
-      buttonIcon("cloud-upload", "Upload", () => void this.upload()),
-      buttonIcon("radio-tower", "Serial Monitor", () => void this.monitor())
+      buttonIcon("refresh", uiText("Detectar Arduino CLI"), () => void this.refresh()),
+      buttonIcon("add", uiText("Criar sketch"), () => void this.createSketch()),
+      buttonIcon("build", uiText("Compilar"), () => void this.compile()),
+      buttonIcon("cloud-upload", uiText("Enviar para a placa"), () => void this.upload()),
+      buttonIcon("radio-tower", uiText("Monitor serial"), () => void this.monitor())
     );
 
     for (const baud of BAUD_RATES) {
@@ -90,11 +91,11 @@ export class ArduinoPanel {
     this.baudSelect.addEventListener("change", () => void this.saveConfig({ baudRate: Number(this.baudSelect.value) || 9600 }));
 
     this.form.append(
-      field("CLI", this.cliPath),
-      field("Sketch", this.sketchPath),
-      field("Board", this.boardSelect),
-      field("Port", this.portSelect),
-      field("Baud", this.baudSelect)
+      field(uiText("CLI"), this.cliPath),
+      field(uiText("Sketch"), this.sketchPath),
+      field(uiText("Placa"), this.boardSelect),
+      field(uiText("Porta"), this.portSelect),
+      field(uiText("Taxa de transmissão"), this.baudSelect)
     );
     this.element.append(toolbar, this.summary, this.form, this.output);
   }
@@ -102,22 +103,22 @@ export class ArduinoPanel {
   private async renderLimitedMode(): Promise<void> {
     this.config = await api.arduino.loadConfig({ workspace: this.workspaceSupplier() });
     this.summary.textContent = platform.isMobile
-      ? "Arduino CLI indisponivel no mobile"
-      : "Arduino CLI indisponivel no modo web";
+      ? uiText("Arduino CLI indisponível no mobile")
+      : uiText("Arduino CLI indisponível no modo web");
     this.cliPath.value = this.config.cliPath ?? "";
     this.sketchPath.value = this.config.sketchPath ?? "";
     this.setBaudValue(this.config.baudRate);
     this.ports = [];
     this.boards = [];
     this.renderSelects();
-    this.output.textContent = "Modo limitado: crie e edite sketches, mas compile/upload/monitor dependem do desktop com Arduino CLI.";
+    this.output.textContent = uiText("Modo limitado: crie e edite sketches, mas compilação, envio e monitor serial dependem do desktop com Arduino CLI.");
   }
 
   private renderSelects(): void {
     this.boardSelect.replaceChildren(el("option", { text: "Selecione a placa", attrs: { value: "" } }));
     if (this.config.selectedBoardFqbn && !this.boards.some(board => board.fqbn === this.config.selectedBoardFqbn)) {
       this.boardSelect.append(el("option", {
-        text: `Saved board (${this.config.selectedBoardFqbn})`,
+        text: uiText("Placa salva ({board})").replace("{board}", this.config.selectedBoardFqbn),
         attrs: { value: this.config.selectedBoardFqbn }
       }));
     }
@@ -132,7 +133,7 @@ export class ArduinoPanel {
     this.portSelect.replaceChildren(el("option", { text: "Selecione a porta", attrs: { value: "" } }));
     if (this.config.selectedPort && !this.ports.some(port => port.port === this.config.selectedPort)) {
       this.portSelect.append(el("option", {
-        text: `Saved port (${this.config.selectedPort})`,
+        text: uiText("Porta salva ({port})").replace("{port}", this.config.selectedPort),
         attrs: { value: this.config.selectedPort }
       }));
     }
@@ -144,17 +145,17 @@ export class ArduinoPanel {
   }
 
   private async createSketch(): Promise<void> {
-    const name = await showInputDialog("Nome do sketch", "Blink");
+    const name = await showInputDialog(uiText("Nome do sketch"), "Blink");
     if (!name?.trim()) return;
     try {
       const result = await api.arduino.createSketch({ workspace: this.workspaceSupplier(), name });
       this.config = result.config;
       this.sketchPath.value = result.sketchPath;
       await this.openFile(result.filePath);
-      this.appendOutput(`Sketch criado: ${basename(result.filePath)}`);
-      this.updateStatus(`Sketch Arduino criado: ${result.sketchPath}`);
+      this.appendOutput(uiText("Sketch criado: {file}").replace("{file}", basename(result.filePath)));
+      this.updateStatus(uiText("Sketch Arduino criado: {path}").replace("{path}", result.sketchPath));
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Falha ao criar sketch Arduino"));
+      this.appendOutput(reportError(error, this.updateStatus, uiText("Falha ao criar sketch Arduino")));
     }
   }
 
@@ -164,10 +165,10 @@ export class ArduinoPanel {
     this.appendOutput(`arduino-cli compile --fqbn ${request.fqbn} ${request.sketchPath}`);
     try {
       const result = await api.arduino.compile(request);
-      this.appendOutput(result.output);
-      this.updateStatus(result.success ? "Compilação do Arduino concluída" : "Falha na compilação do Arduino");
+      this.appendOutput(uiText(result.output));
+      this.updateStatus(result.success ? uiText("Compilação do Arduino concluída") : uiText("Falha na compilação do Arduino"));
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Falha na compilação do Arduino"));
+      this.appendOutput(reportError(error, this.updateStatus, uiText("Falha na compilação do Arduino")));
     }
   }
 
@@ -175,23 +176,23 @@ export class ArduinoPanel {
     const request = this.operationRequest();
     const port = this.portSelect.value || this.config.selectedPort;
     if (!request || !port) {
-      this.updateStatus("Selecione uma porta Arduino.");
+      this.updateStatus(uiText("Selecione uma porta Arduino."));
       return;
     }
     this.appendOutput(`arduino-cli upload -p ${port} --fqbn ${request.fqbn} ${request.sketchPath}`);
     try {
       const result = await api.arduino.upload({ ...request, port });
-      this.appendOutput(result.output);
-      this.updateStatus(result.success ? "Upload do Arduino concluído" : "Falha no upload do Arduino");
+      this.appendOutput(uiText(result.output));
+      this.updateStatus(result.success ? uiText("Upload do Arduino concluído") : uiText("Falha no upload do Arduino"));
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Falha no upload do Arduino"));
+      this.appendOutput(reportError(error, this.updateStatus, uiText("Falha no upload do Arduino")));
     }
   }
 
   private async monitor(): Promise<void> {
     const port = this.portSelect.value || this.config.selectedPort;
     if (!port) {
-      this.updateStatus("Selecione uma porta Arduino.");
+      this.updateStatus(uiText("Selecione uma porta Arduino."));
       return;
     }
     const baudRate = Number(this.baudSelect.value) || this.config.baudRate || 9600;
@@ -205,10 +206,10 @@ export class ArduinoPanel {
         baudRate,
         durationMs: 10000
       });
-      this.appendOutput(result.output);
-      this.updateStatus(result.success ? "Serial monitor complete" : "Serial monitor stopped");
+      this.appendOutput(uiText(result.output));
+      this.updateStatus(result.success ? uiText("Monitor serial concluído") : uiText("Monitor serial interrompido"));
     } catch (error) {
-      this.appendOutput(reportError(error, this.updateStatus, "Falha no monitor serial do Arduino"));
+      this.appendOutput(reportError(error, this.updateStatus, uiText("Falha no monitor serial do Arduino")));
     }
   }
 
@@ -216,11 +217,11 @@ export class ArduinoPanel {
     const sketchPath = this.sketchPath.value.trim() || this.config.sketchPath;
     const fqbn = this.boardSelect.value || this.config.selectedBoardFqbn;
     if (!sketchPath) {
-      this.updateStatus("Selecione ou crie um sketch Arduino.");
+      this.updateStatus(uiText("Selecione ou crie um sketch Arduino."));
       return undefined;
     }
     if (!fqbn) {
-      this.updateStatus("Selecione uma board Arduino.");
+      this.updateStatus(uiText("Selecione uma placa Arduino."));
       return undefined;
     }
     return {
