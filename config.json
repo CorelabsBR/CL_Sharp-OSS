@@ -1,10 +1,11 @@
 {
   "schemaVersion": 1,
+  "desktopName": "Sharp-OSS",
   "application": {
     "packageName": "Sharp-OSS",
     "displayName": "Sharp-OSS",
-    "version": "1.4.0",
-    "versionCode": 10400,
+    "version": "1.4.1",
+    "versionCode": 10401,
     "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
     "author": "CoreLabs",
     "copyrightOwner": "CoreLabs",
@@ -91,7 +92,8 @@
         "AppImage",
         "deb"
       ],
-      "icon": "icon.png",
+      "icon": "logo",
+      "syncDesktopName": true,
       "category": "Development",
       "maintainer": "CoreLabs",
       "synopsis": "Sharp-OSS IDE",
@@ -102,10 +104,10 @@
         "nsis",
         "portable"
       ],
-      "icon": "icon.ico"
+      "icon": "logo"
     },
     "mac": {
-      "icon": "icon.icns",
+      "icon": "logo",
       "category": "public.app-category.developer-tools"
     },
     "appImage": {

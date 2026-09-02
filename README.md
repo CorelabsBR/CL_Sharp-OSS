@@ -47,7 +47,7 @@ O SHARP existe para:
 ## Command Center
 Quando nenhum workspace está aberto, o Sharp-OSS Electron exibe o Command Center como hub inicial do editor.
 
-O hub permite abrir pasta, criar arquivo, criar projeto, clonar repositório Git, abrir terminal, abrir Notes, acessar temas/configurações, revisar atalhos e reabrir workspaces recentes. As ações usam as APIs reais do backend Electron/Node e os últimos workspaces ficam persistidos em `~/.sharp/recent-files.json`.
+O hub permite , criar arquivo, criar projeto, clonar repositório Git,  terminal,  Notes, acessar temas/configurações, revisar atalhos e re workspaces recentes. As ações usam as APIs reais do backend Electron/Node e os últimos workspaces ficam persistidos em `~/.sharp/recent-files.json`.
 
 ## Desktop e Mobile
 

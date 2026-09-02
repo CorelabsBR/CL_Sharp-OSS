@@ -68,6 +68,7 @@ import type {
   WorkspacePathRequest,
   WorkspaceRenameRequest
 } from "../../shared/types";
+import { DEFAULT_DISCORD_RICH_PRESENCE_SETTINGS, normalizeDiscordRichPresenceSettings } from "../../shared/discordPresence";
 import { LANGUAGE_RUNTIMES } from "../../core/runtime/languages";
 import { BUILD_CONFIG } from "../../shared/buildConfig";
 import { DEFAULT_LOCALE, LOCALE_LABELS, normalizeLocale, SUPPORTED_LOCALES } from "../../shared/i18n";
@@ -184,12 +185,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   confirmDelete: true,
   binaryFileTypesIgnored: [],
   keyboardShortcuts: [],
-  discordRichPresence: {
-    enabled: true, applicationId: "", showFileName: true, showProjectName: true, showLanguage: true,
-    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "sharp",
-    largeImageText: "Sharp-OSS", localSmallImageKey: "local", remoteSmallImageKey: "remote",
-    localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host", buttons: []
-  }
+  discordRichPresence: { ...DEFAULT_DISCORD_RICH_PRESENCE_SETTINGS }
 };
 
 const DEFAULT_SESSION: PersistedSession = {
@@ -718,13 +714,13 @@ function createBrowserApi(): SharpApi {
 
   const loadSettings = async (): Promise<AppSettings> => {
     const saved = await readJsonFile<Partial<AppSettings>>(appDataFs, SETTINGS_PATH, {});
-    const settings = { ...DEFAULT_SETTINGS, ...saved, discordRichPresence: { ...DEFAULT_SETTINGS.discordRichPresence, ...saved.discordRichPresence } };
+    const settings = { ...DEFAULT_SETTINGS, ...saved, discordRichPresence: normalizeDiscordRichPresenceSettings(saved.discordRichPresence) };
     await writeJsonFile(appDataFs, SETTINGS_PATH, settings);
     return settings;
   };
 
   const saveSettings = async (settings: AppSettings): Promise<AppSettings> => {
-    const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language), discordRichPresence: { ...DEFAULT_SETTINGS.discordRichPresence, ...settings.discordRichPresence } };
+    const merged = { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language), discordRichPresence: normalizeDiscordRichPresenceSettings(settings.discordRichPresence) };
     await writeJsonFile(appDataFs, SETTINGS_PATH, merged);
     return merged;
   };
@@ -1162,7 +1158,7 @@ function createSearchApi(fs: FsApi): SharpApi["search"] {
 function createRemoteFallbackApi(fs: FsApi): RemoteApi {
   const unavailable = (): GitOperationResult => ({
     success: false,
-    output: "Host remoto depende do backend Node/Electron neste ambiente."
+    output: "Host Remoto depende do backend Node/Electron neste ambiente."
   });
   return {
     loadHosts: () => readJsonFile<RemoteHostConfig[]>(fs, REMOTE_HOSTS_PATH, []),

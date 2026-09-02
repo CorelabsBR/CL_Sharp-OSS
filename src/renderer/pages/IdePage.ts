@@ -162,6 +162,7 @@ export class IdePage {
   private pendingChord: string | undefined;
   private pendingChordTimer?: number;
   private updateButton?: HTMLButtonElement;
+  private updateState: AppUpdateStatus = { state: "idle", message: "Atualizações ainda não foram verificadas." };
   private statusGitRequest = 0;
   private readonly disposers: Array<() => void> = [];
   private disposed = false;
@@ -197,6 +198,7 @@ export class IdePage {
 
   private async init(): Promise<void> {
     this.element.dataset.platform = platform.kind;
+    this.syncViewportLayout();
     this.settings = await api.settings.load();
     if (this.disposed) return;
     setUiLocale(this.settings.language);
@@ -274,7 +276,7 @@ export class IdePage {
     const logo = el("div", { className: "title-logo" });
     logo.append(el("img", { attrs: { src: DEFAULT_LOGO_URL, alt: BUILD_CONFIG.displayName } }), el("span", { text: BUILD_CONFIG.displayName }));
     const menus = el("div", { className: "title-menus" });
-    const openWorkspaceLabel = platform.isMobile ? uiText("Abrir pasta do dispositivo") : uiText("Abrir pasta");
+    const openWorkspaceLabel = platform.isMobile ? uiText("Abrir Pasta do dispositivo") : uiText("Abrir Pasta");
     menus.append(
       menuButton(uiText("Arquivo"), [
         [uiText("Novo arquivo"), "Ctrl+N", () => this.editor.newTab()],
@@ -316,7 +318,7 @@ export class IdePage {
         [uiText("Copiar linha para baixo"), "Shift+Alt+Down", () => this.editor.copyLineDown()]
       ]),
       menuButton(uiText("Exibir"), [
-        [uiText("Paleta de comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
+        [uiText("Paleta de Comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
         [uiText("Abertura rápida"), "Ctrl+P", () => this.palette.showQuickOpen()],
         [uiText("Explorador"), "Ctrl+Shift+E", () => this.showPanel("explorer")],
         [uiText("Pesquisar"), "Ctrl+Shift+F", () => this.showPanel("search")],
@@ -325,7 +327,7 @@ export class IdePage {
         ["Arduino", "", () => this.showPanel("arduino")],
         [uiText("Problemas"), "F8", () => this.showPanel("problems")],
         [uiText("Saída"), "Ctrl+Shift+U", () => this.showOutput()],
-        [uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
+        [uiText("Atalhos de Teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts()],
         [uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions")],
         [uiText("Alternar barra lateral"), "Ctrl+B", () => this.toggleSidebar()],
         [uiText("Alternar terminal"), "Ctrl+`", () => this.toggleTerminal()],
@@ -340,7 +342,7 @@ export class IdePage {
         [uiText("Caminhos dos runtimes"), "", () => void this.showLanguageRuntimes()]
       ]),
       menuButton(uiText("Terminal"), [
-        [uiText("Novo terminal"), "Ctrl+Shift+`", () => this.showTerminal(true)],
+        [uiText("Novo terminal"), "Ctrl+Shift+`", () => this.newTerminal()],
         [uiText("Saída"), "", () => this.terminal.showOutputPanel()],
         [uiText("Problemas"), "", () => this.terminal.showProblemsPanel()],
         [uiText("Console de depuração"), "", () => this.terminal.showDebugConsole()],
@@ -351,7 +353,7 @@ export class IdePage {
         [uiText("Fechar terminal"), "", () => this.terminal.closeCurrentTerminal()]
       ]),
       menuButton(uiText("Preferências"), [
-        [uiText("Paleta de comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
+        [uiText("Paleta de Comandos"), "Ctrl+Shift+P", () => this.palette.showCommands()],
         [uiText("Configurações"), "Ctrl+,", () => this.showSettings()],
         [uiText("Verificar atualizações"), "", () => void this.checkForUpdates()],
         [uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes()],
@@ -406,7 +408,7 @@ export class IdePage {
       this.activityButton("source", "source-control", uiText("Controle de código-fonte")),
       this.activityButton("run", "debug-alt", uiText("Executar e depurar")),
       this.activityButton("extensions", "extensions-large", uiText("Extensões")),
-      this.activityButton("remote", "remote", uiText("Host remoto")),
+      this.activityButton("remote", "remote", uiText("Host Remoto")),
       this.activityButton("arduino", "circuit-board", "Arduino"),
       this.activityButton("ai", "copilot-large", uiText("Chat de IA")),
       this.activityButton("problems", "warning", uiText("Problemas")),
@@ -498,6 +500,7 @@ export class IdePage {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => this.updateStatus(`Error: ${errorMessage(event.reason)}`);
     let compactViewport = isCompactViewport();
     const handleViewportChange = () => {
+      this.syncViewportLayout();
       const nextCompactViewport = isCompactViewport();
       if (nextCompactViewport !== compactViewport) {
         compactViewport = nextCompactViewport;
@@ -505,6 +508,7 @@ export class IdePage {
       } else {
         this.syncSidebarScrim();
       }
+      window.requestAnimationFrame(() => this.editor.layout());
     };
     window.addEventListener("keydown", this.handleShortcut, true);
     window.addEventListener("error", handleError);
@@ -539,7 +543,7 @@ export class IdePage {
     const commands: CommandAction[] = [
       { label: "Arquivo: Novo arquivo", shortcut: "Ctrl+N", run: () => this.editor.newTab() },
       { label: "Arquivo: Abrir arquivo", shortcut: "Ctrl+O", run: () => this.editor.openFileFromDialog() },
-      { label: "Arquivo: Abrir pasta", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
+      { label: "Arquivo: Abrir Pasta", shortcut: "Ctrl+K Ctrl+O", run: () => this.explorer.openFolderFromDialog() },
       { label: "Remote Host: Connect", run: () => this.remote.connectSavedHost() },
       { label: "Remote Host: Disconnect", run: () => this.remote.disconnect() },
       { label: "Remote Host: Reconnect", run: () => this.remote.reconnect() },
@@ -583,7 +587,7 @@ export class IdePage {
       { label: "IA: Renomear símbolos", run: () => this.runAIAction("rename") },
       { label: "Exibir: Problemas", shortcut: "F8", run: () => this.showPanel("problems") },
       { label: "Terminal: Alternar terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
-      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.newTerminal() },
       { label: "Terminal: Saída", run: () => this.terminal.showOutputPanel() },
       { label: "Terminal: Console de depuração", run: () => this.terminal.showDebugConsole() },
       { label: "Office: Editar arquivo atual no LibreOffice", keywords: "word excel calc writer docx odt ods planilha formatação", run: () => void this.editor.openActiveInOffice() },
@@ -610,7 +614,7 @@ export class IdePage {
       // { label: "Editor: Remove Line Comment", shortcut: "Ctrl+K Ctrl+U", run: () => this.editor.removeLineComment() },
       // { label: "Editor: Toggle Block Comment", shortcut: "Shift+Alt+A", run: () => this.editor.toggleBlockComment() },
 
-      { label: "Exibir: Paleta de comandos", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
+      { label: "Exibir: Paleta de Comandos", shortcut: "Ctrl+Shift+P", run: () => this.palette.showCommands() },
       { label: "Exibir: Abertura rápida", shortcut: "Ctrl+P", run: () => this.palette.showQuickOpen() },
       { label: "Exibir: Explorador", shortcut: "Ctrl+Shift+E", run: () => this.showPanel("explorer") },
       { label: "Exibir: Controle de código-fonte", shortcut: "Ctrl+Shift+G", run: () => this.showPanel("source") },
@@ -618,7 +622,7 @@ export class IdePage {
       { label: "Exibir: Problemas", shortcut: "Ctrl+Shift+M", run: () => this.showPanel("problems") },
       { label: "Exibir: Alternar barra lateral", shortcut: "Ctrl+B", run: () => this.toggleSidebar() },
       { label: "Terminal: Alternar terminal", shortcut: "Ctrl+`", run: () => this.toggleTerminal() },
-      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.showTerminal(true) },
+      { label: "Terminal: Novo terminal", shortcut: "Ctrl+Shift+`", run: () => this.newTerminal() },
       { label: "Terminal: Limpar", shortcut: "Ctrl+Alt+K", run: () => this.terminal.clearCurrentTerminal() },
       { label: "Executar: Depurar arquivo atual", shortcut: "F5", run: () => this.runCurrentFile(true) },
       { label: "Executar: Compilar projeto", shortcut: "Ctrl+Shift+B", run: () => this.buildProject() },
@@ -952,7 +956,7 @@ export class IdePage {
     }
     if (this.keyboardShortcuts.visible) {
       this.keyboardShortcuts.close();
-      this.updateStatus(uiText("Atalhos de teclado fechados"));
+      this.updateStatus(uiText("Atalhos de Teclado fechados"));
       return;
     }
     if (document.querySelector(".palette-overlay")) {
@@ -1087,14 +1091,14 @@ export class IdePage {
       return row;
     };
 
-    addRow(uiText("Paleta de comandos..."), "Ctrl+Shift+P", () => this.palette.showCommands());
+    addRow(uiText("Paleta de Comandos..."), "Ctrl+Shift+P", () => this.palette.showCommands());
     addRow(uiText("Configurações"), "Ctrl+,", () => this.showSettings());
     addRow(uiText("Configurar runtimes de linguagem"), "", () => void this.showLanguageRuntimes());
     addRow(uiText("Extensões"), "Ctrl+Shift+X", () => this.showPanel("extensions"));
-    addRow(uiText("Atalhos de teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
+    addRow(uiText("Atalhos de Teclado"), "Ctrl+K Ctrl+S", () => this.showKeyboardShortcuts());
     addSeparator();
     addRow(uiText("Chat de IA"), "Ctrl+Alt+I", () => this.showPanel("ai"));
-    addRow(uiText("Host remoto"), "", () => this.showPanel("remote"));
+    addRow(uiText("Host Remoto"), "", () => this.showPanel("remote"));
     addRow("Arduino", "", () => this.showPanel("arduino"));
     addRow(uiText("Problemas"), "F8", () => this.showPanel("problems"));
     addSeparator();
@@ -1127,7 +1131,14 @@ export class IdePage {
     addRow(this.settings.errorLensEnabled ? uiText("Desativar ErrorLens") : uiText("Ativar ErrorLens"), "", () => this.toggleErrorLens());
     addSeparator();
     addRow(uiText("Backup e sincronização de configurações..."), "", () => this.updateStatus(uiText("Backup e sincronização de configurações...")));
-    addRow(uiText("Baixar atualização (1)"), "", () => this.checkForUpdates());
+    const updateLabel = this.updateState.state === "available"
+      ? `${uiText("Baixar atualização")}${this.updateState.version ? ` v${this.updateState.version}` : ""}`
+      : this.updateState.state === "downloaded"
+        ? uiText("Reiniciar e instalar")
+        : this.updateState.state === "downloading"
+          ? `${uiText("Baixando atualização")}: ${this.updateState.percent ?? 0}%`
+          : uiText("Verificar atualizações");
+    addRow(updateLabel, "", () => void this.handleUpdateButton(), this.updateState.state === "downloading" ? "muted" : "");
 
     document.body.append(menu);
     const dismiss = installContextMenuDismiss(menu);
@@ -1191,7 +1202,15 @@ export class IdePage {
     layout.append(categories, page);
     panel.append(searchShell, layout, settingsFooter(
       () => void this.resetSettings(),
-      () => this.updateStatus("Configurações salvas")
+      async () => {
+        try {
+          this.settings = await api.settings.save(this.settings);
+          this.updateStatus("Configurações salvas");
+        } catch (error) {
+          reportError(error, text => this.updateStatus(text), "Falha ao salvar as configurações");
+          throw error;
+        }
+      }
     ));
     await this.renderSettingsPage(page);
   }
@@ -1345,27 +1364,7 @@ export class IdePage {
 
     if (this.settingsCategory === "Discord") {
       const current = this.settings.discordRichPresence;
-      const update = (patch: Partial<typeof current>) => void this.updateSettings({ ...this.settings, discordRichPresence: { ...current, ...patch } });
-      page.append(settingToggle("Ativar Rich Presence", "Publica o contexto da IDE no Discord Desktop.", current.enabled, enabled => update({ enabled })));
-      page.append(settingText("Application ID", "ID da aplicação criada no Discord Developer Portal. Vazio mantém a integração inativa.", current.applicationId, applicationId => update({ applicationId: applicationId.trim() })));
-      page.append(settingToggle("Mostrar nome do arquivo", "Publica apenas o nome, nunca o caminho completo.", current.showFileName, showFileName => update({ showFileName })));
-      page.append(settingToggle("Mostrar projeto", "Publica o nome do workspace atual.", current.showProjectName, showProjectName => update({ showProjectName })));
-      page.append(settingToggle("Mostrar linguagem", "Publica a linguagem do arquivo ativo.", current.showLanguage, showLanguage => update({ showLanguage })));
-      page.append(settingToggle("Mostrar host remoto", "Publica o alias do Remote Host conectado.", current.showRemoteHost, showRemoteHost => update({ showRemoteHost })));
-      page.append(settingToggle("Mostrar tempo decorrido", "Exibe há quanto tempo o Sharp-OSS está aberto.", current.showElapsedTime, showElapsedTime => update({ showElapsedTime })));
-      page.append(settingToggle("Mostrar tipo de workspace", "Identifica workspaces locais e remotos.", current.showWorkspaceType, showWorkspaceType => update({ showWorkspaceType })));
-      page.append(settingText("Imagem principal", "Asset key configurada no Discord Developer Portal.", current.largeImageKey, largeImageKey => update({ largeImageKey: largeImageKey.trim() })));
-      page.append(settingText("Texto da imagem principal", "Texto exibido ao passar o mouse sobre a imagem.", current.largeImageText, largeImageText => update({ largeImageText: largeImageText.trim() })));
-      const firstButton = current.buttons?.[0] ?? { label: "", url: "" };
-      page.append(settingText("Botão — rótulo", "Rótulo opcional do primeiro botão (máximo de dois no protocolo).", firstButton.label, label => update({ buttons: label.trim() || firstButton.url ? [{ ...firstButton, label: label.trim() }] : [] })));
-      page.append(settingText("Botão — URL HTTPS", "Somente URLs HTTPS válidas são publicadas.", firstButton.url, url => update({ buttons: firstButton.label || url.trim() ? [{ ...firstButton, url: url.trim() }] : [] })));
-      const actions = el("div", { className: "settings-inline-actions" });
-      const reconnect = el("button", { className: "wide-action", text: uiText("Reconectar ao Discord") });
-      reconnect.addEventListener("click", () => void api.discordPresence.reconnect().then(state => this.updateStatus(state.message)));
-      const clear = el("button", { className: "wide-action", text: uiText("Limpar atividade") });
-      clear.addEventListener("click", () => void api.discordPresence.clear().then(() => this.updateStatus(uiText("Atividade do Discord removida"))));
-      actions.append(reconnect, clear); page.append(actions);
-      void api.discordPresence.status().then(state => page.append(el("div", { className: "muted-row", text: state.message })));
+      page.append(settingToggle("Ativar Rich Presence", "Publica o contexto da IDE no Discord Desktop.", current.enabled, enabled => void this.updateSettings({ ...this.settings, discordRichPresence: { enabled } })));
       return;
     }
 
@@ -1659,15 +1658,16 @@ export class IdePage {
 
   private renderUpdateStatus(status: AppUpdateStatus): void {
     if (this.disposed) return;
+    this.updateState = status;
     const button = this.updateButton;
     if (!button) return;
     const visible = status.state === "available" || status.state === "downloading" || status.state === "downloaded";
     button.hidden = !visible;
     button.disabled = status.state === "downloading";
     button.title = status.message;
-    if (status.state === "available") button.textContent = `Atualizar Sharp-OSS para v${status.version}`;
-    else if (status.state === "downloading") button.textContent = `Baixando atualização: ${status.percent ?? 0}%`;
-    else if (status.state === "downloaded") button.textContent = "Reiniciar e instalar";
+    if (status.state === "available") button.textContent = `${uiText("Baixar atualização")} v${status.version}`;
+    else if (status.state === "downloading") button.textContent = `${uiText("Baixando atualização")}: ${status.percent ?? 0}%`;
+    else if (status.state === "downloaded") button.textContent = uiText("Reiniciar e instalar");
     else button.textContent = "";
     if (status.state !== "idle" && status.state !== "unsupported") this.updateStatus(status.message);
   }
@@ -1676,6 +1676,7 @@ export class IdePage {
     try {
       const status = await api.update.check();
       this.renderUpdateStatus(status);
+      if (status.state === "unsupported" || status.state === "idle") this.updateStatus(status.message);
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha ao verificar atualizações");
     }
@@ -1684,11 +1685,22 @@ export class IdePage {
   private async handleUpdateButton(): Promise<void> {
     try {
       const status = await api.update.status();
+      this.renderUpdateStatus(status);
       if (status.state === "downloaded") {
+        this.renderUpdateStatus({ ...status, message: "Reiniciando para instalar a atualização…" });
         await api.update.install();
         return;
       }
-      if (status.state === "available") this.renderUpdateStatus(await api.update.download());
+      if (status.state === "available") {
+        this.renderUpdateStatus({ ...status, state: "downloading", percent: 0, message: "Preparando download da atualização…" });
+        this.renderUpdateStatus(await api.update.download());
+        return;
+      }
+      if (status.state === "downloading") {
+        this.updateStatus(status.message);
+        return;
+      }
+      await this.checkForUpdates();
     } catch (error) {
       reportError(error, text => this.updateStatus(text), "Falha ao atualizar o Sharp-OSS");
     }
@@ -1844,7 +1856,7 @@ export class IdePage {
         const command = remoteRunCommand(decodeURIComponent(new URL(filePath).pathname));
         if (!command) throw new Error(`Execução remota não configurada para ${basename(filePath)}.`);
         await this.terminal.runCommand(command);
-        this.updateStatus("Execução iniciada no host remoto");
+        this.updateStatus("Execução iniciada no Host Remoto");
         return;
       }
 
@@ -2052,7 +2064,7 @@ export class IdePage {
     const hasRunnableTarget = platform.canUseNodeBackend
       ? Boolean(this.editor.getCurrentFile() || this.explorer.workspace)
       : Boolean(this.editor.getCurrentFile());
-    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta";
+    const openWorkspaceLabel = platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir Pasta";
     const openWorkspaceDetail = platform.isMobile ? "Usar diretamente a pasta escolhida no seletor do Android." : "Escolher um workspace local.";
     return [
       { id: "open-folder", label: openWorkspaceLabel, detail: openWorkspaceDetail, iconName: "root-folder-opened", run: () => void this.explorer.openFolderFromDialog() },
@@ -2066,7 +2078,7 @@ export class IdePage {
       { id: "notes", label: "Abrir notas", detail: platform.isMobile ? "Abrir ou criar Documents/Sharp-OSS/notes.nps.md." : "Abrir ou criar .sharp/notes.nps.md.", iconName: "note", run: () => void this.openNotes() },
       { id: "theme-lab", label: "Abrir laboratório de temas", detail: "Abrir o seletor de temas, incluindo especiais.", iconName: "paintcan", run: () => void this.showThemePicker(true) },
       { id: "settings", label: "Configurações", detail: "Abrir ajustes do editor.", iconName: "settings-gear", run: () => this.showSettings() },
-      { id: "keyboard-shortcuts", label: "Atalhos de teclado", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
+      { id: "keyboard-shortcuts", label: "Atalhos de Teclado", detail: "Ver comandos, teclas e conflitos.", iconName: "key", run: () => this.showKeyboardShortcuts() },
       { id: "run", label: "Executar projeto", detail: hasRunnableTarget ? (platform.canUseNodeBackend ? "Executar o arquivo/projeto atual." : "Prévia HTML ou alternativa de runtime.") : "Abra um arquivo primeiro.", iconName: "play", disabled: !hasRunnableTarget, run: () => void this.runCurrentFile() },
       { id: "git-status", label: "Controle de código-fonte", detail: platform.canUseGit ? (hasProject ? "Abrir o controle de código-fonte do workspace." : "Abra um workspace primeiro.") : "Abrir o controle de código-fonte em modo limitado.", iconName: "source-control", disabled: platform.canUseGit && !hasProject, run: () => this.showPanel("source") }
     ];
@@ -2105,16 +2117,26 @@ export class IdePage {
     }
   }
 
-  private showTerminal(focus = false): void {
+  private newTerminal(): void {
     this.setTerminalVisible(true);
-    if (!this.terminal.hasTerminal()) this.terminal.newTerminal();
+    this.terminal.newTerminal();
     if (!platform.canUseTerminal) {
       this.terminal.showOutputPanel();
       this.terminal.appendOutput(platform.isMobile
         ? "O shell Android integrado não está disponível neste dispositivo. Saída e registro de comandos ativos."
         : "O terminal real não está disponível no modo web. Saída e registro de comandos ativos.");
-    } else if (focus) {
-      this.terminal.focusCurrentTerminal();
+    }
+  }
+
+  private showTerminal(focus = false): void {
+    this.setTerminalVisible(true);
+    if (!this.terminal.hasTerminal()) this.terminal.newTerminal(focus);
+    else if (focus) this.terminal.focusCurrentTerminal();
+    if (!platform.canUseTerminal) {
+      this.terminal.showOutputPanel();
+      this.terminal.appendOutput(platform.isMobile
+        ? "O shell Android integrado não está disponível neste dispositivo. Saída e registro de comandos ativos."
+        : "O terminal real não está disponível no modo web. Saída e registro de comandos ativos.");
     }
   }
 
@@ -2150,6 +2172,10 @@ export class IdePage {
   private syncSidebarScrim(): void {
     this.sideScrim.hidden = this.sideBar.hidden || !isCompactViewport();
     this.element.classList.toggle("sidebar-drawer-open", !this.sideBar.hidden && isCompactViewport());
+  }
+
+  private syncViewportLayout(): void {
+    this.element.classList.toggle("mobile-landscape-layout", usesMobileLandscapeLayout());
   }
 
   private terminalCwd(): string {
@@ -2196,7 +2222,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   const run = (action: () => void): void => {
     event.preventDefault();
-    event.stopImmediatePropagation();
+    event.stopPropagation();
     this.pendingChord = undefined;
     if (this.pendingChordTimer !== undefined) {
       window.clearTimeout(this.pendingChordTimer);
@@ -2224,7 +2250,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   if (key === "Ctrl+K") {
     event.preventDefault();
-    event.stopImmediatePropagation();
+    event.stopPropagation();
 
     this.pendingChord = "Ctrl+K";
     this.updateStatus("Ctrl+K...");
@@ -2414,7 +2440,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
       "extensions:enable": () => void this.toggleExtensionCommand(true),
       "extensions:disable": () => void this.toggleExtensionCommand(false),
       "extensions:showInstalled": () => void this.showInstalledExtensions(),
-      "terminal:new": () => this.showTerminal(true),
+      "terminal:new": () => this.newTerminal(),
       "terminal:output": () => this.terminal.showOutputPanel(),
       "terminal:problems": () => this.terminal.showProblemsPanel(),
       "terminal:debug": () => this.terminal.showDebugConsole(),
@@ -2650,7 +2676,7 @@ function panelTitle(panel: PanelId): string {
     source: "CONTROLE DE CÓDIGO-FONTE",
     run: "EXECUTAR E DEPURAR",
     extensions: "EXTENSÕES",
-    remote: "HOST REMOTO",
+    remote: "Host Remoto",
     arduino: "ARDUINO",
     ai: "CONVERSA COM IA",
     settings: "CONFIGURAÇÕES",
@@ -2678,15 +2704,49 @@ function statusEncodingLabel(encoding: TextEncoding): string {
   return encoding === "utf8bom" ? "UTF-8 com BOM" : encoding === "utf8" ? "UTF-8" : encoding.toUpperCase();
 }
 
-function settingsFooter(onReset: () => void, onSave: () => void): HTMLElement {
+function settingsFooter(onReset: () => void, onSave: () => Promise<void> | void): HTMLElement {
   const footer = el("div", { className: "settings-footer" });
   const path = el("span", { className: "settings-path", text: platform.isMobile ? "App Data/Sharp-OSS/settings.json" : "~/.sharp/settings.json" });
   const spacer = el("span", { className: "spacer" });
-  const save = el("button", { className: "wide-action settings-save", text: uiText("Salvar"), attrs: { type: "button" } });
-  save.addEventListener("click", onSave);
+  const feedback = el("span", { className: "settings-save-status", attrs: { role: "status", "aria-live": "polite" } });
+  const save = el("button", { className: "wide-action settings-save", text: uiText("Salvar"), attrs: { type: "button", "aria-label": uiText("Salvar") } });
+  let resetTimer: number | undefined;
+  save.addEventListener("click", async () => {
+    if (save.disabled) return;
+    if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+    save.disabled = true;
+    save.classList.remove("is-saved", "is-error");
+    save.classList.add("is-saving");
+    save.setAttribute("aria-busy", "true");
+    save.textContent = uiText("Salvando…");
+    feedback.className = "settings-save-status is-visible";
+    feedback.textContent = uiText("Salvando…");
+    try {
+      await onSave();
+      save.classList.remove("is-saving");
+      save.classList.add("is-saved");
+      save.textContent = uiText("Salvo");
+      feedback.className = "settings-save-status is-visible is-success";
+      feedback.textContent = uiText("Configurações salvas");
+    } catch (error) {
+      save.classList.remove("is-saving");
+      save.classList.add("is-error");
+      save.textContent = uiText("Salvar");
+      feedback.className = "settings-save-status is-visible is-error";
+      feedback.textContent = errorMessage(error);
+    } finally {
+      save.disabled = false;
+      save.removeAttribute("aria-busy");
+    }
+    resetTimer = window.setTimeout(() => {
+      if (!save.isConnected) return;
+      save.classList.remove("is-saved", "is-error");
+      save.textContent = uiText("Salvar");
+    }, 1800);
+  });
   const reset = el("button", { className: "wide-action settings-reset", text: uiText("Redefinir"), attrs: { type: "button" } });
   reset.addEventListener("click", onReset);
-  footer.append(path, spacer, save, reset);
+  footer.append(path, spacer, feedback, save, reset);
   return footer;
 }
 
@@ -2748,7 +2808,11 @@ function settingRow(label: string, description: string, control: HTMLElement): H
 }
 
 function isCompactViewport(): boolean {
-  return window.matchMedia("(max-width: 768px)").matches;
+  return platform.isMobile || window.matchMedia("(max-width: 768px), (max-width: 960px) and (max-height: 600px)").matches;
+}
+
+function usesMobileLandscapeLayout(): boolean {
+  return platform.isMobile || window.matchMedia("(orientation: landscape) and (max-width: 960px) and (max-height: 600px)").matches;
 }
 
 function trapDialogFocus(event: KeyboardEvent, dialog: HTMLElement): void {

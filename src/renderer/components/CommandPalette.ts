@@ -80,7 +80,7 @@ export class CommandPalette {
     })), "Digite um comando");
   }
 
-  showQuickOpen(initialQuery =""): void {
+  showQuickOpen(initialQuery = ""): void {
     this.show(initialQuery, this.quickOpenItems(), "Pesquisar arquivos por nome ou caminho", true);
   }
   //só pra botar o workflow funcionar
@@ -135,7 +135,7 @@ export class CommandPalette {
     const files = [...new Set([...this.workspaceFiles, ...this.quickOpenFiles])];
     return files.map(file => ({
       label: this.workspace && file.startsWith(this.workspace) ? relativePath(this.workspace, file) : basename(file),
-      hint: this.workspace && file.startsWith(this.workspace) ?"" : file,
+      hint: this.workspace && file.startsWith(this.workspace) ? "" : file,
       keywords: file,
       run: () => this.openFile(file, line, column)
     }));
@@ -213,23 +213,10 @@ export class CommandPalette {
       });
     };
     input.addEventListener("input", () => {
-      if (!quickOpen && !input.value.startsWith(">")) {
-        input.value = `>${input.value}`;
-        input.setSelectionRange(input.value.length, input.value.length);
-      }
       selectedIndex = 0;
       render();
     });
     input.addEventListener("keydown", event => {
-      if (!quickOpen && (event.key === "Backspace" || event.key === "Delete")) {
-        const selectionStart = input.selectionStart ?? 0;
-        const selectionEnd = input.selectionEnd ?? selectionStart;
-        if (selectionStart <= 1 || selectionEnd <= 1) {
-          event.preventDefault();
-          input.setSelectionRange(Math.max(1, selectionStart), Math.max(1, selectionEnd));
-          return;
-        }
-      }
       if (event.key === "Escape") {
         event.preventDefault();
         overlay.remove();
@@ -256,7 +243,6 @@ export class CommandPalette {
     });
     render();
     input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
   }
 }
 
@@ -285,7 +271,7 @@ function translateCommandLabel(label: string): string {
   const translations: Record<string, string> = {
     "File: New File": "Arquivo: novo arquivo",
     "File: Open File": "Arquivo: abrir arquivo",
-    "File: Open Folder": "Arquivo: abrir pasta",
+    "File: Open Folder": "Arquivo: Abrir Pasta",
     "File: Save": "Arquivo: salvar",
     "File: Save As": "Arquivo: salvar como",
     "File: Save All": "Arquivo: salvar tudo",
@@ -302,7 +288,7 @@ function translateCommandLabel(label: string): string {
     "View: Extensions": "Exibir: extensões",
     "View: Arduino": "Exibir: Arduino",
     "View: Problems": "Exibir: problemas",
-    "View: Command Palette": "Exibir: paleta de comandos",
+    "View: Command Palette": "Exibir: Paleta de Comandos",
     "View: Quick Open": "Exibir: abertura rápida",
     "View: Toggle Sidebar": "Exibir: alternar barra lateral",
     "Terminal: Toggle Terminal": "Terminal: alternar terminal",

@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { AppSettings, PersistedSession } from "../../shared/types";
 import { DEFAULT_LOCALE, normalizeLocale } from "../../shared/i18n";
+import { DEFAULT_DISCORD_RICH_PRESENCE_SETTINGS, normalizeDiscordRichPresenceSettings } from "../../shared/discordPresence";
 import { sharpHome, recentFilesPath, settingsPath } from "./paths";
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -40,12 +41,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   confirmDelete: true,
   binaryFileTypesIgnored: [],
   keyboardShortcuts: [],
-  discordRichPresence: {
-    enabled: true, applicationId: "", showFileName: true, showProjectName: true, showLanguage: true,
-    showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "sharp",
-    largeImageText: "Sharp-OSS", localSmallImageKey: "local", remoteSmallImageKey: "remote",
-    localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host", buttons: []
-  }
+  discordRichPresence: { ...DEFAULT_DISCORD_RICH_PRESENCE_SETTINGS }
 };
 
 export async function loadSettings(): Promise<AppSettings> {
@@ -79,7 +75,7 @@ export async function resetSettings(): Promise<AppSettings> {
 }
 
 function mergeSettings(settings: Partial<AppSettings>): AppSettings {
-  return { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language), discordRichPresence: { ...DEFAULT_SETTINGS.discordRichPresence, ...settings.discordRichPresence } };
+  return { ...DEFAULT_SETTINGS, ...settings, language: normalizeLocale(settings.language), discordRichPresence: normalizeDiscordRichPresenceSettings(settings.discordRichPresence) };
 }
 // sabemos que me motivou. presente no commit f0655d6.
 

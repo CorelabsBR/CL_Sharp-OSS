@@ -15,6 +15,7 @@ concurrency:
 env:
   NODE_VERSION: "22"
   JAVA_VERSION: "21"
+  CDN_REPOSITORY: CL_NPSharp
   ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
   ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
@@ -41,7 +42,6 @@ jobs:
       version: ${{ steps.metadata.outputs.version }}
       tag: ${{ steps.metadata.outputs.tag }}
       repository: ${{ steps.metadata.outputs.repository }}
-      repository_name: ${{ steps.metadata.outputs.repository_name }}
       title: ${{ steps.metadata.outputs.title }}
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
           const fs = require("node:fs");
           const app = require("./config.json").application;
           if (!app?.version || !app?.repository?.owner || !app?.repository?.name || !app?.displayName) throw new Error("Missing release metadata in config.json.");
-          const values = { version: app.version, tag: `v${app.version}`, repository: `${app.repository.owner}/${app.repository.name}`, repository_name: app.repository.name, title: app.displayName };
+          const values = { version: app.version, tag: `v${app.version}`, repository: `${app.repository.owner}/${app.repository.name}`, title: app.displayName };
           fs.appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(values).map(([key, value]) => `${key}=${value}\n`).join(""));
           NODE
 
@@ -95,7 +95,6 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
-      - run: npm run build:server
       - name: Build Windows Setup, Portable and Portable Fast
         shell: pwsh
         run: |
@@ -124,11 +123,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
           REPOSITORY: ${{ needs.metadata.outputs.repository }}
-          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
         run: |
           mapfile -d '' -t assets < <(find release -maxdepth 1 -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.yml' -o -name '*.blockmap' -o -name 'SHA256SUMS.txt' \) -print0)
           upload_args=(); for asset in "${assets[@]}"; do upload_args+=(--file "$asset"); done
-          node scripts/upload-cdn-release.mjs upload --repository "$REPOSITORY_NAME" --version "$TAG" --platform windows "${upload_args[@]}"
+          node scripts/upload-cdn-release.mjs upload --version "$TAG" --platform windows "${upload_args[@]}"
           gh release upload "$TAG" "${assets[@]}" --repo "$REPOSITORY" --clobber
 
   package-linux:
@@ -151,7 +149,6 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm run build:electron
-      - run: npm run build:server
       - name: Build Linux artifacts and updater metadata
         run: |
           for attempt in 1 2 3; do
@@ -163,9 +160,9 @@ jobs:
         run: |
           test -n "$(find release -maxdepth 1 -name '*.AppImage' -print -quit)"
           test -n "$(find release -maxdepth 1 -name '*.deb' -print -quit)"
-          test -n "$(find release -maxdepth 1 -name '*.blockmap' -print -quit)"
           test -f release/latest-linux.yml
-          find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.blockmap' -o -name 'latest-linux.yml' \) -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS-linux.txt
+          grep -Eq '^[[:space:]]*blockMapSize:[[:space:]]*[1-9][0-9]*[[:space:]]*$' release/latest-linux.yml
+          find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name 'latest-linux.yml' \) -print0 | sort -z | xargs -0 sha256sum > release/SHA256SUMS-linux.txt
       - name: Upload Linux artifacts directly
         env:
           CDN_UPLOAD_URL: ${{ secrets.CDN_UPLOAD_URL }}
@@ -173,11 +170,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
           REPOSITORY: ${{ needs.metadata.outputs.repository }}
-          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
+        shell: bash
         run: |
-          mapfile -d '' -t assets < <(find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.blockmap' -o -name 'latest-linux.yml' -o -name 'SHA256SUMS-linux.txt' \) -print0)
+          mapfile -d '' -t assets < <(find release -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name 'latest-linux.yml' -o -name 'SHA256SUMS-linux.txt' \) -print0)
           upload_args=(); for asset in "${assets[@]}"; do upload_args+=(--file "$asset"); done
-          node scripts/upload-cdn-release.mjs upload --repository "$REPOSITORY_NAME" --version "$TAG" --platform linux "${upload_args[@]}"
+          node scripts/upload-cdn-release.mjs upload --version "$TAG" --platform linux "${upload_args[@]}"
           gh release upload "$TAG" "${assets[@]}" --repo "$REPOSITORY" --clobber
 
   package-android:
@@ -223,12 +220,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
           REPOSITORY: ${{ needs.metadata.outputs.repository }}
-          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
         run: |
           mapfile -d '' -t assets < <(find android/app/build/outputs/apk -type f \( -name '*.apk' -o -name 'SHA256SUMS-android.txt' \) -print0)
           test "${#assets[@]}" -ge 3
           upload_args=(); for asset in "${assets[@]}"; do upload_args+=(--file "$asset"); done
-          node scripts/upload-cdn-release.mjs upload --repository "$REPOSITORY_NAME" --version "$TAG" --platform android "${upload_args[@]}"
+          node scripts/upload-cdn-release.mjs upload --version "$TAG" --platform android "${upload_args[@]}"
           gh release upload "$TAG" "${assets[@]}" --repo "$REPOSITORY" --clobber
 
   finalize-cdn:
@@ -248,12 +244,12 @@ jobs:
         run: gh release view "$TAG" --repo "$REPOSITORY" --json body --jq .body > release-notes.md
       - name: Finalize CDN release
         env:
-          CDN_UPLOAD_URL: ${{ secrets.CDN_UPLOAD_URL }}
-          CDN_UPLOAD_KEY: ${{ secrets.CDN_UPLOAD_KEY }}
+          CDN_FINALIZE_URL: ${{ secrets.CDN_FINALIZE_URL }}
+          CDN_RELEASE_KEY: ${{ secrets.CDN_RELEASE_KEY }}
           TAG: ${{ needs.metadata.outputs.tag }}
-          REPOSITORY_NAME: ${{ needs.metadata.outputs.repository_name }}
+          REPOSITORY: ${{ needs.metadata.outputs.repository }}
           TITLE: ${{ needs.metadata.outputs.title }}
-        run: node scripts/upload-cdn-release.mjs finalize --repository "$REPOSITORY_NAME" --tag "$TAG" --commit-sha "$GITHUB_SHA" --title "$TITLE $TAG" --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --notes-file release-notes.md
+        run: node scripts/upload-cdn-release.mjs finalize --tag "$TAG" --commit-sha "$GITHUB_SHA" --title "$TITLE $TAG" --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --notes-file release-notes.md
       - name: Publish private GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

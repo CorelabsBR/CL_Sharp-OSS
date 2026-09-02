@@ -1,6 +1,6 @@
 {
   "name": "Sharp-OSS",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Sharp-OSS migrated to Electron, TypeScript and Monaco Editor.",
   "main": "dist-electron/main/main.js",
   "type": "commonjs",
@@ -22,7 +22,8 @@
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput --watchFile fixedPollingInterval --watchDirectory fixedPollingInterval",
     "typecheck": "npm run config:sync && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "lint": "npm run config:sync && eslint .",
-    "test": "npm run test:easter-egg && npm run test:updater && npm run test:discord && npm run test:features",
+    "test": "npm run test:release-upload && npm run test:easter-egg && npm run test:updater && npm run test:discord && npm run test:features",
+    "test:release-upload": "node --test scripts/upload-cdn-release.test.mjs",
     "test:features": "npm run build:electron && tsc -p tsconfig.features.json && node --test dist-electron/services/node/featureInfrastructure.test.js dist-electron/services/node/ai/CodexAppServerProvider.test.js && node --test scripts/feature-renderer.test.mjs",
     "test:discord": "npm run build:electron && node --test dist-electron/main/discord/DiscordRichPresenceBuilder.test.js",
     "test:easter-egg": "npm run build:electron && node scripts/gta6-easter-egg.test.mjs",
@@ -105,7 +106,8 @@
         "AppImage",
         "deb"
       ],
-      "icon": "icon.png",
+      "icon": "logo",
+      "syncDesktopName": true,
       "category": "Development",
       "maintainer": "CoreLabs",
       "synopsis": "Sharp-OSS IDE",
@@ -116,10 +118,10 @@
         "nsis",
         "portable"
       ],
-      "icon": "icon.ico"
+      "icon": "logo"
     },
     "mac": {
-      "icon": "icon.icns",
+      "icon": "logo",
       "category": "public.app-category.developer-tools"
     },
     "appImage": {
@@ -181,5 +183,6 @@
     "node-pty@1.1.0": true,
     "ssh2@1.17.0": true,
     "electron-winstaller@5.4.0": true
-  }
+  },
+  "desktopName": "Sharp-OSS"
 }

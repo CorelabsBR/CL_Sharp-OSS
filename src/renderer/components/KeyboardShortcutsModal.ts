@@ -28,7 +28,7 @@ export class KeyboardShortcutsModal {
 
     const conflicts = shortcutConflicts(shortcuts);
     const overlay = el("div", { className: "keyboard-shortcuts-overlay" });
-    const dialog = el("section", { className: "keyboard-shortcuts-modal", attrs: { "aria-label": "Atalhos de teclado" } });
+    const dialog = el("section", { className: "keyboard-shortcuts-modal", attrs: { "aria-label": "Atalhos de Teclado" } });
     const header = el("header", { className: "keyboard-shortcuts-header" });
     const title = el("div", { className: "keyboard-shortcuts-title" });
     title.append(el("h2", { text: "Atalhos de teclado" }), el("span", { text: uiText("{count} atalhos").replace("{count}", String(shortcuts.length)) }));
@@ -112,7 +112,7 @@ export class KeyboardShortcutsModal {
     this.overlay = overlay;
     render();
     search.focus();
-    this.updateStatus("Atalhos de teclado abertos");
+    this.updateStatus("Atalhos de Teclado abertos");
   }
 
   close(): void {

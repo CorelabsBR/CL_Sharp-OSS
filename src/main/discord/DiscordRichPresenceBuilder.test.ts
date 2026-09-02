@@ -4,29 +4,27 @@
  *--------------------------------------------------------------------------------------------*/
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DiscordRichPresenceSettings } from "../../shared/types";
+import { normalizeDiscordRichPresenceSettings } from "../../shared/discordPresence";
 import { buildDiscordActivity } from "./DiscordRichPresenceBuilder";
 
-const settings: DiscordRichPresenceSettings = {
-  enabled: true, applicationId: "1534982448679485551", showFileName: true, showProjectName: true, showLanguage: true,
-  showRemoteHost: true, showElapsedTime: true, showWorkspaceType: true, largeImageKey: "icon",
-  largeImageText: "Sharp-OSS", localSmallImageKey: "local", remoteSmallImageKey: "remote",
-  localSmallImageText: "Workspace local", remoteSmallImageText: "Remote Host",
-  buttons: [{ label: "Site", url: "https://sharp.corelabs.dev.br" }, { label: "Inválido", url: "javascript:alert(1)" }]
-};
-
 test("builds a private, remote activity without exposing paths", () => {
-  const activity = buildDiscordActivity(settings, { filePath: "/home/user/secret/main.ts", workspacePath: "/home/user/secret", workspaceName: "secret", language: "TypeScript", remoteHost: "vortexsys" }, new Date(0));
+  const activity = buildDiscordActivity({ filePath: "/home/user/secret/main.ts", workspacePath: "/home/user/secret", workspaceName: "secret", language: "TypeScript", remoteHost: "vortexsys" }, new Date(0));
   assert.equal(activity.details, "Editando main.ts");
   assert.match(activity.state, /Host: vortexsys/);
   assert.doesNotMatch(JSON.stringify(activity), /home\/user/);
   assert.equal(activity.smallImageKey, "remote");
-  assert.deepEqual(activity.buttons, [{ label: "Site", url: "https://sharp.corelabs.dev.br" }]);
+  assert.equal(activity.largeImageKey, "icon");
+  assert.equal(activity.largeImageText, "Sharp-OSS");
+  assert.equal(activity.startTimestamp?.getTime(), 0);
 });
 
-test("respects privacy flags and maps remote connection state", () => {
-  const activity = buildDiscordActivity({ ...settings, showFileName: false, showProjectName: false, showLanguage: false, showRemoteHost: false, showWorkspaceType: false }, { filePath: "/private/name.ts", workspaceName: "private", remoteStatus: "installing-server" }, new Date(0));
+test("maps remote connection state using the factory activity", () => {
+  const activity = buildDiscordActivity({ filePath: "/private/name.ts", workspaceName: "private", remoteStatus: "installing-server" }, new Date(0));
   assert.equal(activity.details, "Instalando Sharp-OSS Server");
-  assert.equal(activity.state, "IDE em execução");
-  assert.doesNotMatch(JSON.stringify(activity), /name\.ts|private/);
+  assert.equal(activity.state, "Projeto: private • Local");
+});
+
+test("keeps only the on/off preference from legacy or tampered settings", () => {
+  assert.deepEqual(normalizeDiscordRichPresenceSettings({ enabled: false, applicationId: "999999999999999999", buttons: [{ label: "Outro", url: "https://example.com" }] }), { enabled: false });
+  assert.deepEqual(normalizeDiscordRichPresenceSettings({ enabled: "false", applicationId: "999999999999999999" }), { enabled: true });
 });

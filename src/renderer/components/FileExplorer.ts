@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 import type { WorkspaceChangeEvent, WorkspaceEntry } from "../../shared/types";
 import { initialContentForNewSharpFile } from "../../core/easterEggs";
+import { uiText } from "../../shared/i18n";
 import { api, platform } from "../services/api";
 import { buttonIcon, contextMenu, el, fileIcon } from "../utils/dom";
 import { reportError } from "../utils/errors";
@@ -98,7 +99,7 @@ export class FileExplorer {
   async openFolder(folder: string, displayName?: string, location?: string): Promise<void> {
     if (this.disposed) return;
     if (this.remoteConnected && !folder.startsWith("sharp-remote://")) {
-      this.updateStatus("Uma sessão remota está ativa; escolha uma pasta no host remoto.");
+      this.updateStatus(uiText("Uma sessão remota está ativa; escolha uma pasta no host remoto."));
       await this.openRemoteFolder?.();
       return;
     }
@@ -121,7 +122,7 @@ export class FileExplorer {
       this.watchFolder(normalizedFolder);
       this.onWorkspaceChanged(normalizedFolder, this.rootName, this.rootLocation);
       this.render();
-      this.updateStatus(`Workspace aberto: ${this.rootLocation ?? normalizedFolder}`);
+      this.updateStatus(uiText("Workspace aberto: {workspace}").replace("{workspace}", this.rootLocation ?? normalizedFolder));
     } catch (error) {
       if (this.disposed) return;
       this.root = previousRoot;
@@ -130,7 +131,7 @@ export class FileExplorer {
       this.nodes = previousNodes;
       this.watchFolder(previousRoot);
       this.render();
-      reportError(error, this.updateStatus, `Nao foi possivel abrir workspace (${normalizedFolder})`);
+      reportError(error, this.updateStatus, uiText("Não foi possível abrir workspace") + ` (${normalizedFolder})`);
     }
   }
 
@@ -178,9 +179,9 @@ export class FileExplorer {
       }
       if (this.selectedPath && !this.nodes.has(this.selectedPath)) this.selectedPath = this.root;
       this.render();
-      if (!options.silent) this.updateStatus("Explorador atualizado");
+      if (!options.silent) this.updateStatus(uiText("Explorador atualizado"));
     } catch (error) {
-      reportError(error, this.updateStatus, "Não foi possível atualizar o Explorador");
+      reportError(error, this.updateStatus, uiText("Não foi possível atualizar o Explorador"));
     } finally {
       this.refreshInFlight = false;
       if (this.refreshQueued) {
@@ -217,27 +218,27 @@ export class FileExplorer {
 
   private build(): void {
     this.toolbar.append(
-      buttonIcon("new-file", "Novo arquivo", () => this.createInSelected("file")),
-      buttonIcon("new-folder", "Nova pasta", () => this.createInSelected("folder")),
-      buttonIcon("trash", "Excluir item selecionado", () => void this.deleteSelected()),
-      buttonIcon("refresh", "Atualizar", () => void this.refresh()),
-      buttonIcon("collapse-all", "Recolher tudo", () => this.collapseAll())
+      buttonIcon("new-file", uiText("Novo arquivo"), () => this.createInSelected("file")),
+      buttonIcon("new-folder", uiText("Nova pasta"), () => this.createInSelected("folder")),
+      buttonIcon("trash", uiText("Excluir item selecionado"), () => void this.deleteSelected()),
+      buttonIcon("refresh", uiText("Atualizar"), () => void this.refresh()),
+      buttonIcon("collapse-all", uiText("Recolher tudo"), () => this.collapseAll())
     );
     this.tree.tabIndex = 0;
     this.tree.setAttribute("role", "tree");
-    this.tree.setAttribute("aria-label", "Árvore de arquivos");
+    this.tree.setAttribute("aria-label", uiText("Árvore de arquivos"));
     this.tree.addEventListener("keydown", event => {
       if (event.target instanceof HTMLInputElement || (event.key !== "Delete" && event.key !== "Backspace")) return;
       event.preventDefault();
       void this.deleteSelected();
     });
 
-    const title = el("div", { className: "empty-title", text: platform.isMobile ? "Nenhum workspace mobile aberto" : "Nenhuma pasta aberta" });
+    const title = el("div", { className: "empty-title", text: platform.isMobile ? uiText("Nenhum workspace mobile aberto") : uiText("Nenhuma pasta aberta") });
     const subtitle = el("div", {
       className: "empty-subtitle",
-      text: platform.isMobile ? "Escolha uma pasta real do dispositivo para usá-la como workspace." : "Abra uma pasta para exibir os arquivos no Explorer."
+      text: platform.isMobile ? uiText("Escolha uma pasta real do dispositivo para usá-la como workspace.") : uiText("Abra uma pasta para exibir os arquivos no Explorer.")
     });
-    const open = el("button", { className: "primary ui-button ui-button-primary", text: platform.isMobile ? "Escolher pasta do dispositivo" : "Abrir pasta" });
+    const open = el("button", { className: "primary ui-button ui-button-primary", text: platform.isMobile ? uiText("Escolher pasta do dispositivo") : uiText("Abrir pasta") });
     open.addEventListener("click", () => void this.openFolderFromDialog());
     this.empty.append(title, subtitle, open);
     this.element.append(this.toolbar, this.location, this.tree, this.empty);
@@ -365,24 +366,24 @@ export class FileExplorer {
     const isOfficeDocument = /\.(?:docx?|odt|odf|rtf|xlsx?|xlsm|xlsb|ods|csv|tsv|pptx?|odp)$/i.test(node.entry.name) && !node.entry.directory;
     const isWorkspaceRoot = Boolean(this.root && samePath(node.entry.path, this.root));
     contextMenu([
-      { label: node.entry.directory ? "Abrir pasta" : "Abrir arquivo", action: () => void this.openNode(node) },
+      { label: node.entry.directory ? uiText("Abrir pasta") : uiText("Abrir arquivo"), action: () => void this.openNode(node) },
       {
-        label: "Abrir com Live Server",
+        label: uiText("Abrir com Live Server"),
         disabled: !isLiveServerSupported,
         action: () => void this.openLiveServer(node.entry.path)
       },
       {
-        label: "Editar no LibreOffice",
+        label: uiText("Editar no LibreOffice"),
         disabled: !isOfficeDocument || !platform.isDesktop,
-        action: () => void api.office.open(node.entry.path).then(() => this.updateStatus("Aberto no LibreOffice")).catch(error => reportError(error, this.updateStatus, "Não foi possível abrir no LibreOffice"))
+        action: () => void api.office.open(node.entry.path).then(() => this.updateStatus(uiText("Aberto no LibreOffice"))).catch(error => reportError(error, this.updateStatus, uiText("Não foi possível abrir no LibreOffice")))
       },
-      { label: "Novo arquivo", action: () => this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), "file") },
-      { label: "Nova pasta", action: () => this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), "folder") },
-      { label: "Renomear", disabled: isWorkspaceRoot, action: () => void this.rename(node.entry.path) },
-      { label: "Excluir", disabled: isWorkspaceRoot, danger: true, action: () => void this.delete(node.entry.path) },
-      { label: "Copiar caminho", action: () => this.copyToClipboard(node.entry.path) },
-      { label: "Copiar caminho relativo", action: () => this.copyToClipboard(this.root ? relativePath(this.root, node.entry.path) : node.entry.path) },
-      { label: "Atualizar", action: () => void this.refresh() }
+      { label: uiText("Novo arquivo"), action: () => this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), "file") },
+      { label: uiText("Nova pasta"), action: () => this.createIn(node.entry.directory ? node.entry.path : dirname(node.entry.path), "folder") },
+      { label: uiText("Renomear"), disabled: isWorkspaceRoot, action: () => void this.rename(node.entry.path) },
+      { label: uiText("Excluir"), disabled: isWorkspaceRoot, danger: true, action: () => void this.delete(node.entry.path) },
+      { label: uiText("Copiar caminho"), action: () => this.copyToClipboard(node.entry.path) },
+      { label: uiText("Copiar caminho relativo"), action: () => this.copyToClipboard(this.root ? relativePath(this.root, node.entry.path) : node.entry.path) },
+      { label: uiText("Atualizar"), action: () => void this.refresh() }
     ], x, y);
   }
 
@@ -395,14 +396,14 @@ export class FileExplorer {
   private createIn(baseDir: string | undefined, kind: CreateKind): void {
     if (this.disposed) return;
     if (!baseDir || !this.root) {
-      this.updateStatus("Abra uma pasta antes de criar arquivos ou pastas.");
+      this.updateStatus(uiText("Abra uma pasta antes de criar arquivos ou pastas."));
       return;
     }
     const node = this.nodes.get(baseDir);
     if (node?.entry.directory) {
       node.expanded = true;
       void this.loadChildren(baseDir, true).then(() => this.render()).catch(error => {
-        reportError(error, this.updateStatus, "Não foi possível preparar a pasta para criação");
+        reportError(error, this.updateStatus, uiText("Não foi possível preparar a pasta para criação"));
       });
     }
     this.pendingCreate = { workspace: this.root, baseDir, kind, value: "", creating: false };
@@ -420,10 +421,10 @@ export class FileExplorer {
       className: "tree-create-input",
       attrs: {
         value: pending.value,
-        placeholder: pending.kind === "folder" ? "Nova pasta" : "Novo arquivo",
+        placeholder: pending.kind === "folder" ? uiText("Nova pasta") : uiText("Novo arquivo"),
         autocomplete: "off",
         spellcheck: "false",
-        "aria-label": pending.kind === "folder" ? "Nome da nova pasta" : "Nome do novo arquivo"
+        "aria-label": pending.kind === "folder" ? uiText("Nome da nova pasta") : uiText("Nome do novo arquivo")
       }
     });
     if (pending.error) {
@@ -485,11 +486,11 @@ export class FileExplorer {
       await this.refresh();
       await this.revealFile(target);
       if (pending.kind === "file" && !this.disposed) this.onFileOpen(target);
-      this.updateStatus(pending.kind === "folder" ? "Pasta criada" : "Arquivo criado");
+      this.updateStatus(pending.kind === "folder" ? uiText("Pasta criada") : uiText("Arquivo criado"));
     } catch (error) {
       if (this.disposed) return;
       const detail = error instanceof Error ? error.message : String(error);
-      pending.error = detail || `Não foi possível criar ${pending.kind === "folder" ? "a pasta" : "o arquivo"}.`;
+      pending.error = detail || uiText("Não foi possível criar") + ` ${pending.kind === "folder" ? uiText("a pasta") : uiText("o arquivo")}.`;
       pending.creating = false;
       this.focusPendingCreateInput = true;
       this.render();
@@ -520,7 +521,7 @@ export class FileExplorer {
   private async rename(filePath: string): Promise<void> {
     if (this.disposed) return;
     if (!this.root || samePath(filePath, this.root)) return;
-    const name = await showInputDialog("Novo nome", basename(filePath));
+    const name = await showInputDialog(uiText("Novo nome"), basename(filePath));
     if (!name?.trim() || name === basename(filePath)) return;
     try {
       const target = this.workspaceTarget(dirname(filePath), name);
@@ -530,10 +531,10 @@ export class FileExplorer {
         this.selectedPath = joinPath(target, relativePath(filePath, this.selectedPath));
       }
       await this.refresh();
-      this.updateStatus("Item renomeado");
+      this.updateStatus(uiText("Item renomeado"));
     } catch (error) {
       if (this.disposed) return;
-      reportError(error, this.updateStatus, "Não foi possível renomear");
+      reportError(error, this.updateStatus, uiText("Não foi possível renomear"));
     }
   }
 
@@ -553,7 +554,7 @@ export class FileExplorer {
   private async deleteSelected(): Promise<void> {
     const selected = this.selectedPath;
     if (!selected || !this.root || samePath(selected, this.root)) {
-      this.updateStatus("Selecione um arquivo ou pasta para excluir.");
+      this.updateStatus(uiText("Selecione um arquivo ou pasta para excluir."));
       return;
     }
     await this.delete(selected);
@@ -562,14 +563,14 @@ export class FileExplorer {
   private showDeleteDialog(filePath: string): void {
     this.closeDeleteDialog();
     const overlay = el("div", { className: "file-delete-overlay" });
-    const dialog = el("form", { className: "file-delete-dialog", attrs: { "aria-label": "Confirmar exclusão" } });
-    const title = el("h2", { text: `Excluir ${basename(filePath)}?` });
-    const description = el("p", { text: "Esta ação removerá o item do disco." });
+    const dialog = el("form", { className: "file-delete-dialog", attrs: { "aria-label": uiText("Confirmar exclusão") } });
+    const title = el("h2", { text: `${uiText("Excluir")} ${basename(filePath)}?` });
+    const description = el("p", { text: uiText("Esta ação removerá o item do disco.") });
     const remember = el("input", { attrs: { type: "checkbox" } }) as HTMLInputElement;
-    const rememberLabel = el("label", { className: "file-delete-remember", children: [remember, " Não perguntar novamente"] });
+    const rememberLabel = el("label", { className: "file-delete-remember", children: [remember, ` ${uiText("Não perguntar novamente")}`] });
     const error = el("div", { className: "file-delete-error", attrs: { role: "alert", "aria-live": "polite" } });
-    const cancel = el("button", { className: "secondary ui-button", text: "Cancelar", attrs: { type: "button" } });
-    const submit = el("button", { className: "danger ui-button ui-button-danger", text: "Excluir", attrs: { type: "button" } });
+    const cancel = el("button", { className: "secondary ui-button", text: uiText("Cancelar"), attrs: { type: "button" } });
+    const submit = el("button", { className: "danger ui-button ui-button-danger", text: uiText("Excluir"), attrs: { type: "button" } });
     const actions = el("div", { className: "file-delete-actions", children: [cancel, submit] });
     dialog.append(title, description, rememberLabel, error, actions);
     overlay.append(dialog);
@@ -596,7 +597,7 @@ export class FileExplorer {
           try {
             await this.setConfirmDelete(false);
           } catch (preferenceError) {
-            reportError(preferenceError, this.updateStatus, "O item foi excluído, mas não foi possível salvar a preferência de confirmação");
+            reportError(preferenceError, this.updateStatus, uiText("O item foi excluído, mas não foi possível salvar a preferência de confirmação"));
           }
         })
         .catch(errorValue => {
@@ -624,10 +625,10 @@ export class FileExplorer {
       if (this.disposed) return;
       if (this.selectedPath && isSubPath(filePath, this.selectedPath)) this.selectedPath = parent;
       await this.refresh();
-      this.updateStatus("Item excluído");
+      this.updateStatus(uiText("Item excluído"));
     } catch (error) {
       if (this.disposed) return;
-      reportError(error, this.updateStatus, "Não foi possível excluir");
+      reportError(error, this.updateStatus, uiText("Não foi possível excluir"));
       throw error;
     }
   }
@@ -649,7 +650,7 @@ export class FileExplorer {
       this.updateStatus(result.output);
     } catch (error) {
       if (this.disposed) return;
-      reportError(error, this.updateStatus, "Não foi possível abrir com Live Server");
+      reportError(error, this.updateStatus, uiText("Não foi possível abrir com Live Server"));
     }
   }
 
@@ -686,22 +687,22 @@ export class FileExplorer {
     if (this.disposed) return;
     void navigator.clipboard.writeText(text).catch(error => {
       if (this.disposed) return;
-      reportError(error, this.updateStatus, "Não foi possível copiar o caminho");
+      reportError(error, this.updateStatus, uiText("Não foi possível copiar o caminho"));
     });
   }
 
   private workspaceTarget(baseDir: string, rawName: string): string {
     const value = rawName.trim().replace(/\\/g, "/");
-    if (!value || value.startsWith("/") || /^[A-Za-z]:\//.test(value)) throw new Error("Informe um caminho relativo válido.");
+    if (!value || value.startsWith("/") || /^[A-Za-z]:\//.test(value)) throw new Error(uiText("Informe um caminho relativo válido."));
     const segments = value.split("/");
     if (segments.some(segment => !segment || segment === "." || segment === "..")) {
-      throw new Error("O caminho não pode conter segmentos vazios, '.' ou '..'.");
+      throw new Error(uiText("O caminho não pode conter segmentos vazios, '.' ou '..'."));
     }
     if (segments.some(segment => /[<>:"|?*\u0000-\u001F]/.test(segment))) {
-      throw new Error("O nome contém caracteres inválidos.");
+      throw new Error(uiText("O nome contém caracteres inválidos."));
     }
     const target = joinPath(baseDir, ...segments);
-    if (!this.root || !isSubPath(this.root, target)) throw new Error("O item deve permanecer dentro do workspace aberto.");
+    if (!this.root || !isSubPath(this.root, target)) throw new Error(uiText("O item deve permanecer dentro do workspace aberto."));
     return target;
   }
 

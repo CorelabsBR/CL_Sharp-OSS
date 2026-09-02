@@ -90,8 +90,10 @@ export class TerminalPanel {
     this.renderShellOptions();
   }
 
-  newTerminal(): void {
-    void this.startTerminalCreation();
+  newTerminal(focus = true): void {
+    void this.startTerminalCreation().then(() => {
+      if (focus && !this.disposed) this.focusCurrentTerminal();
+    });
   }
 
   async ensureTerminal(): Promise<void> {

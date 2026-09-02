@@ -303,7 +303,7 @@ function createApplicationMenu(): void {
         { label: "Reabrir Editor Fechado", accelerator: "CmdOrCtrl+Shift+T", click: () => sendCommand("file:reopenClosed") },
         { label: "Fechar Todos os Editores", accelerator: "CmdOrCtrl+Shift+W", click: () => sendCommand("file:closeAll") },
         { type: "separator" },
-        { label: "Abrir pasta...", click: () => sendCommand("workspace:openFolder") },
+        { label: "Abrir Pasta...", click: () => sendCommand("workspace:openFolder") },
         { type: "separator" },
         { role: "quit", label: "Sair" }
       ]
@@ -345,7 +345,7 @@ function createApplicationMenu(): void {
         { label: "Alternar painel", accelerator: "CmdOrCtrl+J", click: () => sendCommand("view:terminal") },
         { label: "Problemas", accelerator: "CmdOrCtrl+Shift+M", click: () => sendCommand("view:problems") },
         { label: "Saída", accelerator: "CmdOrCtrl+Shift+U", click: () => sendCommand("view:output") },
-        { label: "Atalhos de teclado", click: () => sendCommand("view:keyboardShortcuts") },
+        { label: "Atalhos de Teclado", click: () => sendCommand("view:keyboardShortcuts") },
         { label: "Extensões", accelerator: "CmdOrCtrl+Shift+X", click: () => sendCommand("view:extensions") },
         { type: "separator" },
         { role: "zoomIn", label: "Ampliar" },

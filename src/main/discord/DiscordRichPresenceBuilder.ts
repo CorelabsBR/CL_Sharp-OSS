@@ -3,7 +3,8 @@
 - Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import path from "node:path";
-import type { DiscordPresenceContext, DiscordRichPresenceSettings } from "../../shared/types";
+import type { DiscordPresenceContext } from "../../shared/types";
+import { DISCORD_ACTIVITY_BRANDING } from "./DiscordRichPresenceConfig";
 
 export interface DiscordActivity {
   details: string;
@@ -28,33 +29,31 @@ const REMOTE_STATUS: Record<string, string> = {
   disconnecting: "Desconectando do Remote Host"
 };
 
-export function buildDiscordActivity(settings: DiscordRichPresenceSettings, context: DiscordPresenceContext, startedAt: Date): DiscordActivity {
+export function buildDiscordActivity(context: DiscordPresenceContext, startedAt: Date): DiscordActivity {
   const fileName = context.filePath ? path.basename(context.filePath) : "";
   const projectName = context.workspaceName || (context.workspacePath ? path.basename(context.workspacePath) : "");
-  let details = settings.showFileName && fileName ? `Editando ${fileName}` : "Desenvolvendo no Sharp-OSS";
-  if (context.running) details = fileName && settings.showFileName ? `Executando ${fileName}` : "Executando projeto";
+  let details = fileName ? `Editando ${fileName}` : "Desenvolvendo no Sharp-OSS";
+  if (context.running) details = fileName ? `Executando ${fileName}` : "Executando projeto";
   else if (context.terminalActive) details = "Usando o terminal integrado";
   else if (context.remoteStatus && context.remoteStatus !== "connected") details = REMOTE_STATUS[context.remoteStatus] || "Conectando ao Remote Host";
 
   const parts: string[] = [];
-  if (settings.showProjectName && projectName) parts.push(`Projeto: ${projectName}`);
-  if (settings.showLanguage && context.language) parts.push(context.language);
-  if (settings.showRemoteHost && context.remoteHost) parts.push(`Host: ${context.remoteHost}`);
-  if (settings.showWorkspaceType) parts.push(context.remoteHost ? "Remoto" : "Local");
+  if (projectName) parts.push(`Projeto: ${projectName}`);
+  if (context.language) parts.push(context.language);
+  if (context.remoteHost) parts.push(`Host: ${context.remoteHost}`);
+  parts.push(context.remoteHost ? "Remoto" : "Local");
 
   const remote = Boolean(context.remoteHost || (context.remoteStatus && context.remoteStatus !== "disconnected"));
   return {
     details: clean(details),
     state: clean(parts.join(" • ") || "IDE em execução"),
-    startTimestamp: settings.showElapsedTime ? startedAt : undefined,
-    largeImageKey: optional(settings.largeImageKey), largeImageText: optional(settings.largeImageText),
-    smallImageKey: settings.showWorkspaceType ? optional(remote ? settings.remoteSmallImageKey : settings.localSmallImageKey) : undefined,
-    smallImageText: settings.showWorkspaceType ? optional(remote ? settings.remoteSmallImageText : settings.localSmallImageText) : undefined,
-    buttons: (settings.buttons ?? []).filter(button => button.label.trim() && isHttpsUrl(button.url)).slice(0, 2).map(button => ({ label: clean(button.label), url: button.url.trim() })),
+    startTimestamp: startedAt,
+    largeImageKey: DISCORD_ACTIVITY_BRANDING.largeImageKey,
+    largeImageText: DISCORD_ACTIVITY_BRANDING.largeImageText,
+    smallImageKey: remote ? DISCORD_ACTIVITY_BRANDING.remoteSmallImageKey : DISCORD_ACTIVITY_BRANDING.localSmallImageKey,
+    smallImageText: remote ? DISCORD_ACTIVITY_BRANDING.remoteSmallImageText : DISCORD_ACTIVITY_BRANDING.localSmallImageText,
     instance: false
   };
 }
 
 function clean(value: string): string { return value.replace(/[\r\n]+/g, " ").trim().slice(0, 128); }
-function optional(value?: string): string | undefined { const result = value?.trim(); return result || undefined; }
-function isHttpsUrl(value: string): boolean { try { return new URL(value).protocol === "https:"; } catch { return false; } }

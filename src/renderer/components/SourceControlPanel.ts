@@ -55,7 +55,7 @@ export class SourceControlPanel {
 
   async runOnFirstRepo(args: string[]): Promise<void> {
     if (!platform.canUseGit) {
-      this.updateStatus(platform.isMobile ? "Git requer Android e um workspace salvo na área do Sharp-OSS." : "Git local nao esta disponivel neste modo.");
+      this.updateStatus(platform.isMobile ? uiText("Git requer Android e um workspace salvo na área do Sharp-OSS.") : uiText("Git local não está disponível neste modo."));
       return;
     }
     const repo = this.repos[0];
@@ -84,13 +84,13 @@ export class SourceControlPanel {
     const refresh = buttonIcon("refresh", uiText("Atualizar"), () => void this.refresh());
     const stageAll = buttonIcon("add", uiText("Preparar tudo"), () => void this.stageAll());
     const unstageAll = buttonIcon("remove", uiText("Remover tudo da preparação"), () => void this.unstageAll());
-    const commit = buttonIcon("check", "Commit", () => void this.commitAll());
+    const commit = buttonIcon("check", uiText("Commit"), () => void this.commitAll());
     commit.classList.add("scm-commit-action");
-    const pull = buttonIcon("repo-pull", "Pull", () => void this.runOnFirstRepo(["pull"]));
-    const push = buttonIcon("repo-push", "Push", () => void this.runOnFirstRepo(["push"]));
-    const fetch = buttonIcon("repo-fetch", "Fetch", () => void this.runOnFirstRepo(["fetch"]));
-    const stash = buttonIcon("archive", "Stash", () => void this.runOnFirstRepo(["stash", "push"]));
-    const stashPop = buttonIcon("restore", "Stash pop", () => void this.runOnFirstRepo(["stash", "pop"]));
+    const pull = buttonIcon("repo-pull", uiText("Pull"), () => void this.runOnFirstRepo(["pull"]));
+    const push = buttonIcon("repo-push", uiText("Push"), () => void this.runOnFirstRepo(["push"]));
+    const fetch = buttonIcon("repo-fetch", uiText("Fetch"), () => void this.runOnFirstRepo(["fetch"]));
+    const stash = buttonIcon("archive", uiText("Stash"), () => void this.runOnFirstRepo(["stash", "push"]));
+    const stashPop = buttonIcon("restore", uiText("Stash pop"), () => void this.runOnFirstRepo(["stash", "pop"]));
     this.gitActions.push(stageAll, unstageAll, commit, pull, push, fetch, stash, stashPop);
     toolbar.append(refresh, stageAll, unstageAll, pull, push, fetch, stash, stashPop);
     this.commitInput.addEventListener("keydown", event => {
@@ -99,7 +99,7 @@ export class SourceControlPanel {
     const allowEmptyRow = el("label", { className: "check-row" });
     allowEmptyRow.append(this.allowEmpty, el("span", { text: uiText("Permitir commit vazio") }));
     const amendRow = el("label", { className: "check-row" });
-    amendRow.append(this.amend, el("span", { text: "Amend" }));
+    amendRow.append(this.amend, el("span", { text: uiText("Amend") }));
     const compose = el("section", { className: "scm-compose", attrs: { "aria-label": uiText("Criar commit") } });
     const commitRow = el("div", { className: "scm-commit-row" });
     commitRow.append(this.commitInput, commit);
@@ -126,7 +126,7 @@ export class SourceControlPanel {
         el("span", { text: repo.ahead || repo.behind ? `↑${repo.ahead} ↓${repo.behind}` : "" }),
         buttonIcon("git-branch", uiText("Branch"), () => void this.chooseBranch(repo)),
         buttonIcon("trash", uiText("Excluir branch"), () => void this.deleteBranch(repo)),
-        buttonIcon("history", "History", () => void this.showHistory(repo))
+        buttonIcon("history", uiText("History"), () => void this.showHistory(repo))
       );
       repoBlock.append(header);
       if (repo.clean) repoBlock.append(el("div", { className: "muted-row scm-clean", text: uiText("Árvore de trabalho limpa") }));
@@ -149,18 +149,18 @@ export class SourceControlPanel {
     this.repos = [];
     this.applyCapabilityState();
     this.summary.textContent = platform.isMobile
-      ? "Controle de código-fonte mobile em modo limitado."
-      : "Controle de código-fonte limitado no modo web.";
+      ? uiText("Controle de código-fonte mobile em modo limitado.")
+      : uiText("Controle de código-fonte limitado no modo web.");
     this.list.replaceChildren(
       el("div", {
         className: "muted-row",
         text: platform.isMobile
-          ? "Git completo depende de um backend nativo futuro. Commit, push, pull, stage e discard ficam desabilitados."
-          : "Git completo depende do backend Electron/Node."
+          ? uiText("Git completo depende de um backend nativo futuro. Commit, push, pull, stage e discard ficam desabilitados.")
+          : uiText("Git completo depende do backend Electron/Node.")
       })
     );
     if (this.workspace) {
-      this.list.append(el("div", { className: "muted-row", text: `Workspace local: ${this.workspace}` }));
+      this.list.append(el("div", { className: "muted-row", text: uiText("Workspace local: {workspace}").replace("{workspace}", this.workspace) }));
     }
   }
 
@@ -258,7 +258,7 @@ export class SourceControlPanel {
 
   private async runOperation(label: string, operation: () => Promise<{ success: boolean; output: string }>): Promise<void> {
     if (this.busy) {
-      this.updateStatus("Já existe uma operação Git em andamento.");
+      this.updateStatus(uiText("Já existe uma operação Git em andamento."));
       return;
     }
     this.busy = true;
@@ -279,13 +279,13 @@ export class SourceControlPanel {
     try {
       if (this.openDiffEditor) {
         const content = await api.git.diffContent(repo.repo, file, file.staged);
-        this.openDiffEditor(`${file.path} (${file.staged ? "Staged" : "Changes"})`, `git-diff:${repo.repo}:${file.path}:${file.staged}`, file.path, content);
+        this.openDiffEditor(`${file.path} (${file.staged ? uiText("Preparadas") : uiText("Alterações")})`, `git-diff:${repo.repo}:${file.path}:${file.staged}`, file.path, content);
         return;
       }
       const diff = await api.git.diff(repo.repo, file, file.staged);
       this.openVirtualFile(`${file.path}.diff`, `git:${repo.repo}:${file.path}:${file.staged}`, diff || uiText("Nenhuma diferença disponível"));
     } catch (error) {
-      reportError(error, this.updateStatus, `Git diff failed (${file.path})`);
+      reportError(error, this.updateStatus, uiText("Git diff falhou") + ` (${file.path})`);
     }
   }
 
@@ -295,12 +295,12 @@ export class SourceControlPanel {
   }
 
   private async chooseBranch(repo: GitRepositoryStatus): Promise<void> {
-    const next = await showInputDialog(`Branch para ${repo.name}`, repo.branch, { placeholder: `Existentes: ${repo.branches.join(", ")}` });
+    const next = await showInputDialog(uiText("Branch para {repo}").replace("{repo}", repo.name), repo.branch, { placeholder: uiText("Existentes: {branches}").replace("{branches}", repo.branches.join(", ")) });
     if (!next?.trim() || next.trim() === repo.branch) return;
     const branch = next.trim();
     const result = repo.branches.includes(branch)
       ? await api.git.checkout(repo.repo, branch)
-      : confirm(`Create branch "${branch}" from ${repo.branch}?`)
+      : confirm(uiText("Criar branch \"{branch}\" a partir de {base}? ").replace("{branch}", branch).replace("{base}", repo.branch))
         ? await api.git.createBranch(repo.repo, branch)
         : { success: false, output: uiText("Operação de branch cancelada") };
     this.updateStatus(result.output || (result.success ? uiText("Operação de branch concluída") : uiText("Falha na operação de branch")));
@@ -313,8 +313,8 @@ export class SourceControlPanel {
       this.updateStatus(branch === repo.branch ? uiText("Não é possível excluir a branch atual.") : uiText("Branch inválida."));
       return;
     }
-    if (!confirm(`Excluir a branch local "${branch}"?`)) return;
-    await this.runOperation("Excluindo branch...", () => api.git.run(repo.repo, ["branch", "-d", branch]));
+    if (!confirm(uiText("Excluir a branch local \"{branch}\"?").replace("{branch}", branch))) return;
+    await this.runOperation(uiText("Excluindo branch..."), () => api.git.run(repo.repo, ["branch", "-d", branch]));
   }
 
   private async resolveConflict(repo: GitRepositoryStatus, file: GitFileStatus): Promise<void> {
@@ -322,7 +322,7 @@ export class SourceControlPanel {
       await this.showDiff(repo, file);
       return;
     }
-    const choice = (await showInputDialog(`Resolver conflito em ${file.path}`, "manual", { placeholder: "current, incoming ou manual" }))?.trim().toLowerCase();
+    const choice = (await showInputDialog(uiText("Resolver conflito em {path}").replace("{path}", file.path), "manual", { placeholder: uiText("current, incoming ou manual") }))?.trim().toLowerCase();
     if (!choice || choice === "manual") {
       await this.showDiff(repo, file);
       return;

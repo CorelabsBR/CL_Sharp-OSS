@@ -111,7 +111,7 @@ export class RemotePanel {
   private async testHost(host: RemoteHostConfig): Promise<void> {
     const password = host.authMethod === "password" ? await showInputDialog(`Senha para ${host.username}@${host.host}`, "", { password: true }) ?? "" : undefined;
     const result = await this.testAndTrust(host, password);
-    this.updateStatus(result.output || (result.success ? "Host remoto conectado" : "Falha no teste do host remoto"));
+    this.updateStatus(result.output || (result.success ? "Host Remoto conectado" : "Falha no teste do Host Remoto"));
   }
 
   private async promptHost(existing?: RemoteHostConfig): Promise<RemoteHostConfig | undefined> {
@@ -149,7 +149,7 @@ export class RemotePanel {
       }
       const tested = await this.testAndTrust(host, this.password || undefined);
       if (!tested.success) {
-        this.updateStatus(tested.output || "Falha ao conectar ao host remoto");
+        this.updateStatus(tested.output || "Falha ao conectar ao Host Remoto");
         return;
       }
       const session = await api.remote.connect(host.id!, this.password || undefined);
@@ -184,8 +184,8 @@ export class RemotePanel {
       if (!this.sessionId) { resolve(undefined); return; }
       const sessionId = this.sessionId;
       const overlay = el("div", { className: "runtime-config-overlay remote-folder-overlay", attrs: { tabindex: "-1" } });
-      const dialog = el("section", { className: "remote-folder-dialog", attrs: { role: "dialog", "aria-modal": "true", "aria-label": "Abrir pasta remota" } });
-      const title = el("div", { className: "remote-folder-title", children: [el("h2", { text: "Abrir pasta no host remoto" }), el("span", { text: this.active ? `${this.active.username}@${this.active.host}` : "Remote Host" })] });
+      const dialog = el("section", { className: "remote-folder-dialog", attrs: { role: "dialog", "aria-modal": "true", "aria-label": "Abrir Pasta remota" } });
+      const title = el("div", { className: "remote-folder-title", children: [el("h2", { text: "Abrir Pasta no Host Remoto" }), el("span", { text: this.active ? `${this.active.username}@${this.active.host}` : "Remote Host" })] });
       const input = el("input", { className: "panel-input remote-folder-input", attrs: { value: `${initialPath.replace(/\/$/, "") || "/"}/`, placeholder: "/home/usuário/projeto", autocomplete: "off", spellcheck: "false" } });
       const status = el("div", { className: "remote-folder-status", text: "Digite um caminho ou escolha uma pasta abaixo." });
       const list = el("div", { className: "remote-folder-list" });

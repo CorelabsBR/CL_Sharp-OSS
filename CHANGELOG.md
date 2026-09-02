@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.4.1 - 2026-09-01
+
+Type: Fix
+
+Description:
+- Corrige o comando de sugestões do editor ao registrar explicitamente o SuggestController do Monaco 0.56 e evita disparar comandos inexistentes quando uma contribuição não está disponível.
+- Adiciona confirmação persistente e acessível ao salvar configurações, com estados "Salvando" e "Salvo", além de hover, foco e contraste reforçados em todos os temas.
+- Corrige o botão de atualização para sempre responder ao clique, iniciar o download quando houver uma versão disponível e compartilhar a mesma ação funcional com o menu Gerenciar.
+- Corrige a ação "Novo terminal" para sempre criar uma nova sessão, inclusive após alternar para o painel Remote Host, e aplica o foco quando a criação assíncrona termina.
+- Corrige o upload de artefatos para a CDN ao enviar o nome do arquivo no campo multipart obrigatório `filename`, evitando a resposta HTTP 400 em Windows, Linux e Android.
+- Configura a etapa final da release com `CDN_FINALIZE_URL`, alinhando o workflow ao endpoint de finalização exigido pelo cliente de CDN.
+- Corrige os textos remanescentes do Git, Explorer e Search que ainda não passavam pelo sistema de i18n, garantindo que a interface inteira siga o locale ativo em desktop, web e mobile.
+- Completa o catálogo de traduções para os estados limitados do Source Control e inclui entradas faltantes para histórico, amend, workspace local e mensagens de bloqueio do Git.
+- Mantém a UI consistente em todos os idiomas suportados e evita que rótulos e status voltem para strings hardcoded em português.
+
 ## 1.4.0 - 2026-08-26
 
 Type: Feature / Refactor / Fix
@@ -254,7 +269,7 @@ Type: Feature
 
 Description:
 - Substitui o workspace virtual do Android pelo seletor nativo de pastas (Storage Access Framework), com permissão persistente para ler e gravar diretamente no local escolhido pelo usuário.
-- Exibe no Explorer a localização da pasta escolhida e restaura o nome e a URI do workspace ao reabrir o aplicativo.
+- Exibe no Explorer a localização da pasta escolhida e restaura o nome e a URI do workspace ao re o aplicativo.
 
 ## 26.8.36 - 2026-07-28
 
@@ -527,7 +542,7 @@ Description:
 Type: Fix
 
 Description:
-- Adiciona abertura universal de arquivos: inspetor hexadecimal/ASCII para binários, visualizadores de mídia e PDF, índice de ZIP/JAR/APK/VSIX e leitura estruturada de NBT (inclusive comprimido). Arquivos desconhecidos deixam de abrir em um diálogo sem utilidade.
+- Adiciona abertura universal de arquivos: inspetor hexadecimal/ASCII para binários, visualizadores de mídia e PDF, índice de ZIP/JAR/APK/VSIX e leitura estruturada de NBT (inclusive comprimido). Arquivos desconhecidos deixam de  em um diálogo sem utilidade.
 
 - Torna a barra de status útil: mostra branch Git, último autor do arquivo, linguagem, fim de linha, codificação e posição do cursor. A codificação pode ser alterada entre UTF-8 e UTF-8 com BOM diretamente pela barra e é preservada ao salvar.
 
@@ -549,14 +564,14 @@ Description:
 - Conclui a tradução para português do Brasil dos textos visíveis restantes em Controle de Código-Fonte, Host Remoto, Terminal, Runtimes, Extensões, menus e paleta de comandos.
 - Carrega explicitamente a contribuição Find do Monaco e executa a ação `actions.find` na instância ativa para corrigir Ctrl+F/Cmd+F.
 - Exibe Configurações em uma janela modal própria, organiza o painel de Problemas e permite criar arquivos e pastas aninhados pelo caminho relativo informado.
-- Cria novos projetos em uma pasta escolhida, inicializa `.sharp` e executa `git init` antes de abrir o workspace.
+- Cria novos projetos em uma pasta escolhida, inicializa `.sharp` e executa `git init` antes de  o workspace.
 
 ## 26.6.5 - 2026-07-27
 
 Type: Fix
 
 Description:
-- Corrige a pesquisa rápida da barra superior para indexar e abrir arquivos reais do workspace, com filtro progressivo por nome ou caminho e exclusão de diretórios de dependências e build.
+- Corrige a pesquisa rápida da barra superior para indexar e  arquivos reais do workspace, com filtro progressivo por nome ou caminho e exclusão de diretórios de dependências e build.
 - Corrige a abertura da busca do Monaco no arquivo ativo e torna as operações da árvore de arquivos seguras, persistentes e sincronizadas com o filesystem.
 - Traduz os menus principais, a barra de título e o painel de pesquisa para português do Brasil.
 
@@ -595,7 +610,7 @@ Description:
 Type: Feature
 
 Description:
-- Adiciona resolucao centralizada de arquivos por conteudo e extensao, evitando abrir imagens no Monaco e avisando antes de abrir binarios como texto.
+- Adiciona resolucao centralizada de arquivos por conteudo e extensao, evitando  imagens no Monaco e avisando antes de  binarios como texto.
 - Adiciona Image Viewer em abas com zoom por roda/Ctrl+roda, arraste, ajuste a janela, tamanho real, fundo de transparencia e metadados do arquivo.
 - Adiciona decodificacao textual com fallback UTF-8, UTF-16 e Latin-1 e persistencia da opcao de nao perguntar novamente por tipo binario.
 

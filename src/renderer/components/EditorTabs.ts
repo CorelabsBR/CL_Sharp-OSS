@@ -219,7 +219,9 @@ export class EditorTabs {
     const linePrefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
     const typedPrefix = typedSnippetPrefix(linePrefix);
     if (!typedPrefix || !matchingSnippets(model.getLanguageId(), typedPrefix).length) return;
-    this.editor.trigger("snippets", "editor.action.triggerSuggest", {});
+    const action = this.editor.getAction("editor.action.triggerSuggest");
+    if (!action) return;
+    void action.run().catch(error => reportError(error, this.onStatus, "Não foi possível abrir as sugestões"));
   }
 
   private insertSnippet(template: string): void {
@@ -872,15 +874,24 @@ export class EditorTabs {
   }
 
   private runEditorAction(actionId: string, status?: string, fallback?: () => void): void {
+    if (this.disposed || !this.editor.getModel()) {
+      this.onStatus("Abra um arquivo para executar esta ação");
+      return;
+    }
     this.editor.focus();
     const action = this.editor.getAction(actionId);
-    if (action) {
-      void action.run();
-    } else {
-      this.editor.trigger("keyboard", actionId, null);
-      fallback?.();
+    if (!action) {
+      if (fallback) {
+        fallback();
+        if (status) this.onStatus(status);
+      } else {
+        this.onStatus(`Ação do editor indisponível: ${actionId}`);
+      }
+      return;
     }
-    if (status) this.onStatus(status);
+    void action.run()
+      .then(() => { if (status) this.onStatus(status); })
+      .catch(error => reportError(error, this.onStatus, "Falha ao executar a ação do editor"));
   }
 
   private commentSelectedLines(add: boolean): void {

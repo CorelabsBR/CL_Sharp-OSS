@@ -13,12 +13,13 @@ const config = JSON.parse(await fs.readFile(configPath, "utf8"));
 
 validateConfig(config);
 
-const { application, npm, electronBuilder, mobile, android } = config;
+const { desktopName, application, npm, electronBuilder, mobile, android } = config;
 const packagePath = path.join(root, "package.json");
 const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
 
 Object.assign(packageJson, {
   name: application.packageName,
+  desktopName: desktopName || application.displayName,
   version: application.version,
   description: application.description,
   main: npm.main,

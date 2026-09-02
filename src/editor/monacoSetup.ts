@@ -11,6 +11,9 @@ import "monaco-editor/features/codicon/register.js";
 import "monaco-editor/features/find/register.js";
 import "monaco-editor/features/snippet/register.js";
 import "monaco-editor/features/suggest/register.js";
+// Monaco 0.56's suggest feature entrypoint only registers inline completions;
+// the controller below owns the suggest widget and editor.action.triggerSuggest.
+import "monaco-editor/editor/contrib/suggest/browser/suggestController.js";
 import { emmetAbbreviationAt, emmetLanguageConfig, htmlAbbreviationAt, isLikelyHtmlAbbreviation } from "./emmet";
 import { matchingSnippets, registerSnippetSource, typedSnippetPrefix } from "./snippets";
 import editorWorker from "monaco-editor/editor/editor.worker.js?worker";
