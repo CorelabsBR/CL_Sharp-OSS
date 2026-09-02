@@ -15,6 +15,7 @@
     "config:sync": "node scripts/sync-project-config.mjs",
     "clean": "node scripts/clean.mjs",
     "dev": "npm run config:sync && node scripts/dev.mjs",
+    "dev1": "npm run config:sync && node scripts/dev1.mjs",
     "dev:renderer": "npm run config:sync && vite",
     "build:renderer": "npm run config:sync && vite build",
     "build:electron": "npm run config:sync && tsc -p tsconfig.electron.json",

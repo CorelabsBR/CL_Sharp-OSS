@@ -5,6 +5,7 @@
 import { isSafeCustomShortcut, normalizeShortcut, shortcutFromEvent, type ShortcutBinding } from "../shortcuts/keybindings";
 import { shortcutConflicts } from "../shortcuts/shortcutRegistry";
 import { el } from "../utils/dom";
+import { uiText } from "../../shared/i18n";
 
 const CATEGORY_ORDER = ["Arquivo", "Busca", "Editor", "Visualizar", "Terminal", "Executar", "Controle de Origem", "Preferências", "Sharp-OSS"];
 
@@ -30,7 +31,7 @@ export class KeyboardShortcutsModal {
     const dialog = el("section", { className: "keyboard-shortcuts-modal", attrs: { "aria-label": "Atalhos de teclado" } });
     const header = el("header", { className: "keyboard-shortcuts-header" });
     const title = el("div", { className: "keyboard-shortcuts-title" });
-    title.append(el("h2", { text: "Atalhos de teclado" }), el("span", { text: `${shortcuts.length} atalhos` }));
+    title.append(el("h2", { text: "Atalhos de teclado" }), el("span", { text: uiText("{count} atalhos").replace("{count}", String(shortcuts.length)) }));
     const add = el("button", { className: "secondary", text: "Adicionar atalho", attrs: { type: "button" } });
     const close = el("button", { className: "icon-button", text: "×", attrs: { title: "Fechar" } });
     close.addEventListener("click", () => this.close());
@@ -46,7 +47,7 @@ export class KeyboardShortcutsModal {
     const search = el("input", { className: "panel-input", attrs: { placeholder: "Pesquisar por comando, categoria ou teclas" } });
     const conflictSummary = el("div", {
       className: "panel-summary",
-      text: conflicts.size ? `${conflicts.size} conflito(s) de atalho detectado(s)` : "Nenhum conflito de atalho"
+      text: conflicts.size ? uiText("{count} conflito(s) de atalho detectado(s)").replace("{count}", String(conflicts.size)) : "Nenhum conflito de atalho"
     });
     const list = el("div", { className: "keyboard-shortcuts-list" });
 
@@ -129,7 +130,7 @@ export class KeyboardShortcutsModal {
     for (const shortcut of commands) {
       const option = document.createElement("option");
       option.value = shortcut.commandId ?? shortcut.id;
-      option.textContent = shortcut.label;
+      option.textContent = uiText(shortcut.label);
       command.append(option);
     }
     const key = el("input", { className: "panel-input", attrs: { placeholder: "Ex.: Ctrl+Alt+K", "aria-label": "Novo atalho" } }) as HTMLInputElement;

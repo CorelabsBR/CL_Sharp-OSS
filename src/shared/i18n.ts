@@ -1980,6 +1980,44 @@ const TRANSLATIONS: Partial<
   "zh-CN": ZH_CN,
 };
 
+/*
+ * The English catalog is the safe fallback for a non-Portuguese locale.  A
+ * partial catalog must never make the UI silently revert to Portuguese.
+ */
+const EN_US_FALLBACK: Record<string, string> = {
+  "Adicionar atalho": "Add Shortcut",
+  "Pesquisar por comando, categoria ou teclas": "Search by command, category, or keys",
+  "Nenhum conflito de atalho": "No shortcut conflicts",
+  "Nenhum atalho encontrado.": "No shortcuts found.",
+  "Remover atalho personalizado": "Remove custom shortcut",
+  "Use Ctrl, Alt ou Shift (ou uma tecla F1–F12).": "Use Ctrl, Alt, or Shift (or an F1–F12 key).",
+  "Não foi possível salvar: {message}": "Could not save: {message}",
+  "Não foi possível remover o atalho: {message}": "Could not remove the shortcut: {message}",
+  "{count} atalhos": "{count} shortcuts",
+  "{count} conflito(s) de atalho detectado(s)": "{count} shortcut conflict(s) detected",
+  "personalizado": "custom",
+  "Processo encerrado": "Process terminated",
+  "Processo do terminal encerrado": "Terminal process terminated",
+  "Terminal indisponível neste ambiente": "Terminal unavailable in this environment",
+  "Terminal desativado nas configurações.": "Terminal disabled in settings.",
+  "Entrada do programa": "Program input",
+  "Entrada do programa — digite e pressione Enter": "Program input — type and press Enter",
+  "Comando": "Command",
+  "Use o painel Problems na Activity Bar para ver diagnósticos e navegar até os arquivos.": "Use the Problems panel in the Activity Bar to view diagnostics and navigate to files.",
+  "[Output] Canal de saída ativo.": "[Output] Output channel active.",
+  "[Ports] Nenhuma porta encaminhada.": "[Ports] No forwarded ports.",
+  "[Git] Use o painel Source Control para branch, stage e commit.": "[Git] Use the Source Control panel for branches, staging, and commits.",
+  "[Git] Git nativo ainda não está disponível neste ambiente.": "[Git] Native Git is not available in this environment yet.",
+  "Nenhum processo ativo para encerrar.": "No active process to terminate.",
+  "Encerrando processo...": "Terminating process...",
+  "Processo finalizado com código {code}{suffix}.": "Process finished with code {code}{suffix}.",
+  "Shell selecionado: {shell}": "Shell selected: {shell}",
+  "Terminal remoto aberto em {host}": "Remote terminal opened on {host}",
+  "{name} aberto com {shell}": "{name} opened with {shell}",
+  "O terminal Node real não está disponível no mobile. Use este painel como saída e registro de comandos.": "The real Node terminal is unavailable on mobile. Use this panel for output and command logs.",
+  "O terminal real não está disponível no modo web. Use este painel como saída e registro de comandos.": "The real terminal is unavailable in web mode. Use this panel for output and command logs."
+};
+
 let uiLocale: AppLocale = DEFAULT_LOCALE;
 
 const localeListeners = new Set<(locale: AppLocale) => void>();
@@ -1989,7 +2027,10 @@ export function t(locale: AppLocale, portuguese: string): string {
     return portuguese;
   }
 
-  return TRANSLATIONS[locale]?.[portuguese] ?? portuguese;
+  return TRANSLATIONS[locale]?.[portuguese]
+    ?? EN_US[portuguese]
+    ?? EN_US_FALLBACK[portuguese]
+    ?? portuguese;
 }
 
 export function setUiLocale(locale: unknown): void {
