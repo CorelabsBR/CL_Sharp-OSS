@@ -91,7 +91,7 @@ test("catálogos não deixam o diálogo Sobre e o menu em português", () => {
     "en-US": ["Toggle ErrorLens", "About Sharp-OSS", "Development", "Application", "Sharp-OSS Data", "System", "Repository", "Close"],
     "es-ES": ["Alternar ErrorLens", "Acerca de Sharp-OSS", "Desarrollo", "Aplicación", "Datos de Sharp-OSS", "Sistema", "Repositorio", "Cerrar"],
     "ru-RU": ["Переключить ErrorLens", "О Sharp-OSS", "Разработка", "Приложение", "Данные Sharp-OSS", "Система", "Репозиторий", "Закрыть"],
-    "zh-CN": ["切换 ErrorLens", "关于 Sharp-OSS", "开发环境", "应用程序", "Sharp-OSS 数据", "系统", "仓库", "关闭"]
+    "zh-CN": ["切换 ErrorLens", "关于此应用", "开发环境", "应用程序", "应用数据", "系统", "仓库", "关闭"]
   };
   const keys = ["Alternar ErrorLens", "Sobre o Sharp-OSS", "Desenvolvimento", "Aplicativo", "Dados do Sharp-OSS", "Sistema", "Repositório", "Fechar"];
 

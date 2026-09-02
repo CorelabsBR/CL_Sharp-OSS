@@ -637,5 +637,7 @@
   "arduino-cli board list falhou.": "arduino-cli board list 命令执行失败。",
   "arduino-cli board listall falhou.": "arduino-cli board listall 命令执行失败。",
   "${errors} erro(s), ${warnings} aviso(s), ${this.diagnostics.length} no total": "${errors} 个错误，${warnings} 个警告，共 ${this.diagnostics.length} 个",
-  "Pesquisar arquivos por nome ou caminho": "按名称或路径搜索文件"
+  "Pesquisar arquivos por nome ou caminho": "按名称或路径搜索文件",
+  "{count} atalhos": "{count} 个快捷键",
+  "{count} conflito(s) de atalho detectado(s)": "检测到 {count} 个快捷键冲突"
 }

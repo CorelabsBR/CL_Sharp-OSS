@@ -637,5 +637,7 @@
   "Arduino CLI detectado.": "Arduino CLI detectado.",
   "Arduino CLI nao encontrado no PATH.": "Arduino CLI no se encontró en PATH.",
   "arduino-cli board list falhou.": "El comando arduino-cli board list falló.",
-  "arduino-cli board listall falhou.": "El comando arduino-cli board listall falló."
+  "arduino-cli board listall falhou.": "El comando arduino-cli board listall falló.",
+  "{count} atalhos": "{count} atajos",
+  "{count} conflito(s) de atalho detectado(s)": "{count} conflicto(s) de atajos detectado(s)"
 }

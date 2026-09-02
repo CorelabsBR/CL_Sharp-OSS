@@ -636,5 +636,8 @@
   "arduino-cli board listall falhou.": "O comando arduino-cli board listall falhou.",
   "${errors} erro(s), ${warnings} aviso(s), ${this.diagnostics.length} no total": "${errors} erro(s), ${warnings} aviso(s), ${this.diagnostics.length} no total",
   "Pesquisar em ${basename(this.explorer.workspace)}": "Pesquisar em ${basename(this.explorer.workspace)}",
-  "Pesquisar arquivos por nome ou caminho": "Pesquisar arquivos por nome ou caminho"
+  "Pesquisar arquivos por nome ou caminho": "Pesquisar arquivos por nome ou caminho",
+  "Nenhuma extensão instalada.": "Nenhuma extensão instalada.",
+  "{count} atalhos": "{count} atalhos",
+  "{count} conflito(s) de atalho detectado(s)": "{count} conflito(s) de atalho detectado(s)"
 }

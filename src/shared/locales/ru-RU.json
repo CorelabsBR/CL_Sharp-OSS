@@ -637,5 +637,7 @@
   "Arduino CLI nao encontrado no PATH.": "Arduino CLI не найден в PATH.",
   "arduino-cli board list falhou.": "Не удалось выполнить команду arduino-cli board list.",
   "arduino-cli board listall falhou.": "Не удалось выполнить команду arduino-cli board listall.",
-  "${errors} erro(s), ${warnings} aviso(s), ${this.diagnostics.length} no total": "${errors} ошибок, ${warnings} предупреждений, всего ${this.diagnostics.length}"
+  "${errors} erro(s), ${warnings} aviso(s), ${this.diagnostics.length} no total": "${errors} ошибок, ${warnings} предупреждений, всего ${this.diagnostics.length}",
+  "{count} atalhos": "Сочетаний клавиш: {count}",
+  "{count} conflito(s) de atalho detectado(s)": "Обнаружено конфликтов сочетаний клавиш: {count}"
 }
