@@ -198,6 +198,7 @@ export class IdePage {
 
   private async init(): Promise<void> {
     this.element.dataset.platform = platform.kind;
+    this.syncViewportLayout();
     this.settings = await api.settings.load();
     if (this.disposed) return;
     setUiLocale(this.settings.language);
@@ -499,6 +500,7 @@ export class IdePage {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => this.updateStatus(`Error: ${errorMessage(event.reason)}`);
     let compactViewport = isCompactViewport();
     const handleViewportChange = () => {
+      this.syncViewportLayout();
       const nextCompactViewport = isCompactViewport();
       if (nextCompactViewport !== compactViewport) {
         compactViewport = nextCompactViewport;
@@ -506,6 +508,7 @@ export class IdePage {
       } else {
         this.syncSidebarScrim();
       }
+      window.requestAnimationFrame(() => this.editor.layout());
     };
     window.addEventListener("keydown", this.handleShortcut, true);
     window.addEventListener("error", handleError);
@@ -1361,27 +1364,7 @@ export class IdePage {
 
     if (this.settingsCategory === "Discord") {
       const current = this.settings.discordRichPresence;
-      const update = (patch: Partial<typeof current>) => void this.updateSettings({ ...this.settings, discordRichPresence: { ...current, ...patch } });
-      page.append(settingToggle("Ativar Rich Presence", "Publica o contexto da IDE no Discord Desktop.", current.enabled, enabled => update({ enabled })));
-      page.append(settingText("Application ID", "ID da aplicação criada no Discord Developer Portal. Vazio mantém a integração inativa.", current.applicationId, applicationId => update({ applicationId: applicationId.trim() })));
-      page.append(settingToggle("Mostrar nome do arquivo", "Publica apenas o nome, nunca o caminho completo.", current.showFileName, showFileName => update({ showFileName })));
-      page.append(settingToggle("Mostrar projeto", "Publica o nome do workspace atual.", current.showProjectName, showProjectName => update({ showProjectName })));
-      page.append(settingToggle("Mostrar linguagem", "Publica a linguagem do arquivo ativo.", current.showLanguage, showLanguage => update({ showLanguage })));
-      page.append(settingToggle("Mostrar Host Remoto", "Publica o alias do Remote Host conectado.", current.showRemoteHost, showRemoteHost => update({ showRemoteHost })));
-      page.append(settingToggle("Mostrar tempo decorrido", "Exibe há quanto tempo o Sharp-OSS está aberto.", current.showElapsedTime, showElapsedTime => update({ showElapsedTime })));
-      page.append(settingToggle("Mostrar tipo de workspace", "Identifica workspaces locais e remotos.", current.showWorkspaceType, showWorkspaceType => update({ showWorkspaceType })));
-      page.append(settingText("Imagem principal", "Asset key configurada no Discord Developer Portal.", current.largeImageKey, largeImageKey => update({ largeImageKey: largeImageKey.trim() })));
-      page.append(settingText("Texto da imagem principal", "Texto exibido ao passar o mouse sobre a imagem.", current.largeImageText, largeImageText => update({ largeImageText: largeImageText.trim() })));
-      const firstButton = current.buttons?.[0] ?? { label: "", url: "" };
-      page.append(settingText("Botão — rótulo", "Rótulo opcional do primeiro botão (máximo de dois no protocolo).", firstButton.label, label => update({ buttons: label.trim() || firstButton.url ? [{ ...firstButton, label: label.trim() }] : [] })));
-      page.append(settingText("Botão — URL HTTPS", "Somente URLs HTTPS válidas são publicadas.", firstButton.url, url => update({ buttons: firstButton.label || url.trim() ? [{ ...firstButton, url: url.trim() }] : [] })));
-      const actions = el("div", { className: "settings-inline-actions" });
-      const reconnect = el("button", { className: "wide-action", text: uiText("Reconectar ao Discord") });
-      reconnect.addEventListener("click", () => void api.discordPresence.reconnect().then(state => this.updateStatus(state.message)));
-      const clear = el("button", { className: "wide-action", text: uiText("Limpar atividade") });
-      clear.addEventListener("click", () => void api.discordPresence.clear().then(() => this.updateStatus(uiText("Atividade do Discord removida"))));
-      actions.append(reconnect, clear); page.append(actions);
-      void api.discordPresence.status().then(state => page.append(el("div", { className: "muted-row", text: state.message })));
+      page.append(settingToggle("Ativar Rich Presence", "Publica o contexto da IDE no Discord Desktop.", current.enabled, enabled => void this.updateSettings({ ...this.settings, discordRichPresence: { enabled } })));
       return;
     }
 
@@ -2191,6 +2174,10 @@ export class IdePage {
     this.element.classList.toggle("sidebar-drawer-open", !this.sideBar.hidden && isCompactViewport());
   }
 
+  private syncViewportLayout(): void {
+    this.element.classList.toggle("mobile-landscape-layout", usesMobileLandscapeLayout());
+  }
+
   private terminalCwd(): string {
     if (!platform.isDesktop) {
       return this.editor.getCurrentFile()
@@ -2821,7 +2808,11 @@ function settingRow(label: string, description: string, control: HTMLElement): H
 }
 
 function isCompactViewport(): boolean {
-  return window.matchMedia("(max-width: 768px)").matches;
+  return platform.isMobile || window.matchMedia("(max-width: 768px), (max-width: 960px) and (max-height: 600px)").matches;
+}
+
+function usesMobileLandscapeLayout(): boolean {
+  return platform.isMobile || window.matchMedia("(orientation: landscape) and (max-width: 960px) and (max-height: 600px)").matches;
 }
 
 function trapDialogFocus(event: KeyboardEvent, dialog: HTMLElement): void {

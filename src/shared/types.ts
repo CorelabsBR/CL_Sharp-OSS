@@ -130,27 +130,8 @@ export interface CustomShortcutBinding {
   key: string;
 }
 
-export interface DiscordPresenceButton {
-  label: string;
-  url: string;
-}
-
 export interface DiscordRichPresenceSettings {
   enabled: boolean;
-  applicationId: string;
-  showFileName: boolean;
-  showProjectName: boolean;
-  showLanguage: boolean;
-  showRemoteHost: boolean;
-  showElapsedTime: boolean;
-  showWorkspaceType: boolean;
-  largeImageKey: string;
-  largeImageText: string;
-  localSmallImageKey?: string;
-  remoteSmallImageKey?: string;
-  localSmallImageText?: string;
-  remoteSmallImageText?: string;
-  buttons?: DiscordPresenceButton[];
 }
 
 export interface DiscordPresenceContext {
