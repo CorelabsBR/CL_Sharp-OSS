@@ -339,6 +339,18 @@ select.ui-field {
   transition-delay: 420ms;
 }
 
+/* Keeps tooltips on the last toolbar control inside the visible panel bounds. */
+.ui-tooltip.ui-tooltip-align-end::after {
+  right: 0;
+  left: auto;
+  transform: translate(0, -2px);
+}
+
+.ui-tooltip.ui-tooltip-align-end:hover::after,
+.ui-tooltip.ui-tooltip-align-end:focus-visible::after {
+  transform: translate(0, 0);
+}
+
 /* Shared asynchronous and validation states. */
 .is-loading,
 [aria-busy="true"] {

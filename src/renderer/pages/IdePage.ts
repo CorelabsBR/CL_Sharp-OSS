@@ -78,7 +78,7 @@ export class IdePage {
   private readonly activityBar = el("nav", { className: "activity-bar", attrs: { "aria-label": uiText("Navegação principal") } });
   private readonly sideBar = el("aside", { className: "side-bar" });
   private readonly sideScrim = el("button", { className: "side-scrim", attrs: { type: "button", "aria-label": uiText("Fechar barra lateral") } });
-  private readonly sideTitle = el("div", { className: "side-title", text: uiText("EXPLORADOR") });
+  private readonly sideTitle = el("div", { className: "side-title", text: "" });
   private readonly sideContent = el("div", { className: "side-content" });
   private readonly workbench = el("section", { className: "workbench" });
   private readonly editorStack = el("section", { className: "editor-stack" });
@@ -88,7 +88,7 @@ export class IdePage {
   private readonly statusAuthor = el("span", { className: "status-meta status-author", text: "" });
   private readonly statusType = el("span", { className: "status-meta", text: "" });
   private readonly statusLineEnding = el("span", { className: "status-meta status-line-ending", text: "" });
-  private readonly statusEncoding = el("button", { className: "status-item status-encoding", text: "UTF-8", attrs: { type: "button" } });
+  private readonly statusEncoding = el("span", {}, el("button", { className: "status-item status-encoding", text: "UTF-8", attrs: { type: "button" } }));;
   private readonly statusPosition = el("span", { className: "status-meta", text: "Ln 1, Col 1" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
   private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: uiText("Pesquisar..."), "aria-label": uiText("Pesquisa rápida de arquivos"), autocomplete: "off", spellcheck: "false" } });
@@ -830,7 +830,7 @@ export class IdePage {
     if (panelId === "arduino") void this.arduino.refresh();
     if (panelId === "ai") this.aiChat.focusInput();
     this.updateCommandCenter();
-    this.updateStatus(panelTitle(panelId));
+    this.updateStatus(panelId === "explorer" ? "" : panelTitle(panelId));
     this.persist();
   }
 
@@ -2230,7 +2230,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   const run = (action: () => void): void => {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     this.pendingChord = undefined;
     if (this.pendingChordTimer !== undefined) {
       window.clearTimeout(this.pendingChordTimer);
@@ -2258,7 +2258,7 @@ if (isTyping && !["Ctrl+F", "Ctrl+H", "Ctrl+S", "Ctrl+Shift+P", "Ctrl+P", "Ctrl+
 
   if (key === "Ctrl+K") {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
 
     this.pendingChord = "Ctrl+K";
     this.updateStatus("Ctrl+K...");

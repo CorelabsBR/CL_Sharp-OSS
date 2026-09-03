@@ -229,6 +229,7 @@ async function createMainWindow(): Promise<void> {
       devTools: true
     }
   });
+  window.webContents.openDevTools({ mode: "detach" });
   const webContents = window.webContents;
   mainWindow = window;
   startupProfiler.mark("T2-window-created");

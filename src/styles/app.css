@@ -2470,6 +2470,9 @@ textarea:disabled {
   border-radius: 3px;
   background: transparent;
   color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .status-item:hover:not(:disabled) {

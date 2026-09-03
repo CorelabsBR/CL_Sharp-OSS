@@ -72,12 +72,14 @@ export class ArduinoPanel {
 
   private build(): void {
     const toolbar = el("div", { className: "panel-toolbar ui-toolbar" });
+    const serialMonitorButton = buttonIcon("radio-tower", "Serial Monitor", () => void this.monitor());
+    serialMonitorButton.classList.add("ui-tooltip-align-end");
     toolbar.append(
-      buttonIcon("refresh", uiText("Detectar Arduino CLI"), () => void this.refresh()),
-      buttonIcon("add", uiText("Criar sketch"), () => void this.createSketch()),
-      buttonIcon("build", uiText("Compilar"), () => void this.compile()),
-      buttonIcon("cloud-upload", uiText("Enviar para a placa"), () => void this.upload()),
-      buttonIcon("radio-tower", uiText("Monitor serial"), () => void this.monitor())
+      buttonIcon("refresh", "Detect Arduino CLI", () => void this.refresh()),
+      buttonIcon("add", "Criar sketch", () => void this.createSketch()),
+      buttonIcon("build", "Compile", () => void this.compile()),
+      buttonIcon("cloud-upload", "Upload", () => void this.upload()),
+      serialMonitorButton
     );
 
     for (const baud of BAUD_RATES) {
