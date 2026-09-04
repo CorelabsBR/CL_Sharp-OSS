@@ -152,6 +152,9 @@ interface TerminalRegistration {
 const workspaceWatchers = new Map<string, WorkspaceWatcherRegistration>();
 const terminalRegistrations = new Map<WebContents, TerminalRegistration>();
 let applicationLocale: AppLocale = DEFAULT_LOCALE;
+const shouldOpenDevTools = !app.isPackaged
+  && Boolean(process.env.VITE_DEV_SERVER_URL)
+  && process.env.SHARP_OPEN_DEVTOOLS === "1";
 
 installProcessLifecycleHandlers();
 
@@ -226,10 +229,12 @@ async function createMainWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      devTools: true
+      devTools: shouldOpenDevTools
     }
   });
-  window.webContents.openDevTools({ mode: "detach" });
+  if (shouldOpenDevTools) {
+    window.webContents.openDevTools({ mode: "detach" });
+  }
   const webContents = window.webContents;
   mainWindow = window;
   startupProfiler.mark("T2-window-created");
