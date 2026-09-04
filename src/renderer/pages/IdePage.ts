@@ -88,7 +88,7 @@ export class IdePage {
   private readonly statusAuthor = el("span", { className: "status-meta status-author", text: "" });
   private readonly statusType = el("span", { className: "status-meta", text: "" });
   private readonly statusLineEnding = el("span", { className: "status-meta status-line-ending", text: "" });
-  private readonly statusEncoding = el("span", {}, el("button", { className: "status-item status-encoding", text: "UTF-8", attrs: { type: "button" } }));;
+  private readonly statusEncoding = el("button", { className: "status-item status-encoding", text: "UTF-8", attrs: { type: "button" } });
   private readonly statusPosition = el("span", { className: "status-meta", text: "Ln 1, Col 1" });
   private readonly statusBarElement = el("footer", { className: "status-bar" });
   private readonly commandBar = el("input", { className: "command-bar", attrs: { placeholder: uiText("Pesquisar..."), "aria-label": uiText("Pesquisa rápida de arquivos"), autocomplete: "off", spellcheck: "false" } });
